@@ -1,5 +1,5 @@
 {
-  "name": "hardhat-template",
+  "name": "primitive-hyper",
   "version": "0.0.1",
   "description": "Forkable Hardhat template with Primitive flavors.",
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/primitivefinance/hardhat-template.git"
+    "url": "git+https://github.com/primitivefinance/primitive-hyper.git"
   },
   "keywords": [
     "hardhat",
@@ -20,9 +20,9 @@
   "author": "Primitive",
   "license": "GPL-3.0-or-later",
   "bugs": {
-    "url": "https://github.com/primitivefinance/hardhat-template/issues"
+    "url": "https://github.com/primitivefinance/primitive-hyper/issues"
   },
-  "homepage": "https://github.com/primitivefinance/hardhat-template#readme",
+  "homepage": "https://github.com/primitivefinance/primitive-hyper#readme",
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.5",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
