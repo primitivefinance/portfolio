@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 contract PrimitiveHyper {
     error DecimalsError();
+    error SameTokenError();
 
     struct Pool {
         address risky;
@@ -19,6 +20,6 @@ contract PrimitiveHyper {
         address risky,
         address stable
     ) external {
-
+        if (risky == stable) revert SameTokenError();
     }
 }
