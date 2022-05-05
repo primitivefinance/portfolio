@@ -122,4 +122,45 @@ contract PrimitiveHyper {
 
         // TODO: move risky and stable tokens
     }
+
+    error ZeroDeltaError();
+    error ZeroLiquidityError();
+
+    function allocate(uint256 poolId, uint256 delRisky, uint256 delStable) external returns (uint256 delLiquidity) {
+        if (delRisky == 0 || delStable == 0) revert ZeroDeltaError();
+        Pool memory pool = pools[poolId];
+
+        uint256 liquidity0 = (delRisky * pool.liquidity) / uint256(pool.reserveRisky);
+        uint256 liquidity1 = (delStable * pool.liquidity) / uint256(pool.reserveStable);
+        delLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        if (delLiquidity == 0) revert ZeroLiquidityError();
+
+        liquidityOf[msg.sender][poolId] += delLiquidity;
+
+        // TODO: Move this to a function, use safecast
+        pools[poolId].reserveRisky += uint128(delRisky);
+        pools[poolId].reserveStable += uint128(delStable);
+        pools[poolId].lastTimestamp = uint32(block.timestamp);
+        pools[poolId].liquidity += uint128(delLiquidity);
+
+        // TODO: move the tokens
+    }
+
+    function remove(uint256 poolId, uint256 delLiquidity) external returns (uint256 delRisky, uint256 delStable) {
+        if (delLiquidity == 0) revert ZeroLiquidityError();
+        liquidityOf[msg.sender][poolId] -= delLiquidity;
+
+        Pool memory pool = pools[poolId];
+
+        delRisky = (delLiquidity * uint256(pool.reserveRisky)) / pool.liquidity;
+        delStable = (delLiquidity * uint256(pool.reserveStable)) / pool.liquidity;
+
+        // TODO: Move this to a function, use safecast
+        pools[poolId].reserveRisky -= uint128(delRisky);
+        pools[poolId].reserveStable += uint128(delStable);
+        pools[poolId].lastTimestamp = uint32(block.timestamp);
+        pools[poolId].liquidity += uint128(delLiquidity);
+
+        // TODO: Send the tokens back
+    }
 }
