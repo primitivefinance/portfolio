@@ -6,4 +6,12 @@ library Decoder {
         a = uint8(data >> 4);
         b = uint8(data << 0x0f);
     }
+
+    function convert(bytes memory raw) external pure returns (bytes32 data) {
+        assembly {
+            let shift := mul(sub(32, mload(raw)), 8)
+            data := mload(add(raw, 32))
+            data := shr(shift, data)
+        }
+    }
 }
