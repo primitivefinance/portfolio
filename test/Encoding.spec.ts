@@ -63,8 +63,8 @@ describe('Prototype', function () {
         const hex = hexToBytes(full.substring(2))
         expect(data.max).to.be.deep.equal(hexlify(hex[0] >> 4))
         expect(data.ord).to.be.deep.equal(hexlify(hex[0] & 0x0f))
-        expect(data.len).to.be.deep.equal(hex[1] >> 4 <= 1 ? hexlify(hex[1]) : hexlify(hex[1] >> 4))
-        expect(data.dec).to.be.deep.equal(hexlify(hex[1] & 0x0f))
+        expect(data.len).to.be.deep.equal(hex[1] >> 4 <= 1 ? hexlify(0x0) : hexlify(hex[1] >> 4))
+        expect(data.dec).to.be.deep.equal(hexlify(hex[1] >> 4 <= 1 ? hex[1] : hex[1] & 0x0f))
         expect(data.end).to.be.deep.equal(hexlify(hex[hex.length - 1]))
         expect(data.amt.toString()).to.deep.equal(parseEther(raw).toString())
       })
@@ -74,11 +74,6 @@ describe('Prototype', function () {
   describe('Encoder', function () {
     testAmountCases.forEach(({ raw, full }) => {
       it('Encodes all info then checks it individually', async function () {
-        /* const bytes = hexToBytes(full.substring(2))
-        const firstByte = bytes[0]
-        const secondByte = bytes[1]
-        const middleBytes = bytes.slice(2, bytes.length - 1)
-        const lastByte = bytes[bytes.length - 1] */
         const wei = parseEther(raw).toString()
         const { firstByte, secondByte, middleBytes, lastByte } = deconstructCalldata(full)
         const { max, ord } = decodeFirstByte(firstByte)
@@ -103,30 +98,21 @@ describe('Prototype', function () {
         expect(lastByte).to.be.deep.equal(encodedLastByte)
       })
 
-      it.skip('Encodes all information and compares against original calldata', async function () {
+      it('Encodes all information and compares against original calldata', async function () {
         const data = await contract.testDecodeInfo(full)
-        const hex = hexToBytes(full.substring(2))
-        expect(data.max).to.be.deep.equal(hexlify(hex[0] >> 4))
-        expect(data.ord).to.be.deep.equal(hexlify(hex[0] & 0x0f))
-        expect(data.len).to.be.deep.equal(hex[1] >> 4 <= 1 ? hexlify(hex[1]) : hexlify(hex[1] >> 4))
-        expect(data.dec).to.be.deep.equal(hexlify(hex[1] & 0x0f))
-        expect(data.end).to.be.deep.equal(hexlify(hex[hex.length - 1]))
-        expect(data.amt.toString()).to.deep.equal(parseEther(raw).toString())
-
-        expect(+data.max).to.be.deep.equal(encodeIsMaxFlag(hex[0] >> 4 > 0))
-        expect(+data.len).to.be.deep.equal(encodeInfoFlag(hex[1] >> 4 <= 1 ? hex[1] : hex[1] >> 4) >> 4)
-        console.log(data.amt.toString(), reverseRunLengthEncode(data.amt).amount._hex)
-        const amt = reverseRunLengthEncode(data.amt).amount
-        console.log(false, +data.ord, +data.len, +data.dec, +amt, +data.end)
-        const params = encodeParameters(false, +data.ord, +data.len, +data.dec, +amt, +data.end)
-        //const params = encodeParameters(false, +data.ord, (+data.len | +data.dec).toString(), data.amt, data.end)
-        console.log('epxetcted', bytesToHex(params))
-        console.log(
-          'encoded second byte',
-          encodeSecondByte(+data.len, +data.dec),
-          hexlify(encodeSecondByte(+data.len, +data.dec))
-        )
-        expect(bytesToHex(params)).to.be.deep.equal(hexlify(full))
+        const { firstByte, secondByte, middleBytes, lastByte } = deconstructCalldata(full)
+        const { max, ord } = decodeFirstByte(firstByte)
+        const { inf, dec } = decodeSecondByte(secondByte)
+        const { amt } = decodeMiddleBytes(middleBytes)
+        const { end } = decodeLastByte(lastByte)
+        expect(data.max).to.be.deep.equal(hexlify(max ? 1 : 0))
+        expect(data.ord).to.be.deep.equal(hexlify(ord))
+        expect(data.len).to.be.deep.equal(hexlify(inf))
+        expect(data.dec).to.be.deep.equal(hexlify(dec))
+        expect(data.end).to.be.deep.equal(hexlify(end))
+        expect(+data.amt._hex).to.deep.equal(+runLengthDecode(amt.toString(), dec)._hex)
+        expect(+data.amt._hex).to.deep.equal(+parseEther(raw)._hex)
+        expect(bytesToHex([firstByte, secondByte, ...middleBytes, lastByte])).to.be.deep.equal(hexlify(full))
       })
     })
   })

@@ -100,7 +100,7 @@ contract PrototypeHyper {
 
     function decodeInfo(bytes calldata data)
         internal
-        view
+        pure
         returns (
             bytes1 max,
             bytes1 ord,
@@ -117,8 +117,12 @@ contract PrototypeHyper {
         max = bytes1(data[0] >> 4); // ['0x_0', ...]
         ord = bytes1(data[0] & 0x0f); // ['0x0_', ...]
         len = bytes1(data[1] >> 4); // ['0x_0']
-        if (len <= 0x01) len = bytes1(data[1]);
-        dec = bytes1(data[1] & 0x0f); // ['0x0_']
+        if (len <= 0x01) {
+            len = bytes1(0x0);
+            dec = bytes1(data[1]);
+        } else {
+            dec = bytes1(data[1] & 0x0f); // ['0x0_']
+        }
         end = bytes1(data[last]); // [... , '0x00']
         amt = Decoder.encodedBytesToAmount(data);
     }
