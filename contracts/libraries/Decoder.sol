@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 /// @dev      Solidity library to manipulate and covert bytes
 /// @author   Primitive
 library Decoder {
-    /// @dev            Separates the two nibbles of a byte
+    /// @dev            Separates the nibbles of a byte into two bytes
     /// @param data     Byte to separate
     /// @return upper   Upper nibble
     /// @return lower   Lower nibble
