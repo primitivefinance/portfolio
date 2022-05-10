@@ -1,17 +1,39 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+/// @title    Decoder Library
+/// @dev      Solidity library to manipulate and covert bytes
+/// @author   Primitive
 library Decoder {
-    function getNibbles(bytes1 data) internal pure returns (uint8 a, uint8 b) {
-        a = uint8(data >> 4);
-        b = uint8(data << 0x0f);
+    /// @dev            Separates the two nibbles of a byte
+    /// @param data     Byte to separate
+    /// @return upper   Upper nibble
+    /// @return lower   Lower nibble
+    function separate(bytes1 data) internal pure returns (bytes1 upper, bytes1 lower) {
+        upper = data >> 4;
+        lower = data & 0x0f;
     }
 
-    function convert(bytes memory raw) external pure returns (bytes32 data) {
+    /// @dev           Converts an array of bytes into a byte32
+    /// @param raw     Array of bytes to convert
+    /// @return data   Converted data
+    function toBytes32(bytes memory raw) internal pure returns (bytes32 data) {
         assembly {
-            let shift := mul(sub(32, mload(raw)), 8)
             data := mload(add(raw, 32))
+            let shift := mul(sub(32, mload(raw)), 8)
             data := shr(shift, data)
         }
+    }
+
+    /// @dev             Converts an array of bytes into an uint256, the array must adhere
+    ///                  to the the following format:
+    ///                  - First byte: Amount of trailing zeros
+    ///                  - Rest of the array: A hexadecimal number
+    /// @param raw       Array of bytes to convert
+    /// @return amount   Converted amount
+    function toAmount(bytes calldata raw) internal pure returns (uint256 amount) {
+        uint8 power = uint8(raw[0]);
+        amount = uint256(toBytes32(raw[1 : raw.length]));
+        amount = amount * 10 ** power;
     }
 }
