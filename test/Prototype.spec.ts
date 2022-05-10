@@ -20,6 +20,7 @@ import {
   encodeOrder,
   encodeParameters,
   encodeSecondByte,
+  encodeTransaction,
   hexToBytes,
   Orders,
   reverseRunLengthEncode,
@@ -41,6 +42,18 @@ const testAmountCases = [
   { raw: '2.2', full: '0x0b111605' },
 ]
 
+interface Parameters {
+  max: boolean
+  ord: Orders
+  pair: number
+  amt: BigNumber
+  output: string
+}
+
+function encodeCalldata(args: Parameters): string {
+  return bytesToHex(encodeTransaction(args.max, args.ord, args.amt, hexlify(args.pair)))
+}
+
 describe('Prototype', function () {
   let signer: Signer, contract: TestPrototypeHyper
 
@@ -52,10 +65,19 @@ describe('Prototype', function () {
   })
 
   it('Order: Swaps ETH to Token with order type 0x01', async function () {
-    const amount = ethers.utils.parseEther('10')
     let tx: Tx = { to: contract.address, value: '' }
-    tx.data = encodeOrder(Orders.SWAP_EXACT_ETH_FOR_TOKENS) + amount._hex.substring(2) + '05'
     tx.value = BigNumber.from('1')._hex
-    await signer.sendTransaction(tx)
+    const amount = ethers.utils.parseEther('10')
+    const args: Parameters = {
+      max: false,
+      ord: Orders.SWAP_EXACT_ETH_FOR_TOKENS,
+      pair: 1,
+      amt: amount,
+      output: tx.value,
+    }
+    tx.data = encodeCalldata(args)
+    await expect(signer.sendTransaction(tx))
+      .to.emit(contract, 'Swap')
+      .withArgs(args.ord, args.pair, args.output, args.amt._hex)
   })
 })

@@ -52,4 +52,33 @@ library Decoder {
         bytes memory value = raw[2:raw.length - 1];
         amount = uint256(bytes32(value) >> ((32 - uint8(value.length)) * 8)) * 10**power;
     }
+
+    function decodeArgs(bytes calldata data)
+        internal
+        pure
+        returns (
+            bytes1 max,
+            bytes1 ord,
+            bytes1 len,
+            bytes1 dec,
+            bytes1 end,
+            uint256 amt
+        )
+    {
+        uint8 last;
+        unchecked {
+            last = uint8(data.length - 1);
+        }
+        max = bytes1(data[0] >> 4); // ['0x_0', ...]
+        ord = bytes1(data[0] & 0x0f); // ['0x0_', ...]
+        len = bytes1(data[1] >> 4); // ['0x_0']
+        if (len <= 0x01) {
+            len = bytes1(0x0);
+            dec = bytes1(data[1]);
+        } else {
+            dec = bytes1(data[1] & 0x0f); // ['0x0_']
+        }
+        end = bytes1(data[last]); // [... , '0x00']
+        amt = Decoder.encodedBytesToAmount(data);
+    }
 }

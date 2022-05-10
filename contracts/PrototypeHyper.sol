@@ -5,7 +5,39 @@ import "hardhat/console.sol";
 
 import "./libraries/Decoder.sol";
 
-contract PrototypeHyper {
+interface IERC20 {
+    function balanceOf(address guy) external view returns (uint256);
+}
+
+interface PrototypeEvents {
+    // --- Events --- //
+
+    /// @param order Type of swap.
+    /// @param pair Pool id that was swapped.
+    /// @param input Tokens or eth paid in the swap.
+    /// @param output Tokens or eth received from the swap.
+    event Swap(uint256 order, uint256 pair, uint256 input, uint256 output);
+}
+
+contract PrototypeDataStructures {
+    // --- Structs --- //
+
+    struct Pair {
+        address token0;
+        address token1;
+    }
+
+    struct Reserves {
+        uint256 base;
+        uint256 quote;
+        uint256 slice;
+    }
+
+    mapping(uint8 => Reserves) public reserves;
+    mapping(uint8 => Pair) public getPair;
+}
+
+contract PrototypeHyper is PrototypeEvents, PrototypeDataStructures {
     string private greeting;
     // --- Order Types --- //
     bytes1 public constant UNKNOWN = bytes1(0x00);
@@ -20,26 +52,10 @@ contract PrototypeHyper {
     bytes1 public constant SWAP_EXACT_TOKENS_FOR_ETH = bytes1(0x09);
     bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = bytes1(0x0A);
 
-    // --- Order Pairs ---
+    // --- Order Pairs --- //
     uint8 public constant MAIN_PAIR = uint8(1);
 
-    struct Reserves {
-        uint256 base;
-        uint256 quote;
-        uint256 slice;
-    }
-    mapping(uint8 => Reserves) public reserves;
-
-    modifier onSwap() {
-        uint256 pre = reserves[MAIN_PAIR].base;
-        _;
-        uint256 post = reserves[MAIN_PAIR].base;
-        uint256 bal = address(this).balance;
-        require(post > pre, "Failed onSwap");
-        require(bal > 0, "Failed on ether in");
-    }
-
-    // Only the fallback is called.
+    // --- Only the fallback is called. --- //
     fallback() external payable {
         decodeOrder(msg.data);
     }
@@ -70,7 +86,7 @@ contract PrototypeHyper {
         bool token0,
         uint256 amountIn,
         uint256 amountOut
-    ) internal onSwap {
+    ) internal {
         Reserves storage modifiable = reserves[MAIN_PAIR];
         if (token0) {
             modifiable.base += amountIn;
@@ -81,49 +97,91 @@ contract PrototypeHyper {
         }
     }
 
-    function swapExactEth(bytes calldata data) internal {
-        Reserves storage modifiable = reserves[MAIN_PAIR];
-        (, , bytes1 len, bytes1 dec, , uint256 amt) = decodeInfo(data);
+    function getOutput(uint256 input) public view returns (uint256) {
+        return input;
+    }
+
+    function addLiquidity(bytes calldata data) internal {}
+
+    function addLiquidityETH(bytes calldata data) internal {}
+
+    function removeLiquidity(bytes calldata data) internal {}
+
+    function removeLiquidityETH(bytes calldata data) internal {}
+
+    function swapExactETHForTokens(bytes calldata data) internal {
+        (, bytes1 ord, , , bytes1 end, uint256 amt) = Decoder.decodeArgs(data);
+        Reserves storage modifiable = reserves[uint8(end)];
         modifiable.base += msg.value;
         modifiable.quote -= amt;
+        emit Swap(uint8(ord), uint8(end), msg.value, amt);
+    }
+
+    function swapETHForExactTokens(bytes calldata data) internal {
+        (, bytes1 ord, , , bytes1 end, uint256 amt) = Decoder.decodeArgs(data);
+        Reserves storage modifiable = reserves[uint8(end)];
+        modifiable.base += msg.value;
+        modifiable.quote -= amt;
+        emit Swap(uint8(ord), uint8(end), msg.value, amt);
+    }
+
+    function swapExactTokensForETH(bytes calldata data) internal {
+        (, bytes1 ord, , , bytes1 end, uint256 amt) = Decoder.decodeArgs(data);
+        Reserves storage modifiable = reserves[uint8(end)];
+        modifiable.base += msg.value;
+        modifiable.quote -= amt;
+        emit Swap(uint8(ord), uint8(end), msg.value, amt);
+    }
+
+    function swapTokensForExactETH(bytes calldata data) internal {
+        (, bytes1 ord, , , bytes1 end, uint256 amt) = Decoder.decodeArgs(data);
+        Reserves storage modifiable = reserves[uint8(end)];
+        modifiable.base += msg.value;
+        modifiable.quote -= amt;
+        emit Swap(uint8(ord), uint8(end), msg.value, amt);
+    }
+
+    function swapExactTokensForTokens(bytes calldata data) internal {
+        (bytes1 max, bytes1 ord, , , bytes1 end, uint256 amt) = Decoder.decodeArgs(data);
+        Reserves storage modifiable = reserves[uint8(end)];
+        uint256 input = uint8(max) > 0 ? IERC20(getPair[uint8(end)].token0).balanceOf(msg.sender) : amt;
+        uint256 output = getOutput(input);
+        modifiable.base += input;
+        modifiable.quote -= output;
+        emit Swap(uint8(ord), uint8(end), input, output);
+    }
+
+    function swapTokensForExactTokens(bytes calldata data) internal {
+        (, bytes1 ord, , , bytes1 end, uint256 amt) = Decoder.decodeArgs(data);
+        Reserves storage modifiable = reserves[uint8(end)];
+        modifiable.base += msg.value;
+        modifiable.quote -= amt;
+        emit Swap(uint8(ord), uint8(end), msg.value, amt);
     }
 
     function decodeOrder(bytes calldata info) internal {
         bytes1 order = bytes1(info[0]);
 
-        if (order == SWAP_EXACT_ETH_FOR_TOKENS) {
-            swapExactEth(info);
+        if (order == ADD_LIQUIDITY) {
+            addLiquidity(info);
+        } else if (order == ADD_LIQUIDITY_ETH) {
+            addLiquidityETH(info);
+        } else if (order == REMOVE_LIQUIDITY) {
+            removeLiquidity(info);
+        } else if (order == REMOVE_LIQUIDITY_ETH) {
+            removeLiquidityETH(info);
+        } else if (order == SWAP_EXACT_ETH_FOR_TOKENS) {
+            swapExactETHForTokens(info);
+        } else if (order == SWAP_ETH_FOR_EXACT_TOKENS) {
+            swapETHForExactTokens(info);
+        } else if (order == SWAP_EXACT_TOKENS_FOR_ETH) {
+            swapExactTokensForETH(info);
+        } else if (order == SWAP_TOKENS_FOR_EXACT_ETH) {
+            swapTokensForExactETH(info);
+        } else if (order == SWAP_EXACT_TOKENS_FOR_TOKENS) {
+            swapExactTokensForTokens(info);
+        } else if (order == SWAP_TOKENS_FOR_EXACT_TOKENS) {
+            swapTokensForExactTokens(info);
         }
-    }
-
-    error LengthError(uint256 actual, uint256 expected);
-
-    function decodeInfo(bytes calldata data)
-        internal
-        pure
-        returns (
-            bytes1 max,
-            bytes1 ord,
-            bytes1 len,
-            bytes1 dec,
-            bytes1 end,
-            uint256 amt
-        )
-    {
-        uint8 last;
-        unchecked {
-            last = uint8(data.length - 1);
-        }
-        max = bytes1(data[0] >> 4); // ['0x_0', ...]
-        ord = bytes1(data[0] & 0x0f); // ['0x0_', ...]
-        len = bytes1(data[1] >> 4); // ['0x_0']
-        if (len <= 0x01) {
-            len = bytes1(0x0);
-            dec = bytes1(data[1]);
-        } else {
-            dec = bytes1(data[1] & 0x0f); // ['0x0_']
-        }
-        end = bytes1(data[last]); // [... , '0x00']
-        amt = Decoder.encodedBytesToAmount(data);
     }
 }
