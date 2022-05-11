@@ -84,11 +84,11 @@ describe('Prototype', function () {
     )
   })
 
-  describe('HyperLiquidity', function () {
-    const quoteRatio = initialQuote / initialBase // multiply against the base numeraire
-    const liquidityRatio = initialLiquidity / initialBase // multiply against the base numeraire
-    const half = 0.5 // for removing half of liquidity allocated
+  const quoteRatio = initialQuote / initialBase // multiply against the base numeraire
+  const liquidityRatio = initialLiquidity / initialBase // multiply against the base numeraire
+  const half = 0.5 // for removing half of liquidity allocated
 
+  describe('HyperLiquidity', function () {
     /* const orders: MultiOrder[] = [
       {
         ids: [PoolIds.ETH_USDC, PoolIds.ETH_USDC],
@@ -170,10 +170,41 @@ describe('Prototype', function () {
     })
   })
 
-  describe('Compiler', function () {
-    beforeEach(async function () {})
+  function getSwapTokensFromDir(
+    dir: number,
+    base: string,
+    quote: string
+  ): { inputAddress: string; outputAddress: string } {
+    if (dir == 0) {
+      return { inputAddress: base, outputAddress: quote }
+    } else if (dir == 1) {
+      return { inputAddress: quote, outputAddress: base }
+    } else {
+      throw new Error('Direction input not valid')
+    }
+  }
 
-    it('does something cool', async function () {})
+  describe.only('Compiler', function () {
+    beforeEach(async function () {
+      await contracts.pool.setCurve(PoolIds.ETH_USDC, 100, 1e4, 20, 1e4 - 300)
+      await contracts.pool.multiOrder([PoolIds.ETH_USDC], [Kinds.ADD_LIQUIDITY], 10, 10 * quoteRatio, 0)
+    })
+
+    it('singleOrder#Swap Exact Tokens: Emits the swap event', async function () {
+      const dir = 0
+      const tkns = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
+      await expect(
+        contracts.pool.singleOrder(
+          PoolIds.ETH_USDC,
+          Kinds.SWAP_EXACT_TOKENS_FOR_TOKENS,
+          1,
+          1 * quoteRatio,
+          1 * liquidityRatio
+        )
+      )
+        .to.emit(contracts.pool, 'Swap')
+        .withArgs(PoolIds.ETH_USDC, 1, 1 * quoteRatio, tkns.inputAddress, tkns.outputAddress)
+    })
     it('does something cool', async function () {})
   })
 

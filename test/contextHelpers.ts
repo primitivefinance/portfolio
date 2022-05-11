@@ -17,6 +17,7 @@ export async function setupPool(
 ) {
   await contract.setTokens(poolId, tokenBase, tokenQuote)
   await contract.setLiquidity(poolId, internalBase, internalQuote, internalLiquidity)
+  await contract.setTimestamp(100)
 }
 
 export async function mintAndApprove(token: TestERC20, user: string, spender: string, wad: BigNumberish) {

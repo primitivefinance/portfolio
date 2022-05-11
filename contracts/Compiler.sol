@@ -31,27 +31,8 @@ contract Compiler is HyperSwap, CompilerEvents {
         emit Credit(token, amount);
     }
 
-    // --- External --- //
-
-    /// ToDo: Handle amounts better, order types and cleanup code, etc.
-    function multiOrder(
-        uint8[] memory ids,
-        uint8[] memory kinds,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    ) public {
+    function _settle(uint8[] memory ids) internal {
         uint256 len = ids.length;
-        for (uint256 i; i != len; i++) {
-            uint8 id = ids[i];
-            uint8 kind = kinds[i];
-            Tokens memory tks = tokens[id];
-            _cacheAddress(tks.tokenBase, true);
-            _cacheAddress(tks.tokenQuote, true);
-            if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
-            else _removeLiquidity(id, deltaLiquidity);
-        }
-
         for (uint256 i; i != len; i++) {
             uint8 id = ids[i];
             Tokens memory tks = tokens[id];
@@ -87,6 +68,51 @@ contract Compiler is HyperSwap, CompilerEvents {
                 _cacheAddress(tks.tokenQuote, false);
             }
         }
+    }
+
+    // --- External --- //
+
+    /// ToDo: Implement all order types.
+    function singleOrder(
+        uint8 id,
+        uint8 kind,
+        uint256 deltaBase,
+        uint256 deltaQuote,
+        uint256 deltaLiquidity
+    ) external {
+        Tokens memory tkns = tokens[id];
+        _cacheAddress(tkns.tokenBase, true);
+        _cacheAddress(tkns.tokenQuote, true);
+
+        if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
+        else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
+        else _removeLiquidity(id, deltaLiquidity);
+
+        uint8[] memory ids = new uint8[](1);
+        ids[0] = id;
+        _settle(ids);
+    }
+
+    /// ToDo: Handle amounts better, order types and cleanup code, etc.
+    function multiOrder(
+        uint8[] memory ids,
+        uint8[] memory kinds,
+        uint256 deltaBase,
+        uint256 deltaQuote,
+        uint256 deltaLiquidity
+    ) public {
+        uint256 len = ids.length;
+        for (uint256 i; i != len; i++) {
+            uint8 id = ids[i];
+            uint8 kind = kinds[i];
+            Tokens memory tks = tokens[id];
+            _cacheAddress(tks.tokenBase, true);
+            _cacheAddress(tks.tokenQuote, true);
+            if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
+            else _removeLiquidity(id, deltaLiquidity);
+        }
+
+        _settle(ids);
     }
 
     // --- External --- //

@@ -6,6 +6,11 @@ import '@primitivefi/hardhat-dodoc'
 import 'hardhat-tracer'
 
 const config: HardhatUserConfig = {
+  networks: {
+    hardhat: {
+      allowUnlimitedContractSize: true,
+    },
+  },
   solidity: {
     version: '0.8.13',
   },
