@@ -16,7 +16,9 @@ interface HyperLiquidityEvents {
 interface HyperLiquidityDataStructures {
     struct Tokens {
         address tokenBase;
+        uint16 decimalsBase;
         address tokenQuote;
+        uint16 decimalsQuote;
     }
 
     struct Pool {
@@ -46,7 +48,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiqu
     }
 
     // --- Internal Functions (Can Override in Tests) --- //
-    function _blockTimestamp() internal view returns (uint128) {
+    function _blockTimestamp() internal view virtual returns (uint128) {
         return uint128(block.timestamp);
     }
 

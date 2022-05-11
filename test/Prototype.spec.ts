@@ -170,8 +170,15 @@ describe('Prototype', function () {
     })
   })
 
+  describe('Villager', function () {
+    beforeEach(async function () {})
+
+    it('does something cool', async function () {})
+    it('does something cool', async function () {})
+  })
+
   describe('PrototypeHyper', function () {
-    this.beforeEach(async function () {
+    beforeEach(async function () {
       await contracts.main.a(Values.HUNDRED_ETHER, Values.HUNDRED_ETHER)
     })
 

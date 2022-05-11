@@ -24,7 +24,9 @@ contract PrototypeDataStructures {
 
     struct Pair {
         address token0;
+        uint16 decimals0;
         address token1;
+        uint16 decimals1;
     }
 
     struct Reserves {

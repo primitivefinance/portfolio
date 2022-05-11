@@ -8,7 +8,12 @@ contract TestHyperLiquidity is HyperLiquidity {
         address base,
         address quote
     ) public {
-        tokens[id] = Tokens({tokenBase: base, tokenQuote: quote});
+        tokens[id] = Tokens({
+            tokenBase: base,
+            decimalsBase: IERC20(base).decimals(),
+            tokenQuote: quote,
+            decimalsQuote: IERC20(quote).decimals()
+        });
     }
 
     function setLiquidity(
