@@ -33,6 +33,15 @@ contract PrototypeDataStructures {
         uint256 slice;
     }
 
+    struct Packet {
+        bytes1 max;
+        bytes1 ord;
+        bytes1 inf;
+        bytes1 dec;
+        bytes1 end;
+        uint256 amt;
+    }
+
     mapping(uint8 => Reserves) public reserves;
     mapping(uint8 => Pair) public getPair;
 }
@@ -101,7 +110,10 @@ contract PrototypeHyper is PrototypeEvents, PrototypeDataStructures {
         return input;
     }
 
-    function addLiquidity(bytes calldata data) internal {}
+    function addLiquidity(bytes calldata data) internal {
+        (bytes1 m, bytes1 o, bytes1 i, bytes1 d, bytes1 e, uint256 a) = Decoder.decodeArgs(data);
+        Packet memory pkt = Packet(m, o, i, d, e, a);
+    }
 
     function addLiquidityETH(bytes calldata data) internal {}
 
