@@ -170,7 +170,7 @@ describe('Prototype', function () {
     })
   })
 
-  describe('Villager', function () {
+  describe('Compiler', function () {
     beforeEach(async function () {})
 
     it('does something cool', async function () {})

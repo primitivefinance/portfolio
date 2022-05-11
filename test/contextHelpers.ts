@@ -4,9 +4,10 @@ import { TestPrototypeHyper } from '../typechain-types'
 import { TestERC20 } from '../typechain-types/test/TestERC20'
 import { TestHyperLiquidity } from '../typechain-types/test/TestHyperLiquidity'
 import { ethers } from 'hardhat'
+import { TestCompiler } from '../typechain-types/test/TestCompiler'
 
 export async function setupPool(
-  contract: TestHyperLiquidity,
+  contract: TestCompiler,
   poolId: number,
   tokenBase: string,
   tokenQuote: string,
@@ -25,7 +26,7 @@ export async function mintAndApprove(token: TestERC20, user: string, spender: st
 
 export interface Contracts {
   main: TestPrototypeHyper
-  pool: TestHyperLiquidity
+  pool: TestCompiler
   base: TestERC20
   quote: TestERC20
 }
@@ -47,7 +48,7 @@ export async function fixture(hre: HardhatRuntimeEnvironment): Promise<Contracts
   const mainFac = await hre.ethers.getContractFactory('TestPrototypeHyper')
   const main = await mainFac.deploy()
   await main.deployed()
-  const poolFac = await hre.ethers.getContractFactory('TestHyperLiquidity')
+  const poolFac = await hre.ethers.getContractFactory('TestCompiler')
   const pool = await poolFac.deploy()
   await pool.deployed()
   const base = await (await hre.ethers.getContractFactory('TestERC20')).deploy('base', 'base', 18)

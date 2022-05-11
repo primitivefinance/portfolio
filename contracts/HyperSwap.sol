@@ -4,17 +4,17 @@ import "hardhat/console.sol";
 import "./HyperLiquidity.sol";
 import "./libraries/ReplicationMath.sol";
 
-interface VillagerErrors {
+interface HyperSwapErrors {
     error InvariantError(int128 prev, int128 post);
 }
 
-interface VillagerEvents {
+interface HyperSwapEvents {
     event UpdateLastTimestamp(uint128 timestamp);
     event Swap(uint256 id, uint256 input, uint256 output, address tokenIn, address tokenOut);
 }
 
 /// @notice Executes trading on a target curve.
-contract Villager is HyperLiquidity, VillagerEvents, VillagerErrors {
+contract HyperSwap is HyperSwapEvents, HyperSwapErrors, HyperLiquidity {
     // --- View --- //
 
     function getInvariant(uint8 id) public view returns (int128) {
@@ -23,10 +23,6 @@ contract Villager is HyperLiquidity, VillagerEvents, VillagerErrors {
     }
 
     // --- Internals --- //
-
-    function _blockTimestamp() internal view override(HyperLiquidity) returns (uint128) {
-        return uint128(block.timestamp);
-    }
 
     function _updateLastTimestamp(uint8 id) internal virtual returns (uint128 blockTimestamp) {
         Pool storage pool = pools[id];

@@ -1,41 +1,18 @@
 pragma solidity ^0.8.0;
 
-import "./interfaces/IERC20.sol";
 import "hardhat/console.sol";
+import "./interfaces/IERC20.sol";
+import "./EnigmaVirtualMachine.sol";
 
 interface HyperLiquidityErrors {
     error ZilchError();
     error ZeroLiquidityError();
 }
 
-interface HyperLiquidityEvents {
-    event Debit(address token, uint256 amount);
-    event Credit(address token, uint256 amount);
-}
-
-interface HyperLiquidityDataStructures {
-    struct Tokens {
-        address tokenBase;
-        uint16 decimalsBase;
-        address tokenQuote;
-        uint16 decimalsQuote;
-    }
-
-    struct Pool {
-        uint128 internalBase;
-        uint128 internalQuote;
-        uint128 internalLiquidity;
-        uint128 blockTimestamp;
-    }
-
-    struct Position {
-        uint256 liquidity;
-        uint128 blockTimestamp;
-    }
-}
+interface HyperLiquidityEvents {}
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
-contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiquidityDataStructures {
+contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVirtualMachine {
     // --- View --- //
 
     /// Gets base and quote tokens entitled to argument `liquidity`.
@@ -47,29 +24,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiqu
         return (amount0, amount1);
     }
 
-    // --- Internal Functions (Can Override in Tests) --- //
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
-    }
-
-    function _getBal(address token) internal view returns (uint256) {
-        return IERC20(token).balanceOf(address(this));
-    }
-
-    function _cacheAddress(address token, bool flag) internal {
-        addressCache[token] = flag;
-    }
-
-    function _applyDebit(address token, uint256 amount) internal {
-        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
-        else IERC20(token).transferFrom(msg.sender, address(this), amount);
-        emit Debit(token, amount);
-    }
-
-    function _applyCredit(address token, uint256 amount) internal {
-        balances[msg.sender][token] += amount;
-        emit Credit(token, amount);
-    }
+    // --- Internal Functions --- //
 
     /// @notice Changes internal "fake" reserves of a pool with `id`.
     /// @dev    Liquidity must be credited to an address, and token amounts must be _applyDebited.
@@ -126,86 +81,4 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiqu
         pos.liquidity -= deltaLiquidity;
         pos.blockTimestamp = _blockTimestamp();
     }
-
-    // --- External --- //
-
-    function fund(address token, uint256 amount) external {
-        _applyCredit(token, amount);
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
-    }
-
-    function draw(address token, uint256 amount) external {
-        _applyDebit(token, amount);
-        IERC20(token).transfer(msg.sender, amount);
-    }
-
-    function multiOrder(
-        uint8[] memory ids,
-        uint8[] memory kinds,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    ) public {
-        uint256 len = ids.length;
-        for (uint256 i; i != len; i++) {
-            uint8 id = ids[i];
-            uint8 kind = kinds[i];
-            Tokens memory tks = tokens[id];
-            _cacheAddress(tks.tokenBase, true);
-            _cacheAddress(tks.tokenQuote, true);
-            if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
-            else _removeLiquidity(id, deltaLiquidity);
-        }
-
-        for (uint256 i; i != len; i++) {
-            uint8 id = ids[i];
-            Tokens memory tks = tokens[id];
-            uint256 globalBase = globalReserves[tks.tokenBase];
-            uint256 globalQuote = globalReserves[tks.tokenQuote];
-            uint256 actualBase = _getBal(tks.tokenBase);
-            uint256 actualQuote = _getBal(tks.tokenQuote);
-            if (addressCache[tks.tokenBase]) {
-                if (globalBase > actualBase) {
-                    uint256 deficit = globalBase - actualBase;
-                    // _applyDebit
-                    _applyDebit(tks.tokenBase, deficit);
-                } else {
-                    // _applyCredit if non zero
-                    uint256 surplus = actualBase - globalBase;
-                    _applyCredit(tks.tokenBase, surplus);
-                }
-
-                _cacheAddress(tks.tokenBase, false);
-            }
-
-            if (addressCache[tks.tokenQuote]) {
-                if (globalQuote > actualQuote) {
-                    uint256 deficit = globalQuote - actualQuote;
-                    // _applyDebit
-                    _applyDebit(tks.tokenQuote, deficit);
-                } else {
-                    // _applyCredit if non zero
-                    uint256 surplus = actualQuote - globalQuote;
-                    _applyCredit(tks.tokenQuote, surplus);
-                }
-
-                _cacheAddress(tks.tokenQuote, false);
-            }
-        }
-    }
-
-    // --- Storage --- //
-
-    // Token -> Physical Reserves.
-    mapping(address => uint256) public globalReserves;
-    // Pool id -> Pool Data Structure.
-    mapping(uint8 => Pool) public pools;
-    // Pool id -> Tokens of a Pool.
-    mapping(uint8 => Tokens) public tokens;
-    // User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint8 => Position)) public positions;
-    // User -> Token -> Interal Balance.
-    mapping(address => mapping(address => uint256)) public balances;
-    // Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
-    mapping(address => bool) public addressCache;
 }
