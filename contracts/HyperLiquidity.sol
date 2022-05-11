@@ -59,17 +59,12 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiqu
     }
 
     function _applyDebit(address token, uint256 amount) internal {
-        if (balances[msg.sender][token] >= amount) {
-            balances[msg.sender][token] -= amount;
-        } else {
-            IERC20(token).transferFrom(msg.sender, address(this), amount);
-        }
-        console.log(token, amount);
+        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
+        else IERC20(token).transferFrom(msg.sender, address(this), amount);
         emit Debit(token, amount);
     }
 
     function _applyCredit(address token, uint256 amount) internal {
-        //IERC20(token).transfer(msg.sender, amount);
         balances[msg.sender][token] += amount;
         emit Credit(token, amount);
     }
@@ -132,6 +127,16 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiqu
 
     // --- External --- //
 
+    function fund(address token, uint256 amount) external {
+        _applyCredit(token, amount);
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
+    }
+
+    function draw(address token, uint256 amount) external {
+        _applyDebit(token, amount);
+        IERC20(token).transfer(msg.sender, amount);
+    }
+
     function multiOrder(
         uint8[] memory ids,
         uint8[] memory kinds,
@@ -146,7 +151,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiqu
             Tokens memory tks = tokens[id];
             _cacheAddress(tks.tokenBase, true);
             _cacheAddress(tks.tokenQuote, true);
-            if (kind == 0) _addLiquidity(id, deltaBase, deltaQuote);
+            if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
             else _removeLiquidity(id, deltaLiquidity);
         }
 
@@ -171,7 +176,6 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, HyperLiqu
                 _cacheAddress(tks.tokenBase, false);
             }
 
-            console.log(addressCache[tks.tokenQuote]);
             if (addressCache[tks.tokenQuote]) {
                 if (globalQuote > actualQuote) {
                     uint256 deficit = globalQuote - actualQuote;

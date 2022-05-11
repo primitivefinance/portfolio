@@ -36,6 +36,7 @@
     "ethers": "5.6.1",
     "evm-bn": "^1.1.1",
     "hardhat": "^2.9.3",
+    "hardhat-tracer": "^1.1.0-rc.5",
     "husky": ">=6",
     "lint-staged": ">=10",
     "prettier": "2.6.2",
