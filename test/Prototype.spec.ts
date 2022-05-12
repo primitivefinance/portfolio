@@ -222,7 +222,7 @@ describe('Prototype', function () {
       )
         .to.emit(contracts.pool, 'Debit')
         .withArgs(contracts.base.address, baseSwapAmount * 2)
-        .to.emit(contracts.pool, 'Debit')
+        .to.emit(contracts.pool, 'Credit')
         .withArgs(contracts.quote.address, 0)
         .to.emit(contracts.pool, 'Swap')
         .withArgs(PoolIds.ETH_USDC, baseSwapAmount, baseSwapAmount * quoteRatio, tkns.inputAddress, tkns.outputAddress)
