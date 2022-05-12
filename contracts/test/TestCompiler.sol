@@ -49,4 +49,10 @@ contract TestCompiler is Compiler {
     ) public {
         curves[id] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
     }
+
+    // --- Create --- //
+
+    function testCreatePair(bytes calldata data) public returns (uint16) {
+        return _createPair(data);
+    }
 }

@@ -1,5 +1,5 @@
 import { BigNumber } from 'ethers'
-import { hexlify } from 'ethers/lib/utils'
+import { hexlify, isHexString } from 'ethers/lib/utils'
 import { decodePackedByte, encodePackedByte, trailingRunLengthEncode } from './encoders'
 import { bytesToHex, hexToBytes } from './units'
 
@@ -20,6 +20,8 @@ export enum Instructions {
   SWAP_ETH_FOR_EXACT_TOKENS,
   CREATE_POOL,
 }
+
+// --- Full Instruction Encoders --- //
 
 /**
  *
@@ -127,4 +129,11 @@ export function encodeArguments(
 ): number[] {
   const bytesArray = [encodeFirstByte(max, ord), encodeSecondByte(inf, dec), ...encodeMiddleBytes(amt).bytes, end]
   return bytesArray
+}
+
+export function encodeCreatePair(base: string, quote: string): { bytes: number[]; hex: string } {
+  if (!isHexString(base)) throw new Error(`Base address not a hex string: ${base}`)
+  if (!isHexString(quote)) throw new Error(`Quote address not a hex string: ${quote}`)
+  const bytes = [...hexToBytes(base), ...hexToBytes(quote)]
+  return { bytes, hex: bytesToHex(bytes) }
 }

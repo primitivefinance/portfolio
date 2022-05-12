@@ -26,8 +26,7 @@ export async function mintAndApprove(token: TestERC20, user: string, spender: st
 }
 
 export interface Contracts {
-  main: TestPrototypeHyper
-  pool: TestCompiler
+  main: TestCompiler
   base: TestERC20
   quote: TestERC20
 }
@@ -46,15 +45,12 @@ export async function contextFixture(hre: HardhatRuntimeEnvironment): Promise<Co
 }
 
 export async function fixture(hre: HardhatRuntimeEnvironment): Promise<Contracts> {
-  const mainFac = await hre.ethers.getContractFactory('TestPrototypeHyper')
+  const mainFac = await hre.ethers.getContractFactory('TestCompiler')
   const main = await mainFac.deploy()
   await main.deployed()
-  const poolFac = await hre.ethers.getContractFactory('TestCompiler')
-  const pool = await poolFac.deploy()
-  await pool.deployed()
   const base = await (await hre.ethers.getContractFactory('TestERC20')).deploy('base', 'base', 18)
   const quote = await (await hre.ethers.getContractFactory('TestERC20')).deploy('quote', 'quote', 18)
   await base.deployed()
   await quote.deployed()
-  return { main, pool, base, quote }
+  return { main, base, quote }
 }
