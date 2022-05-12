@@ -43,7 +43,7 @@ contract TestCompiler is Compiler {
     function setCurve(
         uint8 id,
         uint128 strike,
-        uint64 sigma,
+        uint32 sigma,
         uint32 maturity,
         uint32 gamma
     ) public {

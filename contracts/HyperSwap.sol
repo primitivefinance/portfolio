@@ -2,9 +2,11 @@ pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
 import "./HyperLiquidity.sol";
+import "./EnigmaVirtualMachine.sol";
 import "./libraries/ReplicationMath.sol";
 
 interface HyperSwapErrors {
+    error PoolZilchError();
     error InvariantError(int128 prev, int128 post);
 }
 
@@ -14,7 +16,7 @@ interface HyperSwapEvents {
 }
 
 /// @notice Executes trading on a target curve.
-contract HyperSwap is HyperSwapEvents, HyperSwapErrors, HyperLiquidity {
+contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
     // --- View --- //
 
     function getInvariant(uint8 id) public view returns (int128) {
@@ -26,7 +28,7 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, HyperLiquidity {
 
     function _updateLastTimestamp(uint8 id) internal virtual returns (uint128 blockTimestamp) {
         Pool storage pool = pools[id];
-        if (pool.blockTimestamp == 0) revert ZilchError();
+        if (pool.blockTimestamp == 0) revert PoolZilchError();
 
         Curve storage curve = curves[id];
         uint32 maturity = curve.maturity;
@@ -111,16 +113,4 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, HyperLiquidity {
     // --- External --- //
 
     // --- Storage --- //
-    struct Curve {
-        uint128 strike;
-        uint64 sigma;
-        uint32 maturity;
-        uint32 gamma;
-    }
-
-    /// Pool Id -> Curve
-    mapping(uint8 => Curve) public curves;
-
-    uint256 public constant PERCENTAGE = 1e4;
-    uint256 public constant PRECISION = 1e18;
 }

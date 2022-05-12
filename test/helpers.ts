@@ -14,6 +14,7 @@ export enum Orders {
   SWAP_TOKENS_FOR_EXACT_ETH,
   SWAP_EXACT_TOKENS_FOR_ETH,
   SWAP_ETH_FOR_EXACT_TOKENS,
+  CREATE_POOL,
 }
 
 export function encodeOrder(order: Orders) {

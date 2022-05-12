@@ -1,6 +1,8 @@
 pragma solidity ^0.8.0;
 
 import "./HyperSwap.sol";
+import "./HyperLiquidity.sol";
+import "./Shaper.sol";
 
 interface CompilerEvents {
     event Debit(address token, uint256 amount);
@@ -9,7 +11,7 @@ interface CompilerEvents {
 
 /// @notice Final Boss
 /// @dev HyperSwap -> SingleOrder & MultiOrder -> { HyperSwap: _swap -> { HyperLiquidity: _addLiquidity & _removeLiquidity } }
-contract Compiler is HyperSwap, CompilerEvents {
+contract Compiler is Shaper, HyperSwap, HyperLiquidity, CompilerEvents {
     // --- Internal --- //
 
     function _getBal(address token) internal view returns (uint256) {
@@ -86,6 +88,7 @@ contract Compiler is HyperSwap, CompilerEvents {
 
         if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
         else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
+        else if (kind == 11) _create(100, 9900, 20, 9970, 5e18, 1e18);
         else _removeLiquidity(id, deltaLiquidity);
 
         uint8[] memory ids = new uint8[](1);
@@ -110,6 +113,7 @@ contract Compiler is HyperSwap, CompilerEvents {
             _cacheAddress(tks.tokenQuote, true);
             if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
             else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
+            else if (kind == 11) _create(10, 9900, 100 + 60 * 60 * 24 * 365, 9970, 5e17, 1e18);
             else _removeLiquidity(id, deltaLiquidity);
         }
 

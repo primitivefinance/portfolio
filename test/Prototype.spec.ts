@@ -227,6 +227,21 @@ describe('Prototype', function () {
         .to.emit(contracts.pool, 'Swap')
         .withArgs(PoolIds.ETH_USDC, baseSwapAmount, baseSwapAmount * quoteRatio, tkns.inputAddress, tkns.outputAddress)
     })
+
+    it('multiOrder#Create Pool then Add Liquidity', async function () {
+      const baseSwapAmount = 1
+      await expect(
+        contracts.pool.multiOrder(
+          [PoolIds.ETH_USDC, PoolIds.ETH_USDC],
+          [Kinds.CREATE_POOL, Kinds.ADD_LIQUIDITY],
+          baseSwapAmount,
+          baseSwapAmount * quoteRatio,
+          0
+        )
+      )
+        .to.emit(contracts.pool, 'Debit')
+        .withArgs(contracts.base.address, parseEther('0.5').add(baseSwapAmount)._hex)
+    })
   })
 
   describe('PrototypeHyper', function () {

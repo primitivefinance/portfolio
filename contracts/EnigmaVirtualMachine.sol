@@ -19,9 +19,22 @@ interface EnigmaDataStructures {
         uint256 liquidity;
         uint128 blockTimestamp;
     }
+
+    struct Curve {
+        uint128 strike;
+        uint32 sigma;
+        uint32 maturity;
+        uint32 gamma;
+    }
 }
 
 contract EnigmaVirtualMachine is EnigmaDataStructures {
+    // --- Internal --- //
+
+    function _blockTimestamp() internal view virtual returns (uint128) {
+        return uint128(block.timestamp);
+    }
+
     // ----- Enigma Storage ---- //
 
     // ----- Enigma Opcodes ----- //
@@ -36,10 +49,13 @@ contract EnigmaVirtualMachine is EnigmaDataStructures {
     bytes1 public constant SWAP_TOKENS_FOR_EXACT_ETH = bytes1(0x08);
     bytes1 public constant SWAP_EXACT_TOKENS_FOR_ETH = bytes1(0x09);
     bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = bytes1(0x0A);
+    bytes1 public constant CREATE_POOL = bytes1(0x0B);
 
     // ----- Enigma State ----- //
     // Pool id -> Pool Data Structure.
     mapping(uint8 => Pool) public pools;
+    /// Pool Id -> Curve.
+    mapping(uint8 => Curve) public curves;
     // Pool id -> Tokens of a Pool.
     mapping(uint8 => Tokens) public tokens;
     // Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
@@ -51,9 +67,6 @@ contract EnigmaVirtualMachine is EnigmaDataStructures {
     // User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) public balances;
 
-    // --- Internal --- //
-
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
-    }
+    uint256 public constant PERCENTAGE = 1e4;
+    uint256 public constant PRECISION = 1e18;
 }
