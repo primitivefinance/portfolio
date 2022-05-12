@@ -1,7 +1,9 @@
 pragma solidity ^0.8.0;
 
+import "./libraries/Instructions.sol";
+
 interface EnigmaDataStructures {
-    struct Tokens {
+    struct Pair {
         address tokenBase;
         uint16 decimalsBase;
         address tokenQuote;
@@ -50,14 +52,15 @@ contract EnigmaVirtualMachine is EnigmaDataStructures {
     bytes1 public constant SWAP_EXACT_TOKENS_FOR_ETH = bytes1(0x09);
     bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = bytes1(0x0A);
     bytes1 public constant CREATE_POOL = bytes1(0x0B);
+    bytes1 public constant CREATE_PAIR = bytes1(0x0C);
 
     // ----- Enigma State ----- //
     // Pool id -> Pool Data Structure.
     mapping(uint8 => Pool) public pools;
     /// Pool Id -> Curve.
     mapping(uint8 => Curve) public curves;
-    // Pool id -> Tokens of a Pool.
-    mapping(uint8 => Tokens) public tokens;
+    // Pool id -> Pair of a Pool.
+    mapping(uint16 => Pair) public pairs;
     // Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
     mapping(address => bool) public addressCache;
     // Token -> Physical Reserves.

@@ -23,7 +23,7 @@ contract TestERC20 is IERC20 {
         decimals = decimals_;
     }
 
-    /// @notice Used for testing tokens with decimals that are not 18
+    /// @notice Used for testing pairs with decimals that are not 18
     function setDecimals(uint8 decimals_) public {
         decimals = decimals_;
     }

@@ -52,7 +52,7 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
         // todo: swap maturity buffer logic implementation
         int128 invariant = getInvariant(id);
 
-        Tokens memory tkns = tokens[id];
+        Pair memory pair = pairs[id];
 
         {
             // swap logic
@@ -74,8 +74,8 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
             adjustedQuote = (adjustedQuote * PRECISION) / pool.internalLiquidity;
 
             int128 invariantAfter = ReplicationMath.calcInvariant(
-                10**(18 - tkns.decimalsBase),
-                10**(18 - tkns.decimalsQuote),
+                10**(18 - pair.decimalsBase),
+                10**(18 - pair.decimalsQuote),
                 adjustedBase,
                 adjustedQuote,
                 curve.strike,
@@ -89,13 +89,13 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
             if (dir == 0) {
                 pool.internalBase += uint128(input);
                 pool.internalQuote -= uint128(output);
-                globalReserves[tkns.tokenBase] += uint128(input);
-                globalReserves[tkns.tokenQuote] -= uint128(output);
+                globalReserves[pair.tokenBase] += uint128(input);
+                globalReserves[pair.tokenQuote] -= uint128(output);
             } else {
                 pool.internalBase -= uint128(output);
                 pool.internalQuote += uint128(input);
-                globalReserves[tkns.tokenBase] -= uint128(output);
-                globalReserves[tkns.tokenQuote] += uint128(input);
+                globalReserves[pair.tokenBase] -= uint128(output);
+                globalReserves[pair.tokenQuote] += uint128(input);
             }
 
             pool.blockTimestamp = lastTimestamp;
@@ -105,8 +105,8 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
             id,
             input,
             output,
-            dir == 0 ? tkns.tokenBase : tkns.tokenQuote,
-            dir == 0 ? tkns.tokenQuote : tkns.tokenBase
+            dir == 0 ? pair.tokenBase : pair.tokenQuote,
+            dir == 0 ? pair.tokenQuote : pair.tokenBase
         );
     }
 

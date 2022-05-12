@@ -192,7 +192,7 @@ describe('Prototype', function () {
 
     it('singleOrder#Swap Exact Tokens: Emits the swap event', async function () {
       const dir = 0
-      const tkns = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
+      const pair = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
       await expect(
         contracts.pool.singleOrder(
           PoolIds.ETH_USDC,
@@ -203,12 +203,12 @@ describe('Prototype', function () {
         )
       )
         .to.emit(contracts.pool, 'Swap')
-        .withArgs(PoolIds.ETH_USDC, 1, 1 * quoteRatio, tkns.inputAddress, tkns.outputAddress)
+        .withArgs(PoolIds.ETH_USDC, 1, 1 * quoteRatio, pair.inputAddress, pair.outputAddress)
     })
 
     it('multiOrder#Add Liquidity then Swap', async function () {
       const dir = 0
-      const tkns = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
+      const pair = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
       const baseSwapAmount = 1
 
       await expect(
@@ -225,7 +225,7 @@ describe('Prototype', function () {
         .to.emit(contracts.pool, 'Credit')
         .withArgs(contracts.quote.address, 0)
         .to.emit(contracts.pool, 'Swap')
-        .withArgs(PoolIds.ETH_USDC, baseSwapAmount, baseSwapAmount * quoteRatio, tkns.inputAddress, tkns.outputAddress)
+        .withArgs(PoolIds.ETH_USDC, baseSwapAmount, baseSwapAmount * quoteRatio, pair.inputAddress, pair.outputAddress)
     })
 
     it('multiOrder#Create Pool then Add Liquidity', async function () {

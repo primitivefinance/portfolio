@@ -3,8 +3,9 @@ pragma solidity ^0.8.0;
 import "./libraries/ReplicationMath.sol";
 import "./EnigmaVirtualMachine.sol";
 import "hardhat/console.sol";
+import "./interfaces/IERC20.sol";
 
-interface ShaperEvents {
+interface HyperCreateEvents {
     event Create(
         uint8 indexed poolId,
         uint128 strike,
@@ -15,14 +16,17 @@ interface ShaperEvents {
         uint256 quote,
         uint256 liquidity
     );
+
+    event CreatePair(address indexed base, address indexed quote);
 }
 
-interface ShaperErrors {
+interface HyperCreateErrors {
+    error PairExists(uint16 pairId);
     error PoolExpiredError();
     error CalibrationError(uint256, uint256);
 }
 
-contract Shaper is ShaperEvents, ShaperErrors, EnigmaVirtualMachine {
+contract HyperCreate is HyperCreateEvents, HyperCreateErrors, EnigmaVirtualMachine {
     function encodePoolId(
         uint128 strike,
         uint32 sigma,
@@ -32,7 +36,24 @@ contract Shaper is ShaperEvents, ShaperErrors, EnigmaVirtualMachine {
         return uint8(4);
     }
 
-    function _createPair(address base, address quote) internal returns (uint8) {}
+    uint256 pairNonce;
+    mapping(address => mapping(address => uint16)) public getPairId;
+
+    function _createPair(bytes calldata data) internal returns (uint16 pairId) {
+        (address base, address quote) = Instructions.decodeCreatePair(data);
+        pairId = getPairId[base][quote];
+        if (pairId != 0) revert PairExists(pairId);
+
+        pairId = uint16(++pairNonce);
+        getPairId[base][quote] = pairId; // note: no reverse lookup, because order matters!
+        pairs[pairId] = Pair({
+            tokenBase: base,
+            decimalsBase: IERC20(base).decimals(),
+            tokenQuote: quote,
+            decimalsQuote: IERC20(quote).decimals()
+        });
+        emit CreatePair(base, quote);
+    }
 
     function _create(
         uint128 strike,
@@ -58,8 +79,8 @@ contract Shaper is ShaperEvents, ShaperErrors, EnigmaVirtualMachine {
         Curve memory curve = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
 
         if (lastTimestamp > curve.maturity) revert PoolExpiredError();
-        Tokens memory tkns = tokens[0]; // ToDo: fix so we have a pair id per pool id?
-        (uint256 factor0, uint256 factor1) = (10**(18 - tkns.decimalsBase), 10**(18 - tkns.decimalsQuote));
+        Pair memory pair = pairs[0]; // ToDo: fix so we have a pair id per pool id?
+        (uint256 factor0, uint256 factor1) = (10**(18 - pair.decimalsBase), 10**(18 - pair.decimalsQuote));
         console.log(factor0);
         require(riskyPerLp <= PRECISION / factor0, "Too much base");
         uint32 tau = curve.maturity - uint32(lastTimestamp); // time until expiry

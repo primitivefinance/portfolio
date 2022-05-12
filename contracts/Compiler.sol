@@ -2,7 +2,7 @@ pragma solidity ^0.8.0;
 
 import "./HyperSwap.sol";
 import "./HyperLiquidity.sol";
-import "./Shaper.sol";
+import "./HyperCreate.sol";
 
 interface CompilerEvents {
     event Debit(address token, uint256 amount);
@@ -10,12 +10,26 @@ interface CompilerEvents {
 }
 
 /// @notice Final Boss
-/// @dev HyperSwap -> SingleOrder & MultiOrder -> { HyperSwap: _swap -> { HyperLiquidity: _addLiquidity & _removeLiquidity } }
-contract Compiler is Shaper, HyperSwap, HyperLiquidity, CompilerEvents {
-    // --- Internal --- //
+/// @dev Inherits the pool creator, swapper, and liquidity modules.
+contract Compiler is HyperCreate, HyperSwap, HyperLiquidity, CompilerEvents {
+    // --- Fallback --- //
+
+    fallback() external payable {
+        _process(msg.data);
+    }
+
+    // --- View --- //
 
     function _getBal(address token) internal view returns (uint256) {
         return IERC20(token).balanceOf(address(this));
+    }
+
+    // --- Internal --- //
+
+    function _process(bytes calldata data) internal {
+        bytes1 instruction = bytes1(data[0] & 0x0f);
+
+        if (instruction == CREATE_POOL) {}
     }
 
     function _cacheAddress(address token, bool flag) internal {
@@ -37,7 +51,7 @@ contract Compiler is Shaper, HyperSwap, HyperLiquidity, CompilerEvents {
         uint256 len = ids.length;
         for (uint256 i; i != len; i++) {
             uint8 id = ids[i];
-            Tokens memory tks = tokens[id];
+            Pair memory tks = pairs[id];
             uint256 globalBase = globalReserves[tks.tokenBase];
             uint256 globalQuote = globalReserves[tks.tokenQuote];
             uint256 actualBase = _getBal(tks.tokenBase);
@@ -82,9 +96,9 @@ contract Compiler is Shaper, HyperSwap, HyperLiquidity, CompilerEvents {
         uint256 deltaQuote,
         uint256 deltaLiquidity
     ) external {
-        Tokens memory tkns = tokens[id];
-        _cacheAddress(tkns.tokenBase, true);
-        _cacheAddress(tkns.tokenQuote, true);
+        Pair memory pair = pairs[id];
+        _cacheAddress(pair.tokenBase, true);
+        _cacheAddress(pair.tokenQuote, true);
 
         if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
         else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
@@ -108,7 +122,7 @@ contract Compiler is Shaper, HyperSwap, HyperLiquidity, CompilerEvents {
         for (uint256 i; i != len; i++) {
             uint8 id = ids[i];
             uint8 kind = kinds[i];
-            Tokens memory tks = tokens[id];
+            Pair memory tks = pairs[id];
             _cacheAddress(tks.tokenBase, true);
             _cacheAddress(tks.tokenQuote, true);
             if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);

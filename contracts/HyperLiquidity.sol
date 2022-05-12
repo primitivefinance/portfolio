@@ -17,7 +17,7 @@ interface HyperLiquidityEvents {
 contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVirtualMachine {
     // --- View --- //
 
-    /// Gets base and quote tokens entitled to argument `liquidity`.
+    /// Gets base and quote pairs entitled to argument `liquidity`.
     function getPhysicalReserves(uint256 liquidity) public view returns (uint256, uint256) {
         Pool memory pool = pools[0];
         uint256 total = uint256(pool.internalLiquidity);
@@ -49,7 +49,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         pool.internalLiquidity += uint128(deltaLiquidity);
         pool.blockTimestamp = _blockTimestamp();
 
-        Tokens storage token = tokens[id];
+        Pair storage token = pairs[id];
         globalReserves[token.tokenBase] += deltaBase;
         globalReserves[token.tokenQuote] += deltaQuote;
 
@@ -75,7 +75,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         pool.internalLiquidity -= uint128(deltaLiquidity);
         pool.blockTimestamp = _blockTimestamp();
 
-        Tokens storage token = tokens[id];
+        Pair storage token = pairs[id];
         globalReserves[token.tokenBase] -= deltaBase;
         globalReserves[token.tokenQuote] -= deltaQuote;
 

@@ -14,8 +14,8 @@ interface PrototypeEvents {
 
     /// @param order Type of swap.
     /// @param pair Pool id that was swapped.
-    /// @param input Tokens or eth paid in the swap.
-    /// @param output Tokens or eth received from the swap.
+    /// @param input Pair or eth paid in the swap.
+    /// @param output Pair or eth received from the swap.
     event Swap(uint256 order, uint256 pair, uint256 input, uint256 output);
 }
 
@@ -63,7 +63,7 @@ contract PrototypeHyper is PrototypeEvents, PrototypeDataStructures {
     bytes1 public constant SWAP_EXACT_TOKENS_FOR_ETH = bytes1(0x09);
     bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = bytes1(0x0A);
 
-    // --- Order Pairs --- //
+    // --- Order Pair --- //
     uint8 public constant MAIN_PAIR = uint8(1);
 
     // --- Only the fallback is called. --- //

@@ -18,7 +18,7 @@ contract TestCompiler is Compiler {
         address base,
         address quote
     ) public {
-        tokens[id] = Tokens({
+        pairs[id] = Pair({
             tokenBase: base,
             decimalsBase: IERC20(base).decimals(),
             tokenQuote: quote,
