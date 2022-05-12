@@ -32,6 +32,8 @@ contract Shaper is ShaperEvents, ShaperErrors, EnigmaVirtualMachine {
         return uint8(4);
     }
 
+    function _createPair(address base, address quote) internal returns (uint8) {}
+
     function _create(
         uint128 strike,
         uint32 sigma,

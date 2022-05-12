@@ -121,10 +121,6 @@ export function deconstructCalldata(hexString: string): {
   return { firstByte, secondByte, middleBytes, lastByte }
 }
 
-export function encodeAmountBytes(amountHex: string): number {
-  return +reverseRunLengthEncode(amountHex).amount._hex
-}
-
 export function encodeTransaction(
   isMax: boolean,
   order: Orders,

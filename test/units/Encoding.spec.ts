@@ -3,7 +3,7 @@ import { BigNumber, Signer } from 'ethers'
 import { parseEther } from 'ethers/lib/utils'
 import hre, { ethers } from 'hardhat'
 import { toBn } from 'evm-bn'
-import { TestPrototypeHyper } from '../typechain-types'
+import { TestPrototypeHyper } from '../../typechain-types'
 import {
   bytesToHex,
   decodeEnd,
@@ -26,7 +26,7 @@ import {
   reverseRunLengthEncode,
   runLengthDecode,
   runLengthEncode,
-} from './helpers'
+} from '../helpers'
 const { hexlify } = ethers.utils
 
 interface Tx {
