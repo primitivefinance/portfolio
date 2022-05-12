@@ -109,6 +109,7 @@ contract Compiler is HyperSwap, CompilerEvents {
             _cacheAddress(tks.tokenBase, true);
             _cacheAddress(tks.tokenQuote, true);
             if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
+            else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
             else _removeLiquidity(id, deltaLiquidity);
         }
 

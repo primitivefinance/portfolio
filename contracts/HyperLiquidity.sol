@@ -9,7 +9,9 @@ interface HyperLiquidityErrors {
     error ZeroLiquidityError();
 }
 
-interface HyperLiquidityEvents {}
+interface HyperLiquidityEvents {
+    event AddLiquidity();
+}
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
 contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVirtualMachine {
