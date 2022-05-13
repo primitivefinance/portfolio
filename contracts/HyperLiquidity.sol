@@ -222,7 +222,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     }
 
     function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint128 strike, uint24 sigma, uint32 maturity, uint16 fee) = Instructions.decodeCreateCurve(data);
+        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data);
         bytes32 rawCurveId = Decoder.toBytes32(data);
         curveId = getCurveIds[rawCurveId];
         if (curveId != 0) revert CurveExists(curveId);
@@ -234,7 +234,9 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         emit CreateCurve(curveId, strike, sigma, maturity, gamma);
     }
 
-    function _createPool(bytes calldata data) internal returns (uint32 poolId) {}
+    function _createPool(bytes calldata data) internal returns (uint32 poolId) {
+        (uint48 poolId, uint16 pairId, uint32 curveId) = Instructions.decodePoolId(data);
+    }
 
     function _createPool(
         uint16 pairId,

@@ -156,3 +156,29 @@ export function encodeCreateCurve(
   ]
   return { bytes, hex: bytesToHex(bytes) }
 }
+
+export function encodePoolId(pairId: number, curveId: number): { bytes: number[]; hex: string } {
+  const pairByte = hexZeroPad(hexlify(pairId), 2)
+  const curveByte = hexZeroPad(hexlify(curveId), 4)
+  const bytes = [...hexToBytes(pairByte), ...hexToBytes(curveByte)]
+  return { bytes, hex: bytesToHex(bytes) }
+}
+
+export function encodeCreatePool(
+  pairId: number,
+  curveId: number,
+  basePerLiquidity: number,
+  deltaLiquidity: number
+): { bytes: number[]; hex: string } {
+  const pairByte = hexZeroPad(hexlify(pairId), 2)
+  const curveByte = hexZeroPad(hexlify(curveId), 4)
+  const basePerLiquidityByte = hexZeroPad(hexlify(basePerLiquidity), 16)
+  const deltaLiquidityByte = hexZeroPad(hexlify(deltaLiquidity), 16)
+  const bytes = [
+    ...hexToBytes(pairByte),
+    ...hexToBytes(curveByte),
+    ...hexToBytes(basePerLiquidityByte),
+    ...hexToBytes(deltaLiquidityByte),
+  ]
+  return { bytes, hex: bytesToHex(bytes) }
+}
