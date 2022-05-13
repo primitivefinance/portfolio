@@ -233,6 +233,32 @@ export function encodeAddLiquidity(
   return { bytes, hex: bytesToHex(bytes) }
 }
 
+export function encodeSwapExactTokens(
+  useMax: boolean,
+  poolId: number,
+  deltaIn: BigNumber,
+  direction: 0 | 1
+): { bytes: number[]; hex: string } {
+  const opcode = Instructions.SWAP_EXACT_TOKENS_FOR_TOKENS
+  const firstByte = encodeFirstByte(useMax, opcode)
+  if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
+
+  const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
+  const { amount, decimals } = trailingRunLengthEncode(deltaIn.toString())
+  const amountBytes = hexToBytes(BigNumber.from(amount)._hex)
+  const amountDecimalByte = encodeSecondByte(0, decimals)
+  const lastByte = direction
+
+  const bytes = [
+    ...hexToBytes(hexlify(opcode)),
+    ...hexToBytes(poolIdBytes),
+    amountDecimalByte,
+    ...amountBytes,
+    lastByte,
+  ]
+  return { bytes, hex: bytesToHex(bytes) }
+}
+
 export function decodePoolId(bytes: number[]): string {
   return bytesToHex(bytes)
 }

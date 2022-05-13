@@ -45,5 +45,5 @@ interface IEnigmaEvents {
 
     // --- Swap --- //
     event Swap(uint256 id, uint256 input, uint256 output, address tokenIn, address tokenOut);
-    event UpdateLastTimestamp(uint128 timestamp);
+    event UpdateLastTimestamp(uint48 poolId);
 }

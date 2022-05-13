@@ -80,6 +80,10 @@ contract TestCompiler is Compiler {
         return _addLiquidity(data);
     }
 
+    function testSwapExactTokens(bytes calldata data) public returns (uint256) {
+        return _swapExactTokens(data);
+    }
+
     // -- Test --
 
     function testGetLiquidityMinted(

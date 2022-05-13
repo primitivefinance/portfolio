@@ -9,6 +9,7 @@ import {
   encodeCreatePair,
   encodeCreatePool,
   encodeRemoveLiquidity,
+  encodeSwapExactTokens,
   fixedX64ToFloat,
 } from '../../lib'
 import { mintAndApprove } from '../contextHelpers'
@@ -17,6 +18,20 @@ import { TestERC20 } from '../../typechain-types/test/TestERC20'
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
 import { BasicRealPool } from '../shared/utils'
+
+function getSwapTokensFromDir(
+  dir: number,
+  base: string,
+  quote: string
+): { inputAddress: string; outputAddress: string } {
+  if (dir == 0) {
+    return { inputAddress: base, outputAddress: quote }
+  } else if (dir == 1) {
+    return { inputAddress: quote, outputAddress: base }
+  } else {
+    throw new Error('Direction input not valid')
+  }
+}
 
 // Note: if any of these tests randomly breaks... look at what _blockTimestamp() is pointing to in the contracts.
 describe('Compiler', function () {
@@ -178,6 +193,54 @@ describe('Compiler', function () {
           '66904055621924321',
           toRemove.sub(computationRoundingHops)
         )
+    })
+  })
+
+  describe('SwapExactTokens', function () {
+    it('swaps exact input amount of tokens and emits the Swap event', async function () {
+      await contracts.main.setTimestamp(100)
+      const base = contracts.base.address
+      const quote = contracts.quote.address
+
+      const strike = parseEther('10')
+      const sigma = 1e4
+      const maturity = 60 * 60 * 24 * 365 // note: the contracts _blockTimestamp is set to 100.
+      const fee = 100
+      const gamma = 1e4 - fee
+
+      const basePerLiquidity = parseEther('0.69')
+      const deltaLiquidity = parseEther('1')
+
+      const deltaBase = basePerLiquidity
+
+      const payloadPair = encodeCreatePair(base, quote)
+      await contracts.main.testCreatePair(payloadPair.hex)
+      const pairId = (await contracts.main.pairNonce()) as BigNumber
+
+      const payloadCurve = encodeCreateCurve(strike, sigma, maturity, fee)
+      await contracts.main.testCreateCurve(payloadCurve.hex)
+      const curveId = (await contracts.main.curveNonce()) as BigNumber
+
+      const poolPayload = encodeCreatePool(
+        parseInt(pairId._hex),
+        parseInt(curveId._hex),
+        basePerLiquidity,
+        deltaLiquidity
+      )
+
+      const rawPayload = poolPayload.bytes.slice(1)
+      const poolId = decodePoolId(rawPayload.slice(0, 6))
+      await contracts.main.testCreatePool(poolPayload.hex)
+
+      const deltaIn = deltaBase.div(1000)
+
+      const deltaOut = parseEther('0.000970860704930000')
+      const dir = 0
+      const swapPayload = encodeSwapExactTokens(false, parseInt(poolId), deltaIn, dir)
+      const tokens = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
+      await expect(contracts.main.testSwapExactTokens(swapPayload.hex))
+        .to.emit(contracts.main, 'Swap')
+        .withArgs(parseInt(poolId), deltaIn, deltaOut, tokens.inputAddress, tokens.outputAddress)
     })
   })
 

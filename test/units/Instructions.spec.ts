@@ -90,4 +90,18 @@ describe('Instructions', function () {
     expect(result[2]._hex).to.be.hexEqual(deltaBase._hex)
     expect(result[3]._hex).to.be.hexEqual(deltaQuote._hex)
   })
+
+  it('testDecodeSwapExactTokens', async function () {
+    const poolId = 8
+    const dir = 0
+    const useMax = false
+    const deltaIn = BigNumber.from(300)
+    const data = instruct.encodeSwapExactTokens(useMax, poolId, deltaIn, dir)
+    const result = await instructions.testDecodeSwapExactTokens(data.hex)
+    await instructions.testDecodeSwapExactTokens(data.hex)
+    expect(result[0]).to.be.eq(useMax ? 1 : 0)
+    expect(result[1]).to.be.eq(poolId)
+    expect(result[2]._hex).to.be.hexEqual(deltaIn._hex)
+    expect(result[3]).to.be.eq(dir)
+  })
 })

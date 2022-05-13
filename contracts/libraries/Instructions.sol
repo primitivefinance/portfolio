@@ -1,5 +1,6 @@
 pragma solidity ^0.8.0;
-import "hardhat/console.sol";
+
+import "./Decoder.sol";
 
 library Instructions {
     function decodeCreatePair(bytes calldata data) internal pure returns (address tokenBase, address tokenQuote) {
@@ -72,7 +73,8 @@ library Instructions {
         pairId = uint16(bytes2(data[1:3]));
         uint8 power = uint8(bytes1(data[7]));
         bytes memory value = data[8:];
-        deltaLiquidity = uint128(uint128(bytes16(value) >> ((16 - uint8(value.length)) * 8)) * 10**power);
+        //deltaLiquidity = uint128(uint128(bytes16(value) >> ((16 - uint8(value.length)) * 8)) * 10**power);
+        deltaLiquidity = uint128(Decoder.bytesToSingleAmount(data[7:])); // note: does not use higher bits length data, only decimals.
     }
 
     function decodeAddLiquidity(bytes calldata data)
@@ -95,6 +97,22 @@ library Instructions {
         bytes memory quote = data[baseLen + 8:baseLen + 8 + quoteLen];
         deltaBase = uint128(uint128(bytes16(base) >> ((16 - uint8(base.length)) * 8)) * 10**basePower);
         deltaQuote = uint128(uint128(bytes16(quote) >> ((16 - uint8(quote.length)) * 8)) * 10**quotePower);
+    }
+
+    function decodeSwapExactTokens(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint128 deltaIn,
+            uint8 direction
+        )
+    {
+        useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
+        poolId = uint48(bytes6(data[1:7]));
+        deltaIn = uint128(Decoder.bytesToSingleAmount(data[7:data.length - 1])); // note: does not use higher bits length data, only decimals.
+        direction = uint8(data[data.length - 1]);
     }
 
     function decodeSwapExactETH(bytes calldata data) internal pure returns (uint256) {}

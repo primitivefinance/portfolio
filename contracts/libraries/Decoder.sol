@@ -37,6 +37,13 @@ library Decoder {
         amount = amount * 10**power;
     }
 
+    function bytesToSingleAmount(bytes calldata raw) internal pure returns (uint256 amount) {
+        bytes1 powerByte = bytes1(raw[0]);
+        uint8 power = powerByte > 0x0f ? uint8(powerByte) : uint8(raw[0] & 0x0f); // Check if entire byte is decimal value.
+        amount = uint256(toBytes32(raw[1:raw.length]));
+        amount = amount * 10**power;
+    }
+
     function toAmount(bytes calldata raw, uint8 power) internal pure returns (uint256 amount) {
         amount = uint256(toBytes32(raw));
         amount = amount * 10**power;

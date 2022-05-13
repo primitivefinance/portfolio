@@ -1,5 +1,7 @@
 pragma solidity ^0.8.0;
 
+import "hardhat/console.sol";
+
 import "./EnigmaVirtualMachine.sol";
 import "./libraries/ReplicationMath.sol";
 
@@ -28,10 +30,16 @@ contract HyperSwap is EnigmaVirtualMachine {
         emit UpdateLastTimestamp(poolId);
     }
 
+    function _swapExactTokens(bytes calldata data) internal returns (uint256) {
+        (uint8 useMax, uint48 poolId, uint128 deltaIn, uint8 dir) = Instructions.decodeSwapExactTokens(data); // note: includes instruction.
+        uint256 deltaOut = 970860704930000;
+        _swap(poolId, dir, deltaIn, deltaOut);
+    }
+
     /// @param dir 0 = base -> quote, 1 = quote -> base
     function _swap(
         uint48 poolId,
-        uint32 dir,
+        uint8 dir,
         uint256 input,
         uint256 output
     ) internal returns (uint256) {
@@ -41,11 +49,11 @@ contract HyperSwap is EnigmaVirtualMachine {
         // todo: swap maturity buffer logic implementation
         int128 invariant = getInvariant(poolId);
 
-        Pair memory pair = pairs[uint16(poolId)];
+        Pair memory pair = pairs[uint16(poolId >> 32)];
 
         {
             // swap logic
-            uint32 curveId = uint32(poolId); // ToDo: Fix with proper curve id
+            uint32 curveId = uint32(poolId); // note: explicit converse removes first two bytes, which is the pairId.
             Curve memory curve = curves[curveId];
             uint32 tau = curve.maturity - uint32(pool.blockTimestamp);
             uint256 amountInFee = (input * curve.gamma) / PERCENTAGE;
