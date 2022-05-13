@@ -71,20 +71,27 @@ contract EnigmaVirtualMachine is EnigmaDataStructures, EnigmaErrors {
     bytes1 public constant CREATE_CURVE = bytes1(0x0D);
 
     // ----- Enigma State ----- //
-    // Pool id -> Pool Data Structure.
-    mapping(uint48 => Pool) public pools;
-    /// Pool Id -> Curve.
-    mapping(uint32 => Curve) public curves;
     // Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;
+    // Pool id -> Pool Data Structure.
+    mapping(uint48 => Pool) public pools;
+    /// Pool id -> Curve.
+    mapping(uint32 => Curve) public curves;
     // Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
     mapping(address => bool) public addressCache;
+    // Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
+    mapping(bytes32 => uint32) public getCurveIds;
     // Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
-    // User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint48 => Position)) public positions;
+    // Base Token -> Quote Token -> Pair id
+    mapping(address => mapping(address => uint16)) public getPairId;
     // User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) public balances;
+    // User -> Pool id -> Liquidity Positions.
+    mapping(address => mapping(uint48 => Position)) public positions;
+
+    uint256 public pairNonce;
+    uint256 public curveNonce;
 
     uint256 public constant PERCENTAGE = 1e4;
     uint256 public constant PRECISION = 1e18;

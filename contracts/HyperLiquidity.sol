@@ -21,16 +21,6 @@ interface HyperLiquidityErrors {
 
 interface HyperLiquidityEvents {
     event AddLiquidity();
-    event Create(
-        uint8 indexed poolId,
-        uint128 strike,
-        uint32 sigma,
-        uint32 maturity,
-        uint32 gamma,
-        uint256 base,
-        uint256 quote,
-        uint256 liquidity
-    );
 
     event CreatePool(
         uint48 indexed poolId,
@@ -108,7 +98,8 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         pool.internalLiquidity += deltaLiquidity.toUint128();
         pool.blockTimestamp = _blockTimestamp();
 
-        _increaseGlobal(uint16(poolId), deltaBase, deltaQuote); // Compared against later to settle operation.
+        uint16 pairId = uint16(poolId);
+        _increaseGlobal(pairId, deltaBase, deltaQuote); // Compared against later to settle operation.
     }
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
@@ -189,21 +180,6 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     }
 
     // --- Create --- //
-
-    function encodePoolId(
-        uint128 strike,
-        uint32 sigma,
-        uint32 maturity,
-        uint32 gamma
-    ) public view returns (uint8) {
-        return uint8(4);
-    }
-
-    uint256 public pairNonce;
-    mapping(address => mapping(address => uint16)) public getPairId;
-    mapping(bytes32 => uint32) public getCurveIds;
-
-    uint256 public curveNonce;
 
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
         (address base, address quote) = Instructions.decodeCreatePair(data);
