@@ -106,6 +106,8 @@ contract EnigmaVirtualMachine is EnigmaDataStructures, EnigmaErrors {
     uint256 public constant PERCENTAGE = 1e4;
     /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
     uint256 public constant PRECISION = 1e18;
+    /// @dev Maximum pool fee.
+    uint256 public constant MAX_POOL_FEE = 1e3;
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
 }

@@ -1,25 +1,37 @@
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
-
 import "./interfaces/IERC20.sol";
-
 import "./libraries/ReplicationMath.sol";
 import "./libraries/SafeCast.sol";
-
 import "./EnigmaVirtualMachine.sol";
 
 interface HyperLiquidityErrors {
-    error ZilchError();
-    error ZeroLiquidityError();
+    // --- Creation --- //
+    error PoolExists();
+    error NonExistentPool(uint48 poolId);
     error PairExists(uint16 pairId);
     error CurveExists(uint32 curveId);
+
+    // --- Validation --- //
+    error ZeroLiquidityError();
     error PoolExpiredError();
-    error CalibrationError(uint256, uint256);
+    error MaxFee(uint16 fee);
+    error MinSigma(uint24 sigma);
+    error MinStrike(uint128 strike);
+    error CalibrationError(uint256 deltaBase, uint256 deltaQuote);
+
+    // --- Special --- //
     error JitLiquidity(uint256 lastTime, uint256 currentTime);
 }
 
 interface HyperLiquidityEvents {
+    // --- Common --- //
+    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+
+    event IncreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
+    event DecreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
+
     event AddLiquidity(
         uint48 indexed poolId,
         uint16 indexed pairId,
@@ -35,6 +47,7 @@ interface HyperLiquidityEvents {
         uint256 deltaLiquidity
     );
 
+    // --- Uncommon --- //
     event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);
     event CreateCurve(
         uint32 indexed curveId,
@@ -51,18 +64,7 @@ interface HyperLiquidityEvents {
         uint256 deltaQuote,
         uint256 deltaLiquidity
     );
-
-    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-
-    event IncreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
-    event DecreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
 }
-
-// ---- Types --- //
-
-type ValueX is uint256;
-type ValueY is uint256;
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
 contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVirtualMachine {
@@ -88,34 +90,6 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         uint256 liquidity0 = (deltaBase * pool.internalLiquidity) / uint256(pool.internalBase);
         uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
         deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-    }
-
-    function getLiquidityMintedFromBase(uint48 poolId, uint256 deltaBase)
-        public
-        view
-        returns (uint256 deltaLiquidity, uint256 deltaQuote)
-    {
-        Pool memory pool = pools[poolId];
-        return getOptimalAmounts(deltaBase, pool.internalBase, pool.internalQuote, pool.internalLiquidity);
-    }
-
-    function getLiquidityMintedFromQuote(uint48 poolId, uint256 deltaQuote)
-        public
-        view
-        returns (uint256 deltaLiquidity, uint256 deltaBase)
-    {
-        Pool memory pool = pools[poolId];
-        return getOptimalAmounts(deltaQuote, pool.internalQuote, pool.internalBase, pool.internalLiquidity);
-    }
-
-    function getOptimalAmounts(
-        uint256 deltaX,
-        uint256 reserveX,
-        uint256 reserveY,
-        uint256 totalSupply
-    ) public pure returns (uint256 deltaLiquidity, uint256 deltaY) {
-        deltaLiquidity = (deltaX * totalSupply) / reserveX;
-        deltaY = (deltaLiquidity * reserveY) / totalSupply;
     }
 
     /// @notice Computes the amount of time passed since the Position's liquidity was updated.
@@ -203,28 +177,8 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         (uint8 useMax, uint48 poolId, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data); // Includes opcode
         // ToDo: make use of useMax flag
 
-        if (pools[poolId].blockTimestamp == 0) revert ZilchError(); // Pool doesn't exist.
+        if (pools[poolId].blockTimestamp == 0) revert NonExistentPool(poolId); // Pool doesn't exist.
         deltaLiquidity = getLiquidityMinted(poolId, deltaBase, deltaQuote);
-        _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
-        _increasePosition(poolId, deltaLiquidity);
-    }
-
-    function _addExactBase(uint48 poolId, uint256 deltaBase)
-        internal
-        returns (uint256 deltaLiquidity, uint256 deltaQuote)
-    {
-        if (pools[poolId].blockTimestamp == 0) revert ZilchError(); // Pool doesn't exist.
-        (deltaLiquidity, deltaQuote) = getLiquidityMintedFromBase(poolId, deltaBase);
-        _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
-        _increasePosition(poolId, deltaLiquidity);
-    }
-
-    function _addExactQuote(uint48 poolId, uint256 deltaQuote)
-        internal
-        returns (uint256 deltaLiquidity, uint256 deltaBase)
-    {
-        if (pools[poolId].blockTimestamp == 0) revert ZilchError(); // Pool doesn't exist.
-        (deltaLiquidity, deltaQuote) = getLiquidityMintedFromQuote(poolId, deltaQuote);
         _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
         _increasePosition(poolId, deltaLiquidity);
     }
@@ -235,7 +189,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(data);
 
         Pool storage pool = pools[poolId];
-        if (pool.blockTimestamp == 0) revert ZilchError();
+        if (pool.blockTimestamp == 0) revert NonExistentPool(poolId);
 
         deltaBase = (pool.internalBase * deltaLiquidity) / pool.internalLiquidity;
         deltaQuote = (pool.internalQuote * deltaLiquidity) / pool.internalLiquidity;
@@ -272,15 +226,19 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         emit CreatePair(pairId, base, quote);
     }
 
+    /// @dev Sets a Curve at the `curveId`. Sigma, maturity, and strike are validated implicitly by their limited size.
     function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
         (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data[1:]);
-        bytes32 rawCurveId = Decoder.toBytes32(data[1:]);
+        bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: trim the enigma instruction.
         curveId = getCurveIds[rawCurveId];
         if (curveId != 0) revert CurveExists(curveId);
+        if (sigma == 0) revert MinSigma(sigma);
+        if (strike == 0) revert MinStrike(strike);
+        if (fee > MAX_POOL_FEE) revert MaxFee(fee);
 
         curveId = uint32(++curveNonce);
         getCurveIds[rawCurveId] = curveId; // note: this is to optimize calldata input when choosing a curve
-        uint32 gamma = uint32(1e4 - fee);
+        uint32 gamma = uint32(PERCENTAGE - fee);
         curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
 
         emit CreateCurve(curveId, strike, sigma, maturity, gamma);
@@ -294,13 +252,15 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
             uint256 deltaQuote
         )
     {
+        // note: slices the instruction byte.
         (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 basePerLiquidity, uint128 deltaLiquidity) = Instructions
             .decodeCreatePool(data[1:]);
         poolId = poolId_;
 
         Curve memory curve = curves[curveId];
-        uint128 lastTimestamp = _blockTimestamp();
-        if (lastTimestamp > curve.maturity) revert PoolExpiredError();
+        if (pools[poolId].blockTimestamp != 0) revert PoolExists();
+        uint128 blockTimestamp = _blockTimestamp();
+        if (blockTimestamp > curve.maturity) revert PoolExpiredError();
         uint256 minLiquidity;
 
         {
@@ -310,7 +270,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
             uint256 lowestDecimals = (pair.decimalsBase > pair.decimalsQuote ? pair.decimalsQuote : pair.decimalsBase);
             minLiquidity = 10**(lowestDecimals / MIN_LIQUIDITY_FACTOR);
 
-            uint32 tau = curve.maturity - uint32(lastTimestamp); // time until expiry
+            uint32 tau = curve.maturity - uint32(blockTimestamp); // time until expiry
             deltaQuote = ReplicationMath.getStableGivenRisky(
                 0,
                 factor0,
