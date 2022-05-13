@@ -3,14 +3,9 @@ pragma solidity ^0.8.0;
 import "./HyperSwap.sol";
 import "./HyperLiquidity.sol";
 
-interface CompilerEvents {
-    event Debit(address token, uint256 amount);
-    event Credit(address token, uint256 amount);
-}
-
 /// @notice Final Boss
 /// @dev Inherits the pool creator, swapper, and liquidity modules.
-contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
+contract Compiler is HyperLiquidity, HyperSwap {
     // --- Fallback --- //
 
     fallback() external payable {
@@ -19,42 +14,51 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
 
     // --- View --- //
 
-    function _getBal(address token) internal view returns (uint256) {
-        return IERC20(token).balanceOf(address(this));
-    }
-
     // --- Internal --- //
 
-    function _process(bytes calldata data) internal {
+    function _process(bytes calldata data) private {
         bytes1 instruction = bytes1(data[0] & 0x0f);
 
-        if (instruction == CREATE_POOL) {}
+        if (instruction == ADD_LIQUIDITY) {
+            _addLiquidity(data);
+        } else if (instruction == REMOVE_LIQUIDITY) {
+            _removeLiquidity(data);
+        } else if (instruction == SWAP_EXACT_TOKENS_FOR_TOKENS) {
+            _swapExactTokens(data);
+        } else if (instruction == CREATE_POOL) {
+            _createPool(data);
+        } else if (instruction == CREATE_CURVE) {
+            _createCurve(data);
+        } else if (instruction == CREATE_PAIR) {
+            _createPair(data);
+        }
     }
 
     function _cacheAddress(address token, bool flag) internal {
         addressCache[token] = flag;
     }
 
-    function _applyDebit(address token, uint256 amount) internal {
+    function _applyDebit(address token, uint256 amount) private {
         if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
         else IERC20(token).transferFrom(msg.sender, address(this), amount);
         emit Debit(token, amount);
     }
 
-    function _applyCredit(address token, uint256 amount) internal {
+    function _applyCredit(address token, uint256 amount) private {
         balances[msg.sender][token] += amount;
+        _increaseGlobal(token, amount);
         emit Credit(token, amount);
     }
 
-    function _settle(uint32[] memory poolIds) internal {
+    function _settle(uint32[] memory poolIds) private {
         uint256 len = poolIds.length;
         for (uint256 i; i != len; i++) {
             uint48 poolId = poolIds[i];
             Pair memory tks = pairs[uint16(poolId)];
             uint256 globalBase = globalReserves[tks.tokenBase];
             uint256 globalQuote = globalReserves[tks.tokenQuote];
-            uint256 actualBase = _getBal(tks.tokenBase);
-            uint256 actualQuote = _getBal(tks.tokenQuote);
+            uint256 actualBase = _balanceOf(tks.tokenBase);
+            uint256 actualQuote = _balanceOf(tks.tokenQuote);
             if (addressCache[tks.tokenBase]) {
                 if (globalBase > actualBase) {
                     uint256 deficit = globalBase - actualBase;
@@ -94,7 +98,7 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
         uint256 deltaBase,
         uint256 deltaQuote,
         uint256 deltaLiquidity
-    ) external {
+    ) external lock {
         Pair memory pair = pairs[uint16(poolId)];
         _cacheAddress(pair.tokenBase, true);
         _cacheAddress(pair.tokenQuote, true);
@@ -113,7 +117,7 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
         uint256 deltaBase,
         uint256 deltaQuote,
         uint256 deltaLiquidity
-    ) public {
+    ) public lock {
         uint256 len = poolIds.length;
         for (uint256 i; i != len; i++) {
             uint48 poolId = poolIds[i];
@@ -129,12 +133,12 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
 
     // --- External --- //
     // ToDo: Move to be internal
-    function fund(address token, uint256 amount) external {
+    function fund(address token, uint256 amount) external lock {
         _applyCredit(token, amount);
         IERC20(token).transferFrom(msg.sender, address(this), amount);
     }
 
-    function draw(address token, uint256 amount) external {
+    function draw(address token, uint256 amount) external lock {
         _applyDebit(token, amount);
         IERC20(token).transfer(msg.sender, amount);
     }

@@ -45,17 +45,6 @@ describe('Compiler', function () {
     await mintAndApprove(contracts.quote, context.user, contracts.main.address, Values.ETHER)
   })
 
-  describe('HyperLiquidity', function () {
-    it('getLiquidityMinted compared against getLiquidityMinted2', async function () {
-      const poolId = 4
-      const { internalBase, internalQuote, internalLiquidity } = BasicRealPool
-      await contracts.main.setLiquidity(poolId, internalBase, internalQuote, internalLiquidity)
-      const zero = await contracts.main.testGetLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
-      const one = await contracts.main.getLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
-      const two = await contracts.main.getLiquidityMinted2(poolId, internalBase._hex)
-    })
-  })
-
   it('testGetReportedPrice', async function () {
     const scaleFactorRisky = 1
     const scaleFactoryStable = 1
@@ -70,6 +59,17 @@ describe('Compiler', function () {
       tau
     )
     expect(fixedX64ToFloat(price)).to.be.eq(3.7647263806019016)
+  })
+
+  describe('HyperLiquidity', function () {
+    it('getLiquidityMinted compared against getLiquidityMinted2', async function () {
+      const poolId = 4
+      const { internalBase, internalQuote, internalLiquidity } = BasicRealPool
+      await contracts.main.setLiquidity(poolId, internalBase, internalQuote, internalLiquidity)
+      const zero = await contracts.main.testGetLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
+      const one = await contracts.main.getLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
+      const two = await contracts.main.getLiquidityMinted2(poolId, internalBase._hex)
+    })
   })
 
   describe('CreatePair', function () {

@@ -52,8 +52,12 @@ contract HyperLiquidity is EnigmaVirtualMachine {
         pool.internalLiquidity += deltaLiquidity.toUint128();
         pool.blockTimestamp = _blockTimestamp();
 
-        uint16 pairId = uint16(poolId >> 32); // ToDo: use actual pair
-        _increaseGlobal(pairId, deltaBase, deltaQuote); // Compared against later to settle operation.
+        uint16 pairId = uint16(poolId >> 32); // note: first two bytes of poolId is pairId.
+        Pair memory pair = pairs[pairId];
+
+        // note: Compared against later to settle transaction.
+        _increaseGlobal(pair.tokenBase, deltaBase);
+        _increaseGlobal(pair.tokenQuote, deltaQuote);
 
         emit AddLiquidity(poolId, pairId, deltaBase, deltaQuote, deltaLiquidity);
     }
@@ -79,27 +83,14 @@ contract HyperLiquidity is EnigmaVirtualMachine {
     }
 
     /// @dev Most important function because it manages the solvency of the Engima.
-    function _increaseGlobal(
-        uint16 pairId,
-        uint256 deltaBase,
-        uint256 deltaQuote
-    ) internal {
-        Pair memory pair = pairs[pairId];
-        globalReserves[pair.tokenBase] += deltaBase;
-        globalReserves[pair.tokenQuote] += deltaQuote;
-        emit IncreaseGlobal(pair.tokenBase, pair.tokenQuote, deltaBase, deltaQuote);
+    function _increaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] += amount;
+        emit IncreaseGlobal(token, amount);
     }
 
-    /// @dev Most important function because it manages the solvency of the Engima.
-    function _decreaseGlobal(
-        uint16 pairId,
-        uint256 deltaBase,
-        uint256 deltaQuote
-    ) internal {
-        Pair memory pair = pairs[pairId];
-        globalReserves[pair.tokenBase] -= deltaBase.toUint128();
-        globalReserves[pair.tokenQuote] -= deltaQuote.toUint128();
-        emit DecreaseGlobal(pair.tokenBase, pair.tokenQuote, deltaBase, deltaQuote);
+    function _decreaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] += amount;
+        emit DecreaseGlobal(token, amount);
     }
 
     /// @notice Changes internal "fake" reserves of a pool with `poolId`.
@@ -133,7 +124,10 @@ contract HyperLiquidity is EnigmaVirtualMachine {
         pool.blockTimestamp = _blockTimestamp();
 
         _decreasePosition(poolId, deltaLiquidity);
-        _decreaseGlobal(pairId, deltaBase, deltaQuote);
+
+        Pair memory pair = pairs[pairId];
+        _decreaseGlobal(pair.tokenBase, deltaBase);
+        _decreaseGlobal(pair.tokenQuote, deltaQuote);
 
         emit RemoveLiquidity(poolId, pairId, deltaBase, deltaQuote, deltaLiquidity);
     }

@@ -1,13 +1,17 @@
 pragma solidity ^0.8.0;
 
 interface IEnigmaEvents {
-    // --- Critical --- //
-    event IncreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
-    event DecreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
-
     // --- Accounts --- //
     event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
     event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+
+    // --- Critical --- //
+    event IncreaseGlobal(address indexed token, uint256 amount);
+    event DecreaseGlobal(address indexed token, uint256 amount);
+
+    // --- Compiler --- //
+    event Debit(address indexed token, uint256 amount);
+    event Credit(address indexed token, uint256 amount);
 
     // --- Liquidity --- //
     event AddLiquidity(
