@@ -3,6 +3,8 @@ pragma solidity ^0.8.0;
 import "./libraries/Instructions.sol";
 import "./libraries/Decoder.sol";
 
+import "./interfaces/IERC20.sol";
+
 interface EnigmaDataStructures {
     struct Pair {
         address tokenBase;
@@ -31,11 +33,23 @@ interface EnigmaDataStructures {
     }
 }
 
-contract EnigmaVirtualMachine is EnigmaDataStructures {
+interface EnigmaErrors {
+    error BalanceError();
+}
+
+contract EnigmaVirtualMachine is EnigmaDataStructures, EnigmaErrors {
     // --- Internal --- //
 
     function _blockTimestamp() internal view virtual returns (uint128) {
         return uint128(block.timestamp);
+    }
+
+    function _balanceOf(address token) internal view returns (uint256) {
+        (bool success, bytes memory data) = token.staticcall(
+            abi.encodeWithSelector(IERC20.balanceOf.selector, address(this))
+        );
+        if (!success || data.length != 32) revert BalanceError();
+        return abi.decode(data, (uint256));
     }
 
     // ----- Enigma Storage ---- //
@@ -74,4 +88,5 @@ contract EnigmaVirtualMachine is EnigmaDataStructures {
 
     uint256 public constant PERCENTAGE = 1e4;
     uint256 public constant PRECISION = 1e18;
+    uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
 }
