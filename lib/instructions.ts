@@ -7,18 +7,20 @@ import { bytesToHex, hexToBytes } from './units'
  * "Opcodes" of the Enigma Virtual Machine.
  */
 export enum Instructions {
-  UNKNOWN,
-  ADD_LIQUIDITY,
-  ADD_LIQUIDITY_ETH,
-  REMOVE_LIQUIDITY,
-  REMOVE_LIQUIDITY_ETH,
-  SWAP_EXACT_TOKENS_FOR_TOKENS,
+  UNKNOWN = 0x00,
+  ADD_LIQUIDITY = 0x01,
+  ADD_LIQUIDITY_ETH = 0x02,
+  REMOVE_LIQUIDITY = 0x03,
+  REMOVE_LIQUIDITY_ETH = 0x04,
+  SWAP_EXACT_TOKENS_FOR_TOKENS = 0x05,
   SWAP_TOKENS_FOR_EXACT_TOKENS,
   SWAP_EXACT_ETH_FOR_TOKENS,
   SWAP_TOKENS_FOR_EXACT_ETH,
   SWAP_EXACT_TOKENS_FOR_ETH,
   SWAP_ETH_FOR_EXACT_TOKENS,
   CREATE_POOL,
+  CREATE_PAIR,
+  CREATE_CURVE = 0x0d,
 }
 
 // --- Full Instruction Encoders --- //
@@ -132,9 +134,10 @@ export function encodeArguments(
 }
 
 export function encodeCreatePair(base: string, quote: string): { bytes: number[]; hex: string } {
+  const opcode = Instructions.CREATE_PAIR
   if (!isHexString(base)) throw new Error(`Base address not a hex string: ${base}`)
   if (!isHexString(quote)) throw new Error(`Quote address not a hex string: ${quote}`)
-  const bytes = [...hexToBytes(base), ...hexToBytes(quote)]
+  const bytes = [...hexToBytes(hexlify(opcode)), ...hexToBytes(base), ...hexToBytes(quote)]
   return { bytes, hex: bytesToHex(bytes) }
 }
 
@@ -144,11 +147,13 @@ export function encodeCreateCurve(
   maturity: number,
   fee: number
 ): { bytes: number[]; hex: string } {
+  const opcode = Instructions.CREATE_CURVE
   const strikeByte = hexZeroPad(strike.toHexString(), 16)
   const sigmaByte = hexZeroPad(hexlify(sigma), 3)
   const maturityByte = hexZeroPad(hexlify(maturity), 4)
   const feeByte = hexZeroPad(hexlify(fee), 2)
   const bytes = [
+    ...hexToBytes(hexlify(opcode)),
     ...hexToBytes(sigmaByte),
     ...hexToBytes(maturityByte),
     ...hexToBytes(feeByte),
@@ -170,11 +175,13 @@ export function encodeCreatePool(
   basePerLiquidity: BigNumber,
   deltaLiquidity: BigNumber
 ): { bytes: number[]; hex: string } {
+  const opcode = Instructions.CREATE_POOL
   const pairByte = hexZeroPad(hexlify(pairId), 2)
   const curveByte = hexZeroPad(hexlify(curveId), 4)
   const basePerLiquidityByte = hexZeroPad(basePerLiquidity.toHexString(), 16)
   const deltaLiquidityByte = hexZeroPad(deltaLiquidity.toHexString(), 16)
   const bytes = [
+    ...hexToBytes(hexlify(opcode)),
     ...hexToBytes(pairByte),
     ...hexToBytes(curveByte),
     ...hexToBytes(basePerLiquidityByte),

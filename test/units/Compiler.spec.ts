@@ -79,7 +79,7 @@ describe('Compiler', function () {
         basePerLiquidity,
         deltaLiquidity
       )
-      const poolId = decodePoolId(poolPayload.bytes.slice(0, 6))
+      const poolId = decodePoolId(poolPayload.bytes.slice(1, 7))
       await expect(contracts.main.testCreatePool(poolPayload.hex))
         .to.emit(contracts.main, 'CreatePool')
         .withArgs(parseInt(poolId), pairId, curveId, deltaBase, deltaQuote, deltaLiquidity)
