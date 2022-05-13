@@ -1,19 +1,7 @@
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
-import "./HyperLiquidity.sol";
 import "./EnigmaVirtualMachine.sol";
 import "./libraries/ReplicationMath.sol";
-
-interface HyperSwapErrors {
-    error PoolZilchError();
-    error InvariantError(int128 prev, int128 post);
-}
-
-interface HyperSwapEvents {
-    event UpdateLastTimestamp(uint128 timestamp);
-    event Swap(uint256 id, uint256 input, uint256 output, address tokenIn, address tokenOut);
-}
 
 /// @notice Executes trading on a target curve.
 contract HyperSwap is EnigmaVirtualMachine {

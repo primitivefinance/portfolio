@@ -1,71 +1,9 @@
 pragma solidity ^0.8.0;
 
+import "./EnigmaVirtualMachine.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/ReplicationMath.sol";
 import "./libraries/SafeCast.sol";
-import "./EnigmaVirtualMachine.sol";
-
-interface HyperLiquidityErrors {
-    // --- Creation --- //
-    error PoolExists();
-    error NonExistentPool(uint48 poolId);
-    error PairExists(uint16 pairId);
-    error CurveExists(uint32 curveId);
-
-    // --- Validation --- //
-    error ZeroLiquidityError();
-    error PoolExpiredError();
-    error MaxFee(uint16 fee);
-    error MinSigma(uint24 sigma);
-    error MinStrike(uint128 strike);
-    error CalibrationError(uint256 deltaBase, uint256 deltaQuote);
-
-    // --- Special --- //
-    error JitLiquidity(uint256 lastTime, uint256 currentTime);
-}
-
-interface HyperLiquidityEvents {
-    // --- Critical --- //
-    event IncreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
-    event DecreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
-
-    // --- Liquidity --- //
-    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-
-    event AddLiquidity(
-        uint48 indexed poolId,
-        uint16 indexed pairId,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    );
-    event RemoveLiquidity(
-        uint48 indexed poolId,
-        uint16 indexed pairId,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    );
-
-    // --- Uncommon --- //
-    event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);
-    event CreateCurve(
-        uint32 indexed curveId,
-        uint128 strike,
-        uint24 sigma,
-        uint32 indexed maturity,
-        uint32 indexed gamma
-    );
-    event CreatePool(
-        uint48 indexed poolId,
-        uint16 indexed pairId,
-        uint32 indexed curveId,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    );
-}
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
 contract HyperLiquidity is EnigmaVirtualMachine {
