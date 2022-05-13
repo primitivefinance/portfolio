@@ -72,6 +72,8 @@ contract EnigmaVirtualMachine is IEnigma {
     uint256 public pairNonce;
     /// @dev A value incremented by one on curve creation. Reduces calldata.
     uint256 public curveNonce;
+    /// @dev Amount of seconds of available time to swap past maturity of a pool.
+    uint256 public constant BUFFER = 300;
     /// @dev Constant amount of basis points. All percentage values are integers in basis points.
     uint256 public constant PERCENTAGE = 1e4;
     /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.

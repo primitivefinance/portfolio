@@ -11,14 +11,6 @@ contract HyperLiquidity is EnigmaVirtualMachine {
 
     // --- View --- //
 
-    /// @notice Gets base and quote pairs entitled to argument `liquidity`.
-    function getPhysicalReserves(uint48 poolId, uint256 liquidity) public view returns (uint256 base, uint256 quote) {
-        Pool memory pool = pools[poolId];
-        uint256 total = uint256(pool.internalLiquidity);
-        base = (uint256(pool.internalBase) * liquidity) / total;
-        quote = (uint256(pool.internalQuote) * liquidity) / total;
-    }
-
     /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
     function getLiquidityMinted(
         uint48 poolId,

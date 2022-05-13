@@ -1,7 +1,5 @@
 pragma solidity ^0.8.0;
 
-import "hardhat/console.sol";
-
 import "./EnigmaVirtualMachine.sol";
 import "./libraries/ReplicationMath.sol";
 
@@ -9,9 +7,34 @@ import "./libraries/ReplicationMath.sol";
 contract HyperSwap is EnigmaVirtualMachine {
     // --- View --- //
 
-    function getInvariant(uint48 poolId) public view returns (int128) {
+    function checkSwapMaturityCondition(uint128 lastTimestamp) public view returns (uint256 elapsed) {
+        elapsed = _blockTimestamp() - lastTimestamp;
+    }
+
+    /// @notice Gets base and quote pairs entitled to argument `liquidity`.
+    function getPhysicalReserves(uint48 poolId, uint256 liquidity) public view returns (uint256 base, uint256 quote) {
         Pool memory pool = pools[poolId];
-        return int128(1);
+        uint256 total = uint256(pool.internalLiquidity);
+        base = (uint256(pool.internalBase) * liquidity) / total;
+        quote = (uint256(pool.internalQuote) * liquidity) / total;
+    }
+
+    function getInvariant(uint48 poolId) public view returns (int128 invariant) {
+        Curve memory curve = curves[uint32(poolId)]; // note: purposefully removes first two bytes.
+        uint32 tau = curve.maturity - uint32(pools[poolId].blockTimestamp); // curve maturity can never be less than lastTimestamp
+        (uint256 riskyPerLiquidity, uint256 stablePerLiquidity) = getPhysicalReserves(poolId, PRECISION); // 1e18 liquidity
+        Pair memory pair = pairs[uint16(poolId >> 32)];
+        uint256 scaleFactorBase = 10**(18 - pair.decimalsBase);
+        uint256 scaleFactorQuote = 10**(18 - pair.decimalsQuote);
+        invariant = ReplicationMath.calcInvariant(
+            scaleFactorBase,
+            scaleFactorQuote,
+            riskyPerLiquidity,
+            stablePerLiquidity,
+            curve.strike,
+            curve.sigma,
+            tau
+        );
     }
 
     // --- Internals --- //
@@ -46,15 +69,15 @@ contract HyperSwap is EnigmaVirtualMachine {
         Pool storage pool = pools[poolId];
 
         uint128 lastTimestamp = _updateLastTimestamp(poolId);
-        // todo: swap maturity buffer logic implementation
+        uint256 secondsPastMaturity = checkSwapMaturityCondition(lastTimestamp);
+        if (secondsPastMaturity > BUFFER) revert PoolExpiredError();
         int128 invariant = getInvariant(poolId);
 
         Pair memory pair = pairs[uint16(poolId >> 32)];
 
         {
             // swap logic
-            uint32 curveId = uint32(poolId); // note: explicit converse removes first two bytes, which is the pairId.
-            Curve memory curve = curves[curveId];
+            Curve memory curve = curves[uint32(poolId)]; // note: explicit converse removes first two bytes, which is the pairId.
             uint32 tau = curve.maturity - uint32(pool.blockTimestamp);
             uint256 amountInFee = (input * curve.gamma) / PERCENTAGE;
             uint256 adjustedBase;
@@ -107,8 +130,4 @@ contract HyperSwap is EnigmaVirtualMachine {
             dir == 0 ? pair.tokenQuote : pair.tokenBase
         );
     }
-
-    // --- External --- //
-
-    // --- Storage --- //
 }
