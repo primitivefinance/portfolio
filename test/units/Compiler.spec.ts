@@ -2,13 +2,15 @@ import hre from 'hardhat'
 import { expect } from 'chai'
 import { Compiler } from '../../typechain-types/Compiler.sol'
 import { Context, contextFixture, Contracts, fixture } from '../shared/fixture'
-import { decodePoolId, encodeCreateCurve, encodeCreatePair, encodeCreatePool } from '../../lib'
+import { decodePoolId, encodeCreateCurve, encodeCreatePair, encodeCreatePool, encodeRemoveLiquidity } from '../../lib'
 import { mintAndApprove } from '../contextHelpers'
 import { Values } from '../constants'
 import { TestERC20 } from '../../typechain-types/test/TestERC20'
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
+import { BasicRealPool } from '../shared/utils'
 
+// Note: if any of these tests randomly breaks... look at what _blockTimestamp() is pointing to in the contracts.
 describe('Compiler', function () {
   let contracts: Contracts, context: Context
 
@@ -18,6 +20,18 @@ describe('Compiler', function () {
 
     await mintAndApprove(contracts.base, context.user, contracts.main.address, Values.ETHER)
     await mintAndApprove(contracts.quote, context.user, contracts.main.address, Values.ETHER)
+  })
+
+  describe('HyperLiquidity', function () {
+    it('getLiquidityMinted compared against getLiquidityMinted2', async function () {
+      const poolId = 4
+      const { internalBase, internalQuote, internalLiquidity } = BasicRealPool
+      await contracts.main.setLiquidity(poolId, internalBase, internalQuote, internalLiquidity)
+      const zero = await contracts.main.testGetLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
+      const one = await contracts.main.getLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
+      const two = await contracts.main.getLiquidityMinted2(poolId, internalBase._hex)
+      console.log({ zero, one, two })
+    })
   })
 
   describe('CreatePair', function () {
@@ -83,6 +97,52 @@ describe('Compiler', function () {
       await expect(contracts.main.testCreatePool(poolPayload.hex))
         .to.emit(contracts.main, 'CreatePool')
         .withArgs(parseInt(poolId), pairId, curveId, deltaBase, deltaQuote, deltaLiquidity)
+    })
+  })
+
+  describe('RemoveLiquidity', function () {
+    it('removes liquidity and emits the RemoveLiquidity event', async function () {
+      await contracts.main.setTimestamp(100)
+      const base = contracts.base.address
+      const quote = contracts.quote.address
+
+      const strike = parseEther('10')
+      const sigma = 1e4
+      const maturity = 60 * 60 * 24 * 365 // note: the contracts _blockTimestamp is set to 100.
+      const fee = 100
+      const gamma = 1e4 - fee
+
+      const basePerLiquidity = parseEther('0.69')
+      const deltaLiquidity = parseEther('1')
+
+      const deltaBase = basePerLiquidity
+      const deltaQuote = BigNumber.from('669038505037077076')
+
+      const payloadPair = encodeCreatePair(base, quote)
+      await contracts.main.testCreatePair(payloadPair.hex)
+      const pairId = (await contracts.main.pairNonce()) as BigNumber
+
+      const payloadCurve = encodeCreateCurve(strike, sigma, maturity, fee)
+      await contracts.main.testCreateCurve(payloadCurve.hex)
+      const curveId = (await contracts.main.curveNonce()) as BigNumber
+
+      const poolPayload = encodeCreatePool(
+        parseInt(pairId._hex),
+        parseInt(curveId._hex),
+        basePerLiquidity,
+        deltaLiquidity
+      )
+
+      const rawPayload = poolPayload.bytes.slice(1)
+      const poolId = decodePoolId(rawPayload.slice(0, 6))
+      await contracts.main.testCreatePool(poolPayload.hex)
+
+      const toRemove = deltaLiquidity.div(10)
+
+      const removePayload = encodeRemoveLiquidity(false, parseInt(poolId), toRemove)
+      await expect(contracts.main.testRemoveLiquidity(removePayload.hex))
+        .to.emit(contracts.main, 'RemoveLiquidity')
+        .withArgs(parseInt(poolId), parseInt(pairId._hex), deltaBase.div(10), '66904055621924321', toRemove)
     })
   })
 })

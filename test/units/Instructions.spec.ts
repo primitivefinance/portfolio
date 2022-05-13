@@ -19,8 +19,9 @@ describe('Instructions', function () {
 
     const data = instruct.encodeCreatePair(one, two)
     const result = await instructions.testDecodeCreatePair(data.hex)
-    expect(result[0]).to.be.hexEqual(bytesToHex(data.bytes.slice(0, 20)))
-    expect(result[1]).to.be.hexEqual(bytesToHex(data.bytes.slice(20)))
+    const info = data.bytes.slice(1) // removes opcode byte
+    expect(result[0]).to.be.hexEqual(bytesToHex(info.slice(0, 20)))
+    expect(result[1]).to.be.hexEqual(bytesToHex(info.slice(20)))
   })
 
   it('testDecodePoolId', async function () {
@@ -28,6 +29,7 @@ describe('Instructions', function () {
     const curveId = 2 ^ 6
     const data = instruct.encodePoolId(pairId, curveId)
     const result = await instructions.testDecodePoolId(data.hex)
+
     expect(result[0]).to.be.eq(parseInt(data.hex))
     expect(result[1]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(0, 2))))
     expect(result[2]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(2))))
@@ -40,10 +42,11 @@ describe('Instructions', function () {
     const fee = 100
     const data = instruct.encodeCreateCurve(strike, sigma, maturity, fee)
     const result = await instructions.testDecodeCreateCurve(data.hex)
-    expect(result[0]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(0, 3))))
-    expect(result[1]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(3, 7))))
-    expect(result[2]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(7, 9))))
-    expect(result[3]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(9))))
+    const info = data.bytes.slice(1) // removes opcode byte
+    expect(result[0]).to.be.eq(parseInt(bytesToHex(info.slice(0, 3))))
+    expect(result[1]).to.be.eq(parseInt(bytesToHex(info.slice(3, 7))))
+    expect(result[2]).to.be.eq(parseInt(bytesToHex(info.slice(7, 9))))
+    expect(result[3]).to.be.eq(parseInt(bytesToHex(info.slice(9))))
   })
 
   it('testDecodeCreatePool', async function () {
@@ -53,10 +56,25 @@ describe('Instructions', function () {
     const deltaLiquidity = BigNumber.from(1)
     const data = instruct.encodeCreatePool(pairId, curveId, basePerLiquidity, deltaLiquidity)
     const result = await instructions.testDecodeCreatePool(data.hex)
-    expect(result[0]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(0, 6))))
-    expect(result[1]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(0, 2))))
-    expect(result[2]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(2, 6))))
-    expect(result[3]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(6, 22))))
-    expect(result[4]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(22))))
+    const info = data.bytes.slice(1) // removes opcode byte
+    expect(result[0]).to.be.eq(parseInt(bytesToHex(info.slice(0, 6))))
+    expect(result[1]).to.be.eq(parseInt(bytesToHex(info.slice(0, 2))))
+    expect(result[2]).to.be.eq(parseInt(bytesToHex(info.slice(2, 6))))
+    expect(result[3]).to.be.eq(parseInt(bytesToHex(info.slice(6, 22))))
+    expect(result[4]).to.be.eq(parseInt(bytesToHex(info.slice(22))))
+  })
+
+  it('testDecodeRemoveLiquidity', async function () {
+    const poolId = 8
+    const pairId = 0
+    const useMax = false
+    const deltaLiquidity = BigNumber.from(72)
+    const data = instruct.encodeRemoveLiquidity(useMax, poolId, deltaLiquidity)
+    const result = await instructions.testDecodeRemoveLiquidity(data.hex)
+    console.log({ data, result })
+    expect(result[0]).to.be.eq(useMax ? 1 : 0)
+    expect(result[1]).to.be.eq(poolId)
+    expect(result[2]).to.be.eq(pairId)
+    expect(result[3]._hex).to.be.hexEqual(deltaLiquidity._hex)
   })
 })

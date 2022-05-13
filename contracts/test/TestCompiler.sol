@@ -1,6 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "../Compiler.sol";
+import "hardhat/console.sol";
 
 contract TestCompiler is Compiler {
     uint256 public timestamp;
@@ -69,5 +70,43 @@ contract TestCompiler is Compiler {
         )
     {
         return _createPool(data);
+    }
+
+    function testRemoveLiquidity(bytes calldata data) public returns (uint256, uint256) {
+        return _removeLiquidity(data);
+    }
+
+    // -- Test --
+
+    function testGetLiquidityMinted(
+        uint48 poolId,
+        uint256 deltaBase,
+        uint256 deltaQuote
+    )
+        public
+        view
+        returns (
+            uint256 deltaLiquidity,
+            uint256 deltaQuote2,
+            uint256 deltaLiquidity2
+        )
+    {
+        deltaLiquidity = getLiquidityMinted(poolId, deltaBase, deltaQuote);
+        (deltaLiquidity2, deltaQuote2) = getLiquidityMinted2(poolId, deltaBase);
+    }
+
+    function getLiquidityMinted2(uint48 poolId, uint256 deltaBase)
+        public
+        view
+        returns (uint256 deltaLiquidity, uint256 deltaQuote)
+    {
+        Pool memory pool = pools[poolId];
+        uint256 liquidity0 = (deltaBase * pool.internalLiquidity) / uint256(pool.internalBase);
+        deltaQuote = (uint256(pool.internalBase) * liquidity0) / uint256(pool.internalLiquidity);
+        deltaLiquidity = liquidity0;
+        uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
+        uint256 deltaLiquidity1 = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        console.log(liquidity0, deltaLiquidity, deltaQuote);
+        console.log(liquidity1, deltaLiquidity);
     }
 }

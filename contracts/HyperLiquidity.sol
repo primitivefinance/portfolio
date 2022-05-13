@@ -20,7 +20,20 @@ interface HyperLiquidityErrors {
 }
 
 interface HyperLiquidityEvents {
-    event AddLiquidity();
+    event AddLiquidity(
+        uint48 indexed poolId,
+        uint16 indexed pairId,
+        uint256 deltaBase,
+        uint256 deltaQuote,
+        uint256 deltaLiquidity
+    );
+    event RemoveLiquidity(
+        uint48 indexed poolId,
+        uint16 indexed pairId,
+        uint256 deltaBase,
+        uint256 deltaQuote,
+        uint256 deltaLiquidity
+    );
 
     event CreatePool(
         uint48 indexed poolId,
@@ -42,6 +55,11 @@ interface HyperLiquidityEvents {
     event IncreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
     event DecreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
 }
+
+// ---- Types --- //
+
+type ValueX is uint256;
+type ValueY is uint256;
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
 contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVirtualMachine {
@@ -67,6 +85,34 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         uint256 liquidity0 = (deltaBase * pool.internalLiquidity) / uint256(pool.internalBase);
         uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
         deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+    }
+
+    function getLiquidityMintedFromBase(uint48 poolId, uint256 deltaBase)
+        public
+        view
+        returns (uint256 deltaLiquidity, uint256 deltaQuote)
+    {
+        Pool memory pool = pools[poolId];
+        return getOptimalAmounts(deltaBase, pool.internalBase, pool.internalQuote, pool.internalLiquidity);
+    }
+
+    function getLiquidityMintedFromQuote(uint48 poolId, uint256 deltaQuote)
+        public
+        view
+        returns (uint256 deltaLiquidity, uint256 deltaBase)
+    {
+        Pool memory pool = pools[poolId];
+        return getOptimalAmounts(deltaQuote, pool.internalQuote, pool.internalBase, pool.internalLiquidity);
+    }
+
+    function getOptimalAmounts(
+        uint256 deltaX,
+        uint256 reserveX,
+        uint256 reserveY,
+        uint256 totalSupply
+    ) public pure returns (uint256 deltaLiquidity, uint256 deltaY) {
+        deltaLiquidity = (deltaX * totalSupply) / reserveX;
+        deltaY = (deltaLiquidity * reserveY) / totalSupply;
     }
 
     /// @notice Computes the amount of time passed since the Position's liquidity was updated.
@@ -97,6 +143,8 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         pool.internalQuote += deltaQuote.toUint128();
         pool.internalLiquidity += deltaLiquidity.toUint128();
         pool.blockTimestamp = _blockTimestamp();
+        console.log(pool.blockTimestamp);
+        emit AddLiquidity(poolId, uint16(poolId), deltaBase, deltaQuote, deltaLiquidity);
 
         uint16 pairId = uint16(poolId);
         _increaseGlobal(pairId, deltaBase, deltaQuote); // Compared against later to settle operation.
@@ -104,13 +152,13 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][uint8(poolId)]; // ToDo: work on position ids.
+        Position storage pos = positions[msg.sender][poolId];
         pos.liquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
     }
 
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][poolId]; // ToDo: work on position ids.
+        Position storage pos = positions[msg.sender][poolId];
         (uint256 dist, uint256 currentTimestamp) = checkJitLiquidity(msg.sender, poolId);
         if (dist < 0) revert JitLiquidity(pos.blockTimestamp, currentTimestamp); // ToDo: Work on JIT mitigation.
 
@@ -155,11 +203,34 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         _increasePosition(poolId, deltaLiquidity);
     }
 
-    function _removeLiquidity(uint48 poolId, uint256 deltaLiquidity)
+    function _addExactBase(uint48 poolId, uint256 deltaBase)
         internal
-        returns (uint256 deltaBase, uint256 deltaQuote)
+        returns (uint256 deltaLiquidity, uint256 deltaQuote)
     {
+        if (pools[poolId].blockTimestamp == 0) revert ZilchError(); // Pool doesn't exist.
+        (deltaLiquidity, deltaQuote) = getLiquidityMintedFromBase(poolId, deltaBase);
+        _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
+        _increasePosition(poolId, deltaLiquidity);
+    }
+
+    function _addExactQuote(uint48 poolId, uint256 deltaQuote)
+        internal
+        returns (uint256 deltaLiquidity, uint256 deltaBase)
+    {
+        if (pools[poolId].blockTimestamp == 0) revert ZilchError(); // Pool doesn't exist.
+        (deltaLiquidity, deltaQuote) = getLiquidityMintedFromQuote(poolId, deltaQuote);
+        _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
+        _increasePosition(poolId, deltaLiquidity);
+    }
+
+    function _removeLiquidity(bytes calldata data) internal returns (uint256 deltaBase, uint256 deltaQuote) {
+        // note: Does not trim the first byte (engima instruction) because the max flag is encoded in it.
+        (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(data);
+
+        // ToDo: make use of the useMax flag.
+
         Pool storage pool = pools[poolId];
+        console.log(poolId, pool.internalBase, pool.blockTimestamp);
         if (pool.blockTimestamp == 0) revert ZilchError();
 
         deltaBase = (pool.internalBase * deltaLiquidity) / pool.internalLiquidity;
@@ -167,16 +238,15 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
 
-        pool.internalBase -= (deltaBase).toUint128();
-        pool.internalQuote -= (deltaQuote).toUint128();
-        pool.internalLiquidity -= (deltaLiquidity).toUint128();
+        pool.internalBase -= deltaBase.toUint128();
+        pool.internalQuote -= deltaQuote.toUint128();
+        pool.internalLiquidity -= deltaLiquidity;
         pool.blockTimestamp = _blockTimestamp();
 
         _decreasePosition(poolId, deltaLiquidity);
-
-        // ToDo: get the pairId
-        uint16 pairId = uint16(poolId);
         _decreaseGlobal(pairId, deltaBase, deltaQuote);
+
+        emit RemoveLiquidity(poolId, pairId, deltaBase, deltaQuote, deltaLiquidity);
     }
 
     // --- Create --- //

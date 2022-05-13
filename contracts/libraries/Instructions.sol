@@ -57,6 +57,24 @@ library Instructions {
         strike = uint128(bytes16(data[9:]));
     }
 
+    function decodeRemoveLiquidity(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint16 pairId,
+            uint128 deltaLiquidity
+        )
+    {
+        useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
+        poolId = uint48(bytes6(data[1:7]));
+        pairId = uint16(bytes2(data[1:3]));
+        uint8 power = uint8(bytes1(data[7]));
+        bytes memory value = data[8:];
+        deltaLiquidity = uint128(uint128(bytes16(value) >> ((16 - uint8(value.length)) * 8)) * 10**power);
+    }
+
     function decodeAddLiquidity(bytes calldata data) internal pure returns (uint256) {}
 
     function decodeSwapExactETH(bytes calldata data) internal pure returns (uint256) {}
