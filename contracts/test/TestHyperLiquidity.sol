@@ -17,7 +17,7 @@ contract TestHyperLiquidity is HyperLiquidity {
     }
 
     function setLiquidity(
-        uint32 poolId,
+        uint48 poolId,
         uint256 base,
         uint256 quote,
         uint256 liquidity

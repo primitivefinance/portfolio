@@ -33,7 +33,7 @@ interface HyperLiquidityEvents {
     );
 
     event CreatePool(
-        uint32 indexed poolId,
+        uint48 indexed poolId,
         uint16 indexed pairId,
         uint32 indexed curveId,
         uint256 deltaBase,
@@ -60,7 +60,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     // --- View --- //
 
     /// @notice Gets base and quote pairs entitled to argument `liquidity`.
-    function getPhysicalReserves(uint32 poolId, uint256 liquidity) public view returns (uint256 base, uint256 quote) {
+    function getPhysicalReserves(uint48 poolId, uint256 liquidity) public view returns (uint256 base, uint256 quote) {
         Pool memory pool = pools[poolId];
         uint256 total = uint256(pool.internalLiquidity);
         base = (uint256(pool.internalBase) * liquidity) / total;
@@ -69,7 +69,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
 
     /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
     function getLiquidityMinted(
-        uint32 poolId,
+        uint48 poolId,
         uint256 deltaBase,
         uint256 deltaQuote
     ) public view returns (uint256 deltaLiquidity) {
@@ -80,12 +80,12 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     }
 
     /// @notice Computes the amount of time passed since the Position's liquidity was updated.
-    function checkJitLiquidity(address account, uint32 posId)
+    function checkJitLiquidity(address account, uint48 poolId)
         public
         view
         returns (uint256 distance, uint256 currentTime)
     {
-        Position memory pos = positions[account][posId];
+        Position memory pos = positions[account][poolId];
         // ToDo: implement jit mitigation logic.
         currentTime = _blockTimestamp();
         distance = currentTime - pos.blockTimestamp;
@@ -95,7 +95,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
 
     /// @dev Assumes token amounts will be paid and an account's position is increased.
     function _increaseLiquidity(
-        uint32 poolId,
+        uint48 poolId,
         uint256 deltaBase,
         uint256 deltaQuote,
         uint256 deltaLiquidity
@@ -112,15 +112,15 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     }
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
-    function _increasePosition(uint32 posId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][uint8(posId)]; // ToDo: work on position ids.
+    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][uint8(poolId)]; // ToDo: work on position ids.
         pos.liquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
     }
 
-    function _decreasePosition(uint32 posId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][uint8(posId)]; // ToDo: work on position ids.
-        (uint256 dist, uint256 currentTimestamp) = checkJitLiquidity(msg.sender, posId);
+    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][poolId]; // ToDo: work on position ids.
+        (uint256 dist, uint256 currentTimestamp) = checkJitLiquidity(msg.sender, poolId);
         if (dist < 0) revert JitLiquidity(pos.blockTimestamp, currentTimestamp); // ToDo: Work on JIT mitigation.
 
         pos.liquidity -= deltaLiquidity.toUint128();
@@ -154,7 +154,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     /// @notice Changes internal "fake" reserves of a pool with `poolId`.
     /// @dev    Liquidity must be credited to an address, and token amounts must be _applyDebited.
     function _addLiquidity(
-        uint32 poolId,
+        uint48 poolId,
         uint256 deltaBase,
         uint256 deltaQuote
     ) internal returns (uint256 deltaLiquidity) {
@@ -164,7 +164,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         _increasePosition(poolId, deltaLiquidity);
     }
 
-    function _removeLiquidity(uint32 poolId, uint256 deltaLiquidity)
+    function _removeLiquidity(uint48 poolId, uint256 deltaLiquidity)
         internal
         returns (uint256 deltaBase, uint256 deltaQuote)
     {
@@ -234,50 +234,47 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         emit CreateCurve(curveId, strike, sigma, maturity, gamma);
     }
 
-    function _createPool(bytes calldata data) internal returns (uint32 poolId) {
-        (uint48 poolId, uint16 pairId, uint32 curveId) = Instructions.decodePoolId(data);
-    }
-
-    function _createPool(
-        uint16 pairId,
-        uint32 curveId,
-        uint256 riskyPerLp,
-        uint256 deltaLiquidity
-    )
+    function _createPool(bytes calldata data)
         internal
         returns (
-            uint32 poolId,
+            uint48 poolId,
             uint256 deltaBase,
             uint256 deltaQuote
         )
     {
-        poolId = encodePoolId(11, 11, 11, 11);
+        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 basePerLiquidity, uint128 deltaLiquidity) = Instructions
+            .decodeCreatePool(data);
+        poolId = poolId_;
+
         Curve memory curve = curves[curveId];
         uint128 lastTimestamp = _blockTimestamp();
         if (lastTimestamp > curve.maturity) revert PoolExpiredError();
+        uint256 minLiquidity;
 
-        Pair memory pair = pairs[pairId];
-        (uint256 factor0, uint256 factor1) = (10**(18 - pair.decimalsBase), 10**(18 - pair.decimalsQuote));
-        require(riskyPerLp <= PRECISION / factor0, "Too much base");
+        {
+            Pair memory pair = pairs[pairId];
+            (uint256 factor0, uint256 factor1) = (10**(18 - pair.decimalsBase), 10**(18 - pair.decimalsQuote));
+            require(basePerLiquidity <= PRECISION / factor0, "Too much base");
+            uint256 lowestDecimals = (pair.decimalsBase > pair.decimalsQuote ? pair.decimalsQuote : pair.decimalsBase);
+            minLiquidity = 10**(lowestDecimals / MIN_LIQUIDITY_FACTOR);
 
-        uint32 tau = curve.maturity - uint32(lastTimestamp); // time until expiry
-        deltaQuote = ReplicationMath.getStableGivenRisky(
-            0,
-            factor0,
-            factor1,
-            riskyPerLp,
-            curve.strike,
-            curve.sigma,
-            tau
-        );
-        deltaBase = (riskyPerLp * deltaLiquidity) / PRECISION; // riskyDecimals * 1e18 decimals / 1e18 = riskyDecimals
-        deltaQuote = (deltaQuote * deltaLiquidity) / PRECISION;
+            uint32 tau = curve.maturity - uint32(lastTimestamp); // time until expiry
+            deltaQuote = ReplicationMath.getStableGivenRisky(
+                0,
+                factor0,
+                factor1,
+                basePerLiquidity,
+                curve.strike,
+                curve.sigma,
+                tau
+            );
+            deltaBase = (basePerLiquidity * deltaLiquidity) / PRECISION; // riskyDecimals * 1e18 decimals / 1e18 = riskyDecimals
+            deltaQuote = (deltaQuote * deltaLiquidity) / PRECISION;
+        }
 
         if (deltaBase == 0 || deltaQuote == 0) revert CalibrationError(deltaBase, deltaQuote);
         _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
 
-        uint256 lowestDecimals = (pair.decimalsBase > pair.decimalsQuote ? pair.decimalsQuote : pair.decimalsBase);
-        uint256 minLiquidity = 10**(lowestDecimals / MIN_LIQUIDITY_FACTOR);
         uint256 positionLiquidity = deltaLiquidity - minLiquidity; // Permanently burned.
         _increasePosition(poolId, positionLiquidity);
 

@@ -49,7 +49,7 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
     function _settle(uint32[] memory poolIds) internal {
         uint256 len = poolIds.length;
         for (uint256 i; i != len; i++) {
-            uint32 poolId = poolIds[i];
+            uint48 poolId = poolIds[i];
             Pair memory tks = pairs[uint16(poolId)];
             uint256 globalBase = globalReserves[tks.tokenBase];
             uint256 globalQuote = globalReserves[tks.tokenQuote];
@@ -89,7 +89,7 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
 
     /// ToDo: Implement all order types.
     function singleOrder(
-        uint32 poolId,
+        uint48 poolId,
         uint8 kind,
         uint256 deltaBase,
         uint256 deltaQuote,
@@ -120,7 +120,7 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
     ) public {
         uint256 len = poolIds.length;
         for (uint256 i; i != len; i++) {
-            uint32 poolId = poolIds[i];
+            uint48 poolId = poolIds[i];
             uint8 kind = kinds[i];
             Pair memory tks = pairs[uint16(poolId)];
             _cacheAddress(tks.tokenBase, true);

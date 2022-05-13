@@ -139,12 +139,12 @@ export function encodeCreatePair(base: string, quote: string): { bytes: number[]
 }
 
 export function encodeCreateCurve(
-  strike: number,
+  strike: BigNumber,
   sigma: number,
   maturity: number,
   fee: number
 ): { bytes: number[]; hex: string } {
-  const strikeByte = hexZeroPad(hexlify(strike), 16)
+  const strikeByte = hexZeroPad(strike.toHexString(), 16)
   const sigmaByte = hexZeroPad(hexlify(sigma), 3)
   const maturityByte = hexZeroPad(hexlify(maturity), 4)
   const feeByte = hexZeroPad(hexlify(fee), 2)
@@ -167,13 +167,13 @@ export function encodePoolId(pairId: number, curveId: number): { bytes: number[]
 export function encodeCreatePool(
   pairId: number,
   curveId: number,
-  basePerLiquidity: number,
-  deltaLiquidity: number
+  basePerLiquidity: BigNumber,
+  deltaLiquidity: BigNumber
 ): { bytes: number[]; hex: string } {
   const pairByte = hexZeroPad(hexlify(pairId), 2)
   const curveByte = hexZeroPad(hexlify(curveId), 4)
-  const basePerLiquidityByte = hexZeroPad(hexlify(basePerLiquidity), 16)
-  const deltaLiquidityByte = hexZeroPad(hexlify(deltaLiquidity), 16)
+  const basePerLiquidityByte = hexZeroPad(basePerLiquidity.toHexString(), 16)
+  const deltaLiquidityByte = hexZeroPad(deltaLiquidity.toHexString(), 16)
   const bytes = [
     ...hexToBytes(pairByte),
     ...hexToBytes(curveByte),
@@ -181,4 +181,8 @@ export function encodeCreatePool(
     ...hexToBytes(deltaLiquidityByte),
   ]
   return { bytes, hex: bytesToHex(bytes) }
+}
+
+export function decodePoolId(bytes: number[]): string {
+  return bytesToHex(bytes)
 }

@@ -72,7 +72,7 @@ contract EnigmaVirtualMachine is EnigmaDataStructures, EnigmaErrors {
 
     // ----- Enigma State ----- //
     // Pool id -> Pool Data Structure.
-    mapping(uint32 => Pool) public pools;
+    mapping(uint48 => Pool) public pools;
     /// Pool Id -> Curve.
     mapping(uint32 => Curve) public curves;
     // Pool id -> Pair of a Pool.
@@ -82,7 +82,7 @@ contract EnigmaVirtualMachine is EnigmaDataStructures, EnigmaErrors {
     // Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
     // User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint32 => Position)) public positions;
+    mapping(address => mapping(uint48 => Position)) public positions;
     // User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) public balances;
 

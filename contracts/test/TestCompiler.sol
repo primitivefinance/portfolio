@@ -27,7 +27,7 @@ contract TestCompiler is Compiler {
     }
 
     function setLiquidity(
-        uint32 poolId,
+        uint48 poolId,
         uint256 base,
         uint256 quote,
         uint256 liquidity
@@ -41,13 +41,13 @@ contract TestCompiler is Compiler {
     }
 
     function setCurve(
-        uint32 poolId,
+        uint32 curveId,
         uint128 strike,
         uint24 sigma,
         uint32 maturity,
         uint32 gamma
     ) public {
-        curves[poolId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
+        curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
     }
 
     // --- Create --- //
@@ -58,5 +58,16 @@ contract TestCompiler is Compiler {
 
     function testCreateCurve(bytes calldata data) public returns (uint32) {
         return _createCurve(data);
+    }
+
+    function testCreatePool(bytes calldata data)
+        public
+        returns (
+            uint48,
+            uint256,
+            uint256
+        )
+    {
+        return _createPool(data);
     }
 }

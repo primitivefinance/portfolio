@@ -3,6 +3,7 @@ import { TestInstructions } from '../../typechain-types/test/TestInstructions'
 import * as instruct from '../../lib'
 import { expect } from 'chai'
 import { bytesToHex } from '../../lib'
+import { BigNumber } from 'ethers'
 
 describe('Instructions', function () {
   let instructions: TestInstructions
@@ -33,7 +34,7 @@ describe('Instructions', function () {
   })
 
   it('testDecodeCreateCurve', async function () {
-    const strike = 50
+    const strike = BigNumber.from(50)
     const sigma = 1e4
     const maturity = 200
     const fee = 100
@@ -48,8 +49,8 @@ describe('Instructions', function () {
   it('testDecodeCreatePool', async function () {
     const pairId = 4
     const curveId = 2 ^ 6
-    const basePerLiquidity = 400
-    const deltaLiquidity = 1
+    const basePerLiquidity = BigNumber.from(400)
+    const deltaLiquidity = BigNumber.from(1)
     const data = instruct.encodeCreatePool(pairId, curveId, basePerLiquidity, deltaLiquidity)
     const result = await instructions.testDecodeCreatePool(data.hex)
     expect(result[0]).to.be.eq(parseInt(bytesToHex(data.bytes.slice(0, 6))))

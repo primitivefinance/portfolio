@@ -19,29 +19,30 @@ interface HyperSwapEvents {
 contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
     // --- View --- //
 
-    function getInvariant(uint32 id) public view returns (int128) {
-        Pool memory pool = pools[id];
+    function getInvariant(uint48 poolId) public view returns (int128) {
+        Pool memory pool = pools[poolId];
         return int128(1);
     }
 
     // --- Internals --- //
 
-    function _updateLastTimestamp(uint32 id) internal virtual returns (uint128 blockTimestamp) {
-        Pool storage pool = pools[id];
+    function _updateLastTimestamp(uint48 poolId) internal virtual returns (uint128 blockTimestamp) {
+        Pool storage pool = pools[poolId];
         if (pool.blockTimestamp == 0) revert PoolZilchError();
 
-        Curve storage curve = curves[id];
+        uint32 curveId = uint32(poolId); // ToDo: Fix with actual curveId
+        Curve storage curve = curves[curveId];
         uint32 maturity = curve.maturity;
         blockTimestamp = _blockTimestamp();
         if (blockTimestamp > maturity) blockTimestamp = maturity; // if expired, set to the maturity
 
         pool.blockTimestamp = blockTimestamp; // set state
-        emit UpdateLastTimestamp(id);
+        emit UpdateLastTimestamp(poolId);
     }
 
     /// @param dir 0 = base -> quote, 1 = quote -> base
     function _swap(
-        uint32 poolId,
+        uint48 poolId,
         uint32 dir,
         uint256 input,
         uint256 output
@@ -56,7 +57,8 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
 
         {
             // swap logic
-            Curve memory curve = curves[poolId];
+            uint32 curveId = uint32(poolId); // ToDo: Fix with proper curve id
+            Curve memory curve = curves[curveId];
             uint32 tau = curve.maturity - uint32(pool.blockTimestamp);
             uint256 amountInFee = (input * curve.gamma) / PERCENTAGE;
             uint256 adjustedBase;
