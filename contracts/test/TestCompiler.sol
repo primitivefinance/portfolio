@@ -14,11 +14,11 @@ contract TestCompiler is Compiler {
     }
 
     function setTokens(
-        uint8 id,
+        uint16 pairId,
         address base,
         address quote
     ) public {
-        pairs[id] = Pair({
+        pairs[pairId] = Pair({
             tokenBase: base,
             decimalsBase: IERC20(base).decimals(),
             tokenQuote: quote,
@@ -27,12 +27,12 @@ contract TestCompiler is Compiler {
     }
 
     function setLiquidity(
-        uint8 id,
+        uint32 poolId,
         uint256 base,
         uint256 quote,
         uint256 liquidity
     ) public {
-        pools[id] = Pool({
+        pools[poolId] = Pool({
             internalBase: uint128(base),
             internalQuote: uint128(quote),
             internalLiquidity: uint128(liquidity),
@@ -41,13 +41,13 @@ contract TestCompiler is Compiler {
     }
 
     function setCurve(
-        uint8 id,
+        uint32 poolId,
         uint128 strike,
         uint24 sigma,
         uint32 maturity,
         uint32 gamma
     ) public {
-        curves[id] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
+        curves[poolId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
     }
 
     // --- Create --- //

@@ -19,14 +19,14 @@ interface HyperSwapEvents {
 contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
     // --- View --- //
 
-    function getInvariant(uint8 id) public view returns (int128) {
+    function getInvariant(uint32 id) public view returns (int128) {
         Pool memory pool = pools[id];
         return int128(1);
     }
 
     // --- Internals --- //
 
-    function _updateLastTimestamp(uint8 id) internal virtual returns (uint128 blockTimestamp) {
+    function _updateLastTimestamp(uint32 id) internal virtual returns (uint128 blockTimestamp) {
         Pool storage pool = pools[id];
         if (pool.blockTimestamp == 0) revert PoolZilchError();
 
@@ -41,22 +41,22 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
 
     /// @param dir 0 = base -> quote, 1 = quote -> base
     function _swap(
-        uint8 id,
-        uint8 dir,
+        uint32 poolId,
+        uint32 dir,
         uint256 input,
         uint256 output
     ) internal returns (uint256) {
-        Pool storage pool = pools[id];
+        Pool storage pool = pools[poolId];
 
-        uint128 lastTimestamp = _updateLastTimestamp(id);
+        uint128 lastTimestamp = _updateLastTimestamp(poolId);
         // todo: swap maturity buffer logic implementation
-        int128 invariant = getInvariant(id);
+        int128 invariant = getInvariant(poolId);
 
-        Pair memory pair = pairs[id];
+        Pair memory pair = pairs[uint16(poolId)];
 
         {
             // swap logic
-            Curve memory curve = curves[id];
+            Curve memory curve = curves[poolId];
             uint32 tau = curve.maturity - uint32(pool.blockTimestamp);
             uint256 amountInFee = (input * curve.gamma) / PERCENTAGE;
             uint256 adjustedBase;
@@ -102,7 +102,7 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
         }
 
         emit Swap(
-            id,
+            poolId,
             input,
             output,
             dir == 0 ? pair.tokenBase : pair.tokenQuote,

@@ -4,11 +4,11 @@ import "../HyperLiquidity.sol";
 
 contract TestHyperLiquidity is HyperLiquidity {
     function setTokens(
-        uint8 id,
+        uint16 pairId,
         address base,
         address quote
     ) public {
-        pairs[id] = Pair({
+        pairs[pairId] = Pair({
             tokenBase: base,
             decimalsBase: IERC20(base).decimals(),
             tokenQuote: quote,
@@ -17,12 +17,12 @@ contract TestHyperLiquidity is HyperLiquidity {
     }
 
     function setLiquidity(
-        uint8 id,
+        uint32 poolId,
         uint256 base,
         uint256 quote,
         uint256 liquidity
     ) public {
-        pools[id] = Pool({
+        pools[poolId] = Pool({
             internalBase: uint128(base),
             internalQuote: uint128(quote),
             internalLiquidity: uint128(liquidity),

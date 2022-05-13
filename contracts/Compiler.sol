@@ -46,11 +46,11 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
         emit Credit(token, amount);
     }
 
-    function _settle(uint8[] memory ids) internal {
-        uint256 len = ids.length;
+    function _settle(uint32[] memory poolIds) internal {
+        uint256 len = poolIds.length;
         for (uint256 i; i != len; i++) {
-            uint8 id = ids[i];
-            Pair memory tks = pairs[id];
+            uint32 poolId = poolIds[i];
+            Pair memory tks = pairs[uint16(poolId)];
             uint256 globalBase = globalReserves[tks.tokenBase];
             uint256 globalQuote = globalReserves[tks.tokenQuote];
             uint256 actualBase = _getBal(tks.tokenBase);
@@ -89,48 +89,48 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
 
     /// ToDo: Implement all order types.
     function singleOrder(
-        uint8 id,
+        uint32 poolId,
         uint8 kind,
         uint256 deltaBase,
         uint256 deltaQuote,
         uint256 deltaLiquidity
     ) external {
-        Pair memory pair = pairs[id];
+        Pair memory pair = pairs[uint16(poolId)];
         _cacheAddress(pair.tokenBase, true);
         _cacheAddress(pair.tokenQuote, true);
 
-        if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
-        else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
+        if (kind == 1) _addLiquidity(poolId, deltaBase, deltaQuote);
+        else if (kind == 5) _swap(poolId, 0, deltaBase, deltaQuote);
         else if (kind == 11) _createPool(100, 9900, 20, 9970, 5e18, 1e18);
-        else _removeLiquidity(id, deltaLiquidity);
+        else _removeLiquidity(poolId, deltaLiquidity);
 
-        uint8[] memory ids = new uint8[](1);
-        ids[0] = id;
-        _settle(ids);
+        uint32[] memory poolIds = new uint32[](1);
+        poolIds[0] = uint32(poolId);
+        _settle(poolIds);
     }
 
     /// ToDo: Handle amounts better, order types and cleanup code, etc.
     function multiOrder(
-        uint8[] memory ids,
+        uint32[] memory poolIds,
         uint8[] memory kinds,
         uint256 deltaBase,
         uint256 deltaQuote,
         uint256 deltaLiquidity
     ) public {
-        uint256 len = ids.length;
+        uint256 len = poolIds.length;
         for (uint256 i; i != len; i++) {
-            uint8 id = ids[i];
+            uint32 poolId = poolIds[i];
             uint8 kind = kinds[i];
-            Pair memory tks = pairs[id];
+            Pair memory tks = pairs[uint16(poolId)];
             _cacheAddress(tks.tokenBase, true);
             _cacheAddress(tks.tokenQuote, true);
-            if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
-            else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
+            if (kind == 1) _addLiquidity(poolId, deltaBase, deltaQuote);
+            else if (kind == 5) _swap(poolId, 0, deltaBase, deltaQuote);
             else if (kind == 11) _createPool(10, 9900, 100 + 60 * 60 * 24 * 365, 9970, 5e17, 1e18);
-            else _removeLiquidity(id, deltaLiquidity);
+            else _removeLiquidity(poolId, deltaLiquidity);
         }
 
-        _settle(ids);
+        _settle(poolIds);
     }
 
     // --- External --- //

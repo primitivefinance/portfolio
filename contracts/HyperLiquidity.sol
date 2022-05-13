@@ -1,9 +1,13 @@
 pragma solidity ^0.8.0;
 
 import "hardhat/console.sol";
+
 import "./interfaces/IERC20.sol";
-import "./EnigmaVirtualMachine.sol";
+
 import "./libraries/ReplicationMath.sol";
+import "./libraries/SafeCast.sol";
+
+import "./EnigmaVirtualMachine.sol";
 
 interface HyperLiquidityErrors {
     error ZilchError();
@@ -38,6 +42,8 @@ interface HyperLiquidityEvents {
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
 contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVirtualMachine {
+    using SafeCast for uint256;
+
     // --- View --- //
 
     /// Gets base and quote pairs entitled to argument `liquidity`.
@@ -52,37 +58,37 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     // --- Internal Functions --- //
 
     function _getLiquidityMinted(
-        uint8 id,
+        uint32 poolId,
         uint256 deltaBase,
         uint256 deltaQuote
     ) internal view returns (uint256 deltaLiquidity) {
-        Pool memory pool = pools[id];
+        Pool memory pool = pools[poolId];
         uint256 liquidity0 = (deltaBase * pool.internalLiquidity) / uint256(pool.internalBase);
         uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
         deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
     }
 
     function _increaseLiquidity(
-        uint8 id,
+        uint32 poolId,
         uint256 deltaBase,
         uint256 deltaQuote,
         uint256 deltaLiquidity
     ) internal {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        Pool storage pool = pools[id];
+        Pool storage pool = pools[poolId];
         if (pool.blockTimestamp == 0) revert ZilchError();
 
-        pool.internalBase += uint128(deltaBase);
-        pool.internalQuote += uint128(deltaQuote);
-        pool.internalLiquidity += uint128(deltaLiquidity);
+        pool.internalBase += (deltaBase).toUint128();
+        pool.internalQuote += (deltaQuote).toUint128();
+        pool.internalLiquidity += (deltaLiquidity).toUint128();
         pool.blockTimestamp = _blockTimestamp();
 
-        _increaseGlobal(id, deltaBase, deltaQuote);
+        _increaseGlobal(uint16(poolId), deltaBase, deltaQuote);
     }
 
-    function _increasePosition(uint16 posId, uint256 deltaLiquidity) internal {
+    function _increasePosition(uint32 posId, uint256 deltaLiquidity) internal {
         Position storage pos = positions[msg.sender][uint8(posId)]; // ToDo: work on position ids.
-        pos.liquidity += deltaLiquidity;
+        pos.liquidity += (deltaLiquidity).toUint128();
         pos.blockTimestamp = _blockTimestamp();
     }
 
@@ -96,23 +102,23 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         globalReserves[pair.tokenQuote] -= deltaQuote;
     }
 
-    /// @notice Changes internal "fake" reserves of a pool with `id`.
+    /// @notice Changes internal "fake" reserves of a pool with `poolId`.
     /// @dev    Liquidity must be credited to an address, and token amounts must be _applyDebited.
     function _addLiquidity(
-        uint8 id,
+        uint32 poolId,
         uint256 deltaBase,
         uint256 deltaQuote
     ) internal {
-        uint256 deltaLiquidity = _getLiquidityMinted(id, deltaBase, deltaQuote);
-        _increaseLiquidity(id, deltaBase, deltaQuote, deltaLiquidity);
-        _increasePosition(id, deltaLiquidity);
+        uint256 deltaLiquidity = _getLiquidityMinted(poolId, deltaBase, deltaQuote);
+        _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
+        _increasePosition(poolId, deltaLiquidity);
     }
 
-    function _removeLiquidity(uint8 id, uint256 deltaLiquidity)
+    function _removeLiquidity(uint32 poolId, uint256 deltaLiquidity)
         internal
         returns (uint256 deltaBase, uint256 deltaQuote)
     {
-        Pool storage pool = pools[id];
+        Pool storage pool = pools[poolId];
         if (pool.blockTimestamp == 0) revert ZilchError();
 
         deltaBase = (pool.internalBase * deltaLiquidity) / pool.internalLiquidity;
@@ -120,17 +126,17 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
 
-        pool.internalBase -= uint128(deltaBase);
-        pool.internalQuote -= uint128(deltaQuote);
-        pool.internalLiquidity -= uint128(deltaLiquidity);
+        pool.internalBase -= (deltaBase).toUint128();
+        pool.internalQuote -= (deltaQuote).toUint128();
+        pool.internalLiquidity -= (deltaLiquidity).toUint128();
         pool.blockTimestamp = _blockTimestamp();
 
-        Pair storage pair = pairs[id];
+        Pair storage pair = pairs[uint16(poolId)];
         globalReserves[pair.tokenBase] -= deltaBase;
         globalReserves[pair.tokenQuote] -= deltaQuote;
 
-        Position storage pos = positions[msg.sender][id];
-        pos.liquidity -= deltaLiquidity;
+        Position storage pos = positions[msg.sender][poolId];
+        pos.liquidity -= (deltaLiquidity).toUint128();
         pos.blockTimestamp = _blockTimestamp();
     }
 
@@ -206,7 +212,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         Curve memory curve = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
 
         if (lastTimestamp > curve.maturity) revert PoolExpiredError();
-        Pair memory pair = pairs[0]; // ToDo: fix so we have a pair id per pool id?
+        Pair memory pair = pairs[0]; // ToDo: fix so we have a pair poolId per pool poolId?
         (uint256 factor0, uint256 factor1) = (10**(18 - pair.decimalsBase), 10**(18 - pair.decimalsQuote));
         console.log(factor0);
         require(riskyPerLp <= PRECISION / factor0, "Too much base");

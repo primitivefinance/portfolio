@@ -6,9 +6,9 @@ import "./libraries/Decoder.sol";
 interface EnigmaDataStructures {
     struct Pair {
         address tokenBase;
-        uint16 decimalsBase;
+        uint8 decimalsBase;
         address tokenQuote;
-        uint16 decimalsQuote;
+        uint8 decimalsQuote;
     }
 
     struct Pool {
@@ -19,7 +19,7 @@ interface EnigmaDataStructures {
     }
 
     struct Position {
-        uint256 liquidity;
+        uint128 liquidity;
         uint128 blockTimestamp;
     }
 
@@ -58,7 +58,7 @@ contract EnigmaVirtualMachine is EnigmaDataStructures {
 
     // ----- Enigma State ----- //
     // Pool id -> Pool Data Structure.
-    mapping(uint8 => Pool) public pools;
+    mapping(uint32 => Pool) public pools;
     /// Pool Id -> Curve.
     mapping(uint32 => Curve) public curves;
     // Pool id -> Pair of a Pool.
@@ -68,7 +68,7 @@ contract EnigmaVirtualMachine is EnigmaDataStructures {
     // Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
     // User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint8 => Position)) public positions;
+    mapping(address => mapping(uint32 => Position)) public positions;
     // User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) public balances;
 
