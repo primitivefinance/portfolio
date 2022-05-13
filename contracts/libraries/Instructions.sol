@@ -18,16 +18,7 @@ library Instructions {
         )
     {}
 
-    function decodePoolId(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint128 strike,
-            uint32 sigma,
-            uint32 maturity,
-            uint32 gamma
-        )
-    {}
+    function decodePoolId(bytes calldata data) internal pure returns (uint16 pairId, uint32 curveId) {}
 
     /// @dev Encoded calldata is packed without zeros.
     function decodeCreateCurve(bytes calldata data)

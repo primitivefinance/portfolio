@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "./libraries/ReplicationMath.sol";
-import "./EnigmaVirtualMachine.sol";
+import "./HyperLiquidity.sol";
 import "hardhat/console.sol";
 import "./interfaces/IERC20.sol";
 
@@ -79,19 +79,21 @@ contract HyperCreate is HyperCreateEvents, HyperCreateErrors, EnigmaVirtualMachi
         emit CreateCurve(curveId, strike, sigma, maturity, gamma);
     }
 
+    function _createPool(bytes calldata data) internal returns (uint32 poolId) {}
+
     function _createPool(
         uint128 strike,
         uint24 sigma,
         uint32 maturity,
         uint32 gamma,
         uint256 riskyPerLp,
-        uint256 delLiquidity
+        uint256 deltaLiquidity
     )
         internal
         returns (
             uint8 poolId,
-            uint256 delRisky,
-            uint256 delStable
+            uint256 deltaBase,
+            uint256 deltaQuote
         )
     {
         // ToDo: adjust based on min token decimals.
@@ -109,7 +111,7 @@ contract HyperCreate is HyperCreateEvents, HyperCreateErrors, EnigmaVirtualMachi
         require(riskyPerLp <= PRECISION / factor0, "Too much base");
         uint32 tau = curve.maturity - uint32(lastTimestamp); // time until expiry
         console.log(tau);
-        delStable = ReplicationMath.getStableGivenRisky(
+        deltaQuote = ReplicationMath.getStableGivenRisky(
             0,
             factor0,
             factor1,
@@ -118,23 +120,17 @@ contract HyperCreate is HyperCreateEvents, HyperCreateErrors, EnigmaVirtualMachi
             curve.sigma,
             tau
         );
-        delRisky = (riskyPerLp * delLiquidity) / PRECISION; // riskyDecimals * 1e18 decimals / 1e18 = riskyDecimals
-        delStable = (delStable * delLiquidity) / PRECISION;
+        deltaBase = (riskyPerLp * deltaLiquidity) / PRECISION; // riskyDecimals * 1e18 decimals / 1e18 = riskyDecimals
+        deltaQuote = (deltaQuote * deltaLiquidity) / PRECISION;
 
-        if (delRisky == 0 || delStable == 0) revert CalibrationError(delRisky, delStable);
+        if (deltaBase == 0 || deltaQuote == 0) revert CalibrationError(deltaBase, deltaQuote);
         curves[poolId] = curve; // state update
 
-        Position storage pos = positions[msg.sender][poolId];
-        uint256 amount = delLiquidity - MIN_LIQUIDITY;
-        pos.liquidity += amount; // burn min liquidity, at cost of msg.sender
-        pos.blockTimestamp = lastTimestamp;
+        uint256 amount = deltaLiquidity - MIN_LIQUIDITY;
 
-        Pool storage pool = pools[poolId];
-        pool.internalBase += uint128(delRisky);
-        pool.internalQuote += uint128(delStable);
-        pool.internalLiquidity += uint128(delLiquidity);
-        pool.blockTimestamp = lastTimestamp;
+        /*         _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
+        _increasePosition(poolId, amount); */
 
-        //emit Create(poolId, curve.strike, curve.sigma, curve.maturity, curve.gamma, delRisky, delStable, amount);
+        //emit Create(poolId, curve.strike, curve.sigma, curve.maturity, curve.gamma, deltaBase, deltaQuote, amount);
     }
 }

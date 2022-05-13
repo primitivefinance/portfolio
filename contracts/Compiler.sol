@@ -2,7 +2,6 @@ pragma solidity ^0.8.0;
 
 import "./HyperSwap.sol";
 import "./HyperLiquidity.sol";
-import "./HyperCreate.sol";
 
 interface CompilerEvents {
     event Debit(address token, uint256 amount);
@@ -11,7 +10,7 @@ interface CompilerEvents {
 
 /// @notice Final Boss
 /// @dev Inherits the pool creator, swapper, and liquidity modules.
-contract Compiler is HyperCreate, HyperSwap, HyperLiquidity, CompilerEvents {
+contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
     // --- Fallback --- //
 
     fallback() external payable {

@@ -38,7 +38,6 @@ describe('Compiler', function () {
       const gamma = 1e4 - fee
       const nonce = await contracts.main.curveNonce()
       const payload = encodeCreateCurve(strike, sigma, maturity, fee)
-      console.log(payload.bytes, payload.hex)
       await expect(contracts.main.testCreateCurve(payload.hex))
         .to.emit(contracts.main, 'CreateCurve')
         .withArgs(parseInt(nonce.add(1).toString()), strike, sigma, maturity, gamma)
