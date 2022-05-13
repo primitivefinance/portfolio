@@ -4,6 +4,7 @@ import { Compiler } from '../../typechain-types/Compiler.sol'
 import { Context, contextFixture, Contracts, fixture } from '../shared/fixture'
 import {
   decodePoolId,
+  encodeAddLiquidity,
   encodeCreateCurve,
   encodeCreatePair,
   encodeCreatePool,
@@ -119,6 +120,64 @@ describe('Compiler', function () {
       await expect(contracts.main.testCreatePool(poolPayload.hex))
         .to.emit(contracts.main, 'CreatePool')
         .withArgs(parseInt(poolId), pairId, curveId, deltaBase, deltaQuote, deltaLiquidity)
+    })
+  })
+
+  describe('AddLiquidity', function () {
+    it('adds liquidity and emits the AddLiquidity event', async function () {
+      await contracts.main.setTimestamp(100)
+      const base = contracts.base.address
+      const quote = contracts.quote.address
+
+      const strike = parseEther('10')
+      const sigma = 1e4
+      const maturity = 60 * 60 * 24 * 365 // note: the contracts _blockTimestamp is set to 100.
+      const fee = 100
+      const gamma = 1e4 - fee
+
+      const basePerLiquidity = parseEther('0.69')
+      const deltaLiquidity = parseEther('1')
+
+      const deltaBase = basePerLiquidity
+      const deltaQuote = BigNumber.from('669038505037077076')
+
+      const payloadPair = encodeCreatePair(base, quote)
+      await contracts.main.testCreatePair(payloadPair.hex)
+      const pairId = (await contracts.main.pairNonce()) as BigNumber
+
+      const payloadCurve = encodeCreateCurve(strike, sigma, maturity, fee)
+      await contracts.main.testCreateCurve(payloadCurve.hex)
+      const curveId = (await contracts.main.curveNonce()) as BigNumber
+
+      const poolPayload = encodeCreatePool(
+        parseInt(pairId._hex),
+        parseInt(curveId._hex),
+        basePerLiquidity,
+        deltaLiquidity
+      )
+
+      const rawPayload = poolPayload.bytes.slice(1)
+      const poolId = decodePoolId(rawPayload.slice(0, 6))
+      await contracts.main.testCreatePool(poolPayload.hex)
+
+      const toRemove = deltaLiquidity.div(10)
+
+      const allocatePayload = encodeAddLiquidity(
+        false,
+        parseInt(poolId),
+        deltaBase.div(10),
+        BigNumber.from('66904055621924321')
+      )
+      const computationRoundingHops = 2
+      await expect(contracts.main.testAddLiquidity(allocatePayload.hex))
+        .to.emit(contracts.main, 'AddLiquidity')
+        .withArgs(
+          parseInt(poolId),
+          parseInt(pairId._hex),
+          deltaBase.div(10),
+          '66904055621924321',
+          toRemove.sub(computationRoundingHops)
+        )
     })
   })
 

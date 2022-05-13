@@ -76,4 +76,18 @@ describe('Instructions', function () {
     expect(result[2]).to.be.eq(pairId)
     expect(result[3]._hex).to.be.hexEqual(deltaLiquidity._hex)
   })
+
+  it('testDecodeAddLiquidity', async function () {
+    const poolId = 8
+    const useMax = false
+    const deltaBase = BigNumber.from(300)
+    const deltaQuote = BigNumber.from(700)
+    const data = instruct.encodeAddLiquidity(useMax, poolId, deltaBase, deltaQuote)
+    const result = await instructions.testDecodeAddLiquidity(data.hex)
+    await instructions.testDecodeAddLiquidityGas(data.hex)
+    expect(result[0]).to.be.eq(useMax ? 1 : 0)
+    expect(result[1]).to.be.eq(poolId)
+    expect(result[2]._hex).to.be.hexEqual(deltaBase._hex)
+    expect(result[3]._hex).to.be.hexEqual(deltaQuote._hex)
+  })
 })

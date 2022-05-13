@@ -99,8 +99,7 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
         _cacheAddress(pair.tokenBase, true);
         _cacheAddress(pair.tokenQuote, true);
 
-        if (kind == 1) _addLiquidity(poolId, deltaBase, deltaQuote);
-        else if (kind == 5) _swap(poolId, 0, deltaBase, deltaQuote);
+        if (kind == 5) _swap(poolId, 0, deltaBase, deltaQuote);
 
         uint32[] memory poolIds = new uint32[](1);
         poolIds[0] = uint32(poolId);
@@ -122,8 +121,7 @@ contract Compiler is HyperLiquidity, HyperSwap, CompilerEvents {
             Pair memory tks = pairs[uint16(poolId)];
             _cacheAddress(tks.tokenBase, true);
             _cacheAddress(tks.tokenQuote, true);
-            if (kind == 1) _addLiquidity(poolId, deltaBase, deltaQuote);
-            else if (kind == 5) _swap(poolId, 0, deltaBase, deltaQuote);
+            if (kind == 5) _swap(poolId, 0, deltaBase, deltaQuote);
         }
 
         _settle(poolIds);

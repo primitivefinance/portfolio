@@ -76,6 +76,10 @@ contract TestCompiler is Compiler {
         return _removeLiquidity(data);
     }
 
+    function testAddLiquidity(bytes calldata data) public returns (uint256) {
+        return _addLiquidity(data);
+    }
+
     // -- Test --
 
     function testGetLiquidityMinted(
@@ -106,8 +110,6 @@ contract TestCompiler is Compiler {
         deltaLiquidity = liquidity0;
         uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
         uint256 deltaLiquidity1 = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-        console.log(liquidity0, deltaLiquidity, deltaQuote);
-        console.log(liquidity1, deltaLiquidity);
     }
 
     function testGetReportedPrice(

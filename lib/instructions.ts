@@ -88,7 +88,6 @@ export function decodeFirstByte(byte: number): { max: boolean; ord: number } {
  * @returns
  */
 export function encodeSecondByte(info: number, decimals: number): number {
-  if (info <= 1) return decimals
   return encodePackedByte(info, decimals)
 }
 
@@ -205,25 +204,34 @@ export function encodeRemoveLiquidity(
   return { bytes, hex: bytesToHex(bytes) }
 }
 
-/* export function encodeAddLiquidity(
-  useMax: number,
+export function encodeAddLiquidity(
+  useMax: boolean,
   poolId: number,
-  amount: BigNumber
+  deltaBase: BigNumber,
+  deltaQuote: BigNumber
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.ADD_LIQUIDITY
-  const pairBytes = hexZeroPad(hexlify(pairId), 2)
-  const curveBytes = hexZeroPad(hexlify(curveId), 4)
-  const basePerLiquidityBytes = hexZeroPad(basePerLiquidity.toHexString(), 16)
-  const deltaLiquidityBytes = hexZeroPad(deltaLiquidity.toHexString(), 16)
+  const firstByte = encodeFirstByte(useMax, opcode)
+  if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
+
+  const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
+  const { amount: encodedBase, decimals: decimalsBase } = trailingRunLengthEncode(deltaBase.toString())
+  const { amount: encodedQuote, decimals: decimalsQuote } = trailingRunLengthEncode(deltaQuote.toString())
+  const baseBytes = hexToBytes(BigNumber.from(encodedBase)._hex)
+  const baseDecimalByte = encodeSecondByte(baseBytes.length, decimalsBase)
+  const quoteBytes = hexToBytes(BigNumber.from(encodedQuote)._hex)
+  const quoteDecimalByte = encodeSecondByte(quoteBytes.length, decimalsQuote)
+
   const bytes = [
     ...hexToBytes(hexlify(opcode)),
-    ...hexToBytes(pairBytes),
-    ...hexToBytes(curveBytes),
-    ...hexToBytes(basePerLiquidityBytes),
-    ...hexToBytes(deltaLiquidityBytes),
+    ...hexToBytes(poolIdBytes),
+    baseDecimalByte,
+    ...baseBytes,
+    ...quoteBytes,
+    quoteDecimalByte,
   ]
   return { bytes, hex: bytesToHex(bytes) }
-} */
+}
 
 export function decodePoolId(bytes: number[]): string {
   return bytesToHex(bytes)

@@ -147,10 +147,10 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         pool.internalLiquidity += deltaLiquidity.toUint128();
         pool.blockTimestamp = _blockTimestamp();
 
-        uint16 pairId = uint16(poolId); // ToDo: use actual pair
+        uint16 pairId = uint16(poolId >> 32); // ToDo: use actual pair
         _increaseGlobal(pairId, deltaBase, deltaQuote); // Compared against later to settle operation.
 
-        emit AddLiquidity(poolId, uint16(poolId), deltaBase, deltaQuote, deltaLiquidity);
+        emit AddLiquidity(poolId, pairId, deltaBase, deltaQuote, deltaLiquidity);
     }
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
@@ -199,11 +199,10 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
 
     /// @notice Changes internal "fake" reserves of a pool with `poolId`.
     /// @dev    Liquidity must be credited to an address, and token amounts must be _applyDebited.
-    function _addLiquidity(
-        uint48 poolId,
-        uint256 deltaBase,
-        uint256 deltaQuote
-    ) internal returns (uint256 deltaLiquidity) {
+    function _addLiquidity(bytes calldata data) internal returns (uint256 deltaLiquidity) {
+        (uint8 useMax, uint48 poolId, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data); // Includes opcode
+        // ToDo: make use of useMax flag
+
         if (pools[poolId].blockTimestamp == 0) revert ZilchError(); // Pool doesn't exist.
         deltaLiquidity = getLiquidityMinted(poolId, deltaBase, deltaQuote);
         _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);

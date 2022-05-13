@@ -75,7 +75,27 @@ library Instructions {
         deltaLiquidity = uint128(uint128(bytes16(value) >> ((16 - uint8(value.length)) * 8)) * 10**power);
     }
 
-    function decodeAddLiquidity(bytes calldata data) internal pure returns (uint256) {}
+    function decodeAddLiquidity(bytes calldata data)
+        internal
+        view
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint128 deltaBase,
+            uint128 deltaQuote
+        )
+    {
+        useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
+        poolId = uint48(bytes6(data[1:7]));
+        uint8 basePower = uint8(bytes1(data[7]) & 0x0f);
+        uint8 baseLen = uint8((bytes1(data[7]) & 0xf0) >> 4);
+        uint8 quotePower = uint8(bytes1(data[data.length - 1]) & 0x0f);
+        uint8 quoteLen = uint8((bytes1(data[data.length - 1]) & 0xf0) >> 4);
+        bytes memory base = data[8:8 + baseLen];
+        bytes memory quote = data[baseLen + 8:baseLen + 8 + quoteLen];
+        deltaBase = uint128(uint128(bytes16(base) >> ((16 - uint8(base.length)) * 8)) * 10**basePower);
+        deltaQuote = uint128(uint128(bytes16(quote) >> ((16 - uint8(quote.length)) * 8)) * 10**quotePower);
+    }
 
     function decodeSwapExactETH(bytes calldata data) internal pure returns (uint256) {}
 }

@@ -62,4 +62,29 @@ contract TestInstructions {
     {
         return Instructions.decodeRemoveLiquidity(data);
     }
+
+    function testDecodeAddLiquidity(bytes calldata data)
+        public
+        view
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint128 deltaBase,
+            uint128 deltaQuote
+        )
+    {
+        return Instructions.decodeAddLiquidity(data);
+    }
+
+    function testDecodeAddLiquidityGas(bytes calldata data)
+        public
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint128 deltaBase,
+            uint128 deltaQuote
+        )
+    {
+        return Instructions.decodeAddLiquidity(data);
+    }
 }
