@@ -25,12 +25,13 @@ interface HyperLiquidityErrors {
 }
 
 interface HyperLiquidityEvents {
-    // --- Common --- //
-    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-
+    // --- Critical --- //
     event IncreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
     event DecreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
+
+    // --- Liquidity --- //
+    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
 
     event AddLiquidity(
         uint48 indexed poolId,
@@ -67,7 +68,7 @@ interface HyperLiquidityEvents {
 }
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
-contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVirtualMachine {
+contract HyperLiquidity is EnigmaVirtualMachine {
     using SafeCast for uint256;
 
     // --- View --- //

@@ -16,7 +16,7 @@ interface HyperSwapEvents {
 }
 
 /// @notice Executes trading on a target curve.
-contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
+contract HyperSwap is EnigmaVirtualMachine {
     // --- View --- //
 
     function getInvariant(uint48 poolId) public view returns (int128) {
@@ -28,7 +28,7 @@ contract HyperSwap is HyperSwapEvents, HyperSwapErrors, EnigmaVirtualMachine {
 
     function _updateLastTimestamp(uint48 poolId) internal virtual returns (uint128 blockTimestamp) {
         Pool storage pool = pools[poolId];
-        if (pool.blockTimestamp == 0) revert PoolZilchError();
+        if (pool.blockTimestamp == 0) revert PoolExists();
 
         uint32 curveId = uint32(poolId); // ToDo: Fix with actual curveId
         Curve storage curve = curves[curveId];
