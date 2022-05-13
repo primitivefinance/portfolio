@@ -2,7 +2,14 @@ import hre from 'hardhat'
 import { expect } from 'chai'
 import { Compiler } from '../../typechain-types/Compiler.sol'
 import { Context, contextFixture, Contracts, fixture } from '../shared/fixture'
-import { decodePoolId, encodeCreateCurve, encodeCreatePair, encodeCreatePool, encodeRemoveLiquidity } from '../../lib'
+import {
+  decodePoolId,
+  encodeCreateCurve,
+  encodeCreatePair,
+  encodeCreatePool,
+  encodeRemoveLiquidity,
+  fixedX64ToFloat,
+} from '../../lib'
 import { mintAndApprove } from '../contextHelpers'
 import { Values } from '../constants'
 import { TestERC20 } from '../../typechain-types/test/TestERC20'
@@ -30,8 +37,23 @@ describe('Compiler', function () {
       const zero = await contracts.main.testGetLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
       const one = await contracts.main.getLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
       const two = await contracts.main.getLiquidityMinted2(poolId, internalBase._hex)
-      console.log({ zero, one, two })
     })
+  })
+
+  it('testGetReportedPrice', async function () {
+    const scaleFactorRisky = 1
+    const scaleFactoryStable = 1
+    const { strike, sigma, internalBase } = BasicRealPool
+    const tau = 60 * 60 * 24 * 356 - 100
+    const price = await contracts.main.testGetReportedPrice(
+      scaleFactorRisky,
+      scaleFactoryStable,
+      internalBase,
+      strike,
+      sigma,
+      tau
+    )
+    expect(fixedX64ToFloat(price)).to.be.eq(3.7647263806019016)
   })
 
   describe('CreatePair', function () {

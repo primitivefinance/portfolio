@@ -92,4 +92,23 @@ library ReplicationMath {
         int128 stableX64 = stablePerLiquidity.scaleToX64(scaleFactorStable);
         invariantX64 = stableX64.sub(outputX64);
     }
+
+    function getReportedPrice(
+        uint256 scaleFactorRisky,
+        uint256 scaleFactorStable,
+        uint256 riskyPerLiquidity,
+        uint256 strike,
+        uint256 sigma,
+        uint256 tau
+    ) internal pure returns (int128 reportedPrice) {
+        int128 strikeX64 = strike.scaleToX64(scaleFactorStable);
+        int128 riskyX64 = riskyPerLiquidity.scaleToX64(scaleFactorRisky); // mul by 2^64, div by precision
+        int128 oneMinusRiskyX64 = ONE_INT.sub(riskyX64);
+        int128 volX64 = getProportionalVolatility(sigma, tau);
+        int128 tauX64 = tau.toYears();
+        int128 sigmaX64 = sigma.percentageToX64();
+        int128 step0 = oneMinusRiskyX64.getInverseCDF().mul(volX64).exp();
+        int128 step1 = (int128(-0x8000000000000000)).mul(sigmaX64.pow(2).mul(tauX64)).exp();
+        return strikeX64.mul(step0).mul(step1);
+    }
 }

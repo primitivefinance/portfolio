@@ -35,14 +35,6 @@ interface HyperLiquidityEvents {
         uint256 deltaLiquidity
     );
 
-    event CreatePool(
-        uint48 indexed poolId,
-        uint16 indexed pairId,
-        uint32 indexed curveId,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    );
     event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);
     event CreateCurve(
         uint32 indexed curveId,
@@ -51,6 +43,17 @@ interface HyperLiquidityEvents {
         uint32 indexed maturity,
         uint32 indexed gamma
     );
+    event CreatePool(
+        uint48 indexed poolId,
+        uint16 indexed pairId,
+        uint32 indexed curveId,
+        uint256 deltaBase,
+        uint256 deltaQuote,
+        uint256 deltaLiquidity
+    );
+
+    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
 
     event IncreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
     event DecreaseGlobal(address indexed base, address indexed quote, uint256 deltaBase, uint256 deltaQuote);
@@ -143,11 +146,11 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         pool.internalQuote += deltaQuote.toUint128();
         pool.internalLiquidity += deltaLiquidity.toUint128();
         pool.blockTimestamp = _blockTimestamp();
-        console.log(pool.blockTimestamp);
-        emit AddLiquidity(poolId, uint16(poolId), deltaBase, deltaQuote, deltaLiquidity);
 
-        uint16 pairId = uint16(poolId);
+        uint16 pairId = uint16(poolId); // ToDo: use actual pair
         _increaseGlobal(pairId, deltaBase, deltaQuote); // Compared against later to settle operation.
+
+        emit AddLiquidity(poolId, uint16(poolId), deltaBase, deltaQuote, deltaLiquidity);
     }
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
@@ -155,6 +158,8 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         Position storage pos = positions[msg.sender][poolId];
         pos.liquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
+
+        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
@@ -164,6 +169,8 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
 
         pos.liquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = currentTimestamp.toUint128();
+
+        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
     /// @dev Most important function because it manages the solvency of the Engima.
@@ -224,13 +231,11 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
     }
 
     function _removeLiquidity(bytes calldata data) internal returns (uint256 deltaBase, uint256 deltaQuote) {
+        // ToDo: make use of the useMax flag.
         // note: Does not trim the first byte (engima instruction) because the max flag is encoded in it.
         (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(data);
 
-        // ToDo: make use of the useMax flag.
-
         Pool storage pool = pools[poolId];
-        console.log(poolId, pool.internalBase, pool.blockTimestamp);
         if (pool.blockTimestamp == 0) revert ZilchError();
 
         deltaBase = (pool.internalBase * deltaLiquidity) / pool.internalLiquidity;
@@ -264,6 +269,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
             tokenQuote: quote,
             decimalsQuote: IERC20(quote).decimals()
         });
+
         emit CreatePair(pairId, base, quote);
     }
 
@@ -277,6 +283,7 @@ contract HyperLiquidity is HyperLiquidityErrors, HyperLiquidityEvents, EnigmaVir
         getCurveIds[rawCurveId] = curveId; // note: this is to optimize calldata input when choosing a curve
         uint32 gamma = uint32(1e4 - fee);
         curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
+
         emit CreateCurve(curveId, strike, sigma, maturity, gamma);
     }
 

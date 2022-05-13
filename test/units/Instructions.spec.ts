@@ -71,7 +71,6 @@ describe('Instructions', function () {
     const deltaLiquidity = BigNumber.from(72)
     const data = instruct.encodeRemoveLiquidity(useMax, poolId, deltaLiquidity)
     const result = await instructions.testDecodeRemoveLiquidity(data.hex)
-    console.log({ data, result })
     expect(result[0]).to.be.eq(useMax ? 1 : 0)
     expect(result[1]).to.be.eq(poolId)
     expect(result[2]).to.be.eq(pairId)

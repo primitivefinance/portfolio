@@ -109,4 +109,23 @@ contract TestCompiler is Compiler {
         console.log(liquidity0, deltaLiquidity, deltaQuote);
         console.log(liquidity1, deltaLiquidity);
     }
+
+    function testGetReportedPrice(
+        uint256 scaleFactorRisky,
+        uint256 scaleFactorStable,
+        uint256 riskyPerLiquidity,
+        uint256 strike,
+        uint256 sigma,
+        uint256 tau
+    ) public view returns (int128) {
+        return
+            ReplicationMath.getReportedPrice(
+                scaleFactorRisky,
+                scaleFactorStable,
+                riskyPerLiquidity,
+                strike,
+                sigma,
+                tau
+            );
+    }
 }
