@@ -1,5 +1,5 @@
 import { BigNumber } from 'ethers'
-import { hexlify, isHexString } from 'ethers/lib/utils'
+import { defaultAbiCoder, hexlify, hexZeroPad, isHexString } from 'ethers/lib/utils'
 import { decodePackedByte, encodePackedByte, trailingRunLengthEncode } from './encoders'
 import { bytesToHex, hexToBytes } from './units'
 
@@ -135,5 +135,24 @@ export function encodeCreatePair(base: string, quote: string): { bytes: number[]
   if (!isHexString(base)) throw new Error(`Base address not a hex string: ${base}`)
   if (!isHexString(quote)) throw new Error(`Quote address not a hex string: ${quote}`)
   const bytes = [...hexToBytes(base), ...hexToBytes(quote)]
+  return { bytes, hex: bytesToHex(bytes) }
+}
+
+export function encodeCreateCurve(
+  strike: number,
+  sigma: number,
+  maturity: number,
+  fee: number
+): { bytes: number[]; hex: string } {
+  const strikeByte = hexZeroPad(hexlify(strike), 16)
+  const sigmaByte = hexZeroPad(hexlify(sigma), 3)
+  const maturityByte = hexZeroPad(hexlify(maturity), 4)
+  const feeByte = hexZeroPad(hexlify(fee), 2)
+  const bytes = [
+    ...hexToBytes(sigmaByte),
+    ...hexToBytes(maturityByte),
+    ...hexToBytes(feeByte),
+    ...hexToBytes(strikeByte),
+  ]
   return { bytes, hex: bytesToHex(bytes) }
 }

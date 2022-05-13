@@ -102,7 +102,7 @@ contract Compiler is HyperCreate, HyperSwap, HyperLiquidity, CompilerEvents {
 
         if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
         else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
-        else if (kind == 11) _create(100, 9900, 20, 9970, 5e18, 1e18);
+        else if (kind == 11) _createPool(100, 9900, 20, 9970, 5e18, 1e18);
         else _removeLiquidity(id, deltaLiquidity);
 
         uint8[] memory ids = new uint8[](1);
@@ -127,7 +127,7 @@ contract Compiler is HyperCreate, HyperSwap, HyperLiquidity, CompilerEvents {
             _cacheAddress(tks.tokenQuote, true);
             if (kind == 1) _addLiquidity(id, deltaBase, deltaQuote);
             else if (kind == 5) _swap(id, 0, deltaBase, deltaQuote);
-            else if (kind == 11) _create(10, 9900, 100 + 60 * 60 * 24 * 365, 9970, 5e17, 1e18);
+            else if (kind == 11) _createPool(10, 9900, 100 + 60 * 60 * 24 * 365, 9970, 5e17, 1e18);
             else _removeLiquidity(id, deltaLiquidity);
         }
 

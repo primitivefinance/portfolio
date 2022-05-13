@@ -17,11 +17,19 @@ interface HyperCreateEvents {
         uint256 liquidity
     );
 
-    event CreatePair(address indexed base, address indexed quote);
+    event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);
+    event CreateCurve(
+        uint32 indexed curveId,
+        uint128 strike,
+        uint24 sigma,
+        uint32 indexed maturity,
+        uint32 indexed gamma
+    );
 }
 
 interface HyperCreateErrors {
     error PairExists(uint16 pairId);
+    error CurveExists(uint32 curveId);
     error PoolExpiredError();
     error CalibrationError(uint256, uint256);
 }
@@ -36,8 +44,11 @@ contract HyperCreate is HyperCreateEvents, HyperCreateErrors, EnigmaVirtualMachi
         return uint8(4);
     }
 
-    uint256 pairNonce;
+    uint256 public pairNonce;
     mapping(address => mapping(address => uint16)) public getPairId;
+    mapping(bytes32 => uint32) public getCurveIds;
+
+    uint256 public curveNonce;
 
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
         (address base, address quote) = Instructions.decodeCreatePair(data);
@@ -52,12 +63,25 @@ contract HyperCreate is HyperCreateEvents, HyperCreateErrors, EnigmaVirtualMachi
             tokenQuote: quote,
             decimalsQuote: IERC20(quote).decimals()
         });
-        emit CreatePair(base, quote);
+        emit CreatePair(pairId, base, quote);
     }
 
-    function _create(
+    function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
+        (uint128 strike, uint24 sigma, uint32 maturity, uint16 fee) = Instructions.decodeCreateCurve(data);
+        bytes32 rawCurveId = Decoder.toBytes32(data);
+        curveId = getCurveIds[rawCurveId];
+        if (curveId != 0) revert CurveExists(curveId);
+
+        curveId = uint32(++curveNonce);
+        getCurveIds[rawCurveId] = curveId; // note: this is to optimize calldata input when choosing a curve
+        uint32 gamma = uint32(1e4 - fee);
+        curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
+        emit CreateCurve(curveId, strike, sigma, maturity, gamma);
+    }
+
+    function _createPool(
         uint128 strike,
-        uint32 sigma,
+        uint24 sigma,
         uint32 maturity,
         uint32 gamma,
         uint256 riskyPerLp,

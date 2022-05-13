@@ -43,7 +43,7 @@ contract TestCompiler is Compiler {
     function setCurve(
         uint8 id,
         uint128 strike,
-        uint32 sigma,
+        uint24 sigma,
         uint32 maturity,
         uint32 gamma
     ) public {
@@ -54,5 +54,9 @@ contract TestCompiler is Compiler {
 
     function testCreatePair(bytes calldata data) public returns (uint16) {
         return _createPair(data);
+    }
+
+    function testCreateCurve(bytes calldata data) public returns (uint32) {
+        return _createCurve(data);
     }
 }

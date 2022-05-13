@@ -1,7 +1,3 @@
-import { hexlify } from 'ethers/lib/utils'
-import { Instructions } from './instructions'
-import { bytesToHex, hexToBytes } from './units'
-
 // --- Byte Manipulation --- //
 
 // Left shift 4 bits to put into the higher order bits of a byte.

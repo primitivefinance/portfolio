@@ -1,6 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "./libraries/Instructions.sol";
+import "./libraries/Decoder.sol";
 
 interface EnigmaDataStructures {
     struct Pair {
@@ -24,7 +25,7 @@ interface EnigmaDataStructures {
 
     struct Curve {
         uint128 strike;
-        uint32 sigma;
+        uint24 sigma;
         uint32 maturity;
         uint32 gamma;
     }
@@ -53,12 +54,13 @@ contract EnigmaVirtualMachine is EnigmaDataStructures {
     bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = bytes1(0x0A);
     bytes1 public constant CREATE_POOL = bytes1(0x0B);
     bytes1 public constant CREATE_PAIR = bytes1(0x0C);
+    bytes1 public constant CREATE_CURVE = bytes1(0x0D);
 
     // ----- Enigma State ----- //
     // Pool id -> Pool Data Structure.
     mapping(uint8 => Pool) public pools;
     /// Pool Id -> Curve.
-    mapping(uint8 => Curve) public curves;
+    mapping(uint32 => Curve) public curves;
     // Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;
     // Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
