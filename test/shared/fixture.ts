@@ -1,9 +1,7 @@
 import { ethers } from 'hardhat'
 import { BigNumberish, Signer } from 'ethers'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { TestPrototypeHyper } from '../../typechain-types'
 import { TestERC20 } from '../../typechain-types/test/TestERC20'
-import { TestHyperLiquidity } from '../../typechain-types/test/TestHyperLiquidity'
 import { TestCompiler } from '../../typechain-types/test/TestCompiler'
 
 export async function setupPool(

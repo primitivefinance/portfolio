@@ -1,7 +1,6 @@
 import hre from 'hardhat'
 import { expect } from 'chai'
-import { Compiler } from '../../typechain-types/Compiler.sol'
-import { Context, contextFixture, Contracts, fixture } from '../shared/fixture'
+import { Context, contextFixture, Contracts, fixture, mintAndApprove } from '../shared/fixture'
 import {
   bytesToHex,
   decodePoolId,
@@ -15,12 +14,10 @@ import {
   fixedX64ToFloat,
   INSTRUCTION_JUMP,
 } from '../../lib'
-import { mintAndApprove } from '../contextHelpers'
-import { Values } from '../constants'
 import { TestERC20 } from '../../typechain-types/test/TestERC20'
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
-import { BasicRealPool } from '../shared/utils'
+import { BasicRealPool, Values } from '../shared/utils'
 
 function getSwapTokensFromDir(
   dir: number,
@@ -64,7 +61,7 @@ describe('Compiler', function () {
     expect(fixedX64ToFloat(price)).to.be.eq(3.7647263806019016)
   })
 
-  describe.only('Compiler Fallback', function () {
+  describe('Compiler Fallback', function () {
     it('testJumpProcess: creates a pair using the jump process', async function () {
       const [base, quote] = [contracts.base.address, contracts.quote.address]
       const data = encodeCreatePair(base, quote)
