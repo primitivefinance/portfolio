@@ -22,24 +22,28 @@ describe('HyperSwap.sol', function () {
       const block = await hre.ethers.provider.getBlock(number)
       const timestamp = block.timestamp
       await hre.ethers.provider.send('evm_mine', [timestamp + 1000])
-      await expect(hyperSwap.testCheckSwapMaturityCondition(timestamp)).to.not.be.reverted
+      await expect(hyperSwap.testCheckSwapMaturityCondition(timestamp)).to.not.emit(hyperSwap, 'log').to.not.be.reverted
     })
     it('testGetPhysicalReserves', async function () {
       const liquidity = parseEther('1')
-      await expect(hyperSwap.testGetPhysicalReserves(liquidity)).to.not.be.reverted
+      await expect(hyperSwap.testGetPhysicalReserves(liquidity)).to.not.emit(hyperSwap, 'log').to.not.be.reverted
     })
     it('testGetInvariant', async function () {
-      await expect(hyperSwap.testGetInvariant()).to.not.be.reverted
+      await expect(hyperSwap.testGetInvariant()).to.not.emit(hyperSwap, 'log').to.not.be.reverted
     })
   })
 
   describe('HyperSwap Internal', function () {
     it('testUpdateLastTimestamp', async function () {
-      await expect(hyperSwap.testUpdateLastTimestamp()).to.emit(hyperSwap, 'UpdateLastTimestamp').and.to.not.be.reverted
+      await expect(hyperSwap.testUpdateLastTimestamp())
+        .to.emit(hyperSwap, 'UpdateLastTimestamp')
+        .to.not.emit(hyperSwap, 'log').and.to.not.be.reverted
     })
     it('testSwap', async function () {
-      await expect(hyperSwap.testSwap(0)).to.emit(hyperSwap, 'Swap').and.to.not.be.reverted
-      await expect(hyperSwap.testSwap(1)).to.emit(hyperSwap, 'Swap').and.to.not.be.reverted
+      await expect(hyperSwap.testSwap(0)).to.emit(hyperSwap, 'Swap').and.to.not.emit(hyperSwap, 'log').and.to.not.be
+        .reverted
+      await expect(hyperSwap.testSwap(1)).to.emit(hyperSwap, 'Swap').and.to.not.emit(hyperSwap, 'log').and.to.not.be
+        .reverted
     })
   })
 })

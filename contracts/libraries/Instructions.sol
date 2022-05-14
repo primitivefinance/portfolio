@@ -5,25 +5,17 @@ import "./Decoder.sol";
 library Instructions {
     error DecodePairBytesLength(uint256 length);
 
-    /// @dev Jump encoded data is a multi-instruction packed byte array (instead of padded).
-    /// @param data First byte is pointer of next instruction. Second byte is total instructions.
-    function decodeJumpBytes(bytes calldata data) internal pure returns (uint256) {
-        /* uint8 pointer = uint8(data[0]);
-        uint8 length = uint8(data[1]);
-        uint256 start;
+    function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(token0, token1);
+    }
 
-        // For each instruction set...
-        for (uint256 i; i != length; ++i) {
-            start = uint256(2 + pointer * i);
-            // Get the bytes of the instruction
-            bytes memory instruction = data[start:pointer];
-
-            // Process the instruction
-            _process(instruction);
-
-            // Set the new pointer to the next instruction
-            pointer = uint8(data[pointer]);
-        } */
+    function encodeCreateCurve(
+        uint24 sigma,
+        uint32 maturity,
+        uint16 fee,
+        uint128 strike
+    ) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(sigma, maturity, fee, strike);
     }
 
     /// @dev Expects a 40-byte length array with two addresses packed into it.

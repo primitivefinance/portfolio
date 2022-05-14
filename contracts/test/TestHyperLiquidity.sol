@@ -2,7 +2,7 @@ pragma solidity ^0.8.0;
 
 import "../HyperLiquidity.sol";
 
-contract TestHyperLiquidity is HyperLiquidity {
+contract THyperLiquidity is HyperLiquidity {
     function setTokens(
         uint16 pairId,
         address base,

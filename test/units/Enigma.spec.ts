@@ -14,11 +14,11 @@ describe('EnigmaVirtualMachine.sol', function () {
   describe('Enigma View', function () {
     it('testBalanceOf', async function () {
       await contracts.base.mint(enigma.address, '100')
-      await expect(enigma.testBalanceOf(contracts.base.address)).to.not.be.reverted
+      await expect(enigma.testBalanceOf(contracts.base.address)).to.not.emit(enigma, 'log').to.not.be.reverted
     })
 
     it('testUpdateLastTimestamp', async function () {
-      await expect(enigma.testUpdateLastTimestamp()).to.not.be.reverted
+      await expect(enigma.testUpdateLastTimestamp()).to.not.emit(enigma, 'log').to.not.be.reverted
     })
 
     it('testBlockTimestamp', async function () {
@@ -29,7 +29,7 @@ describe('EnigmaVirtualMachine.sol', function () {
     })
 
     it('tests all constants', async function () {
-      await expect(enigma.testConstants()).to.not.be.reverted
+      await expect(enigma.testConstants()).to.not.emit(enigma, 'log').to.not.be.reverted
     })
   })
 })

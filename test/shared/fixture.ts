@@ -5,6 +5,7 @@ import { TestERC20 } from '../../typechain-types/test/TestERC20'
 import { TestCompiler } from '../../typechain-types/test/TestCompiler'
 import { TestEnigmaVirtualMachine } from '../../typechain-types/test/EnigmaVirtualMachine.t.sol/TestEnigmaVirtualMachine'
 import { TestHyperSwap } from '../../typechain-types/test/HyperSwap.t.sol/TestHyperSwap'
+import { TestHyperLiquidity } from '../../typechain-types/test/HyperLiquidity.t.sol/TestHyperLiquidity'
 
 export async function setupPool(
   contract: TestCompiler,
@@ -43,6 +44,10 @@ export async function deployTestEnigma(hre: HardhatRuntimeEnvironment): Promise<
 
 export async function deployTestHyperSwap(hre: HardhatRuntimeEnvironment): Promise<TestHyperSwap> {
   return (await (await hre.ethers.getContractFactory('TestHyperSwap')).deploy()) as TestHyperSwap
+}
+
+export async function deployTestHyperLiquidity(hre: HardhatRuntimeEnvironment): Promise<TestHyperLiquidity> {
+  return (await (await hre.ethers.getContractFactory('TestHyperLiquidity')).deploy()) as TestHyperLiquidity
 }
 
 export async function contextFixture(hre: HardhatRuntimeEnvironment): Promise<Context> {
