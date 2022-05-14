@@ -95,8 +95,9 @@ contract HyperLiquidity is EnigmaVirtualMachine {
 
     /// @notice Changes internal "fake" reserves of a pool with `poolId`.
     /// @dev    Liquidity must be credited to an address, and token amounts must be _applyDebited.
-    function _addLiquidity(bytes calldata data) internal returns (uint256 deltaLiquidity) {
-        (uint8 useMax, uint48 poolId, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data); // Includes opcode
+    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 deltaLiquidity) {
+        (uint8 useMax, uint48 poolId_, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data); // Includes opcode
+        poolId = poolId_;
         // ToDo: make use of useMax flag
 
         if (pools[poolId].blockTimestamp == 0) revert NonExistentPool(poolId); // Pool doesn't exist.
@@ -105,10 +106,20 @@ contract HyperLiquidity is EnigmaVirtualMachine {
         _increasePosition(poolId, deltaLiquidity);
     }
 
-    function _removeLiquidity(bytes calldata data) internal returns (uint256 deltaBase, uint256 deltaQuote) {
+    function _removeLiquidity(bytes calldata data)
+        internal
+        returns (
+            uint48 poolId,
+            uint256 deltaBase,
+            uint256 deltaQuote
+        )
+    {
         // ToDo: make use of the useMax flag.
         // note: Does not trim the first byte (engima instruction) because the max flag is encoded in it.
-        (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(data);
+        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(
+            data
+        );
+        poolId = poolId_;
 
         Pool storage pool = pools[poolId];
         if (pool.blockTimestamp == 0) revert NonExistentPool(poolId);

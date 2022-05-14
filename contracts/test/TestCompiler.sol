@@ -72,16 +72,41 @@ contract TestCompiler is Compiler {
         return _createPool(data);
     }
 
-    function testRemoveLiquidity(bytes calldata data) public returns (uint256, uint256) {
+    function testRemoveLiquidity(bytes calldata data)
+        public
+        returns (
+            uint48,
+            uint256,
+            uint256
+        )
+    {
         return _removeLiquidity(data);
     }
 
-    function testAddLiquidity(bytes calldata data) public returns (uint256) {
+    function testAddLiquidity(bytes calldata data) public returns (uint48, uint256) {
         return _addLiquidity(data);
     }
 
-    function testSwapExactTokens(bytes calldata data) public returns (uint256) {
+    function testSwapExactTokens(bytes calldata data) public returns (uint48, uint256) {
         return _swapExactTokens(data);
+    }
+
+    /// @dev Should be formatted like a jump instruction set with a INSTRUCTION_JUMP opcode.
+    function testJumpProcess(bytes calldata data) public returns (uint256) {
+        _jumpProcess(data);
+    }
+
+    function testMain(bytes calldata data) public {
+        uint16[] memory pairIds;
+        if (data[0] != INSTRUCTION_JUMP) {
+            pairIds = new uint16[](1);
+            uint16 pairId = _process(data);
+            pairIds[0] = pairId;
+        } else {
+            pairIds = _jumpProcess(data);
+        }
+
+        _settleBalances(pairIds);
     }
 
     // -- Test --

@@ -5,8 +5,30 @@ import "./Decoder.sol";
 library Instructions {
     error DecodePairBytesLength(uint256 length);
 
+    /// @dev Jump encoded data is a multi-instruction packed byte array (instead of padded).
+    /// @param data First byte is pointer of next instruction. Second byte is total instructions.
+    function decodeJumpBytes(bytes calldata data) internal pure returns (uint256) {
+        /* uint8 pointer = uint8(data[0]);
+        uint8 length = uint8(data[1]);
+        uint256 start;
+
+        // For each instruction set...
+        for (uint256 i; i != length; ++i) {
+            start = uint256(2 + pointer * i);
+            // Get the bytes of the instruction
+            bytes memory instruction = data[start:pointer];
+
+            // Process the instruction
+            _process(instruction);
+
+            // Set the new pointer to the next instruction
+            pointer = uint8(data[pointer]);
+        } */
+    }
+
     /// @dev Expects a 40-byte length array with two addresses packed into it.
-    /// @param data Maximum 40 bytes. | 0x | 20 bytes base token | 20 bytes quote token |.
+    /// @param data Maximum 20 + 20 = 40 bytes.
+    /// | 0x | 20 bytes base token | 20 bytes quote token |.
     function decodeCreatePair(bytes calldata data) internal pure returns (address tokenBase, address tokenQuote) {
         if (data.length < 40) revert DecodePairBytesLength(data.length);
         tokenBase = address(bytes20(data[:20]));
@@ -14,7 +36,8 @@ library Instructions {
     }
 
     /// @dev Expects a poolId and two left zero padded amounts for `basePerLiquidity` and `deltaLiquidity`.
-    /// @param data Maximum 38 bytes. | 0x | left-pad 6 bytes poolId | left-pad 16 bytes | left padded 16 bytes |
+    /// @param data Maximum 6 + 16 + 16 = 38 bytes.
+    /// | 0x | left-pad 6 bytes poolId | left-pad 16 bytes | left padded 16 bytes |
     function decodeCreatePool(bytes calldata data)
         internal
         pure
@@ -52,7 +75,8 @@ library Instructions {
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
     /// @dev Expects a 25 length byte array of left padded parameters.
-    /// @param data Maximum 25 bytes. | 0x | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 16 bytes strike |
+    /// @param data Maximum 3 + 4 + 2 + 16 = 25 bytes.
+    /// | 0x | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 16 bytes strike |
     function decodeCreateCurve(bytes calldata data)
         internal
         pure
@@ -71,7 +95,7 @@ library Instructions {
     }
 
     /// @dev Expects an opcode, poolId, and trailing run-length encoded amount.
-    /// @param data Maximum 24 bytes.
+    /// @param data Maximum 1 + 6 + 16 = 23 bytes.
     /// | 0x | 1 packed byte useMax Flag - opcode | 6 byte poolId | 1 packed byte amount length - amount power | amount in amount length bytes |.
     function decodeRemoveLiquidity(bytes calldata data)
         internal
@@ -89,6 +113,9 @@ library Instructions {
         deltaLiquidity = uint128(Decoder.bytesToSingleAmount(data[7:])); // note: does not use higher bits length data, only decimals.
     }
 
+    /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
+    /// @param data Maximum 8 + 16 + 16 = 40 bytes.
+    /// | 0x | 1 packed byte useMax Flag - opcode | 6 byte poolId | 1 packed len-power amount0 | amount0 | amount1 | 1 packed len-power amount1 |.
     function decodeAddLiquidity(bytes calldata data)
         internal
         pure
@@ -111,6 +138,10 @@ library Instructions {
         deltaQuote = uint128(uint128(bytes16(quote) >> ((16 - uint8(quote.length)) * 8)) * 10**quotePower);
     }
 
+    /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
+    /// @dev Expects standard instructions with the end byte specifying swap direction.
+    /// @param data Maximum 1 + 6 + 16 + 1 = 24 bytes.
+    /// | 0x | 1 byte packed flag-opcode | 6 byte poolId | up to 16 byte TRLE amount | 1 byte direction |.
     function decodeSwapExactTokens(bytes calldata data)
         internal
         pure

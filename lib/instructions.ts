@@ -23,6 +23,8 @@ export enum Instructions {
   CREATE_CURVE = 0x0d,
 }
 
+export const INSTRUCTION_JUMP = 0xaa
+
 // --- Full Instruction Encoders --- //
 
 /**
@@ -256,6 +258,36 @@ export function encodeSwapExactTokens(
     ...amountBytes,
     lastByte,
   ]
+  return { bytes, hex: bytesToHex(bytes) }
+}
+
+export function encodeJumpInstruction(instructions: number[][]): { bytes: number[]; hex: string } {
+  const opcode = INSTRUCTION_JUMP
+  const length = instructions.length
+
+  let instructionBytesPacked: number[] = []
+
+  let expectedLength = 1 + 1 // can remove
+
+  let nextPointer: number = 0
+  // For each instruction set, return a new instruction set that has the next pointer
+  instructions.forEach((instruction, i) => {
+    // With the instruction, and index of instruction, we create a new array with the next pointer in front
+    if (i == 0) {
+      nextPointer = instruction.length + 1 + 1 + 1 // add opcode and length and this pointer
+    } else {
+      nextPointer = nextPointer + instruction.length + 1 // note: effectively, instructionBytesPacked.length + instruction.length + 1 + 2 // Add previous length, this instruction, and this pointer byte
+    }
+
+    // [0:opcode, 1:length, 2:pointer, 3 + 40 = 43: instruction, 43 + 1 = 44: pointer, 45 + 40 = 85: instruction]
+    const editedInstruction = [nextPointer, ...instruction]
+    instructionBytesPacked.push(...editedInstruction)
+
+    expectedLength = expectedLength + 1 + instruction.length
+  })
+
+  const bytes = [opcode, length, ...instructionBytesPacked]
+  const actualLength = bytes.length
   return { bytes, hex: bytesToHex(bytes) }
 }
 

@@ -3,14 +3,17 @@ import { expect } from 'chai'
 import { Compiler } from '../../typechain-types/Compiler.sol'
 import { Context, contextFixture, Contracts, fixture } from '../shared/fixture'
 import {
+  bytesToHex,
   decodePoolId,
   encodeAddLiquidity,
   encodeCreateCurve,
   encodeCreatePair,
   encodeCreatePool,
+  encodeJumpInstruction,
   encodeRemoveLiquidity,
   encodeSwapExactTokens,
   fixedX64ToFloat,
+  INSTRUCTION_JUMP,
 } from '../../lib'
 import { mintAndApprove } from '../contextHelpers'
 import { Values } from '../constants'
@@ -59,6 +62,68 @@ describe('Compiler', function () {
       tau
     )
     expect(fixedX64ToFloat(price)).to.be.eq(3.7647263806019016)
+  })
+
+  describe.only('Compiler Fallback', function () {
+    it('testJumpProcess: creates a pair using the jump process', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      const data = encodeCreatePair(base, quote)
+      const jumpInstruction = encodeJumpInstruction([data.bytes])
+      await expect(contracts.main.testJumpProcess(jumpInstruction.hex))
+        .to.emit(contracts.main, 'CreatePair')
+        .withArgs(await contracts.main.pairNonce(), base, quote)
+    })
+
+    it('testJumpProcess: creates two pairs using the jump process', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      const data = encodeCreatePair(base, quote)
+      const data2 = encodeCreatePair(quote, base)
+      const jumpInstruction = encodeJumpInstruction([data.bytes, data2.bytes])
+      const nonce = (await contracts.main.pairNonce()).add(1)
+      await expect(contracts.main.testJumpProcess(jumpInstruction.hex))
+        .to.emit(contracts.main, 'CreatePair')
+        .to.emit(contracts.main, 'CreatePair')
+      const pair1 = await contracts.main.pairs(nonce)
+      expect(pair1.tokenBase).to.be.eq(base)
+      expect(pair1.tokenQuote).to.be.eq(quote)
+      const pair2 = await contracts.main.pairs(nonce.add(1))
+      expect(pair2.tokenBase).to.be.eq(quote)
+      expect(pair2.tokenQuote).to.be.eq(base)
+    })
+
+    it.only('testMain: public function for the fallback to create a Pair, Curve, and Pool', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      const strike = parseEther('10')
+      const sigma = 1e4
+      const maturity = 60 * 60 * 24 * 365 // note: the contracts _blockTimestamp is set to 100.
+      const fee = 100
+      const gamma = 1e4 - fee
+
+      const basePerLiquidity = parseEther('0.69')
+      const deltaLiquidity = parseEther('1')
+
+      const deltaBase = basePerLiquidity
+      const deltaQuote = BigNumber.from('669038505037077076')
+
+      const pairId = ((await contracts.main.pairNonce()) as BigNumber).add(1)
+      const curveId = ((await contracts.main.curveNonce()) as BigNumber).add(1)
+
+      const data0 = encodeCreatePair(base, quote)
+      const data1 = encodeCreateCurve(strike, sigma, maturity, fee)
+      const data2 = encodeCreatePool(parseInt(pairId._hex), parseInt(curveId._hex), basePerLiquidity, deltaLiquidity)
+      const jumpInstruction = encodeJumpInstruction([data0.bytes, data1.bytes, data2.bytes])
+      await expect(contracts.main.testMain(jumpInstruction.hex))
+        .to.emit(contracts.main, 'CreatePool')
+        .to.emit(contracts.main, 'CreateCurve')
+        .to.emit(contracts.main, 'CreatePool')
+    })
+
+    it('fallback#tests the fallback by sending data directly to contract', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      const data = encodeCreatePair(base, quote)
+      const jumpInstruction = encodeJumpInstruction([data.bytes])
+      await context.signer.sendTransaction({ to: contracts.main.address, data: jumpInstruction.hex, value: 0x0 })
+    })
   })
 
   describe('HyperLiquidity', function () {

@@ -46,6 +46,7 @@ contract EnigmaVirtualMachine is IEnigma {
     bytes1 public constant CREATE_POOL = bytes1(0x0B);
     bytes1 public constant CREATE_PAIR = bytes1(0x0C);
     bytes1 public constant CREATE_CURVE = bytes1(0x0D);
+    bytes1 public constant INSTRUCTION_JUMP = bytes1(0xAA);
 
     // ----- Enigma State ----- //
     /// @dev Pool id -> Pair of a Pool.

@@ -53,9 +53,10 @@ contract HyperSwap is EnigmaVirtualMachine {
         emit UpdateLastTimestamp(poolId);
     }
 
-    function _swapExactTokens(bytes calldata data) internal returns (uint256) {
-        (uint8 useMax, uint48 poolId, uint128 deltaIn, uint8 dir) = Instructions.decodeSwapExactTokens(data); // note: includes instruction.
-        uint256 deltaOut = 970860704930000;
+    function _swapExactTokens(bytes calldata data) internal returns (uint48 poolId, uint256 deltaOut) {
+        (uint8 useMax, uint48 poolId_, uint128 deltaIn, uint8 dir) = Instructions.decodeSwapExactTokens(data); // note: includes instruction.
+        poolId = poolId_;
+        deltaOut = 970860704930000;
         _swap(poolId, dir, deltaIn, deltaOut);
     }
 
