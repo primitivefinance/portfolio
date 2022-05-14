@@ -47,8 +47,8 @@ library Reserve {
     /// @notice                 Increases one reserve value and decreases the other
     /// @param  reserve         Reserve state to update
     /// @param  riskyForStable  Direction of swap
-    /// @param  deltaIn         Amount of tokens paid, increases one reserve by
-    /// @param  deltaOut        Amount of tokens sent out, decreases the other reserve by
+    /// @param  deltaIn         Amount of pairs paid, increases one reserve by
+    /// @param  deltaOut        Amount of pairs sent out, decreases the other reserve by
     /// @param  blockTimestamp  Timestamp used to update cumulative reserves
     function swap(
         Data storage reserve,
@@ -69,9 +69,9 @@ library Reserve {
 
     /// @notice                 Add to both reserves and total supply of liquidity
     /// @param  reserve         Reserve storage to manipulate
-    /// @param  delRisky        Amount of risky tokens to add to the reserve
-    /// @param  delStable       Amount of stable tokens to add to the reserve
-    /// @param  delLiquidity    Amount of liquidity created with the provided tokens
+    /// @param  delRisky        Amount of risky pairs to add to the reserve
+    /// @param  delStable       Amount of stable pairs to add to the reserve
+    /// @param  delLiquidity    Amount of liquidity created with the provided pairs
     /// @param  blockTimestamp  Timestamp used to update cumulative reserves
     function allocate(
         Data storage reserve,
@@ -88,8 +88,8 @@ library Reserve {
 
     /// @notice                 Remove from both reserves and total supply of liquidity
     /// @param  reserve         Reserve storage to manipulate
-    /// @param  delRisky        Amount of risky tokens to remove to the reserve
-    /// @param  delStable       Amount of stable tokens to remove to the reserve
+    /// @param  delRisky        Amount of risky pairs to remove to the reserve
+    /// @param  delStable       Amount of stable pairs to remove to the reserve
     /// @param  delLiquidity    Amount of liquidity removed from total supply
     /// @param  blockTimestamp  Timestamp used to update cumulative reserves
     function remove(
@@ -107,9 +107,9 @@ library Reserve {
 
     /// @notice                 Calculates risky and stable token amounts of `delLiquidity`
     /// @param reserve          Reserve in memory to use reserves and liquidity of
-    /// @param delLiquidity     Amount of liquidity to fetch underlying tokens of
-    /// @return delRisky        Amount of risky tokens controlled by `delLiquidity`
-    /// @return delStable       Amount of stable tokens controlled by `delLiquidity`
+    /// @param delLiquidity     Amount of liquidity to fetch underlying pairs of
+    /// @return delRisky        Amount of risky pairs controlled by `delLiquidity`
+    /// @return delStable       Amount of stable pairs controlled by `delLiquidity`
     function getAmounts(Data memory reserve, uint256 delLiquidity)
         internal
         pure

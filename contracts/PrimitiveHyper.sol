@@ -16,7 +16,7 @@ contract PrimitiveHyper {
     error CalibrationError();
 
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
-    uint256 public constant PRECISION = 10 ** 18;
+    uint256 public constant PRECISION = 10**18;
     address public immutable WETH;
 
     struct Pool {
@@ -45,7 +45,9 @@ contract PrimitiveHyper {
 
     mapping(address => mapping(uint256 => uint256)) liquidityOf;
 
-    constructor(address WETH_) { WETH = WETH_; }
+    constructor(address WETH_) {
+        WETH = WETH_;
+    }
 
     struct CreateParams {
         address risky;
@@ -58,13 +60,16 @@ contract PrimitiveHyper {
         uint256 delLiquidity;
     }
 
-    function checkTokens(address risky, address stable) private returns (
-        uint8 riskyDecimals,
-        uint8 stableDecimals,
-        uint256 scaleFactorRisky,
-        uint256 scaleFactorStable,
-        uint256 minLiquidity
-    ) {
+    function checkTokens(address risky, address stable)
+        private
+        returns (
+            uint8 riskyDecimals,
+            uint8 stableDecimals,
+            uint256 scaleFactorRisky,
+            uint256 scaleFactorStable,
+            uint256 minLiquidity
+        )
+    {
         if (risky == stable) revert SameTokenError();
         if (stable == address(0)) stable = WETH;
         if (risky == address(0)) risky = WETH;
@@ -76,19 +81,22 @@ contract PrimitiveHyper {
         if (stableDecimals > 18 || stableDecimals < 6) revert DecimalsError();
 
         unchecked {
-            scaleFactorRisky = 10 ** (18 - riskyDecimals);
-            scaleFactorStable = 10 ** (18 - stableDecimals);
+            scaleFactorRisky = 10**(18 - riskyDecimals);
+            scaleFactorStable = 10**(18 - stableDecimals);
             uint256 lowestDecimals = riskyDecimals < stableDecimals ? riskyDecimals : stableDecimals;
-            minLiquidity = 10 ** (lowestDecimals / MIN_LIQUIDITY_FACTOR);
+            minLiquidity = 10**(lowestDecimals / MIN_LIQUIDITY_FACTOR);
         }
     }
 
     // TODO: Check if it's better to create an engine and a pool separately or do it in one time like this
-    function create(CreateParams memory params) external returns (
-        uint256 poolId,
-        uint256 delRisky,
-        uint256 delStable
-    ) {
+    function create(CreateParams memory params)
+        external
+        returns (
+            uint256 poolId,
+            uint256 delRisky,
+            uint256 delStable
+        )
+    {
         (
             uint8 riskyDecimals,
             uint8 stableDecimals,
@@ -143,18 +151,20 @@ contract PrimitiveHyper {
         delStable = (delStable * params.delLiquidity) / PRECISION;
         if (delRisky == 0 || delStable == 0) revert CalibrationError();
 
-        pools.push(Pool({
-            risky: params.risky,
-            stable: params.stable,
-            strike: params.strike,
-            sigma: params.sigma,
-            gamma: params.gamma,
-            maturity: params.maturity,
-            riskyDecimals: riskyDecimals,
-            stableDecimals: stableDecimals,
-            scaleFactorRisky: scaleFactorRisky,
-            scaleFactorStable: scaleFactorStable
-        }));
+        pools.push(
+            Pool({
+                risky: params.risky,
+                stable: params.stable,
+                strike: params.strike,
+                sigma: params.sigma,
+                gamma: params.gamma,
+                maturity: params.maturity,
+                riskyDecimals: riskyDecimals,
+                stableDecimals: stableDecimals,
+                scaleFactorRisky: scaleFactorRisky,
+                scaleFactorStable: scaleFactorStable
+            })
+        );
 
         poolId = pools.length - 1;
 
@@ -168,13 +178,17 @@ contract PrimitiveHyper {
         uint256 amount = params.delLiquidity - minLiquidity;
         liquidityOf[msg.sender][poolId] += amount;
 
-        // TODO: move risky and stable tokens
+        // TODO: move risky and stable pairs
     }
 
     error ZeroDeltaError();
     error ZeroLiquidityError();
 
-    function allocate(uint256 poolId, uint256 delRisky, uint256 delStable) external returns (uint256 delLiquidity) {
+    function allocate(
+        uint256 poolId,
+        uint256 delRisky,
+        uint256 delStable
+    ) external returns (uint256 delLiquidity) {
         if (delRisky == 0 || delStable == 0) revert ZeroDeltaError();
         Reserve memory reserve = reserves[poolId];
 
@@ -191,7 +205,7 @@ contract PrimitiveHyper {
         reserves[poolId].lastTimestamp = uint32(block.timestamp);
         reserves[poolId].liquidity += uint128(delLiquidity);
 
-        // TODO: move the tokens
+        // TODO: move the pairs
     }
 
     function remove(uint256 poolId, uint256 delLiquidity) external returns (uint256 delRisky, uint256 delStable) {
@@ -209,7 +223,7 @@ contract PrimitiveHyper {
         reserves[poolId].lastTimestamp = uint32(block.timestamp);
         reserves[poolId].liquidity += uint128(delLiquidity);
 
-        // TODO: Send the tokens back
+        // TODO: Send the pairs back
     }
 
     uint256 BUFFER = 120 seconds;
@@ -225,8 +239,6 @@ contract PrimitiveHyper {
         // pools[poolId].lastTimestamp = block.timestamp >= pools[poolId].maturity ? pools[poolId].maturity : block.timestamp;
 
         // if (pools[poolId].lastTimestamp >
-
-
     }
 
     function invariantOf(uint256 poolId) public view returns (int128 invariant) {
@@ -246,9 +258,9 @@ contract PrimitiveHyper {
 
     /// @notice                 Calculates risky and stable token amounts of `delLiquidity`
     /// @param reserve          Reserve in memory to use reserves and liquidity of
-    /// @param delLiquidity     Amount of liquidity to fetch underlying tokens of
-    /// @return delRisky        Amount of risky tokens controlled by `delLiquidity`
-    /// @return delStable       Amount of stable tokens controlled by `delLiquidity`
+    /// @param delLiquidity     Amount of liquidity to fetch underlying pairs of
+    /// @return delRisky        Amount of risky pairs controlled by `delLiquidity`
+    /// @return delStable       Amount of stable pairs controlled by `delLiquidity`
     function getAmounts(Reserve memory reserve, uint256 delLiquidity)
         internal
         pure
