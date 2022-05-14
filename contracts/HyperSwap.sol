@@ -4,7 +4,7 @@ import "./EnigmaVirtualMachine.sol";
 import "./libraries/ReplicationMath.sol";
 
 /// @notice Executes trading on a target curve.
-contract HyperSwap is EnigmaVirtualMachine {
+abstract contract HyperSwap is EnigmaVirtualMachine {
     // --- View --- //
 
     function checkSwapMaturityCondition(uint128 lastTimestamp) public view returns (uint256 elapsed) {

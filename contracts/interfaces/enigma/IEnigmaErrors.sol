@@ -1,6 +1,9 @@
 pragma solidity ^0.8.0;
 
 interface IEnigmaErrors {
+    // --- Compiler --- //
+    error JumpError(uint256 pointer);
+
     // --- Default --- //
     error BalanceError();
     error LockedError();

@@ -29,4 +29,12 @@ contract TestHyperLiquidity is HyperLiquidity {
             blockTimestamp: uint128(block.timestamp)
         });
     }
+
+    function fund(address token, uint256 amount) external override {}
+
+    function draw(
+        address token,
+        uint256 amount,
+        address to
+    ) external override {}
 }

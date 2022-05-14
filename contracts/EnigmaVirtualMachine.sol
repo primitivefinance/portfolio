@@ -5,7 +5,7 @@ import "./interfaces/IERC20.sol";
 import "./libraries/Decoder.sol";
 import "./libraries/Instructions.sol";
 
-contract EnigmaVirtualMachine is IEnigma {
+abstract contract EnigmaVirtualMachine is IEnigma {
     // ----- Reentrancy ----- //
     modifier lock() {
         if (locked != 1) revert LockedError();

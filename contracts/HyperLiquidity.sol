@@ -6,7 +6,7 @@ import "./libraries/ReplicationMath.sol";
 import "./libraries/SafeCast.sol";
 
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
-contract HyperLiquidity is EnigmaVirtualMachine {
+abstract contract HyperLiquidity is EnigmaVirtualMachine {
     using SafeCast for uint256;
 
     // --- View --- //
