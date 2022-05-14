@@ -5,25 +5,15 @@ import "./interfaces/IERC20.sol";
 import "./libraries/ReplicationMath.sol";
 import "./libraries/SafeCast.sol";
 
+/// @title Hyper Liquidity
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.
+/// @dev Processes all pool related instructions.
 abstract contract HyperLiquidity is EnigmaVirtualMachine {
     using SafeCast for uint256;
 
     // --- View --- //
 
-    /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
-    function getLiquidityMinted(
-        uint48 poolId,
-        uint256 deltaBase,
-        uint256 deltaQuote
-    ) public view returns (uint256 deltaLiquidity) {
-        Pool memory pool = pools[poolId];
-        uint256 liquidity0 = (deltaBase * pool.internalLiquidity) / uint256(pool.internalBase);
-        uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
-        deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-    }
-
-    /// @notice Computes the amount of time passed since the Position's liquidity was updated.
+    /// @inheritdoc IEnigmaView
     function checkJitLiquidity(address account, uint48 poolId)
         public
         view
@@ -35,9 +25,80 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
         distance = currentTime - pos.blockTimestamp;
     }
 
+    /// @inheritdoc IEnigmaView
+    function getLiquidityMinted(
+        uint48 poolId,
+        uint256 deltaBase,
+        uint256 deltaQuote
+    ) public view override returns (uint256 deltaLiquidity) {
+        Pool memory pool = pools[poolId];
+        uint256 liquidity0 = (deltaBase * pool.internalLiquidity) / uint256(pool.internalBase);
+        uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
+        deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+    }
+
     // --- Internal Functions --- //
 
+    // --- Global --- //
+
+    /// @dev Most important function because it manages the solvency of the Engima.
+    /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
+    function _increaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] += amount;
+        emit IncreaseGlobal(token, amount);
+    }
+
+    /// @dev Equally important to `_increaseGlobal`.
+    /// @custom:security Critical. Same as above.
+    function _decreaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] -= amount;
+        emit DecreaseGlobal(token, amount);
+    }
+
+    // --- Posiitons --- //
+
+    /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
+    /// @custom:security High. Only method of increasing the liquidity held by accounts.
+    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][poolId];
+        pos.liquidity += deltaLiquidity.toUint128();
+        pos.blockTimestamp = _blockTimestamp();
+
+        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
+    }
+
+    /// @dev Equally important as `_decreasePosition`.
+    /// @custom:security Critical. Includes the JIT liquidity check.
+    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][poolId];
+        (uint256 dist, uint256 currentTimestamp) = checkJitLiquidity(msg.sender, poolId);
+        if (dist < 0) revert JitLiquidity(pos.blockTimestamp, currentTimestamp); // ToDo: Work on JIT mitigation.
+
+        pos.liquidity -= deltaLiquidity.toUint128();
+        pos.blockTimestamp = currentTimestamp.toUint128();
+
+        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
+    }
+
+    // --- Liquidity --- //
+
+    /// @notice Increases internal reserves, liquidity position, and global token balance.
+    /// @dev    Liquidity must be credited to an address, and token amounts must be debited.
+    /// @custom:security High. Handles the state update of positions and the liquidity pool.
+    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 deltaLiquidity) {
+        (uint8 useMax, uint48 poolId_, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data); // Includes opcode
+        poolId = poolId_;
+        // ToDo: make use of useMax flag
+
+        if (pools[poolId].blockTimestamp == 0) revert NonExistentPool(poolId); // Pool doesn't exist.
+        deltaLiquidity = getLiquidityMinted(poolId, deltaBase, deltaQuote);
+        _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
+        _increasePosition(poolId, deltaLiquidity);
+    }
+
+    /// @notice Increases the internal reserves of a pool and global reserves of the pool's token.
     /// @dev Assumes token amounts will be paid and an account's position is increased.
+    /// @custom:security High. Handles the state update of the `pools` and `globalReserves` mappings.
     function _increaseLiquidity(
         uint48 poolId,
         uint256 deltaBase,
@@ -55,57 +116,16 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
         uint16 pairId = uint16(poolId >> 32); // note: first two bytes of poolId is pairId.
         Pair memory pair = pairs[pairId];
 
-        // note: Compared against later to settle transaction.
+        // note: Global reserves are used at the end of instruction processing to settle transactions.
         _increaseGlobal(pair.tokenBase, deltaBase);
         _increaseGlobal(pair.tokenQuote, deltaQuote);
 
         emit AddLiquidity(poolId, pairId, deltaBase, deltaQuote, deltaLiquidity);
     }
 
-    /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
-    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][poolId];
-        pos.liquidity += deltaLiquidity.toUint128();
-        pos.blockTimestamp = _blockTimestamp();
-
-        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
-    }
-
-    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][poolId];
-        (uint256 dist, uint256 currentTimestamp) = checkJitLiquidity(msg.sender, poolId);
-        if (dist < 0) revert JitLiquidity(pos.blockTimestamp, currentTimestamp); // ToDo: Work on JIT mitigation.
-
-        pos.liquidity -= deltaLiquidity.toUint128();
-        pos.blockTimestamp = currentTimestamp.toUint128();
-
-        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
-    }
-
-    /// @dev Most important function because it manages the solvency of the Engima.
-    function _increaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] += amount;
-        emit IncreaseGlobal(token, amount);
-    }
-
-    function _decreaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] += amount;
-        emit DecreaseGlobal(token, amount);
-    }
-
-    /// @notice Changes internal "fake" reserves of a pool with `poolId`.
-    /// @dev    Liquidity must be credited to an address, and token amounts must be _applyDebited.
-    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 deltaLiquidity) {
-        (uint8 useMax, uint48 poolId_, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data); // Includes opcode
-        poolId = poolId_;
-        // ToDo: make use of useMax flag
-
-        if (pools[poolId].blockTimestamp == 0) revert NonExistentPool(poolId); // Pool doesn't exist.
-        deltaLiquidity = getLiquidityMinted(poolId, deltaBase, deltaQuote);
-        _increaseLiquidity(poolId, deltaBase, deltaQuote, deltaLiquidity);
-        _increasePosition(poolId, deltaLiquidity);
-    }
-
+    /// @notice Decreases internal pool reserves, position liquidity, and global token reserves.
+    /// @dev Can revert if JIT check is triggered in `_decreasePosition`.
+    /// @custom:security Critical. Most important instruction for accounts because it processes withdraws.
     function _removeLiquidity(bytes calldata data)
         internal
         returns (
@@ -145,6 +165,29 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
 
     // --- Create --- //
 
+    /// @notice Stores a set of parameters in a Curve struct at the latest `curveNonce`.
+    /// @dev Sigma, maturity, and strike are validated implicitly by their limited size.
+    /// @custom:security Medium. Does not handle tokens. Parameter selection is important and chosen carefully.
+    function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
+        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data[1:]);
+        bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trim the Enigma instruction.
+        curveId = getCurveIds[rawCurveId];
+        if (curveId != 0) revert CurveExists(curveId);
+        if (sigma == 0) revert MinSigma(sigma);
+        if (strike == 0) revert MinStrike(strike);
+        if (fee > MAX_POOL_FEE) revert MaxFee(fee);
+
+        curveId = uint32(++curveNonce);
+        getCurveIds[rawCurveId] = curveId; // note: This is to optimize calldata input when choosing a curve
+        uint32 gamma = uint32(PERCENTAGE - fee);
+        curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
+
+        emit CreateCurve(curveId, strike, sigma, maturity, gamma);
+    }
+
+    /// @notice Stores two token address in a Pair struct at the latest `pairNonce`.
+    /// @dev Pair ids that are 2 bytes are cheaper to reference than 40 bytes of two addresses.
+    /// @custom:security Low. Does not handle tokens, only updates the state of the Enigma.
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
         (address base, address quote) = Instructions.decodeCreatePair(data[1:]);
         pairId = getPairId[base][quote];
@@ -162,24 +205,9 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
         emit CreatePair(pairId, base, quote);
     }
 
-    /// @dev Sets a Curve at the `curveId`. Sigma, maturity, and strike are validated implicitly by their limited size.
-    function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data[1:]);
-        bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: trim the enigma instruction.
-        curveId = getCurveIds[rawCurveId];
-        if (curveId != 0) revert CurveExists(curveId);
-        if (sigma == 0) revert MinSigma(sigma);
-        if (strike == 0) revert MinStrike(strike);
-        if (fee > MAX_POOL_FEE) revert MaxFee(fee);
-
-        curveId = uint32(++curveNonce);
-        getCurveIds[rawCurveId] = curveId; // note: this is to optimize calldata input when choosing a curve
-        uint32 gamma = uint32(PERCENTAGE - fee);
-        curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
-
-        emit CreateCurve(curveId, strike, sigma, maturity, gamma);
-    }
-
+    /// @notice A pool is composed of a pair of tokens and set of curve parameters.
+    /// @dev Expects payment of tokens at the end of instruction processing.
+    /// @custom:security High. Directly handles the initialization of pools including their liquidity.
     function _createPool(bytes calldata data)
         internal
         returns (
