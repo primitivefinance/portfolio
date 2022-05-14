@@ -3,6 +3,18 @@ pragma solidity ^0.8.0;
 import "../EnigmaVirtualMachine.sol";
 import "../libraries/Units.sol";
 
+library StandardPoolHelpers {
+    uint128 public constant STRIKE = 1e19;
+    uint24 public constant SIGMA = 1e4;
+    uint32 public constant MATURITY = 31556953; // adds 1
+    uint16 public constant FEE = 100;
+    uint32 public constant GAMMA = 9900;
+
+    uint128 public constant INTERNAL_BASE = 308537538726000000;
+    uint128 public constant INTERNAL_QUOTE = 3085375387260000000;
+    uint128 public constant INTERNAL_LIQUIDITY = 1e18;
+}
+
 abstract contract Helpers is EnigmaVirtualMachine {
     address public base;
     address public quote;
@@ -18,10 +30,10 @@ abstract contract Helpers is EnigmaVirtualMachine {
         require(quote != address(0x0), "no-quote-token");
 
         Curve storage curve = curves[uint32(poolId)];
-        curve.strike = 1e19; // 10
-        curve.sigma = 1e4; // 100%
-        curve.maturity = uint32(Units.YEAR) + 1; // adds one second because block timestamp is at least 1
-        curve.gamma = 1e4 - 100; // 99%
+        curve.strike = StandardPoolHelpers.STRIKE; // 10
+        curve.sigma = StandardPoolHelpers.SIGMA; // 100%
+        curve.maturity = StandardPoolHelpers.MATURITY; // adds one second because block timestamp is at least 1
+        curve.gamma = StandardPoolHelpers.GAMMA; // 99%
 
         Pair storage pair = pairs[uint16(poolId >> 32)];
         pair.decimalsBase = IERC20(base).decimals();
@@ -30,9 +42,9 @@ abstract contract Helpers is EnigmaVirtualMachine {
         pair.tokenQuote = quote;
 
         Pool storage pool = pools[poolId];
-        pool.internalBase = 308537538726000000; // 0.308
-        pool.internalQuote = 3085375387260000000; // 3.08
-        pool.internalLiquidity = 1e18; // 1
+        pool.internalBase = StandardPoolHelpers.INTERNAL_BASE; // 0.308
+        pool.internalQuote = StandardPoolHelpers.INTERNAL_QUOTE; // 3.08
+        pool.internalLiquidity = StandardPoolHelpers.INTERNAL_LIQUIDITY; // 1
         pool.blockTimestamp = 1; // arbitrary, but cannot be zero!
 
         Position storage pos = positions[msg.sender][poolId];

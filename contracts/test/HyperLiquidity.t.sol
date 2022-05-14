@@ -60,6 +60,29 @@ contract TestExternalLiquidity {
         bytes memory data = Instructions.encodeCreateCurve(sigma, maturity, fee, strike);
         hyper.testCreateCurve(data, sigma, maturity, fee, strike);
     }
+
+    function testCreatePool(address token0, address token1) public {
+        {
+            bytes memory data = Instructions.encodeCreatePair(token0, token1);
+            hyper.testCreatePair(data, token0, token1);
+        }
+        {
+            uint24 sigma = StandardPoolHelpers.SIGMA;
+            uint32 maturity = StandardPoolHelpers.MATURITY + uint32(block.timestamp);
+            uint16 fee = StandardPoolHelpers.FEE;
+            uint128 strike = StandardPoolHelpers.STRIKE;
+            bytes memory data = Instructions.encodeCreateCurve(sigma, maturity, fee, strike);
+            hyper.testCreateCurve(data, sigma, maturity, fee, strike);
+        }
+
+        {
+            uint48 poolId = uint48(0x0100000001);
+            uint128 basePerLiquidity = StandardPoolHelpers.INTERNAL_BASE; // expects parameters to match standard ones.
+            uint128 deltaLiquidity = StandardPoolHelpers.INTERNAL_LIQUIDITY / 1e3; // only mint 1/1000th of the standard liquidity
+            bytes memory data = Instructions.encodeCreatePool(poolId, basePerLiquidity, deltaLiquidity);
+            hyper.testCreatePool(data);
+        }
+    }
 }
 
 contract TestHyperLiquidity is DSTest, Helpers, HyperLiquidity {
@@ -261,6 +284,10 @@ contract TestHyperLiquidity is DSTest, Helpers, HyperLiquidity {
         assertEq(maturity, curve.maturity);
         assertEq(1e4 - fee, curve.gamma);
         assertEq(strike, curve.strike);
+    }
+
+    function testCreatePool(bytes calldata data) public {
+        _createPool(data);
     }
 
     function testCreatePool(bytes calldata data, uint48 poolId) public {}

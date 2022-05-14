@@ -6,7 +6,8 @@ library Instructions {
     error DecodePairBytesLength(uint256 length);
 
     function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(token0, token1);
+        uint8 ecode = 0x0c;
+        data = abi.encodePacked(ecode, token0, token1);
     }
 
     function encodeCreateCurve(
@@ -15,21 +16,32 @@ library Instructions {
         uint16 fee,
         uint128 strike
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(sigma, maturity, fee, strike);
+        uint8 ecode = 0x0D;
+        data = abi.encodePacked(ecode, sigma, maturity, fee, strike);
     }
 
-    /// @dev Expects a 40-byte length array with two addresses packed into it.
-    /// @param data Maximum 20 + 20 = 40 bytes.
-    /// | 0x | 20 bytes base token | 20 bytes quote token |.
+    /// @dev Expects a 41-byte length array with two addresses packed into it.
+    /// @param data Maximum 1 + 20 + 20 = 41 bytes.
+    /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
     function decodeCreatePair(bytes calldata data) internal pure returns (address tokenBase, address tokenQuote) {
         if (data.length < 40) revert DecodePairBytesLength(data.length);
-        tokenBase = address(bytes20(data[:20]));
-        tokenQuote = address(bytes20(data[20:]));
+        // note: first byte is the create pair ecode
+        tokenBase = address(bytes20(data[1:21]));
+        tokenQuote = address(bytes20(data[21:]));
+    }
+
+    function encodeCreatePool(
+        uint48 poolId,
+        uint128 basePerLiquidity,
+        uint128 deltaLiquidity
+    ) internal pure returns (bytes memory data) {
+        uint8 ecode = 0x0b;
+        data = abi.encodePacked(ecode, poolId, basePerLiquidity, deltaLiquidity);
     }
 
     /// @dev Expects a poolId and two left zero padded amounts for `basePerLiquidity` and `deltaLiquidity`.
-    /// @param data Maximum 6 + 16 + 16 = 38 bytes.
-    /// | 0x | left-pad 6 bytes poolId | left-pad 16 bytes | left padded 16 bytes |
+    /// @param data Maximum 1 + 6 + 16 + 16 = 39 bytes.
+    /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes | left padded 16 bytes |
     function decodeCreatePool(bytes calldata data)
         internal
         pure
@@ -41,11 +53,12 @@ library Instructions {
             uint128 deltaLiquidity
         )
     {
-        poolId = uint48(bytes6(data[:6]));
-        pairId = uint16(bytes2(data[:2]));
-        curveId = uint32(bytes4(data[2:6]));
-        basePerLiquidity = uint128(bytes16(data[6:22]));
-        deltaLiquidity = uint128(bytes16(data[22:]));
+        // note: first byte is the create pool enigma code
+        poolId = uint48(bytes6(data[1:7]));
+        pairId = uint16(bytes2(data[1:3]));
+        curveId = uint32(bytes4(data[3:7]));
+        basePerLiquidity = uint128(bytes16(data[7:23]));
+        deltaLiquidity = uint128(bytes16(data[23:]));
     }
 
     /// @dev Expects a 6 byte left-pad `poolId`.
@@ -67,8 +80,8 @@ library Instructions {
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
     /// @dev Expects a 25 length byte array of left padded parameters.
-    /// @param data Maximum 3 + 4 + 2 + 16 = 25 bytes.
-    /// | 0x | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 16 bytes strike |
+    /// @param data Maximum 1 + 3 + 4 + 2 + 16 = 26 bytes.
+    /// | 0x | 1 byte enigma code | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 16 bytes strike |
     function decodeCreateCurve(bytes calldata data)
         internal
         pure
@@ -79,11 +92,12 @@ library Instructions {
             uint128 strike
         )
     {
+        // note: first byte is the create pair ecode
         require(data.length < 32, "Curve data too long");
-        sigma = uint24(bytes3(data[:3]));
-        maturity = uint32(bytes4(data[3:7]));
-        fee = uint16(bytes2(data[7:9]));
-        strike = uint128(bytes16(data[9:]));
+        sigma = uint24(bytes3(data[1:4]));
+        maturity = uint32(bytes4(data[4:8]));
+        fee = uint16(bytes2(data[8:10]));
+        strike = uint128(bytes16(data[10:]));
     }
 
     /// @dev Expects an opcode, poolId, and trailing run-length encoded amount.

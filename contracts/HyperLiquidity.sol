@@ -169,7 +169,7 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
     /// @dev Sigma, maturity, and strike are validated implicitly by their limited size.
     /// @custom:security Medium. Does not handle tokens. Parameter selection is important and chosen carefully.
     function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data[1:]);
+        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data);
         bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trim the Enigma instruction.
         curveId = getCurveIds[rawCurveId];
         if (curveId != 0) revert CurveExists(curveId);
@@ -189,7 +189,7 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
     /// @dev Pair ids that are 2 bytes are cheaper to reference than 40 bytes of two addresses.
     /// @custom:security Low. Does not handle tokens, only updates the state of the Enigma.
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
-        (address base, address quote) = Instructions.decodeCreatePair(data[1:]);
+        (address base, address quote) = Instructions.decodeCreatePair(data);
         pairId = getPairId[base][quote];
         if (pairId != 0) revert PairExists(pairId);
 
@@ -216,9 +216,8 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
             uint256 deltaQuote
         )
     {
-        // note: slices the instruction byte.
         (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 basePerLiquidity, uint128 deltaLiquidity) = Instructions
-            .decodeCreatePool(data[1:]);
+            .decodeCreatePool(data);
         poolId = poolId_;
 
         Curve memory curve = curves[curveId];
