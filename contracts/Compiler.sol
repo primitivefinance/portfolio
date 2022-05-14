@@ -38,18 +38,8 @@ contract Compiler is HyperLiquidity, HyperSwap {
         addressCache[token] = flag;
     }
 
-    function _applyDebit(address token, uint256 amount) private {
-        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
-        else IERC20(token).transferFrom(msg.sender, address(this), amount);
-        emit Debit(token, amount);
-    }
-
-    function _applyCredit(address token, uint256 amount) private {
-        balances[msg.sender][token] += amount;
-        _increaseGlobal(token, amount);
-        emit Credit(token, amount);
-    }
-
+    /// @dev Critical level function that is responsible for handling tokens, debits and credits.
+    ///
     function _settle(uint32[] memory poolIds) private {
         uint256 len = poolIds.length;
         for (uint256 i; i != len; i++) {
@@ -87,6 +77,29 @@ contract Compiler is HyperLiquidity, HyperSwap {
                 _cacheAddress(tks.tokenQuote, false);
             }
         }
+    }
+
+    /// @dev A non-zero debit is a cost that must be paid for a transaction to go through.
+    ///      If a balance exists for the token for the respective account `msg.sender`,
+    ///      it will be used to pay the debit.
+    ///      Else, tokens are expected to be transferred into this contract.
+    ///      Externally paid debits increase the balance of the contract, so the global
+    ///      reserves must be increased.
+    function _applyDebit(address token, uint256 amount) private {
+        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
+        else {
+            _increaseGlobal(token, amount);
+            IERC20(token).transferFrom(msg.sender, address(this), amount);
+        }
+        emit Debit(token, amount);
+    }
+
+    /// @dev A non-zero credit is a receivalble paid to the `msg.sender` account.
+    ///      Positive credits are only applied to the internal balance of the account.
+    ///      Therefore, it does not require a state change for the global reserves.
+    function _applyCredit(address token, uint256 amount) private {
+        balances[msg.sender][token] += amount;
+        emit Credit(token, amount);
     }
 
     // --- External --- //
