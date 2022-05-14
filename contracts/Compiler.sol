@@ -3,25 +3,19 @@ pragma solidity ^0.8.0;
 import "./HyperSwap.sol";
 import "./HyperLiquidity.sol";
 
-import "hardhat/console.sol";
-
 /// @notice Final Boss
 /// @dev Inherits the pool creator, swapper, and liquidity modules.
 contract Compiler is HyperLiquidity, HyperSwap {
     // --- Fallback --- //
 
     fallback() external payable {
-        uint16[] memory pairIds;
         if (msg.data[0] != INSTRUCTION_JUMP) {
-            pairIds = new uint16[](1);
-            uint16 pairId = _process(msg.data);
-            if (pairId != 0) _tempPairIds.push(pairId);
-            //pairIds[0] = pairId;
+            _process(msg.data);
         } else {
-            pairIds = _jumpProcess(msg.data);
+            _jumpProcess(msg.data);
         }
 
-        _settleBalances(pairIds);
+        _settleBalances();
     }
 
     // --- View --- //
@@ -29,8 +23,8 @@ contract Compiler is HyperLiquidity, HyperSwap {
     // --- Internal --- //
 
     function _process(bytes calldata data) internal returns (uint16 pairId) {
-        bytes1 instruction = bytes1(data[0] & 0x0f);
         uint48 poolId;
+        bytes1 instruction = bytes1(data[0] & 0x0f);
 
         if (instruction == ADD_LIQUIDITY) {
             (poolId, ) = _addLiquidity(data);
@@ -46,11 +40,16 @@ contract Compiler is HyperLiquidity, HyperSwap {
             _createPair(data);
         }
 
-        // Caching the addresses to settle the pools interacted with in the fallback function.
-        pairId = uint16(poolId >> 32);
-        Pair memory pair = pairs[pairId];
-        if (!addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
-        if (!addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
+        // note: Only pool interactions have a non-zero poolId.
+        if (poolId != 0) {
+            pairId = uint16(poolId >> 32);
+            // Add the pair to the array to track all the pairs that have been interacted with.
+            _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
+            // Caching the addresses to settle the pools interacted with in the fallback function.
+            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
+            if (!addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
+            if (!addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
+        }
     }
 
     function _cacheAddress(address token, bool flag) internal {
@@ -59,16 +58,16 @@ contract Compiler is HyperLiquidity, HyperSwap {
 
     error JumpError(uint256 pointer);
 
-    uint16[] private _tempPairIds; // note: critical, used in jump process and cleared at end.
+    /// @dev Critical array, used in jump process to track the pairs that were interacted with.
+    /// @notice Cleared at end, never permanently set.
+    uint16[] private _tempPairIds;
 
     /// @dev Expects a special encoding method for multiple instructions.
     /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
-    function _jumpProcess(bytes calldata data) internal returns (uint16[] memory) {
+    function _jumpProcess(bytes calldata data) internal {
         uint8 length = uint8(data[1]);
         uint8 pointer = 2; // note: [opcode, length, instructionPointer, ...instruction, pointer, ...etc]
         uint256 start;
-
-        uint16[] memory pairIds = new uint16[](length); // note: need to return all the pairs interacted with.
 
         // For each instruction set...
         for (uint256 i; i != length; ++i) {
@@ -83,29 +82,18 @@ contract Compiler is HyperLiquidity, HyperSwap {
             bytes calldata instruction = data[start:pointer];
 
             // Process the instruction
-            uint16 pairId = _process(instruction[1:]); // Removes the pointer to the next instruction.
-
-            // Add the pair to the array
-            console.log("adding pairId:", pairId);
-            //if (pairId != 0) pairIds[i] = pairId; // note: pairIds start at 1 because nonce is incremented first.
-            if (pairId != 0) _tempPairIds.push(pairId);
+            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
         }
-
-        return pairIds;
     }
 
     /// @dev Critical level function that is responsible for handling tokens, debits and credits.
-    function _settleBalances(uint16[] memory pairIds) internal {
-        uint256 len = _tempPairIds.length; //pairIds.length;
+    function _settleBalances() internal {
+        uint256 len = _tempPairIds.length;
         uint16[] memory ids = new uint16[](len);
-        console.log("len");
-        console.log(len);
         if (len == 0) return; // note: Dangerous! If pools were interacted with, this return being trigerred would be a failure.
         for (uint256 i; i != len; ++i) {
             uint16 pairId = ids[i];
             Pair memory pair = pairs[pairId];
-            console.log(pairId);
-            console.log(pair.tokenBase, pair.tokenQuote);
             _settleToken(pair.tokenBase);
             _settleToken(pair.tokenQuote);
         }

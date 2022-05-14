@@ -91,7 +91,7 @@ describe('Compiler', function () {
       expect(pair2.tokenQuote).to.be.eq(base)
     })
 
-    it.only('testMain: public function for the fallback to create a Pair, Curve, and Pool', async function () {
+    it('testMain: public function for the fallback to create a Pair, Curve, and Pool', async function () {
       const [base, quote] = [contracts.base.address, contracts.quote.address]
       const strike = parseEther('10')
       const sigma = 1e4

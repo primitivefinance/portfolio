@@ -97,16 +97,13 @@ contract TestCompiler is Compiler {
     }
 
     function testMain(bytes calldata data) public {
-        uint16[] memory pairIds;
         if (data[0] != INSTRUCTION_JUMP) {
-            pairIds = new uint16[](1);
-            uint16 pairId = _process(data);
-            pairIds[0] = pairId;
+            _process(data);
         } else {
-            pairIds = _jumpProcess(data);
+            _jumpProcess(data);
         }
 
-        _settleBalances(pairIds);
+        _settleBalances();
     }
 
     // -- Test --
