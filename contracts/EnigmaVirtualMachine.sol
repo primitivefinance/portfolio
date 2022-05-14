@@ -5,8 +5,11 @@ import "./interfaces/IERC20.sol";
 import "./libraries/Decoder.sol";
 import "./libraries/Instructions.sol";
 
+/// @title Enigma Virtual Machine
+/// @notice Defines the possible instruction set which must be processed in a higher-level compiler.
+/// @dev Implements low-level `balanceOf`, re-entrancy guard, instruction constants and state.
 abstract contract EnigmaVirtualMachine is IEnigma {
-    // ----- Reentrancy ----- //
+    // --- Reentrancy --- //
     modifier lock() {
         if (locked != 1) revert LockedError();
 
@@ -16,12 +19,6 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     }
 
     // --- Internal --- //
-
-    /// @dev Overridable in tests.
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
-    }
-
     /// @dev Gas optimized `balanceOf` method.
     function _balanceOf(address token) internal view returns (uint256) {
         (bool success, bytes memory data) = token.staticcall(
@@ -31,29 +28,33 @@ abstract contract EnigmaVirtualMachine is IEnigma {
         return abi.decode(data, (uint256));
     }
 
-    // ----- Enigma Opcodes ----- //
-    bytes1 public constant UNKNOWN = bytes1(0x00);
-    bytes1 public constant ADD_LIQUIDITY = bytes1(0x01);
-    bytes1 public constant ADD_LIQUIDITY_ETH = bytes1(0x02);
-    bytes1 public constant REMOVE_LIQUIDITY = bytes1(0x03);
-    bytes1 public constant REMOVE_LIQUIDITY_ETH = bytes1(0x04);
-    bytes1 public constant SWAP_EXACT_TOKENS_FOR_TOKENS = bytes1(0x05);
-    bytes1 public constant SWAP_TOKENS_FOR_EXACT_TOKENS = bytes1(0x06);
-    bytes1 public constant SWAP_EXACT_ETH_FOR_TOKENS = bytes1(0x07);
-    bytes1 public constant SWAP_TOKENS_FOR_EXACT_ETH = bytes1(0x08);
-    bytes1 public constant SWAP_EXACT_TOKENS_FOR_ETH = bytes1(0x09);
-    bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = bytes1(0x0A);
-    bytes1 public constant CREATE_POOL = bytes1(0x0B);
-    bytes1 public constant CREATE_PAIR = bytes1(0x0C);
-    bytes1 public constant CREATE_CURVE = bytes1(0x0D);
-    bytes1 public constant INSTRUCTION_JUMP = bytes1(0xAA);
+    /// @dev Overridable in tests.
+    function _blockTimestamp() internal view virtual returns (uint128) {
+        return uint128(block.timestamp);
+    }
 
-    // ----- Enigma State ----- //
+    // --- Instructions --- //
+    bytes1 public constant UNKNOWN = 0x00;
+    bytes1 public constant ADD_LIQUIDITY = 0x01;
+    bytes1 public constant ADD_LIQUIDITY_ETH = 0x02;
+    bytes1 public constant REMOVE_LIQUIDITY = 0x03;
+    bytes1 public constant REMOVE_LIQUIDITY_ETH = 0x04;
+    bytes1 public constant SWAP_EXACT_TOKENS_FOR_TOKENS = 0x05;
+    bytes1 public constant SWAP_TOKENS_FOR_EXACT_TOKENS = 0x06;
+    bytes1 public constant SWAP_EXACT_ETH_FOR_TOKENS = 0x07;
+    bytes1 public constant SWAP_TOKENS_FOR_EXACT_ETH = 0x08;
+    bytes1 public constant SWAP_EXACT_TOKENS_FOR_ETH = 0x09;
+    bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = 0x0A;
+    bytes1 public constant CREATE_POOL = 0x0B;
+    bytes1 public constant CREATE_PAIR = 0x0C;
+    bytes1 public constant CREATE_CURVE = 0x0D;
+    bytes1 public constant INSTRUCTION_JUMP = 0xAA;
+    // --- State --- //
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;
     /// @dev Pool id -> Pool Data Structure.
     mapping(uint48 => Pool) public pools;
-    /// @dev Pool id -> Curve.
+    /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) public curves;
     /// @dev Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
     mapping(address => bool) public addressCache;
