@@ -3,23 +3,33 @@ pragma solidity ^0.8.0;
 import "./EnigmaVirtualMachine.sol";
 import "./libraries/ReplicationMath.sol";
 
-/// @notice Executes trading on a target curve.
+/// @title Hyper Swap
+/// @notice Implements run-time swap execution using Newton's numerical solver to compute amounts.
+/// @dev Processes the swap instructions and logic for all pools.
 abstract contract HyperSwap is EnigmaVirtualMachine {
     // --- View --- //
 
+    /// @dev Expects the latest timestamp of a pool as an argument to compute the elapsed time.
     function checkSwapMaturityCondition(uint128 lastTimestamp) public view returns (uint256 elapsed) {
-        elapsed = _blockTimestamp() - lastTimestamp;
+        uint128 current = _blockTimestamp();
+        if (current > lastTimestamp) elapsed = current - lastTimestamp;
     }
 
-    /// @notice Gets base and quote pairs entitled to argument `liquidity`.
-    function getPhysicalReserves(uint48 poolId, uint256 liquidity) public view returns (uint256 base, uint256 quote) {
+    /// @inheritdoc IEnigmaView
+    function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
+        public
+        view
+        override
+        returns (uint256 deltaBase, uint256 deltaQuote)
+    {
         Pool memory pool = pools[poolId];
         uint256 total = uint256(pool.internalLiquidity);
-        base = (uint256(pool.internalBase) * liquidity) / total;
-        quote = (uint256(pool.internalQuote) * liquidity) / total;
+        deltaBase = (uint256(pool.internalBase) * deltaLiquidity) / total;
+        deltaQuote = (uint256(pool.internalQuote) * deltaLiquidity) / total;
     }
 
-    function getInvariant(uint48 poolId) public view returns (int128 invariant) {
+    /// @inheritdoc IEnigmaView
+    function getInvariant(uint48 poolId) public view override returns (int128 invariant) {
         Curve memory curve = curves[uint32(poolId)]; // note: purposefully removes first two bytes.
         uint32 tau = curve.maturity - uint32(pools[poolId].blockTimestamp); // curve maturity can never be less than lastTimestamp
         (uint256 riskyPerLiquidity, uint256 stablePerLiquidity) = getPhysicalReserves(poolId, PRECISION); // 1e18 liquidity
@@ -37,21 +47,7 @@ abstract contract HyperSwap is EnigmaVirtualMachine {
         );
     }
 
-    // --- Internals --- //
-
-    function _updateLastTimestamp(uint48 poolId) internal virtual returns (uint128 blockTimestamp) {
-        Pool storage pool = pools[poolId];
-        if (pool.blockTimestamp == 0) revert PoolExists();
-
-        uint32 curveId = uint32(poolId); // ToDo: Fix with actual curveId
-        Curve storage curve = curves[curveId];
-        uint32 maturity = curve.maturity;
-        blockTimestamp = _blockTimestamp();
-        if (blockTimestamp > maturity) blockTimestamp = maturity; // if expired, set to the maturity
-
-        pool.blockTimestamp = blockTimestamp; // set state
-        emit UpdateLastTimestamp(poolId);
-    }
+    // --- Internal --- //
 
     function _swapExactTokens(bytes calldata data) internal returns (uint48 poolId, uint256 deltaOut) {
         (uint8 useMax, uint48 poolId_, uint128 deltaIn, uint8 dir) = Instructions.decodeSwapExactTokens(data); // note: includes instruction.
@@ -60,7 +56,10 @@ abstract contract HyperSwap is EnigmaVirtualMachine {
         _swap(poolId, dir, deltaIn, deltaOut);
     }
 
-    /// @param dir 0 = base -> quote, 1 = quote -> base
+    /// @notice Updates the reserves and latest timestamp of the pool at `poolId`.
+    /// @dev Updates the respective reserves and checks the pre and post invariants.
+    /// @param dir Simple way to express the desired swap path. 0 = base -> quote, 1 = quote -> base
+    /// @custom:security High. Directly handles token amounts by altering the reserves of pools.
     function _swap(
         uint48 poolId,
         uint8 dir,
@@ -104,10 +103,9 @@ abstract contract HyperSwap is EnigmaVirtualMachine {
                 curve.sigma,
                 tau
             );
-            // invariant check
+
             if (invariantAfter < invariant) revert InvariantError(invariant, invariantAfter);
 
-            // Commit swap update and settle
             if (dir == 0) {
                 pool.internalBase += uint128(input);
                 pool.internalQuote -= uint128(output);
@@ -130,5 +128,27 @@ abstract contract HyperSwap is EnigmaVirtualMachine {
             dir == 0 ? pair.tokenBase : pair.tokenQuote,
             dir == 0 ? pair.tokenQuote : pair.tokenBase
         );
+    }
+
+    /// @dev First step in a swap is to update a pool's current timestamp, which is used to compute the time until maturity.
+    function _updateLastTimestamp(uint48 poolId) internal virtual returns (uint128 blockTimestamp) {
+        Pool storage pool = pools[poolId];
+        if (pool.blockTimestamp == 0) revert NonExistentPool(poolId);
+
+        uint32 curveId = uint32(poolId); // note: Purposefully uses explicit conversion to get last 4 bytes.
+        Curve storage curve = curves[curveId];
+        uint32 maturity = curve.maturity;
+        blockTimestamp = _blockTimestamp();
+        if (blockTimestamp > maturity) blockTimestamp = maturity; // If expired, set to the maturity.
+
+        pool.blockTimestamp = blockTimestamp; // Updates the state of the pool.
+        emit UpdateLastTimestamp(poolId);
+    }
+
+    // --- External --- //
+
+    /// @inheritdoc IEnigmaActions
+    function updateLastTimestamp(uint48 poolId) external override lock returns (uint128 blockTimestamp) {
+        blockTimestamp = _updateLastTimestamp(poolId);
     }
 }

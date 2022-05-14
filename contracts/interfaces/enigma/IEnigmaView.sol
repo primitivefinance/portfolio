@@ -1,14 +1,7 @@
 pragma solidity ^0.8.0;
 
 interface IEnigmaView {
-    /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
-    /// @dev Designed to round in a direction disadvantageous to the account minting liquidity.
-    /// @custom:security High. Liquidity amounts minted have a direct impact on liquidity pools.
-    function getLiquidityMinted(
-        uint48 poolId,
-        uint256 deltaBase,
-        uint256 deltaQuote
-    ) external view returns (uint256 deltaLiquidity);
+    // --- Liquidity --- //
 
     /// @notice Computes the amount of time passed since the Position's liquidity was updated.
     /// @custom:mev Just In Time (JIT) liquidity is adding and removing liquidity as a sandwich around a transaction.
@@ -20,4 +13,29 @@ interface IEnigmaView {
         external
         view
         returns (uint256 distance, uint256 currentTime);
+
+    /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
+    /// @dev Designed to round in a direction disadvantageous to the account minting liquidity.
+    /// @custom:security High. Liquidity amounts minted have a direct impact on liquidity pools.
+    function getLiquidityMinted(
+        uint48 poolId,
+        uint256 deltaBase,
+        uint256 deltaQuote
+    ) external view returns (uint256 deltaLiquidity);
+
+    // --- Swap --- //
+
+    /// @notice Uses the ReplicationMath.sol trading function to check if a swap is valid.
+    /// @dev Warning! Returns a fixed point 64.64 formatted value.
+    /// @custom:security Critical. The invariant check is the most important check for the Enigma.
+    /// @return invariant FixedPoint64.64 invariant value denominated in `quoteToken` units.
+    function getInvariant(uint48 poolId) external view returns (int128 invariant);
+
+    /// @notice Computes amount of base and quote tokens entitled to `liquidity` amount.
+    /// @dev Can be used to fetch the expected amount of tokens withdrawn from removing `liquidity`.
+    /// @custom:security Medium. Designed to round in a direction disadvantageous to the liquidity owner.
+    function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
+        external
+        view
+        returns (uint256 deltaBase, uint256 deltaQuote);
 }
