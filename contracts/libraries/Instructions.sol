@@ -5,6 +5,10 @@ import "./Decoder.sol";
 library Instructions {
     error DecodePairBytesLength(uint256 length);
 
+    function encodeJumpInstruction() internal pure returns (bytes memory data) {
+        uint8 ecode = 0xaa;
+    }
+
     function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
         uint8 ecode = 0x0c;
         data = abi.encodePacked(ecode, token0, token1);

@@ -112,6 +112,18 @@ describe('Compiler', function () {
       await compiler.helperSetTokens(base.address, quote.address)
       await expect(caller.testProcess(base.address, quote.address)).to.not.emit(compiler, 'log')
     })
+
+    it('testJumpProcess for events', async function () {
+      const { base, quote } = contracts
+      await expect(caller.testJumpProcess(base.address, quote.address))
+        .to.emit(compiler, 'CreatePair')
+        .to.emit(compiler, 'CreateCurve')
+    })
+
+    it('testJumpProcess for errors', async function () {
+      const { base, quote } = contracts
+      await expect(caller.testJumpProcess(base.address, quote.address)).to.not.emit(compiler, 'log')
+    })
   })
 
   it('testGetReportedPrice', async function () {

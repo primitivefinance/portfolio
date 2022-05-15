@@ -86,6 +86,32 @@ contract TestExternalCompiler {
         testAddLiquidity();
         testRemoveLiquidity();
     }
+
+    function testJumpProcess(address token0, address token1) public {
+        uint8 ecode = uint8(0xaa);
+        uint8 length = uint8(0x02);
+        uint8 pointer0;
+        uint8 pointer1;
+
+        bytes memory data0;
+        bytes memory data1;
+
+        {
+            data0 = Instructions.encodeCreatePair(token0, token1);
+            pointer0 = uint8(data0.length) + 3;
+        }
+        {
+            uint24 sigma = StandardPoolHelpers.SIGMA;
+            uint32 maturity = StandardPoolHelpers.MATURITY + uint32(block.timestamp);
+            uint16 fee = StandardPoolHelpers.FEE;
+            uint128 strike = StandardPoolHelpers.STRIKE;
+            data1 = Instructions.encodeCreateCurve(sigma, maturity, fee, strike);
+            pointer1 = pointer0 + uint8(data1.length) + 1;
+        }
+
+        bytes memory data = abi.encodePacked(ecode, length, pointer0, data0, pointer1, data1);
+        compiler.testJumpProcess(data);
+    }
 }
 
 contract TestCompiler is DSTest, Helpers, Compiler {
@@ -200,6 +226,11 @@ contract TestCompiler is DSTest, Helpers, Compiler {
         _process(data);
     }
 
+    /// @dev Should be formatted like a jump instruction set with a INSTRUCTION_JUMP opcode.
+    function testJumpProcess(bytes calldata data) public returns (uint256) {
+        _jumpProcess(data);
+    }
+
     // --- External -- //
 
     function testDraw(
@@ -297,11 +328,6 @@ contract TestCompiler is DSTest, Helpers, Compiler {
 
     function testSwapExactTokens(bytes calldata data) public returns (uint48, uint256) {
         return _swapExactTokens(data);
-    }
-
-    /// @dev Should be formatted like a jump instruction set with a INSTRUCTION_JUMP opcode.
-    function testJumpProcess(bytes calldata data) public returns (uint256) {
-        _jumpProcess(data);
     }
 
     function testMain(bytes calldata data) public {
