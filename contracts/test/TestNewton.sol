@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "../libraries/Newton.sol";
 
@@ -14,7 +15,7 @@ contract TestNewton {
         return y;
     }
 
-    function testCompute(int128 x) public returns (int128) {
+    function testCompute(int128 x) public pure returns (int128) {
         int128 epsilon = ABDKMath64x64.fromUInt(1).div(ABDKMath64x64.fromUInt(1e2));
         uint24 maxRuns = 15;
         return Newton.compute(x, epsilon, maxRuns, _tradingFunction, _derivativeTradingFunction);

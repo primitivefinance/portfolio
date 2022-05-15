@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "./interfaces/IEnigma.sol";
 import "./interfaces/IERC20.sol";
@@ -84,4 +85,6 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
     uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
+    /// @dev Used as the first pointer for the jump process.
+    uint8 public constant JUMP_PROCESS_START_POINTER = 2;
 }

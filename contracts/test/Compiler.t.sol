@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "../Compiler.sol";
 
@@ -14,8 +15,8 @@ contract TestExternalCompiler {
 
     function testAddLiquidity() internal {
         // These amounts are trailing zero run length encoded. So they will be 4 and 4, with 2 and 3 zeroes respectively.
-        uint256 deltaBase = 400;
-        uint256 deltaQuote = 4000;
+        // uint256 deltaBase = 400;
+        // uint256 deltaQuote = 4000;
 
         uint8 ecode = 0x01; // useMax = 0, enigma code = b = 1 = add liquidity
         uint48 poolId = uint48(0x0100000001); // pairId = 0x01, curveId = 0x00000001
@@ -31,8 +32,9 @@ contract TestExternalCompiler {
     }
 
     function testRemoveLiquidity() internal {
+        // uint256 deltaLiquidity = 20; // Only remove a portion
+
         uint48 poolId = uint48(0x0100000001); // pairId = 0x01, curveId = 0x00000001
-        uint256 deltaLiquidity = 20; // Only remove a portion
 
         uint8 ecode = 0x03; // useMax = 0, enigma code = 3 = remove liquidity
         uint8 amount0Info = uint8(0x01); // note: higher order bits SHOULD BE 1, but its 0 for now until the deoder is refactored. Only uses lower order bits.
@@ -115,7 +117,7 @@ contract TestExternalCompiler {
 }
 
 contract TestCompiler is DSTest, Helpers, Compiler {
-    function _liquidityPolicy() internal view override returns (uint256) {
+    function _liquidityPolicy() internal pure override returns (uint256) {
         return 0;
     }
 
@@ -231,7 +233,7 @@ contract TestCompiler is DSTest, Helpers, Compiler {
     }
 
     /// @dev Should be formatted like a jump instruction set with a INSTRUCTION_JUMP opcode.
-    function testJumpProcess(bytes calldata data) public returns (uint256) {
+    function testJumpProcess(bytes calldata data) public {
         _jumpProcess(data);
     }
 
@@ -350,29 +352,7 @@ contract TestCompiler is DSTest, Helpers, Compiler {
         uint48 poolId,
         uint256 deltaBase,
         uint256 deltaQuote
-    )
-        public
-        view
-        returns (
-            uint256 deltaLiquidity,
-            uint256 deltaQuote2,
-            uint256 deltaLiquidity2
-        )
-    {
+    ) public view returns (uint256 deltaLiquidity) {
         deltaLiquidity = getLiquidityMinted(poolId, deltaBase, deltaQuote);
-        (deltaLiquidity2, deltaQuote2) = getLiquidityMinted2(poolId, deltaBase);
-    }
-
-    function getLiquidityMinted2(uint48 poolId, uint256 deltaBase)
-        public
-        view
-        returns (uint256 deltaLiquidity, uint256 deltaQuote)
-    {
-        Pool memory pool = pools[poolId];
-        uint256 liquidity0 = (deltaBase * pool.internalLiquidity) / uint256(pool.internalBase);
-        deltaQuote = (uint256(pool.internalBase) * liquidity0) / uint256(pool.internalLiquidity);
-        deltaLiquidity = liquidity0;
-        uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
-        uint256 deltaLiquidity1 = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
     }
 }

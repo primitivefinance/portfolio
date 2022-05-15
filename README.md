@@ -1,6 +1,8 @@
 # Primitive Hyper
 
-Function arguments bad, packed hex calldata good
+Function arguments bad, packed hex calldata good.
+
+> Note: outdated.
 
 ## Operations
 

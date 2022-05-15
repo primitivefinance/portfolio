@@ -1,11 +1,12 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "../libraries/Instructions.sol";
 
 contract TestInstructions {
     function testDecodePoolId(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint48,
             uint16,
@@ -16,14 +17,14 @@ contract TestInstructions {
     }
 
     /// @dev First byte is the enigma instruction.
-    function testDecodeCreatePair(bytes calldata data) public view returns (address, address) {
+    function testDecodeCreatePair(bytes calldata data) public pure returns (address, address) {
         return Instructions.decodeCreatePair(data);
     }
 
     /// @dev First byte is the enigma instruction.
     function testDecodeCreateCurve(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint24,
             uint32,
@@ -37,7 +38,7 @@ contract TestInstructions {
     /// @dev First byte is the enigma instruction.
     function testDecodeCreatePool(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint48,
             uint16,
@@ -52,7 +53,7 @@ contract TestInstructions {
     /// @dev First byte is the enigma instruction.
     function testDecodeRemoveLiquidity(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint8,
             uint48,
@@ -65,7 +66,7 @@ contract TestInstructions {
 
     function testDecodeAddLiquidity(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint8 useMax,
             uint48 poolId,
@@ -85,12 +86,13 @@ contract TestInstructions {
             uint128 deltaQuote
         )
     {
+        gas = gasleft();
         return Instructions.decodeAddLiquidity(data);
     }
 
     function testDecodeSwap(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint8 useMax,
             uint48 poolId,
@@ -102,6 +104,8 @@ contract TestInstructions {
         return Instructions.decodeSwap(data);
     }
 
+    uint256 public gas;
+
     function testDecodeSwapGas(bytes calldata data)
         public
         returns (
@@ -112,6 +116,7 @@ contract TestInstructions {
             uint8 direction
         )
     {
+        gas = gasleft();
         return Instructions.decodeSwap(data);
     }
 }

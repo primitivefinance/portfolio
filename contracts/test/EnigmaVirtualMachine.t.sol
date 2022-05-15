@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "../EnigmaVirtualMachine.sol";
 
@@ -37,7 +38,7 @@ contract EnigmaVirtualMachineActions is DSTest, EnigmaVirtualMachine {
 
 contract TestEnigmaVirtualMachine is EnigmaVirtualMachineActions {
     // --- Test --- //
-    function testBalanceOf(address token) public returns (uint256) {
+    function testBalanceOf(address token) public {
         uint256 bal0 = IERC20(token).balanceOf(address(this));
         uint256 bal1 = _balanceOf(token, address(this));
         assertEq(bal0, bal1, "unequal-balance");

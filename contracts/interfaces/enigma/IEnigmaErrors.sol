@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 /// @title IEnigmaErrors
 /// @dev All errors thrown by the Enigma and its higher level contracts.

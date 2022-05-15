@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity 0.8.10;
 
 /// @title    Decoder Library
 /// @dev      Solidity library to manipulate and covert bytes

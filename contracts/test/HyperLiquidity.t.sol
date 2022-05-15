@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "../HyperLiquidity.sol";
 
@@ -85,7 +86,7 @@ contract TestExternalLiquidity {
 }
 
 contract TestHyperLiquidity is DSTest, Helpers, HyperLiquidity {
-    function _liquidityPolicy() internal view override returns (uint256) {
+    function _liquidityPolicy() internal pure override returns (uint256) {
         return 0;
     }
 
@@ -93,7 +94,6 @@ contract TestHyperLiquidity is DSTest, Helpers, HyperLiquidity {
 
     function testCheckJitLiquidity() public {
         uint48 poolId = uint48(3);
-        Position storage pos = positions[msg.sender][poolId];
 
         pools[poolId].blockTimestamp = 10;
 
@@ -215,10 +215,7 @@ contract TestHyperLiquidity is DSTest, Helpers, HyperLiquidity {
         uint256 deltaLiquidity
     ) public returns (uint256 deltaBase, uint256 deltaQuote) {
         {
-            (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity_) = Instructions.decodeRemoveLiquidity(
-                data
-            );
-
+            (, uint48 poolId_, , uint128 deltaLiquidity_) = Instructions.decodeRemoveLiquidity(data);
             assertEq(deltaLiquidity_, deltaLiquidity, "decoded-liquidity");
             assertEq(poolId_, poolId, "decoded-poolId");
         }

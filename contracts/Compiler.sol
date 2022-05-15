@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
 import "@rari-capital/solmate/src/tokens/ERC20.sol";
@@ -10,8 +11,6 @@ import "./HyperSwap.sol";
 /// @notice Main contract of the Enigma that implements instruction processing.
 /// @dev Eliminates the use of function signatures. Expects encoded bytes as msg.data in the fallback.
 contract Compiler is HyperLiquidity, HyperSwap {
-    using SafeTransferLib for IERC20;
-
     // --- Fallback --- //
 
     /// @notice Main touchpoint for receiving calls.
@@ -48,7 +47,8 @@ contract Compiler is HyperLiquidity, HyperSwap {
         emit Credit(token, amount);
     }
 
-    /// @dev A positive debit is a cost that must be paid for a transaction to be processed.
+    /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
+    ///      A positive debit is a cost that must be paid for a transaction to be processed.
     ///      If a balance exists for the token for the internal balance of `msg.sender`,
     ///      it will be used to pay the debit.
     ///      Else, tokens are expected to be transferred into this contract using `transferFrom`.
@@ -57,7 +57,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @custom:security Critical. Handles the payment of tokens for all pool actions.
     function _applyDebit(address token, uint256 amount) internal {
         if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
-        else IERC20(token).transferFrom(msg.sender, address(this), amount);
+        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         emit Debit(token, amount);
     }
 
@@ -67,7 +67,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
     function _jumpProcess(bytes calldata data) internal {
         uint8 length = uint8(data[1]);
-        uint8 pointer = 2; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
+        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
         uint256 start;
 
         // For each instruction set...

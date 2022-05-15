@@ -1,7 +1,8 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
-import "@primitivefi/rmm-core/contracts/libraries/SafeCast.sol";
 import "@primitivefi/rmm-core/contracts/libraries/ReplicationMath.sol";
+import "@primitivefi/rmm-core/contracts/libraries/SafeCast.sol";
 
 import "./interfaces/IERC20.sol";
 import "./EnigmaVirtualMachine.sol";

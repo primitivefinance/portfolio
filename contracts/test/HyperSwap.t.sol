@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "@primitivefi/rmm-core/contracts/libraries/Units.sol";
 
@@ -8,7 +9,7 @@ import "./DSTest.sol";
 import "./Helpers.sol";
 
 contract TestHyperSwap is DSTest, Helpers, HyperSwap {
-    function _liquidityPolicy() internal view override returns (uint256) {
+    function _liquidityPolicy() internal pure override returns (uint256) {
         return 0;
     }
 

@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 /// @title IEnigmaEvents
 /// @dev All events emitted from the Enigma and its higher level contracts.

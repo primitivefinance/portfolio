@@ -204,17 +204,6 @@ describe('Compiler', function () {
     })
   })
 
-  describe('HyperLiquidity', function () {
-    it('getLiquidityMinted compared against getLiquidityMinted2', async function () {
-      const poolId = 4
-      const { internalBase, internalQuote, internalLiquidity } = BasicRealPool
-      await contracts.main.setLiquidity(poolId, internalBase, internalQuote, internalLiquidity)
-      const zero = await contracts.main.testGetLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
-      const one = await contracts.main.getLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
-      const two = await contracts.main.getLiquidityMinted2(poolId, internalBase._hex)
-    })
-  })
-
   describe('CreatePair', function () {
     it('creates a pair and emits the CreatePair event', async function () {
       const base = contracts.base.address

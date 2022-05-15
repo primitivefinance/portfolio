@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 /// @title IEngimaDataStructures
 /// @dev All the structs used by the Enigma and its higher level contracts. Returned by the mapping public getters.

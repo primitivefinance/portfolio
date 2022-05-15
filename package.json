@@ -1,7 +1,7 @@
 {
-  "name": "primitive-hyper",
+  "name": "hyper",
   "version": "0.0.1",
-  "description": "Forkable Hardhat template with Primitive flavors.",
+  "description": "Enigma Virtual Machine processes instructions for interacting with liquidity pools.",
   "scripts": {
     "compile": "hardhat compile",
     "typechain": "hardhat typechain",
