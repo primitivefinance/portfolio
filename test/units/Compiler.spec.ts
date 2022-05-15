@@ -18,6 +18,7 @@ import { TestERC20 } from '../../typechain-types/test/TestERC20'
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
 import { BasicRealPool, Values } from '../shared/utils'
+import { TestCompiler, TestExternalCompiler } from '../../typechain-types/test/Compiler.t.sol'
 
 function getSwapTokensFromDir(
   dir: number,
@@ -41,8 +42,59 @@ describe('Compiler', function () {
     context = await contextFixture(hre)
     contracts = await fixture(hre)
 
-    await mintAndApprove(contracts.base, context.user, contracts.main.address, Values.ETHER)
-    await mintAndApprove(contracts.quote, context.user, contracts.main.address, Values.ETHER)
+    //await mintAndApprove(contracts.base, context.user, contracts.main.address, Values.ETHER)
+    //await mintAndApprove(contracts.quote, context.user, contracts.main.address, Values.ETHER)
+  })
+
+  describe.only('Instruction Single & Multi Processing', function () {
+    let compiler: TestCompiler
+    this.beforeEach(async function () {
+      compiler = (await (await hre.ethers.getContractFactory('TestCompiler')).deploy()) as TestCompiler
+      await mintAndApprove(contracts.base, context.user, compiler.address, Values.ETHER)
+      await mintAndApprove(contracts.quote, context.user, compiler.address, Values.ETHER)
+    })
+
+    it('testApplyCredit', async function () {
+      await expect(compiler.testApplyCredit(contracts.base.address, 5))
+        .to.emit(compiler, 'Credit')
+        .withArgs(contracts.base.address, 5)
+        .and.to.not.emit(compiler, 'log')
+    })
+    it('testApplyDebit', async function () {
+      const token = contracts.base.address
+      const amount = 12
+      await expect(compiler.testApplyDebit(token, amount))
+        .to.emit(compiler, 'Debit')
+        .withArgs(token, amount)
+        .and.to.emit(compiler, 'IncreaseGlobal')
+        .and.to.not.emit(compiler, 'log')
+    })
+    it('testSettleToken', async function () {
+      const token = contracts.base.address
+      await expect(compiler.testSettleToken(token))
+        .to.emit(compiler, 'Debit')
+        .withArgs(token, 10)
+        .and.to.emit(compiler, 'Credit')
+        .withArgs(token, 10)
+        .and.to.not.emit(compiler, 'log')
+    })
+    it('testSettleBalances for events', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      await expect(compiler.testSettleBalances(base, quote))
+        .to.emit(compiler, 'Debit')
+        .withArgs(base, 10)
+        .to.emit(compiler, 'Credit')
+        .withArgs(base, 10)
+        .to.emit(compiler, 'Debit')
+        .withArgs(quote, 10)
+        .to.emit(compiler, 'Credit')
+        .withArgs(quote, 10)
+    })
+
+    it('testSettleBalances for fails', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      await expect(compiler.testSettleBalances(base, quote)).to.not.emit(compiler, 'log')
+    })
   })
 
   it('testGetReportedPrice', async function () {

@@ -26,11 +26,11 @@ contract Compiler is HyperLiquidity, HyperSwap {
 
     /// @dev Critical array, used in jump process to track the pairs that were interacted with.
     /// @notice Cleared at end, never permanently set.
-    uint16[] private _tempPairIds;
+    uint16[] internal _tempPairIds;
 
     /// @dev Flag set to true during `_process`. Set to false during `_settleToken`.
     /// @custom:security High. Referenced in settlement to pay for tokens due.
-    function _cacheAddress(address token, bool flag) private {
+    function _cacheAddress(address token, bool flag) internal {
         addressCache[token] = flag;
     }
 
@@ -40,7 +40,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     ///      Positive credits are only applied to the internal balance of the account.
     ///      Therefore, it does not require a state change for the global reserves.
     /// @custom:security Critical. The only method that accounts are credited for tokens.
-    function _applyCredit(address token, uint256 amount) private {
+    function _applyCredit(address token, uint256 amount) internal {
         balances[msg.sender][token] += amount;
         emit Credit(token, amount);
     }
@@ -52,12 +52,9 @@ contract Compiler is HyperLiquidity, HyperSwap {
     ///      Externally paid debits increase the balance of the contract, so the global
     ///      reserves must be increased.
     /// @custom:security Critical. Handles the payment of tokens for all pool actions.
-    function _applyDebit(address token, uint256 amount) private {
+    function _applyDebit(address token, uint256 amount) internal {
         if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
-        else {
-            _increaseGlobal(token, amount);
-            IERC20(token).transferFrom(msg.sender, address(this), amount);
-        }
+        else IERC20(token).transferFrom(msg.sender, address(this), amount);
         emit Debit(token, amount);
     }
 
@@ -125,7 +122,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @custom:security Critical. Handles token payments with `_settleToken`.
     function _settleBalances() internal {
         uint256 len = _tempPairIds.length;
-        uint16[] memory ids = new uint16[](len);
+        uint16[] memory ids = _tempPairIds;
         if (len == 0) return; // note: Dangerous! If pools were interacted with, this return being trigerred would be a failure.
         for (uint256 i; i != len; ++i) {
             uint16 pairId = ids[i];
@@ -140,7 +137,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @dev Increases the `msg.sender` internal balance of a token, or requests payment from them.
     /// @param token Target token to pay or credit.
     /// @custom:security Critical. Handles crediting accounts or requesting payment for debits.
-    function _settleToken(address token) private {
+    function _settleToken(address token) internal {
         if (!addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
         uint256 global = globalReserves[token];
@@ -159,12 +156,16 @@ contract Compiler is HyperLiquidity, HyperSwap {
 
     // --- External --- //
 
+    error DrawBalance();
+
     /// @inheritdoc IEnigmaActions
     function draw(
         address token,
         uint256 amount,
         address to
     ) external lock {
+        // note: Would pull tokens without this conditional check.
+        if (balances[msg.sender][token] < amount) revert DrawBalance();
         _applyDebit(token, amount);
         IERC20(token).transfer(to, amount);
     }

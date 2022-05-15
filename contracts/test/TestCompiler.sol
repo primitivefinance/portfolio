@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 import "../Compiler.sol";
 import "hardhat/console.sol";
 
-contract TestCompiler is Compiler {
+contract TCompiler is Compiler {
     uint256 public timestamp;
 
     function setTimestamp(uint256 timestamp_) public {
