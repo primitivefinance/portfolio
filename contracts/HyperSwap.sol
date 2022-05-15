@@ -6,7 +6,7 @@ import "@primitivefi/rmm-core/contracts/libraries/ReplicationMath.sol";
 import "./EnigmaVirtualMachine.sol";
 
 /// @title Hyper Swap
-/// @notice Implements run-time swap execution using Newton's numerical solver to compute amounts.
+/// @notice Must have higher level contracts implement critical safety checks.
 /// @dev Processes the swap instructions and logic for all pools.
 abstract contract HyperSwap is EnigmaVirtualMachine {
     using SafeCast for uint256;
@@ -54,18 +54,16 @@ abstract contract HyperSwap is EnigmaVirtualMachine {
 
     // --- Internal --- //
 
+    /// @dev Replaces the desired `deltaIn` amount with the `balanceOf` the `msg.sender` if the `useMax` flag is 1.
     function _swapExactForExact(bytes calldata data) internal returns (uint48 poolId, uint256 deltaOut) {
-        (uint8 useMax, uint48 poolId_, uint128 deltaIn, uint128 deltaOut_, uint8 dir) = Instructions.decodeSwap(data); // note: Includes instruction.
+        (uint8 useMax, uint48 poolId_, uint128 deltaIn, uint128 deltaOut_, uint8 dir) = Instructions.decodeSwap(data);
         poolId = poolId_;
         deltaOut = deltaOut_;
 
         if (useMax == 1) {
             Pair memory pair = pairs[uint16(poolId >> 32)];
-            if (dir == 0) {
-                deltaIn = _balanceOf(pair.tokenBase, msg.sender).toUint128();
-            } else {
-                deltaIn = _balanceOf(pair.tokenQuote, msg.sender).toUint128();
-            }
+            if (dir == 0) deltaIn = _balanceOf(pair.tokenBase, msg.sender).toUint128();
+            else deltaIn = _balanceOf(pair.tokenQuote, msg.sender).toUint128();
         }
 
         _swap(poolId, dir, deltaIn, deltaOut);
@@ -81,17 +79,17 @@ abstract contract HyperSwap is EnigmaVirtualMachine {
         uint8 direction,
         uint256 input,
         uint256 output
-    ) internal returns (uint256) {
+    ) internal {
         Pool storage pool = pools[poolId];
 
         uint128 lastTimestamp = _updateLastTimestamp(poolId);
         uint256 secondsPastMaturity = checkSwapMaturityCondition(lastTimestamp);
         if (secondsPastMaturity > BUFFER) revert PoolExpiredError();
-        int128 invariant = getInvariant(poolId);
 
+        int128 invariantX64 = getInvariant(poolId);
         Pair memory pair = pairs[uint16(poolId >> 32)];
         {
-            Curve memory curve = curves[uint32(poolId)]; // note: Explicit converse removes first two bytes, which is the pairId.
+            Curve memory curve = curves[uint32(poolId)]; // note: Explicit conversion removes first two bytes.
             uint32 tau = curve.maturity - uint32(pool.blockTimestamp); // note: Cannot underflow.
             uint256 amountInFee = (input * curve.gamma) / PERCENTAGE;
             uint256 adjustedBase;
@@ -118,7 +116,7 @@ abstract contract HyperSwap is EnigmaVirtualMachine {
                 tau
             );
 
-            if (invariantAfter < invariant) revert InvariantError(invariant, invariantAfter);
+            if (invariantX64 > invariantAfter) revert InvariantError(invariantX64, invariantAfter);
 
             if (direction == 0) {
                 pool.internalBase += uint128(input);

@@ -85,6 +85,7 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
     /// @notice Increases internal reserves, liquidity position, and global token balances.
     /// @dev    Liquidity must be credited to an address, and token amounts must be debited.
     /// @custom:security High. Handles the state update of positions and the liquidity pool.
+    /// @custom:mev Higher level peripheral contract should implement checks that desired liquidity is received.
     function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 deltaLiquidity) {
         (uint8 useMax, uint48 poolId_, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data);
         poolId = poolId_;

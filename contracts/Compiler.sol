@@ -1,34 +1,37 @@
 pragma solidity ^0.8.0;
 
+import "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
+import "@rari-capital/solmate/src/tokens/ERC20.sol";
+
 import "./HyperLiquidity.sol";
 import "./HyperSwap.sol";
 
 /// @title Enigma Compiler
 /// @notice Main contract of the Enigma that implements instruction processing.
-/// @dev Eliminates the majority use of function signatures. Expects encoded bytes as msg.data in the fallback.
+/// @dev Eliminates the use of function signatures. Expects encoded bytes as msg.data in the fallback.
 contract Compiler is HyperLiquidity, HyperSwap {
+    using SafeTransferLib for IERC20;
+
     // --- Fallback --- //
 
     /// @notice Main touchpoint for receiving calls.
     /// @dev Critical: data must be encoded properly to be processed.
     /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
+    /// @custom:mev Higher level security checks must be implemented by calling contract.
     fallback() external payable lock {
-        if (msg.data[0] != INSTRUCTION_JUMP) {
-            _process(msg.data);
-        } else {
-            _jumpProcess(msg.data);
-        }
-
+        if (msg.data[0] != INSTRUCTION_JUMP) _process(msg.data);
+        else _jumpProcess(msg.data);
         _settleBalances();
     }
 
     // --- Private --- //
 
     /// @dev Critical array, used in jump process to track the pairs that were interacted with.
-    /// @notice Cleared at end, never permanently set.
+    /// @notice Cleared at end and never permanently set.
+    /// @custom:security High. Without pairIds to loop through, no token amounts are settled.
     uint16[] internal _tempPairIds;
 
-    /// @dev Flag set to true during `_process`. Set to false during `_settleToken`.
+    /// @dev Flag set to `true` during `_process`. Set to `false` during `_settleToken`.
     /// @custom:security High. Referenced in settlement to pay for tokens due.
     function _cacheAddress(address token, bool flag) internal {
         addressCache[token] = flag;
@@ -36,19 +39,19 @@ contract Compiler is HyperLiquidity, HyperSwap {
 
     // --- Internal --- //
 
-    /// @dev A non-zero credit is a receivalble paid to the `msg.sender` account.
+    /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
     ///      Positive credits are only applied to the internal balance of the account.
     ///      Therefore, it does not require a state change for the global reserves.
-    /// @custom:security Critical. The only method that accounts are credited for tokens.
+    /// @custom:security Critical. Only method which credits accounts with tokens.
     function _applyCredit(address token, uint256 amount) internal {
         balances[msg.sender][token] += amount;
         emit Credit(token, amount);
     }
 
-    /// @dev A non-zero debit is a cost that must be paid for a transaction to go through.
-    ///      If a balance exists for the token for the respective account `msg.sender`,
+    /// @dev A positive debit is a cost that must be paid for a transaction to be processed.
+    ///      If a balance exists for the token for the internal balance of `msg.sender`,
     ///      it will be used to pay the debit.
-    ///      Else, tokens are expected to be transferred into this contract.
+    ///      Else, tokens are expected to be transferred into this contract using `transferFrom`.
     ///      Externally paid debits increase the balance of the contract, so the global
     ///      reserves must be increased.
     /// @custom:security Critical. Handles the payment of tokens for all pool actions.
@@ -168,12 +171,12 @@ contract Compiler is HyperLiquidity, HyperSwap {
         // note: Would pull tokens without this conditional check.
         if (balances[msg.sender][token] < amount) revert DrawBalance();
         _applyDebit(token, amount);
-        IERC20(token).transfer(to, amount);
+        SafeTransferLib.safeTransfer(ERC20(token), to, amount);
     }
 
     /// @inheritdoc IEnigmaActions
     function fund(address token, uint256 amount) external override lock {
         _applyCredit(token, amount);
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
+        SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
 }
