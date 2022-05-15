@@ -91,19 +91,22 @@ contract Compiler is HyperLiquidity, HyperSwap {
     function _process(bytes calldata data) internal returns (uint16 pairId) {
         uint48 poolId;
         bytes1 instruction = bytes1(data[0] & 0x0f);
+        if (instruction == UNKNOWN) revert UnknownInstruction();
 
         if (instruction == ADD_LIQUIDITY) {
             (poolId, ) = _addLiquidity(data);
         } else if (instruction == REMOVE_LIQUIDITY) {
             (poolId, , ) = _removeLiquidity(data);
-        } else if (instruction == SWAP_EXACT_TOKENS_FOR_TOKENS) {
-            (poolId, ) = _swapExactTokens(data);
+        } else if (instruction == SWAP) {
+            (poolId, ) = _swapExactForExact(data);
         } else if (instruction == CREATE_POOL) {
             _createPool(data);
         } else if (instruction == CREATE_CURVE) {
             _createCurve(data);
         } else if (instruction == CREATE_PAIR) {
             _createPair(data);
+        } else {
+            revert UnknownInstruction();
         }
 
         // note: Only pool interactions have a non-zero poolId.
@@ -141,7 +144,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
         if (!addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
         uint256 global = globalReserves[token];
-        uint256 actual = _balanceOf(token);
+        uint256 actual = _balanceOf(token, address(this));
 
         if (global > actual) {
             uint256 deficit = global - actual;

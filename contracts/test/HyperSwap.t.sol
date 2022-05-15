@@ -8,6 +8,10 @@ import "./DSTest.sol";
 import "./Helpers.sol";
 
 contract TestHyperSwap is DSTest, Helpers, HyperSwap {
+    function _liquidityPolicy() internal view override returns (uint256) {
+        return 0;
+    }
+
     // --- View --- //
     function testCheckSwapMaturityCondition(uint128 timestamp) public {
         require(block.timestamp > timestamp, "HyperSwap/timestamp-not-mature");

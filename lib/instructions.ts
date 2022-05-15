@@ -12,7 +12,7 @@ export enum Instructions {
   ADD_LIQUIDITY_ETH = 0x02,
   REMOVE_LIQUIDITY = 0x03,
   REMOVE_LIQUIDITY_ETH = 0x04,
-  SWAP_EXACT_TOKENS_FOR_TOKENS = 0x05,
+  SWAP = 0x05,
   SWAP_TOKENS_FOR_EXACT_TOKENS,
   SWAP_EXACT_ETH_FOR_TOKENS,
   SWAP_TOKENS_FOR_EXACT_ETH,
@@ -220,17 +220,22 @@ export function encodeAddLiquidity(
   const { amount: encodedBase, decimals: decimalsBase } = trailingRunLengthEncode(deltaBase.toString())
   const { amount: encodedQuote, decimals: decimalsQuote } = trailingRunLengthEncode(deltaQuote.toString())
   const baseBytes = hexToBytes(BigNumber.from(encodedBase)._hex)
-  const baseDecimalByte = encodeSecondByte(baseBytes.length, decimalsBase)
+  const baseDecimalByte = decimalsBase
   const quoteBytes = hexToBytes(BigNumber.from(encodedQuote)._hex)
-  const quoteDecimalByte = encodeSecondByte(quoteBytes.length, decimalsQuote)
+  const quoteDecimalByte = decimalsQuote
+
+  const firstSection = [firstByte, ...hexToBytes(poolIdBytes)]
+  const secondSection = [baseDecimalByte, ...baseBytes]
+  const pointer = firstSection.length + secondSection.length + 1
 
   const bytes = [
-    ...hexToBytes(hexlify(opcode)),
+    firstByte,
     ...hexToBytes(poolIdBytes),
+    pointer,
     baseDecimalByte,
     ...baseBytes,
-    ...quoteBytes,
     quoteDecimalByte,
+    ...quoteBytes,
   ]
   return { bytes, hex: bytesToHex(bytes) }
 }
@@ -239,25 +244,35 @@ export function encodeSwapExactTokens(
   useMax: boolean,
   poolId: number,
   deltaIn: BigNumber,
+  deltaOut: BigNumber,
   direction: 0 | 1
 ): { bytes: number[]; hex: string } {
-  const opcode = Instructions.SWAP_EXACT_TOKENS_FOR_TOKENS
+  const opcode = Instructions.SWAP
   const firstByte = encodeFirstByte(useMax, opcode)
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
   const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const { amount, decimals } = trailingRunLengthEncode(deltaIn.toString())
-  const amountBytes = hexToBytes(BigNumber.from(amount)._hex)
-  const amountDecimalByte = encodeSecondByte(0, decimals)
-  const lastByte = direction
+  const { amount: input, decimals: inputDecimals } = trailingRunLengthEncode(deltaIn.toString())
+  const { amount: output, decimals: outputDecimals } = trailingRunLengthEncode(deltaOut.toString())
+  const inputBytes = hexToBytes(BigNumber.from(input)._hex)
+  const outputBytes = hexToBytes(BigNumber.from(output)._hex)
+  const lastByte = hexToBytes(BigNumber.from(direction)._hex)
+
+  const firstSection = [firstByte, ...hexToBytes(poolIdBytes)]
+  const secondSection = [inputDecimals, ...inputBytes]
+  const pointer = firstSection.length + secondSection.length + 1
 
   const bytes = [
-    ...hexToBytes(hexlify(opcode)),
+    firstByte,
     ...hexToBytes(poolIdBytes),
-    amountDecimalByte,
-    ...amountBytes,
-    lastByte,
+    pointer,
+    inputDecimals,
+    ...inputBytes,
+    outputDecimals,
+    ...outputBytes,
+    ...lastByte,
   ]
+
   return { bytes, hex: bytesToHex(bytes) }
 }
 

@@ -39,7 +39,7 @@ contract TestEnigmaVirtualMachine is EnigmaVirtualMachineActions {
     // --- Test --- //
     function testBalanceOf(address token) public returns (uint256) {
         uint256 bal0 = IERC20(token).balanceOf(address(this));
-        uint256 bal1 = _balanceOf(token);
+        uint256 bal1 = _balanceOf(token, address(this));
         assertEq(bal0, bal1, "unequal-balance");
     }
 

@@ -88,28 +88,30 @@ contract TestInstructions {
         return Instructions.decodeAddLiquidity(data);
     }
 
-    function testDecodeSwapExactTokens(bytes calldata data)
+    function testDecodeSwap(bytes calldata data)
         public
         view
         returns (
             uint8 useMax,
             uint48 poolId,
             uint128 deltaIn,
+            uint128 deltaOut,
             uint8 direction
         )
     {
-        return Instructions.decodeSwapExactTokens(data);
+        return Instructions.decodeSwap(data);
     }
 
-    function testDecodeSwapExactTokensGas(bytes calldata data)
+    function testDecodeSwapGas(bytes calldata data)
         public
         returns (
             uint8 useMax,
             uint48 poolId,
             uint128 deltaIn,
+            uint128 deltaOut,
             uint8 direction
         )
     {
-        return Instructions.decodeSwapExactTokens(data);
+        return Instructions.decodeSwap(data);
     }
 }

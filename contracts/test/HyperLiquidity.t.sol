@@ -20,14 +20,15 @@ contract TestExternalLiquidity {
 
         uint8 ecode = 0x01; // useMax = 0, enigma code = b = 1 = add liquidity
         uint48 poolId = uint48(0x0100000001); // pairId = 0x01, curveId = 0x00000001
-        uint8 amount0Info = uint8(0x12); // length of 1, two appended zeros
+        uint8 power0 = uint8(0x02); // two appended zeros
         // since length is 1, we only use one byte!
         uint8 amount0 = uint8(0x04); // so 4 and two zeroes = 400
-        uint8 amount1Info = uint8(0x13); // length of 1, three zeroes
+        uint8 power1 = uint8(0x03); //  three zeroes
         // since length is 1, we only use one byte!
         uint8 amount1 = uint8(0x04); // three appended zeroes, so 4000
         // this is using the trailing run-length encoded amounts!
-        bytes memory data = abi.encodePacked(ecode, poolId, amount0Info, amount0, amount1, amount1Info);
+        uint8 pointer = uint8(0x0A); // ecode + 6 byte poolId + pointer + power + 1 byte amount
+        bytes memory data = abi.encodePacked(ecode, poolId, pointer, power0, amount0, power1, amount1);
         hyper.testAddLiquidity(data, poolId, deltaBase, deltaQuote);
     }
 
@@ -84,6 +85,10 @@ contract TestExternalLiquidity {
 }
 
 contract TestHyperLiquidity is DSTest, Helpers, HyperLiquidity {
+    function _liquidityPolicy() internal view override returns (uint256) {
+        return 0;
+    }
+
     // --- Must Implement --- //
 
     function testCheckJitLiquidity() public {

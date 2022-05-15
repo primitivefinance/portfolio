@@ -14,7 +14,7 @@ interface IEnigmaView {
     function checkJitLiquidity(address account, uint48 poolId)
         external
         view
-        returns (uint256 distance, uint256 currentTime);
+        returns (uint256 distance, uint256 timestamp);
 
     /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
     /// @dev Designed to round in a direction disadvantageous to the account minting liquidity.
@@ -28,7 +28,7 @@ interface IEnigmaView {
     // --- Swap --- //
 
     /// @notice Uses the ReplicationMath.sol trading function to check if a swap is valid.
-    /// @dev Warning! Returns a fixed point 64.64 formatted value.
+    /// @dev Warning! Can revert if poolId references an unsynced pool. Returns a fixed point 64.64 formatted value.
     /// @custom:security Critical. The invariant check is the most important check for the Enigma.
     /// @return invariant FixedPoint64.64 invariant value denominated in `quoteToken` units.
     function getInvariant(uint48 poolId) external view returns (int128 invariant);

@@ -8,6 +8,8 @@ interface IEnigmaErrors {
     error DrawBalance();
     /// @dev Thrown when the jump pointer is further than the length of the next instruction.
     error JumpError(uint256 pointer);
+    /// @dev Thrown if the instruction byte is 0x00 or does not match a valid instruction.
+    error UnknownInstruction();
 
     // --- Default --- //
     /// @dev Thrown when the `IERC20.balanceOf` returns false or less data than expected.
@@ -28,6 +30,8 @@ interface IEnigmaErrors {
     error DecimalsError(uint8 decimals);
     /// @dev Thrown if creating a pair with the same token.
     error SameTokenError();
+    /// @dev Thrown if the amount of base tokens per liquidity is outside of the bounds 0 < x < 1.
+    error PerLiquidityError(uint256 deltaBase);
 
     // --- Validation --- //
     /// @dev Thrown when creating a pool that has one side of the pool have zero tokens.
@@ -45,7 +49,7 @@ interface IEnigmaErrors {
 
     // --- Special --- //
     /// @dev Thrown if the JIT liquidity condition is false.
-    error JitLiquidity(uint256 lastTime, uint256 currentTime);
+    error JitLiquidity(uint256 lastTime, uint256 timestamp);
 
     // --- Swap --- //
     /// @dev Thrown if the effects of a swap put the pool in an invalid state according the the trading function.

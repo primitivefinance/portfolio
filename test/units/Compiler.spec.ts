@@ -379,7 +379,7 @@ describe('Compiler', function () {
 
       const deltaOut = parseEther('0.000970860704930000')
       const dir = 0
-      const swapPayload = encodeSwapExactTokens(false, parseInt(poolId), deltaIn, dir)
+      const swapPayload = encodeSwapExactTokens(false, parseInt(poolId), deltaIn, deltaOut, dir)
       const tokens = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
       await expect(contracts.main.testSwapExactTokens(swapPayload.hex))
         .to.emit(contracts.main, 'Swap')
