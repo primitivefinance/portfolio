@@ -1,43 +1,103 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "./Decoder.sol";
 
 library Instructions {
-    error DecodePairBytesLength(uint256 length);
+    error DecodePairBytesLength(uint256 expected, uint256 length);
 
-    /// @dev Jump encoded data is a multi-instruction packed byte array (instead of padded).
-    /// @param data First byte is pointer of next instruction. Second byte is total instructions.
-    function decodeJumpBytes(bytes calldata data) internal pure returns (uint256) {
-        /* uint8 pointer = uint8(data[0]);
-        uint8 length = uint8(data[1]);
-        uint256 start;
-
-        // For each instruction set...
-        for (uint256 i; i != length; ++i) {
-            start = uint256(2 + pointer * i);
-            // Get the bytes of the instruction
-            bytes memory instruction = data[start:pointer];
-
-            // Process the instruction
-            _process(instruction);
-
-            // Set the new pointer to the next instruction
-            pointer = uint8(data[pointer]);
-        } */
+    /// @dev Encodes the arugments for the CREATE_CURVE instruction.
+    function encodeCreateCurve(
+        uint24 sigma,
+        uint32 maturity,
+        uint16 fee,
+        uint128 strike
+    ) internal pure returns (bytes memory data) {
+        uint8 ecode = 0x0D;
+        data = abi.encodePacked(ecode, sigma, maturity, fee, strike);
     }
 
-    /// @dev Expects a 40-byte length array with two addresses packed into it.
-    /// @param data Maximum 20 + 20 = 40 bytes.
-    /// | 0x | 20 bytes base token | 20 bytes quote token |.
+    /// @dev Encodes the arguments for the CREATE_PAIR instruction.
+    function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
+        uint8 ecode = 0x0C;
+        data = abi.encodePacked(ecode, token0, token1);
+    }
+
+    /// @dev Encodes the arguments for the CREATE_POOL instruction.
+    function encodeCreatePool(
+        uint48 poolId,
+        uint128 basePerLiquidity,
+        uint128 deltaLiquidity
+    ) internal pure returns (bytes memory data) {
+        uint8 ecode = 0x0B;
+        data = abi.encodePacked(ecode, poolId, basePerLiquidity, deltaLiquidity);
+    }
+
+    /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
+    /// @param data Maximum 8 + 16 + 16 = 40 bytes.
+    /// | 0x | 1 packed byte useMax Flag - opcode | 6 byte poolId | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
+    function decodeAddLiquidity(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint128 deltaBase,
+            uint128 deltaQuote
+        )
+    {
+        (bytes1 maxFlag, ) = Decoder.separate(data[0]);
+        useMax = uint8(maxFlag);
+        poolId = uint48(bytes6(data[1:7])); //poolId = uint48(abi.decode(data[1:7], (bytes6)));
+        uint8 pointer = uint8(data[7]);
+        deltaBase = Decoder.toAmount(data[8:pointer]);
+        deltaQuote = Decoder.toAmount(data[pointer:]);
+        // note: If power is greater than 15, then the length byte is next.
+        /* useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
+        poolId = uint48(bytes6(data[1:7]));
+        uint8 basePower = uint8(bytes1(data[7]) & 0x0f);
+        uint8 baseLen = uint8((bytes1(data[7]) & 0xf0) >> 4);
+        uint8 quotePower = uint8(bytes1(data[data.length - 1]) & 0x0f);
+        uint8 quoteLen = uint8((bytes1(data[data.length - 1]) & 0xf0) >> 4);
+        bytes memory base = data[8:8 + baseLen];
+        bytes memory quote = data[baseLen + 8:baseLen + 8 + quoteLen];
+        deltaBase = uint128(uint128(bytes16(base) >> ((16 - uint8(base.length)) * 8)) * 10**basePower);
+        deltaQuote = uint128(uint128(bytes16(quote) >> ((16 - uint8(quote.length)) * 8)) * 10**quotePower); */
+    }
+
+    /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
+    /// @dev Expects a 25 length byte array of left padded parameters.
+    /// @param data Maximum 1 + 3 + 4 + 2 + 16 = 26 bytes.
+    /// | 0x | 1 byte enigma code | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 16 bytes strike |
+    function decodeCreateCurve(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint24 sigma,
+            uint32 maturity,
+            uint16 fee,
+            uint128 strike
+        )
+    {
+        require(data.length < 32, "Curve data too long");
+        sigma = uint24(bytes3(data[1:4])); // note: First byte is the create pair ecode.
+        maturity = uint32(bytes4(data[4:8]));
+        fee = uint16(bytes2(data[8:10]));
+        strike = uint128(bytes16(data[10:]));
+    }
+
+    /// @dev Expects a 41-byte length array with two addresses packed into it.
+    /// @param data Maximum 1 + 20 + 20 = 41 bytes.
+    /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
     function decodeCreatePair(bytes calldata data) internal pure returns (address tokenBase, address tokenQuote) {
-        if (data.length < 40) revert DecodePairBytesLength(data.length);
-        tokenBase = address(bytes20(data[:20]));
-        tokenQuote = address(bytes20(data[20:]));
+        if (data.length != 41) revert DecodePairBytesLength(41, data.length);
+        tokenBase = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
+        tokenQuote = address(bytes20(data[21:]));
     }
 
     /// @dev Expects a poolId and two left zero padded amounts for `basePerLiquidity` and `deltaLiquidity`.
-    /// @param data Maximum 6 + 16 + 16 = 38 bytes.
-    /// | 0x | left-pad 6 bytes poolId | left-pad 16 bytes | left padded 16 bytes |
+    /// @param data Maximum 1 + 6 + 16 + 16 = 39 bytes.
+    /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes | left padded 16 bytes |
     function decodeCreatePool(bytes calldata data)
         internal
         pure
@@ -49,11 +109,11 @@ library Instructions {
             uint128 deltaLiquidity
         )
     {
-        poolId = uint48(bytes6(data[:6]));
-        pairId = uint16(bytes2(data[:2]));
-        curveId = uint32(bytes4(data[2:6]));
-        basePerLiquidity = uint128(bytes16(data[6:22]));
-        deltaLiquidity = uint128(bytes16(data[22:]));
+        poolId = uint48(bytes6(data[1:7])); // note: First byte is the create pool ecode.
+        pairId = uint16(bytes2(data[1:3]));
+        curveId = uint32(bytes4(data[3:7]));
+        basePerLiquidity = uint128(bytes16(data[7:23]));
+        deltaLiquidity = uint128(bytes16(data[23:]));
     }
 
     /// @dev Expects a 6 byte left-pad `poolId`.
@@ -73,27 +133,6 @@ library Instructions {
         curveId = uint32(bytes4(data[2:]));
     }
 
-    /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
-    /// @dev Expects a 25 length byte array of left padded parameters.
-    /// @param data Maximum 3 + 4 + 2 + 16 = 25 bytes.
-    /// | 0x | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 16 bytes strike |
-    function decodeCreateCurve(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint24 sigma,
-            uint32 maturity,
-            uint16 fee,
-            uint128 strike
-        )
-    {
-        require(data.length < 32, "Curve data too long");
-        sigma = uint24(bytes3(data[:3]));
-        maturity = uint32(bytes4(data[3:7]));
-        fee = uint16(bytes2(data[7:9]));
-        strike = uint128(bytes16(data[9:]));
-    }
-
     /// @dev Expects an opcode, poolId, and trailing run-length encoded amount.
     /// @param data Maximum 1 + 6 + 16 = 23 bytes.
     /// | 0x | 1 packed byte useMax Flag - opcode | 6 byte poolId | 1 packed byte amount length - amount power | amount in amount length bytes |.
@@ -110,53 +149,29 @@ library Instructions {
         useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
         poolId = uint48(bytes6(data[1:7]));
         pairId = uint16(bytes2(data[1:3]));
-        deltaLiquidity = uint128(Decoder.bytesToSingleAmount(data[7:])); // note: does not use higher bits length data, only decimals.
-    }
-
-    /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
-    /// @param data Maximum 8 + 16 + 16 = 40 bytes.
-    /// | 0x | 1 packed byte useMax Flag - opcode | 6 byte poolId | 1 packed len-power amount0 | amount0 | amount1 | 1 packed len-power amount1 |.
-    function decodeAddLiquidity(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint8 useMax,
-            uint48 poolId,
-            uint128 deltaBase,
-            uint128 deltaQuote
-        )
-    {
-        useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
-        poolId = uint48(bytes6(data[1:7]));
-        uint8 basePower = uint8(bytes1(data[7]) & 0x0f);
-        uint8 baseLen = uint8((bytes1(data[7]) & 0xf0) >> 4);
-        uint8 quotePower = uint8(bytes1(data[data.length - 1]) & 0x0f);
-        uint8 quoteLen = uint8((bytes1(data[data.length - 1]) & 0xf0) >> 4);
-        bytes memory base = data[8:8 + baseLen];
-        bytes memory quote = data[baseLen + 8:baseLen + 8 + quoteLen];
-        deltaBase = uint128(uint128(bytes16(base) >> ((16 - uint8(base.length)) * 8)) * 10**basePower);
-        deltaQuote = uint128(uint128(bytes16(quote) >> ((16 - uint8(quote.length)) * 8)) * 10**quotePower);
+        deltaLiquidity = uint128(Decoder.toAmount(data[7:]));
     }
 
     /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
     /// @dev Expects standard instructions with the end byte specifying swap direction.
     /// @param data Maximum 1 + 6 + 16 + 1 = 24 bytes.
     /// | 0x | 1 byte packed flag-opcode | 6 byte poolId | up to 16 byte TRLE amount | 1 byte direction |.
-    function decodeSwapExactTokens(bytes calldata data)
+    function decodeSwap(bytes calldata data)
         internal
         pure
         returns (
             uint8 useMax,
             uint48 poolId,
             uint128 deltaIn,
+            uint128 deltaOut,
             uint8 direction
         )
     {
         useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
         poolId = uint48(bytes6(data[1:7]));
-        deltaIn = uint128(Decoder.bytesToSingleAmount(data[7:data.length - 1])); // note: does not use higher bits length data, only decimals.
+        uint8 pointer = uint8(data[7]);
+        deltaIn = uint128(Decoder.toAmount(data[8:pointer]));
+        deltaOut = uint128(Decoder.toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
         direction = uint8(data[data.length - 1]);
     }
-
-    function decodeSwapExactETH(bytes calldata data) internal pure returns (uint256) {}
 }

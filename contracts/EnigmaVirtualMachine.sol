@@ -1,4 +1,5 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "./interfaces/IEnigma.sol";
 import "./interfaces/IERC20.sol";
@@ -20,9 +21,9 @@ abstract contract EnigmaVirtualMachine is IEnigma {
 
     // --- Internal --- //
     /// @dev Gas optimized `balanceOf` method.
-    function _balanceOf(address token) internal view returns (uint256) {
+    function _balanceOf(address token, address account) internal view returns (uint256) {
         (bool success, bytes memory data) = token.staticcall(
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(this))
+            abi.encodeWithSelector(IERC20.balanceOf.selector, account)
         );
         if (!success || data.length != 32) revert BalanceError();
         return abi.decode(data, (uint256));
@@ -33,18 +34,16 @@ abstract contract EnigmaVirtualMachine is IEnigma {
         return uint128(block.timestamp);
     }
 
+    /// @dev Overridable in tests.
+    function _liquidityPolicy() internal view virtual returns (uint256) {
+        return JUST_IN_TIME_LIQUIDITY_POLICY;
+    }
+
     // --- Instructions --- //
     bytes1 public constant UNKNOWN = 0x00;
     bytes1 public constant ADD_LIQUIDITY = 0x01;
-    bytes1 public constant ADD_LIQUIDITY_ETH = 0x02;
     bytes1 public constant REMOVE_LIQUIDITY = 0x03;
-    bytes1 public constant REMOVE_LIQUIDITY_ETH = 0x04;
-    bytes1 public constant SWAP_EXACT_TOKENS_FOR_TOKENS = 0x05;
-    bytes1 public constant SWAP_TOKENS_FOR_EXACT_TOKENS = 0x06;
-    bytes1 public constant SWAP_EXACT_ETH_FOR_TOKENS = 0x07;
-    bytes1 public constant SWAP_TOKENS_FOR_EXACT_ETH = 0x08;
-    bytes1 public constant SWAP_EXACT_TOKENS_FOR_ETH = 0x09;
-    bytes1 public constant SWAP_ETH_FOR_EXACT_TOKENS = 0x0A;
+    bytes1 public constant SWAP = 0x05;
     bytes1 public constant CREATE_POOL = 0x0B;
     bytes1 public constant CREATE_PAIR = 0x0C;
     bytes1 public constant CREATE_CURVE = 0x0D;
@@ -84,4 +83,8 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     uint256 public constant MAX_POOL_FEE = 1e3;
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
+    /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
+    uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
+    /// @dev Used as the first pointer for the jump process.
+    uint8 public constant JUMP_PROCESS_START_POINTER = 2;
 }

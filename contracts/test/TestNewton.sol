@@ -1,8 +1,7 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "../libraries/Newton.sol";
-import "../libraries/ReplicationMath.sol";
-import "../libraries/CumulativeNormalDistribution.sol";
 
 contract TestNewton {
     using ABDKMath64x64 for int128;
@@ -10,21 +9,16 @@ contract TestNewton {
 
     function testComputeOutput(int128 x) public returns (int128) {
         int128 epsilon = ABDKMath64x64.fromUInt(1).div(ABDKMath64x64.fromUInt(1e2));
-        uint256 maxRuns = 15;
+        uint24 maxRuns = 15;
         int128 y = Newton.compute(x, epsilon, maxRuns, _tradingFunction, _derivativeTradingFunction);
         result = y;
         return y;
     }
 
-    function testCompute(int128 x) public returns (int128) {
+    function testCompute(int128 x) public pure returns (int128) {
         int128 epsilon = ABDKMath64x64.fromUInt(1).div(ABDKMath64x64.fromUInt(1e2));
-        uint256 maxRuns = 15;
+        uint24 maxRuns = 15;
         return Newton.compute(x, epsilon, maxRuns, _tradingFunction, _derivativeTradingFunction);
-    }
-
-    function testComputeTen(int128 x) public returns (int128) {
-        int128 epsilon = ABDKMath64x64.fromUInt(1).div(ABDKMath64x64.fromUInt(1e2));
-        return Newton.computeTen(x, epsilon, _tradingFunction, _derivativeTradingFunction);
     }
 
     function tradingFunction(int128 x) public pure returns (int128) {

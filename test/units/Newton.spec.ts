@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { BigNumber } from 'ethers'
 import { ethers } from 'hardhat'
-import { TestNewton } from '../../typechain-types/test/TestNewton'
+import { TestNewton } from 'typechain-types'
 import { toBn } from 'evm-bn'
 import { formatEther } from 'ethers/lib/utils'
 
@@ -27,7 +27,6 @@ describe('Newton', function () {
       const initial = -4
       await newton.testComputeOutput(floatToFixedX64(initial))
       await newton.testCompute(floatToFixedX64(initial))
-      await newton.testComputeTen(floatToFixedX64(initial))
       const result = await newton.result()
       const parsed = fixedX64ToFloat(result)
       const expected = -1

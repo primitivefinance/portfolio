@@ -1,9 +1,11 @@
 {
-  "name": "primitive-hyper",
+  "name": "hyper",
   "version": "0.0.1",
-  "description": "Forkable Hardhat template with Primitive flavors.",
+  "description": "Enigma Virtual Machine processes instructions for interacting with liquidity pools.",
   "scripts": {
     "compile": "hardhat compile",
+    "typechain": "hardhat typechain",
+    "clean": "hardhat clean && hardhat compile && hardhat typechain",
     "test": "hardhat test",
     "prettier": "prettier --write .",
     "prepare": "husky install"
@@ -49,6 +51,8 @@
     "*.{js,css,md}": "prettier --write"
   },
   "dependencies": {
+    "@primitivefi/rmm-core": "^1.0.0",
+    "@rari-capital/solmate": "^6.3.0",
     "@typechain/ethers-v5": "^10.0.0",
     "@typechain/hardhat": "^6.0.0",
     "typechain": "^8.0.0"

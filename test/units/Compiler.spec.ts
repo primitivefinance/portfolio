@@ -1,7 +1,6 @@
 import hre from 'hardhat'
 import { expect } from 'chai'
-import { Compiler } from '../../typechain-types/Compiler.sol'
-import { Context, contextFixture, Contracts, fixture } from '../shared/fixture'
+import { Context, contextFixture, Contracts, fixture, mintAndApprove } from '../shared/fixture'
 import {
   bytesToHex,
   decodePoolId,
@@ -15,12 +14,10 @@ import {
   fixedX64ToFloat,
   INSTRUCTION_JUMP,
 } from '../../lib'
-import { mintAndApprove } from '../contextHelpers'
-import { Values } from '../constants'
-import { TestERC20 } from '../../typechain-types/test/TestERC20'
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
-import { BasicRealPool } from '../shared/utils'
+import { BasicRealPool, Values } from '../shared/utils'
+import { TestCompiler, TestExternalCompiler } from 'typechain-types'
 
 function getSwapTokensFromDir(
   dir: number,
@@ -48,7 +45,88 @@ describe('Compiler', function () {
     await mintAndApprove(contracts.quote, context.user, contracts.main.address, Values.ETHER)
   })
 
-  it('testGetReportedPrice', async function () {
+  describe('Instruction Single & Multi Processing', function () {
+    let compiler: TestCompiler, caller: TestExternalCompiler
+    this.beforeEach(async function () {
+      compiler = (await (await hre.ethers.getContractFactory('TestCompiler')).deploy()) as TestCompiler
+      caller = (await (
+        await hre.ethers.getContractFactory('TestExternalCompiler')
+      ).deploy(compiler.address)) as TestExternalCompiler
+      await mintAndApprove(contracts.base, context.user, compiler.address, Values.ETHER)
+      await mintAndApprove(contracts.quote, context.user, compiler.address, Values.ETHER)
+    })
+
+    it('testApplyCredit for events', async function () {
+      await expect(compiler.testApplyCredit(contracts.base.address, 5))
+        .to.emit(compiler, 'Credit')
+        .withArgs(contracts.base.address, 5)
+    })
+    it('testApplyCredit for errors', async function () {
+      await expect(compiler.testApplyCredit(contracts.base.address, 5)).and.to.not.emit(compiler, 'log')
+    })
+    it('testApplyDebit for events', async function () {
+      const token = contracts.base.address
+      const amount = 12
+      await expect(compiler.testApplyDebit(token, amount)).to.emit(compiler, 'Debit').withArgs(token, amount)
+    })
+    it('testApplyDebit for errors', async function () {
+      const token = contracts.base.address
+      const amount = 12
+      await expect(compiler.testApplyDebit(token, amount)).and.to.not.emit(compiler, 'log')
+    })
+    it('testSettleToken for events', async function () {
+      const token = contracts.base.address
+      await expect(compiler.testSettleToken(token))
+        .to.emit(compiler, 'Debit')
+        .withArgs(token, 10)
+        .to.emit(compiler, 'Credit')
+        .withArgs(token, 10)
+    })
+    it('testSettleToken for errors', async function () {
+      const token = contracts.base.address
+      await expect(compiler.testSettleToken(token)).to.not.emit(compiler, 'log')
+    })
+    it('testSettleBalances for events', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      await expect(compiler.testSettleBalances(base, quote))
+        .to.emit(compiler, 'Debit')
+        .withArgs(base, 10)
+        .to.emit(compiler, 'Credit')
+        .withArgs(quote, 10)
+    })
+
+    it('testSettleBalances for fails', async function () {
+      const [base, quote] = [contracts.base.address, contracts.quote.address]
+      await expect(compiler.testSettleBalances(base, quote)).to.not.emit(compiler, 'log')
+    })
+
+    it('testProcess for events', async function () {
+      const { base, quote } = contracts
+      await compiler.helperSetTokens(base.address, quote.address)
+      await expect(caller.testProcess(base.address, quote.address)).to.emit(compiler, 'AddLiquidity')
+    })
+
+    it('testProcess for errors', async function () {
+      const { base, quote } = contracts
+      await compiler.helperSetTokens(base.address, quote.address)
+      await expect(caller.testProcess(base.address, quote.address)).to.not.emit(compiler, 'log')
+    })
+
+    it('testJumpProcess for events', async function () {
+      const { base, quote } = contracts
+      await expect(caller.testJumpProcess(base.address, quote.address))
+        .to.emit(compiler, 'CreatePair')
+        .to.emit(compiler, 'CreateCurve')
+    })
+
+    it('testJumpProcess for errors', async function () {
+      const { base, quote } = contracts
+      await expect(caller.testJumpProcess(base.address, quote.address)).to.not.emit(compiler, 'log')
+    })
+  })
+
+  /// note: temporarily removed from contracts, will be added later?
+  /* it('testGetReportedPrice', async function () {
     const scaleFactorRisky = 1
     const scaleFactoryStable = 1
     const { strike, sigma, internalBase } = BasicRealPool
@@ -62,9 +140,9 @@ describe('Compiler', function () {
       tau
     )
     expect(fixedX64ToFloat(price)).to.be.eq(3.7647263806019016)
-  })
+  }) */
 
-  describe.only('Compiler Fallback', function () {
+  describe('Compiler Fallback', function () {
     it('testJumpProcess: creates a pair using the jump process', async function () {
       const [base, quote] = [contracts.base.address, contracts.quote.address]
       const data = encodeCreatePair(base, quote)
@@ -123,17 +201,6 @@ describe('Compiler', function () {
       const data = encodeCreatePair(base, quote)
       const jumpInstruction = encodeJumpInstruction([data.bytes])
       await context.signer.sendTransaction({ to: contracts.main.address, data: jumpInstruction.hex, value: 0x0 })
-    })
-  })
-
-  describe('HyperLiquidity', function () {
-    it('getLiquidityMinted compared against getLiquidityMinted2', async function () {
-      const poolId = 4
-      const { internalBase, internalQuote, internalLiquidity } = BasicRealPool
-      await contracts.main.setLiquidity(poolId, internalBase, internalQuote, internalLiquidity)
-      const zero = await contracts.main.testGetLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
-      const one = await contracts.main.getLiquidityMinted(poolId, internalBase._hex, internalQuote._hex)
-      const two = await contracts.main.getLiquidityMinted2(poolId, internalBase._hex)
     })
   })
 
@@ -301,7 +368,7 @@ describe('Compiler', function () {
 
       const deltaOut = parseEther('0.000970860704930000')
       const dir = 0
-      const swapPayload = encodeSwapExactTokens(false, parseInt(poolId), deltaIn, dir)
+      const swapPayload = encodeSwapExactTokens(false, parseInt(poolId), deltaIn, deltaOut, dir)
       const tokens = getSwapTokensFromDir(dir, contracts.base.address, contracts.quote.address)
       await expect(contracts.main.testSwapExactTokens(swapPayload.hex))
         .to.emit(contracts.main, 'Swap')

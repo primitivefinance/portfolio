@@ -1,10 +1,7 @@
 import { ethers } from 'hardhat'
 import { BigNumberish, Signer } from 'ethers'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { TestPrototypeHyper } from '../../typechain-types'
-import { TestERC20 } from '../../typechain-types/test/TestERC20'
-import { TestHyperLiquidity } from '../../typechain-types/test/TestHyperLiquidity'
-import { TestCompiler } from '../../typechain-types/test/TestCompiler'
+import { TestCompiler, TestEnigmaVirtualMachine, TestERC20, TestHyperLiquidity, TestHyperSwap } from 'typechain-types'
 
 export async function setupPool(
   contract: TestCompiler,
@@ -37,6 +34,18 @@ export interface Context {
   user: string
 }
 
+export async function deployTestEnigma(hre: HardhatRuntimeEnvironment): Promise<TestEnigmaVirtualMachine> {
+  return (await (await hre.ethers.getContractFactory('TestEnigmaVirtualMachine')).deploy()) as TestEnigmaVirtualMachine
+}
+
+export async function deployTestHyperSwap(hre: HardhatRuntimeEnvironment): Promise<TestHyperSwap> {
+  return (await (await hre.ethers.getContractFactory('TestHyperSwap')).deploy()) as TestHyperSwap
+}
+
+export async function deployTestHyperLiquidity(hre: HardhatRuntimeEnvironment): Promise<TestHyperLiquidity> {
+  return (await (await hre.ethers.getContractFactory('TestHyperLiquidity')).deploy()) as TestHyperLiquidity
+}
+
 export async function contextFixture(hre: HardhatRuntimeEnvironment): Promise<Context> {
   const signers = await hre.ethers.getSigners()
   const signer = signers[0]
@@ -46,10 +55,10 @@ export async function contextFixture(hre: HardhatRuntimeEnvironment): Promise<Co
 
 export async function fixture(hre: HardhatRuntimeEnvironment): Promise<Contracts> {
   const mainFac = await hre.ethers.getContractFactory('TestCompiler')
-  const main = await mainFac.deploy()
+  const main = (await mainFac.deploy()) as TestCompiler
   await main.deployed()
-  const base = await (await hre.ethers.getContractFactory('TestERC20')).deploy('base', 'base', 18)
-  const quote = await (await hre.ethers.getContractFactory('TestERC20')).deploy('quote', 'quote', 18)
+  const base = (await (await hre.ethers.getContractFactory('TestERC20')).deploy('base', 'base', 18)) as TestERC20
+  const quote = (await (await hre.ethers.getContractFactory('TestERC20')).deploy('quote', 'quote', 18)) as TestERC20
   await base.deployed()
   await quote.deployed()
   return { main, base, quote }

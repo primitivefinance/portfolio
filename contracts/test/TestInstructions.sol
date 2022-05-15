@@ -1,11 +1,12 @@
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.10;
 
 import "../libraries/Instructions.sol";
 
 contract TestInstructions {
     function testDecodePoolId(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint48,
             uint16,
@@ -16,14 +17,14 @@ contract TestInstructions {
     }
 
     /// @dev First byte is the enigma instruction.
-    function testDecodeCreatePair(bytes calldata data) public view returns (address, address) {
-        return Instructions.decodeCreatePair(data[1:]);
+    function testDecodeCreatePair(bytes calldata data) public pure returns (address, address) {
+        return Instructions.decodeCreatePair(data);
     }
 
     /// @dev First byte is the enigma instruction.
     function testDecodeCreateCurve(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint24,
             uint32,
@@ -31,13 +32,13 @@ contract TestInstructions {
             uint128
         )
     {
-        return Instructions.decodeCreateCurve(data[1:]);
+        return Instructions.decodeCreateCurve(data);
     }
 
     /// @dev First byte is the enigma instruction.
     function testDecodeCreatePool(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint48,
             uint16,
@@ -46,13 +47,13 @@ contract TestInstructions {
             uint128
         )
     {
-        return Instructions.decodeCreatePool(data[1:]);
+        return Instructions.decodeCreatePool(data);
     }
 
     /// @dev First byte is the enigma instruction.
     function testDecodeRemoveLiquidity(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint8,
             uint48,
@@ -65,7 +66,7 @@ contract TestInstructions {
 
     function testDecodeAddLiquidity(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint8 useMax,
             uint48 poolId,
@@ -85,31 +86,37 @@ contract TestInstructions {
             uint128 deltaQuote
         )
     {
+        gas = gasleft();
         return Instructions.decodeAddLiquidity(data);
     }
 
-    function testDecodeSwapExactTokens(bytes calldata data)
+    function testDecodeSwap(bytes calldata data)
         public
-        view
+        pure
         returns (
             uint8 useMax,
             uint48 poolId,
             uint128 deltaIn,
+            uint128 deltaOut,
             uint8 direction
         )
     {
-        return Instructions.decodeSwapExactTokens(data);
+        return Instructions.decodeSwap(data);
     }
 
-    function testDecodeSwapExactTokensGas(bytes calldata data)
+    uint256 public gas;
+
+    function testDecodeSwapGas(bytes calldata data)
         public
         returns (
             uint8 useMax,
             uint48 poolId,
             uint128 deltaIn,
+            uint128 deltaOut,
             uint8 direction
         )
     {
-        return Instructions.decodeSwapExactTokens(data);
+        gas = gasleft();
+        return Instructions.decodeSwap(data);
     }
 }

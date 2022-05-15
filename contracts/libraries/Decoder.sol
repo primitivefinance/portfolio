@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity 0.8.10;
 
 /// @title    Decoder Library
 /// @dev      Solidity library to manipulate and covert bytes
@@ -25,23 +25,34 @@ library Decoder {
         }
     }
 
-    /// @dev             Converts an array of bytes into an uint256, the array must adhere
-    ///                  to the the following format:
-    ///                  - First byte: Amount of trailing zeros
-    ///                  - Rest of the array: A hexadecimal number
-    /// @param raw       Array of bytes to convert
-    /// @return amount   Converted amount
-    function toAmount(bytes calldata raw) internal pure returns (uint256 amount) {
-        uint8 power = uint8(raw[0]);
-        amount = uint256(toBytes32(raw[1:raw.length]));
-        amount = amount * 10**power;
+    /// @dev           Converts an array of bytes into a bytes16.
+    /// @param raw     Array of bytes to convert.
+    /// @return data   Converted data.
+    function toBytes16(bytes memory raw) internal pure returns (bytes16 data) {
+        assembly {
+            data := mload(add(raw, 32))
+            let shift := mul(sub(16, mload(raw)), 8)
+            data := shr(shift, data)
+        }
     }
 
-    function bytesToSingleAmount(bytes calldata raw) internal pure returns (uint256 amount) {
-        bytes1 powerByte = bytes1(raw[0]);
-        uint8 power = powerByte > 0x0f ? uint8(powerByte) : uint8(raw[0] & 0x0f); // Check if entire byte is decimal value.
-        amount = uint256(toBytes32(raw[1:raw.length]));
-        amount = amount * 10**power;
+    /// @dev             Converts an array of bytes into an uint128, the array must adhere
+    ///                  to the the following format:
+    ///                  - First byte: Amount of trailing zeros.
+    ///                  - Rest of the array: A hexadecimal number.
+    /// @param raw       Array of bytes to convert.
+    /// @return amount   Converted amount.
+    function toAmount(bytes calldata raw) internal pure returns (uint128 amount) {
+        uint8 power = uint8(raw[0]);
+        amount = uint128(toBytes16(raw[1:raw.length]));
+        amount = amount * uint128(10**power);
+    }
+
+    function bytesToSingleAmount(bytes calldata raw) internal pure returns (uint128 amount) {
+        uint8 power = uint8(raw[0]);
+        uint8 length = uint8(raw[1]);
+        amount = uint128(toBytes16(raw[2:length]));
+        amount = amount * uint128(10**power);
     }
 
     function toAmount(bytes calldata raw, uint8 power) internal pure returns (uint256 amount) {
