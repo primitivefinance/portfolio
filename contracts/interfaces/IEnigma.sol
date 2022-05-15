@@ -6,4 +6,8 @@ import "./enigma/IEnigmaErrors.sol";
 import "./enigma/IEnigmaEvents.sol";
 import "./enigma/IEnigmaView.sol";
 
-interface IEnigma is IEnigmaActions, IEnigmaDataStructures, IEnigmaErrors, IEnigmaEvents, IEnigmaView {}
+/// @title IEngima
+/// @dev All the interfaces of the Enigma, so it can be imported with ease.
+interface IEnigma is IEnigmaActions, IEnigmaDataStructures, IEnigmaErrors, IEnigmaEvents, IEnigmaView {
+
+}

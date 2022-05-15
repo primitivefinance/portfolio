@@ -156,8 +156,6 @@ contract Compiler is HyperLiquidity, HyperSwap {
 
     // --- External --- //
 
-    error DrawBalance();
-
     /// @inheritdoc IEnigmaActions
     function draw(
         address token,

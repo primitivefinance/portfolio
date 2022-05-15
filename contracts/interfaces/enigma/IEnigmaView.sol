@@ -1,5 +1,7 @@
 pragma solidity ^0.8.0;
 
+/// @title IEnigmaView
+/// @dev Public view functions exposed by the Enigma's higher level contracts.
 interface IEnigmaView {
     // --- Liquidity --- //
 
