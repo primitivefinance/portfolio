@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { parseEther } from 'ethers/lib/utils'
 import hre from 'hardhat'
-import { TestHyperSwap } from '../../typechain-types/test/HyperSwap.t.sol/TestHyperSwap'
+import { TestHyperSwap } from 'typechain-types'
 import { Context, Contracts, fixture, contextFixture, deployTestHyperSwap } from '../shared/fixture'
 
 describe('HyperSwap.sol', function () {

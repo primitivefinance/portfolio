@@ -1,5 +1,5 @@
 import hre from 'hardhat'
-import { TestInstructions } from '../../typechain-types/test/TestInstructions'
+import { TestInstructions } from 'typechain-types'
 import * as instruct from '../../lib'
 import { expect } from 'chai'
 import { bytesToHex } from '../../lib'

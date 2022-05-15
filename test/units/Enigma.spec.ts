@@ -1,6 +1,6 @@
 import { expect } from 'chai'
 import hre from 'hardhat'
-import { TestEnigmaVirtualMachine } from '../../typechain-types/test/EnigmaVirtualMachine.t.sol/TestEnigmaVirtualMachine'
+import { TestEnigmaVirtualMachine } from 'typechain-types'
 import { Context, Contracts, fixture, contextFixture, deployTestEnigma } from '../shared/fixture'
 
 describe('EnigmaVirtualMachine.sol', function () {

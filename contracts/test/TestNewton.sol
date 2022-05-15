@@ -8,7 +8,7 @@ contract TestNewton {
 
     function testComputeOutput(int128 x) public returns (int128) {
         int128 epsilon = ABDKMath64x64.fromUInt(1).div(ABDKMath64x64.fromUInt(1e2));
-        uint256 maxRuns = 15;
+        uint24 maxRuns = 15;
         int128 y = Newton.compute(x, epsilon, maxRuns, _tradingFunction, _derivativeTradingFunction);
         result = y;
         return y;
@@ -16,13 +16,8 @@ contract TestNewton {
 
     function testCompute(int128 x) public returns (int128) {
         int128 epsilon = ABDKMath64x64.fromUInt(1).div(ABDKMath64x64.fromUInt(1e2));
-        uint256 maxRuns = 15;
+        uint24 maxRuns = 15;
         return Newton.compute(x, epsilon, maxRuns, _tradingFunction, _derivativeTradingFunction);
-    }
-
-    function testComputeTen(int128 x) public returns (int128) {
-        int128 epsilon = ABDKMath64x64.fromUInt(1).div(ABDKMath64x64.fromUInt(1e2));
-        return Newton.computeTen(x, epsilon, _tradingFunction, _derivativeTradingFunction);
     }
 
     function tradingFunction(int128 x) public pure returns (int128) {

@@ -14,11 +14,10 @@ import {
   fixedX64ToFloat,
   INSTRUCTION_JUMP,
 } from '../../lib'
-import { TestERC20 } from '../../typechain-types/test/TestERC20'
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
 import { BasicRealPool, Values } from '../shared/utils'
-import { TestCompiler, TestExternalCompiler } from '../../typechain-types/test/Compiler.t.sol'
+import { TestCompiler, TestExternalCompiler } from 'typechain-types'
 
 function getSwapTokensFromDir(
   dir: number,

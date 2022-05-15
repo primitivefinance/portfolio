@@ -1,11 +1,7 @@
 import { ethers } from 'hardhat'
 import { BigNumberish, Signer } from 'ethers'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { TestERC20 } from '../../typechain-types/test/TestERC20'
-import { TestCompiler } from '../../typechain-types/test/Compiler.t.sol'
-import { TestEnigmaVirtualMachine } from '../../typechain-types/test/EnigmaVirtualMachine.t.sol/TestEnigmaVirtualMachine'
-import { TestHyperSwap } from '../../typechain-types/test/HyperSwap.t.sol/TestHyperSwap'
-import { TestHyperLiquidity } from '../../typechain-types/test/HyperLiquidity.t.sol/TestHyperLiquidity'
+import { TestCompiler, TestEnigmaVirtualMachine, TestERC20, TestHyperLiquidity, TestHyperSwap } from 'typechain-types'
 
 export async function setupPool(
   contract: TestCompiler,

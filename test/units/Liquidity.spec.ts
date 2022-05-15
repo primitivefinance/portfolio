@@ -1,9 +1,9 @@
 import { expect } from 'chai'
 import { parseEther } from 'ethers/lib/utils'
 import hre from 'hardhat'
-import { TestHyperLiquidity } from '../../typechain-types/test/HyperLiquidity.t.sol/TestHyperLiquidity'
+import { TestHyperLiquidity } from 'typechain-types'
 import { Context, Contracts, fixture, contextFixture, deployTestHyperLiquidity } from '../shared/fixture'
-import { TestExternalLiquidity } from '../../typechain-types/test/HyperLiquidity.t.sol/TestExternalLiquidity'
+import { TestExternalLiquidity } from 'typechain-types'
 import { BasicRealPool, StandardPoolHelpers } from '../shared/utils'
 
 describe('HyperLiquidity.sol', function () {

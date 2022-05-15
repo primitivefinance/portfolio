@@ -4,6 +4,8 @@
   "description": "Forkable Hardhat template with Primitive flavors.",
   "scripts": {
     "compile": "hardhat compile",
+    "typechain": "hardhat typechain",
+    "clean": "hardhat clean && hardhat compile && hardhat typechain",
     "test": "hardhat test",
     "prettier": "prettier --write .",
     "prepare": "husky install"
