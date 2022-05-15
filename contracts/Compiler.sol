@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
-import "./HyperSwap.sol";
 import "./HyperLiquidity.sol";
+import "./HyperSwap.sol";
 
 /// @title Enigma Compiler
 /// @notice Main contract of the Enigma that implements instruction processing.

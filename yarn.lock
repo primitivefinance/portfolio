@@ -639,6 +639,11 @@
   dependencies:
     squirrelly "^8.0.8"
 
+"@primitivefi/rmm-core@^1.0.0":
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/@primitivefi/rmm-core/-/rmm-core-1.0.0.tgz#cddd7d554f34179312a34208d40f4d4ff573970c"
+  integrity sha512-ac12fse0rRicTOJLssRPW+X36sZSefnZ/Dz9ElIwh586CiY8O+tJLWg4T/B1ymvDF2ils+RtSLWxMWQ1Mb4k9Q==
+
 "@resolver-engine/core@^0.3.3":
   version "0.3.3"
   resolved "https://registry.yarnpkg.com/@resolver-engine/core/-/core-0.3.3.tgz#590f77d85d45bc7ecc4e06c654f41345db6ca967"

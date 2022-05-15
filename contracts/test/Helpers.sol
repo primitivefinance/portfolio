@@ -1,7 +1,8 @@
 pragma solidity ^0.8.0;
 
+import "@primitivefi/rmm-core/contracts/libraries/Units.sol";
+
 import "../EnigmaVirtualMachine.sol";
-import "../libraries/Units.sol";
 
 library StandardPoolHelpers {
     uint128 public constant STRIKE = 1e19;

@@ -1,11 +1,9 @@
 pragma solidity ^0.8.0;
 
+import "../HyperLiquidity.sol";
+
 import "./DSTest.sol";
 import "./Helpers.sol";
-
-import "hardhat/console.sol";
-
-import "../HyperLiquidity.sol";
 
 /// @dev Used to build bytes in calldata to test `_addLiquidity` function.
 contract TestExternalLiquidity {

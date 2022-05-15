@@ -137,23 +137,4 @@ contract TCompiler is Compiler {
         uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
         uint256 deltaLiquidity1 = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
     }
-
-    function testGetReportedPrice(
-        uint256 scaleFactorRisky,
-        uint256 scaleFactorStable,
-        uint256 riskyPerLiquidity,
-        uint256 strike,
-        uint256 sigma,
-        uint256 tau
-    ) public view returns (int128) {
-        return
-            ReplicationMath.getReportedPrice(
-                scaleFactorRisky,
-                scaleFactorStable,
-                riskyPerLiquidity,
-                strike,
-                sigma,
-                tau
-            );
-    }
 }

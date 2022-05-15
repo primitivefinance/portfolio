@@ -1,9 +1,9 @@
 pragma solidity ^0.8.0;
 
+import "../Compiler.sol";
+
 import "./DSTest.sol";
 import "./Helpers.sol";
-
-import "../Compiler.sol";
 
 contract TestExternalCompiler {
     TestCompiler public compiler;
@@ -370,24 +370,5 @@ contract TestCompiler is DSTest, Helpers, Compiler {
         deltaLiquidity = liquidity0;
         uint256 liquidity1 = (deltaQuote * pool.internalLiquidity) / uint256(pool.internalQuote);
         uint256 deltaLiquidity1 = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-    }
-
-    function testGetReportedPrice(
-        uint256 scaleFactorRisky,
-        uint256 scaleFactorStable,
-        uint256 riskyPerLiquidity,
-        uint256 strike,
-        uint256 sigma,
-        uint256 tau
-    ) public view returns (int128) {
-        return
-            ReplicationMath.getReportedPrice(
-                scaleFactorRisky,
-                scaleFactorStable,
-                riskyPerLiquidity,
-                strike,
-                sigma,
-                tau
-            );
     }
 }

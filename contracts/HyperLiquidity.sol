@@ -1,9 +1,10 @@
 pragma solidity ^0.8.0;
 
-import "./EnigmaVirtualMachine.sol";
+import "@primitivefi/rmm-core/contracts/libraries/SafeCast.sol";
+import "@primitivefi/rmm-core/contracts/libraries/ReplicationMath.sol";
+
 import "./interfaces/IERC20.sol";
-import "./libraries/ReplicationMath.sol";
-import "./libraries/SafeCast.sol";
+import "./EnigmaVirtualMachine.sol";
 
 /// @title Hyper Liquidity
 /// @notice Designed to maintain collateral for the sum of virtual liquidity across all pools.

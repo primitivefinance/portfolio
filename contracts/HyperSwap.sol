@@ -1,7 +1,8 @@
 pragma solidity ^0.8.0;
 
+import "@primitivefi/rmm-core/contracts/libraries/ReplicationMath.sol";
+
 import "./EnigmaVirtualMachine.sol";
-import "./libraries/ReplicationMath.sol";
 
 /// @title Hyper Swap
 /// @notice Implements run-time swap execution using Newton's numerical solver to compute amounts.

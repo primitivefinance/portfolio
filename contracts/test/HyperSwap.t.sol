@@ -1,13 +1,11 @@
 pragma solidity ^0.8.0;
 
+import "@primitivefi/rmm-core/contracts/libraries/Units.sol";
+
+import "../HyperSwap.sol";
+
 import "./DSTest.sol";
 import "./Helpers.sol";
-
-import {EnigmaVirtualMachineActions} from "./EnigmaVirtualMachine.t.sol";
-import "../HyperSwap.sol";
-import "../libraries/Units.sol";
-
-import "hardhat/console.sol";
 
 contract TestHyperSwap is DSTest, Helpers, HyperSwap {
     // --- View --- //

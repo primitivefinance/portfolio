@@ -126,7 +126,8 @@ describe('Compiler', function () {
     })
   })
 
-  it('testGetReportedPrice', async function () {
+  /// note: temporarily removed from contracts, will be added later?
+  /* it('testGetReportedPrice', async function () {
     const scaleFactorRisky = 1
     const scaleFactoryStable = 1
     const { strike, sigma, internalBase } = BasicRealPool
@@ -140,7 +141,7 @@ describe('Compiler', function () {
       tau
     )
     expect(fixedX64ToFloat(price)).to.be.eq(3.7647263806019016)
-  })
+  }) */
 
   describe('Compiler Fallback', function () {
     it('testJumpProcess: creates a pair using the jump process', async function () {

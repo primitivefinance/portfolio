@@ -1,8 +1,6 @@
 pragma solidity ^0.8.0;
 
 import "../libraries/Newton.sol";
-import "../libraries/ReplicationMath.sol";
-import "../libraries/CumulativeNormalDistribution.sol";
 
 contract TestNewton {
     using ABDKMath64x64 for int128;
