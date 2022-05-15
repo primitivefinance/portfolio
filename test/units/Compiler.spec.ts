@@ -47,9 +47,12 @@ describe('Compiler', function () {
   })
 
   describe.only('Instruction Single & Multi Processing', function () {
-    let compiler: TestCompiler
+    let compiler: TestCompiler, caller: TestExternalCompiler
     this.beforeEach(async function () {
       compiler = (await (await hre.ethers.getContractFactory('TestCompiler')).deploy()) as TestCompiler
+      caller = (await (
+        await hre.ethers.getContractFactory('TestExternalCompiler')
+      ).deploy(compiler.address)) as TestExternalCompiler
       await mintAndApprove(contracts.base, context.user, compiler.address, Values.ETHER)
       await mintAndApprove(contracts.quote, context.user, compiler.address, Values.ETHER)
     })
@@ -96,6 +99,18 @@ describe('Compiler', function () {
     it('testSettleBalances for fails', async function () {
       const [base, quote] = [contracts.base.address, contracts.quote.address]
       await expect(compiler.testSettleBalances(base, quote)).to.not.emit(compiler, 'log')
+    })
+
+    it('testProcess for events', async function () {
+      const { base, quote } = contracts
+      await compiler.helperSetTokens(base.address, quote.address)
+      await expect(caller.testProcess(base.address, quote.address)).to.emit(compiler, 'AddLiquidity')
+    })
+
+    it('testProcess for errors', async function () {
+      const { base, quote } = contracts
+      await compiler.helperSetTokens(base.address, quote.address)
+      await expect(caller.testProcess(base.address, quote.address)).to.not.emit(compiler, 'log')
     })
   })
 

@@ -11,6 +11,81 @@ contract TestExternalCompiler {
     constructor(address compiler_) {
         compiler = TestCompiler(payable(compiler_));
     }
+
+    function testAddLiquidity() internal {
+        // These amounts are trailing zero run length encoded. So they will be 4 and 4, with 2 and 3 zeroes respectively.
+        uint256 deltaBase = 400;
+        uint256 deltaQuote = 4000;
+
+        uint8 ecode = 0x01; // useMax = 0, enigma code = b = 1 = add liquidity
+        uint48 poolId = uint48(0x0100000001); // pairId = 0x01, curveId = 0x00000001
+        uint8 amount0Info = uint8(0x12); // length of 1, two appended zeros
+        // since length is 1, we only use one byte!
+        uint8 amount0 = uint8(0x04); // so 4 and two zeroes = 400
+        uint8 amount1Info = uint8(0x13); // length of 1, three zeroes
+        // since length is 1, we only use one byte!
+        uint8 amount1 = uint8(0x04); // three appended zeroes, so 4000
+        // this is using the trailing run-length encoded amounts!
+        bytes memory data = abi.encodePacked(ecode, poolId, amount0Info, amount0, amount1, amount1Info);
+        compiler.testProcess(data, poolId);
+    }
+
+    function testRemoveLiquidity() internal {
+        uint48 poolId = uint48(0x0100000001); // pairId = 0x01, curveId = 0x00000001
+        uint256 deltaLiquidity = 20; // Only remove a portion
+
+        uint8 ecode = 0x03; // useMax = 0, enigma code = 3 = remove liquidity
+        uint8 amount0Info = uint8(0x01); // note: higher order bits SHOULD BE 1, but its 0 for now until the deoder is refactored. Only uses lower order bits.
+        // since length is 1, we only use one byte!
+        uint8 amount0 = uint8(0x02); // so 2 and two zeroes = 400
+        // this is using the trailing run-length encoded amounts!
+        bytes memory data = abi.encodePacked(ecode, poolId, amount0Info, amount0);
+        compiler.testProcess(data, poolId);
+    }
+
+    function testCreatePair(address token0, address token1) internal {
+        bytes memory data = Instructions.encodeCreatePair(token0, token1);
+        compiler.testProcess(data, 0);
+    }
+
+    function testCreateCurve(
+        uint24 sigma,
+        uint32 maturity,
+        uint16 fee,
+        uint128 strike
+    ) internal {
+        bytes memory data = Instructions.encodeCreateCurve(sigma, maturity, fee, strike);
+        compiler.testProcess(data, 0);
+    }
+
+    function testCreatePool(address token0, address token1) internal {
+        {
+            bytes memory data = Instructions.encodeCreatePair(token0, token1);
+            compiler.testProcess(data, 0);
+        }
+        {
+            uint24 sigma = StandardPoolHelpers.SIGMA;
+            uint32 maturity = StandardPoolHelpers.MATURITY + uint32(block.timestamp);
+            uint16 fee = StandardPoolHelpers.FEE;
+            uint128 strike = StandardPoolHelpers.STRIKE;
+            bytes memory data = Instructions.encodeCreateCurve(sigma, maturity, fee, strike);
+            compiler.testProcess(data, 0);
+        }
+
+        {
+            uint48 poolId = uint48(0x0100000001);
+            uint128 basePerLiquidity = StandardPoolHelpers.INTERNAL_BASE; // expects parameters to match standard ones.
+            uint128 deltaLiquidity = StandardPoolHelpers.INTERNAL_LIQUIDITY / 1e3; // only mint 1/1000th of the standard liquidity
+            bytes memory data = Instructions.encodeCreatePool(poolId, basePerLiquidity, deltaLiquidity);
+            compiler.testCreatePool(data);
+        }
+    }
+
+    function testProcess(address base, address quote) public {
+        testCreatePool(base, quote);
+        testAddLiquidity();
+        testRemoveLiquidity();
+    }
 }
 
 contract TestCompiler is DSTest, Helpers, Compiler {
@@ -118,6 +193,11 @@ contract TestCompiler is DSTest, Helpers, Compiler {
         balance = balances[msg.sender][token]; // tokens are paid to credit accounts
         assertEq(balance, 10, "settle-credit");
         assertTrue(!addressCache[token], "address-cache-two");
+    }
+
+    function testProcess(bytes calldata data, uint48 poolId) public {
+        if (poolId != 0) helperCreateStandardPool(poolId);
+        _process(data);
     }
 
     // --- External -- //
