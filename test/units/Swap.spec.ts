@@ -40,10 +40,12 @@ describe('HyperSwap.sol', function () {
         .to.not.emit(hyperSwap, 'log').and.to.not.be.reverted
     })
     it('testSwap', async function () {
-      await expect(hyperSwap.testSwap(0)).to.emit(hyperSwap, 'Swap').and.to.not.emit(hyperSwap, 'log').and.to.not.be
-        .reverted
-      await expect(hyperSwap.testSwap(1)).to.emit(hyperSwap, 'Swap').and.to.not.emit(hyperSwap, 'log').and.to.not.be
-        .reverted
+      await expect(hyperSwap.testSwap(0)).to.emit(hyperSwap, 'Swap').and.to.not.be.reverted
+      await expect(hyperSwap.testSwap(1)).to.emit(hyperSwap, 'Swap').and.to.not.be.reverted
+    })
+    it('testSwap', async function () {
+      await expect(hyperSwap.testSwap(0)).to.not.emit(hyperSwap, 'log').and.to.not.be.reverted
+      await expect(hyperSwap.testSwap(1)).to.not.emit(hyperSwap, 'log').and.to.not.be.reverted
     })
   })
 })

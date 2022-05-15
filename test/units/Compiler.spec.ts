@@ -54,39 +54,41 @@ describe('Compiler', function () {
       await mintAndApprove(contracts.quote, context.user, compiler.address, Values.ETHER)
     })
 
-    it('testApplyCredit', async function () {
+    it('testApplyCredit for events', async function () {
       await expect(compiler.testApplyCredit(contracts.base.address, 5))
         .to.emit(compiler, 'Credit')
         .withArgs(contracts.base.address, 5)
-        .and.to.not.emit(compiler, 'log')
     })
-    it('testApplyDebit', async function () {
+    it('testApplyCredit for errors', async function () {
+      await expect(compiler.testApplyCredit(contracts.base.address, 5)).and.to.not.emit(compiler, 'log')
+    })
+    it('testApplyDebit for events', async function () {
       const token = contracts.base.address
       const amount = 12
-      await expect(compiler.testApplyDebit(token, amount))
-        .to.emit(compiler, 'Debit')
-        .withArgs(token, amount)
-        .and.to.emit(compiler, 'IncreaseGlobal')
-        .and.to.not.emit(compiler, 'log')
+      await expect(compiler.testApplyDebit(token, amount)).to.emit(compiler, 'Debit').withArgs(token, amount)
     })
-    it('testSettleToken', async function () {
+    it('testApplyDebit for errors', async function () {
+      const token = contracts.base.address
+      const amount = 12
+      await expect(compiler.testApplyDebit(token, amount)).and.to.not.emit(compiler, 'log')
+    })
+    it('testSettleToken for events', async function () {
       const token = contracts.base.address
       await expect(compiler.testSettleToken(token))
         .to.emit(compiler, 'Debit')
         .withArgs(token, 10)
-        .and.to.emit(compiler, 'Credit')
+        .to.emit(compiler, 'Credit')
         .withArgs(token, 10)
-        .and.to.not.emit(compiler, 'log')
+    })
+    it('testSettleToken for errors', async function () {
+      const token = contracts.base.address
+      await expect(compiler.testSettleToken(token)).to.not.emit(compiler, 'log')
     })
     it('testSettleBalances for events', async function () {
       const [base, quote] = [contracts.base.address, contracts.quote.address]
       await expect(compiler.testSettleBalances(base, quote))
         .to.emit(compiler, 'Debit')
         .withArgs(base, 10)
-        .to.emit(compiler, 'Credit')
-        .withArgs(base, 10)
-        .to.emit(compiler, 'Debit')
-        .withArgs(quote, 10)
         .to.emit(compiler, 'Credit')
         .withArgs(quote, 10)
     })
