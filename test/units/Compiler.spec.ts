@@ -42,11 +42,11 @@ describe('Compiler', function () {
     context = await contextFixture(hre)
     contracts = await fixture(hre)
 
-    //await mintAndApprove(contracts.base, context.user, contracts.main.address, Values.ETHER)
-    //await mintAndApprove(contracts.quote, context.user, contracts.main.address, Values.ETHER)
+    await mintAndApprove(contracts.base, context.user, contracts.main.address, Values.ETHER)
+    await mintAndApprove(contracts.quote, context.user, contracts.main.address, Values.ETHER)
   })
 
-  describe.only('Instruction Single & Multi Processing', function () {
+  describe('Instruction Single & Multi Processing', function () {
     let compiler: TestCompiler, caller: TestExternalCompiler
     this.beforeEach(async function () {
       compiler = (await (await hre.ethers.getContractFactory('TestCompiler')).deploy()) as TestCompiler

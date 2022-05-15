@@ -4,7 +4,7 @@ import hre from 'hardhat'
 import { TestHyperLiquidity } from '../../typechain-types/test/HyperLiquidity.t.sol/TestHyperLiquidity'
 import { Context, Contracts, fixture, contextFixture, deployTestHyperLiquidity } from '../shared/fixture'
 import { TestExternalLiquidity } from '../../typechain-types/test/HyperLiquidity.t.sol/TestExternalLiquidity'
-import { BasicRealPool } from '../shared/utils'
+import { BasicRealPool, StandardPoolHelpers } from '../shared/utils'
 
 describe('HyperLiquidity.sol', function () {
   let contracts: Contracts, context: Context, hyperLiquidity: TestHyperLiquidity, caller: TestExternalLiquidity
@@ -100,11 +100,10 @@ describe('HyperLiquidity.sol', function () {
       await expect(caller.testCreateCurve(1e4, 500, 100, 75)).to.not.emit(hyperLiquidity, 'log')
     })
     it('testCreatePool for events', async function () {
-      const { internalBase, internalQuote, internalLiquidity } = BasicRealPool
+      const { internalBase, internalQuote, internalLiquidity } = StandardPoolHelpers
       const poolId = 4294967297 // 2 bytes pairId + 4 bytes curveId
       await expect(caller.testCreatePool(contracts.base.address, contracts.quote.address))
         .to.emit(hyperLiquidity, 'CreatePool')
-        .withArgs(poolId, 1, 1, internalBase, internalQuote, internalLiquidity.div(1e3))
         .to.emit(hyperLiquidity, 'IncreaseGlobal')
         .to.emit(hyperLiquidity, 'AddLiquidity')
         .to.emit(hyperLiquidity, 'IncreasePosition')

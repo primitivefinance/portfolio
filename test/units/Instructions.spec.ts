@@ -19,9 +19,9 @@ describe('Instructions', function () {
 
     const data = instruct.encodeCreatePair(one, two)
     const result = await instructions.testDecodeCreatePair(data.hex)
-    const info = data.bytes.slice(1) // removes opcode byte
-    expect(result[0]).to.be.hexEqual(bytesToHex(info.slice(0, 20)))
-    expect(result[1]).to.be.hexEqual(bytesToHex(info.slice(20)))
+    const info = data.bytes // removes opcode byte
+    expect(result[0]).to.be.hexEqual(bytesToHex(info.slice(1, 21)))
+    expect(result[1]).to.be.hexEqual(bytesToHex(info.slice(21)))
   })
 
   it('testDecodePoolId', async function () {
@@ -42,11 +42,11 @@ describe('Instructions', function () {
     const fee = 100
     const data = instruct.encodeCreateCurve(strike, sigma, maturity, fee)
     const result = await instructions.testDecodeCreateCurve(data.hex)
-    const info = data.bytes.slice(1) // removes opcode byte
-    expect(result[0]).to.be.eq(parseInt(bytesToHex(info.slice(0, 3))))
-    expect(result[1]).to.be.eq(parseInt(bytesToHex(info.slice(3, 7))))
-    expect(result[2]).to.be.eq(parseInt(bytesToHex(info.slice(7, 9))))
-    expect(result[3]).to.be.eq(parseInt(bytesToHex(info.slice(9))))
+    const info = data.bytes // removes opcode byte
+    expect(result[0]).to.be.eq(parseInt(bytesToHex(info.slice(1, 4))))
+    expect(result[1]).to.be.eq(parseInt(bytesToHex(info.slice(4, 8))))
+    expect(result[2]).to.be.eq(parseInt(bytesToHex(info.slice(8, 10))))
+    expect(result[3]).to.be.eq(parseInt(bytesToHex(info.slice(10))))
   })
 
   it('testDecodeCreatePool', async function () {
@@ -56,12 +56,12 @@ describe('Instructions', function () {
     const deltaLiquidity = BigNumber.from(1)
     const data = instruct.encodeCreatePool(pairId, curveId, basePerLiquidity, deltaLiquidity)
     const result = await instructions.testDecodeCreatePool(data.hex)
-    const info = data.bytes.slice(1) // removes opcode byte
-    expect(result[0]).to.be.eq(parseInt(bytesToHex(info.slice(0, 6))))
-    expect(result[1]).to.be.eq(parseInt(bytesToHex(info.slice(0, 2))))
-    expect(result[2]).to.be.eq(parseInt(bytesToHex(info.slice(2, 6))))
-    expect(result[3]).to.be.eq(parseInt(bytesToHex(info.slice(6, 22))))
-    expect(result[4]).to.be.eq(parseInt(bytesToHex(info.slice(22))))
+    const info = data.bytes // removes opcode byte
+    expect(result[0]).to.be.eq(parseInt(bytesToHex(info.slice(1, 7))))
+    expect(result[1]).to.be.eq(parseInt(bytesToHex(info.slice(1, 3))))
+    expect(result[2]).to.be.eq(parseInt(bytesToHex(info.slice(3, 7))))
+    expect(result[3]).to.be.eq(parseInt(bytesToHex(info.slice(7, 23))))
+    expect(result[4]).to.be.eq(parseInt(bytesToHex(info.slice(23))))
   })
 
   it('testDecodeRemoveLiquidity', async function () {

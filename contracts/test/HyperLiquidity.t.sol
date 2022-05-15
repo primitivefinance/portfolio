@@ -78,7 +78,7 @@ contract TestExternalLiquidity {
         {
             uint48 poolId = uint48(0x0100000001);
             uint128 basePerLiquidity = StandardPoolHelpers.INTERNAL_BASE; // expects parameters to match standard ones.
-            uint128 deltaLiquidity = StandardPoolHelpers.INTERNAL_LIQUIDITY / 1e3; // only mint 1/1000th of the standard liquidity
+            uint128 deltaLiquidity = StandardPoolHelpers.INTERNAL_LIQUIDITY; // only mint 1/1000th of the standard liquidity
             bytes memory data = Instructions.encodeCreatePool(poolId, basePerLiquidity, deltaLiquidity);
             hyper.testCreatePool(data);
         }

@@ -19,6 +19,17 @@ export const BasicRealPool = {
   internalLiquidity: parseEther('1'),
 }
 
+export const StandardPoolHelpers = {
+  strike: parseEther('10'),
+  sigma: 1e4,
+  maturity: 31556953, // note: the contracts _blockTimestamp is set to 100.
+  fee: 100,
+  gamma: 1e4 - 100,
+  internalBase: parseEther('0.308537538726000000'),
+  internalQuote: parseEther('3.085375387260000000'),
+  internalLiquidity: parseEther('1'),
+}
+
 export const Values = {
   ZERO_BN: toBn('0'),
   ONE: 1,

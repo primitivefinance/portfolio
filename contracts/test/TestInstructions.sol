@@ -17,7 +17,7 @@ contract TestInstructions {
 
     /// @dev First byte is the enigma instruction.
     function testDecodeCreatePair(bytes calldata data) public view returns (address, address) {
-        return Instructions.decodeCreatePair(data[1:]);
+        return Instructions.decodeCreatePair(data);
     }
 
     /// @dev First byte is the enigma instruction.
@@ -31,7 +31,7 @@ contract TestInstructions {
             uint128
         )
     {
-        return Instructions.decodeCreateCurve(data[1:]);
+        return Instructions.decodeCreateCurve(data);
     }
 
     /// @dev First byte is the enigma instruction.
@@ -46,7 +46,7 @@ contract TestInstructions {
             uint128
         )
     {
-        return Instructions.decodeCreatePool(data[1:]);
+        return Instructions.decodeCreatePool(data);
     }
 
     /// @dev First byte is the enigma instruction.
