@@ -3,17 +3,15 @@ pragma solidity ^0.8.0;
 import "./Decoder.sol";
 
 library Instructions {
-    error DecodePairBytesLength(uint256 length);
+    error DecodePairBytesLength(uint256 expected, uint256 length);
 
-    function encodeJumpInstruction() internal pure returns (bytes memory data) {
-        uint8 ecode = 0xaa;
-    }
-
+    /// @dev Encodes the arguments for the CREATE_PAIR instruction.
     function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
         uint8 ecode = 0x0c;
         data = abi.encodePacked(ecode, token0, token1);
     }
 
+    /// @dev Encodes the arugments for the CREATE_CURVE instruction.
     function encodeCreateCurve(
         uint24 sigma,
         uint32 maturity,
@@ -28,12 +26,13 @@ library Instructions {
     /// @param data Maximum 1 + 20 + 20 = 41 bytes.
     /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
     function decodeCreatePair(bytes calldata data) internal pure returns (address tokenBase, address tokenQuote) {
-        if (data.length < 40) revert DecodePairBytesLength(data.length);
+        if (data.length != 41) revert DecodePairBytesLength(41, data.length);
         // note: first byte is the create pair ecode
         tokenBase = address(bytes20(data[1:21]));
         tokenQuote = address(bytes20(data[21:]));
     }
 
+    /// @dev Encodes the arguments for the CREATE_POOL instruction.
     function encodeCreatePool(
         uint48 poolId,
         uint128 basePerLiquidity,

@@ -191,16 +191,23 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
     /// @custom:security Low. Does not handle tokens, only updates the state of the Enigma.
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
         (address base, address quote) = Instructions.decodeCreatePair(data);
+        if (base == quote) revert SameTokenError();
+
         pairId = getPairId[base][quote];
         if (pairId != 0) revert PairExists(pairId);
+
+        uint8 decimalsBase = IERC20(base).decimals();
+        uint8 decimalsQuote = IERC20(quote).decimals();
+        if (decimalsBase > 18 || decimalsBase < 6) revert DecimalsError(decimalsBase);
+        if (decimalsQuote > 18 || decimalsQuote < 6) revert DecimalsError(decimalsQuote);
 
         pairId = uint16(++pairNonce);
         getPairId[base][quote] = pairId; // note: no reverse lookup, because order matters!
         pairs[pairId] = Pair({
             tokenBase: base,
-            decimalsBase: IERC20(base).decimals(),
+            decimalsBase: decimalsBase,
             tokenQuote: quote,
-            decimalsQuote: IERC20(quote).decimals()
+            decimalsQuote: decimalsQuote
         });
 
         emit CreatePair(pairId, base, quote);

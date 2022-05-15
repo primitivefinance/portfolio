@@ -24,6 +24,10 @@ interface IEnigmaErrors {
     error PairExists(uint16 pairId);
     /// @dev Thrown when a pool has been created for the pair and curve combination.
     error PoolExists();
+    /// @dev Thrown when decimals of a token in a create pair operation are greater than 18 or less than 6.
+    error DecimalsError(uint8 decimals);
+    /// @dev Thrown if creating a pair with the same token.
+    error SameTokenError();
 
     // --- Validation --- //
     /// @dev Thrown when creating a pool that has one side of the pool have zero tokens.
