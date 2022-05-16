@@ -48,21 +48,10 @@ library Instructions {
     {
         (bytes1 maxFlag, ) = Decoder.separate(data[0]);
         useMax = uint8(maxFlag);
-        poolId = uint48(bytes6(data[1:7])); //poolId = uint48(abi.decode(data[1:7], (bytes6)));
+        poolId = uint48(bytes6(data[1:7]));
         uint8 pointer = uint8(data[7]);
         deltaBase = Decoder.toAmount(data[8:pointer]);
         deltaQuote = Decoder.toAmount(data[pointer:]);
-        // note: If power is greater than 15, then the length byte is next.
-        /* useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
-        poolId = uint48(bytes6(data[1:7]));
-        uint8 basePower = uint8(bytes1(data[7]) & 0x0f);
-        uint8 baseLen = uint8((bytes1(data[7]) & 0xf0) >> 4);
-        uint8 quotePower = uint8(bytes1(data[data.length - 1]) & 0x0f);
-        uint8 quoteLen = uint8((bytes1(data[data.length - 1]) & 0xf0) >> 4);
-        bytes memory base = data[8:8 + baseLen];
-        bytes memory quote = data[baseLen + 8:baseLen + 8 + quoteLen];
-        deltaBase = uint128(uint128(bytes16(base) >> ((16 - uint8(base.length)) * 8)) * 10**basePower);
-        deltaQuote = uint128(uint128(bytes16(quote) >> ((16 - uint8(quote.length)) * 8)) * 10**quotePower); */
     }
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
@@ -146,7 +135,7 @@ library Instructions {
             uint128 deltaLiquidity
         )
     {
-        useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
+        useMax = uint8(data[0] >> 4);
         poolId = uint48(bytes6(data[1:7]));
         pairId = uint16(bytes2(data[1:3]));
         deltaLiquidity = uint128(Decoder.toAmount(data[7:]));
@@ -167,7 +156,7 @@ library Instructions {
             uint8 direction
         )
     {
-        useMax = uint8((bytes1(data[0]) & 0xf0) >> 4);
+        useMax = uint8(data[0] >> 4);
         poolId = uint48(bytes6(data[1:7]));
         uint8 pointer = uint8(data[7]);
         deltaIn = uint128(Decoder.toAmount(data[8:pointer]));
