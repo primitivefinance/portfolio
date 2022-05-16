@@ -35,7 +35,7 @@ library Instructions {
 
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
     /// @param data Maximum 8 + 16 + 16 = 40 bytes.
-    /// | 0x | 1 packed byte useMax Flag - opcode | 6 byte poolId | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
+    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
     function decodeAddLiquidity(bytes calldata data)
         internal
         pure
@@ -122,9 +122,9 @@ library Instructions {
         curveId = uint32(bytes4(data[2:]));
     }
 
-    /// @dev Expects an opcode, poolId, and trailing run-length encoded amount.
+    /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
     /// @param data Maximum 1 + 6 + 16 = 23 bytes.
-    /// | 0x | 1 packed byte useMax Flag - opcode | 6 byte poolId | 1 packed byte amount length - amount power | amount in amount length bytes |.
+    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 1 byte amount power | amount in amount length bytes |.
     function decodeRemoveLiquidity(bytes calldata data)
         internal
         pure
@@ -144,7 +144,7 @@ library Instructions {
     /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
     /// @dev Expects standard instructions with the end byte specifying swap direction.
     /// @param data Maximum 1 + 6 + 16 + 1 = 24 bytes.
-    /// | 0x | 1 byte packed flag-opcode | 6 byte poolId | up to 16 byte TRLE amount | 1 byte direction |.
+    /// | 0x | 1 byte packed flag-enigma code | 6 byte poolId | up to 16 byte TRLE amount | 1 byte direction |.
     function decodeSwap(bytes calldata data)
         internal
         pure
