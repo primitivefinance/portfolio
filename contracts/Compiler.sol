@@ -103,7 +103,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
         } else if (instruction == SWAP) {
             (poolId, ) = _swapExactForExact(data);
         } else if (instruction == CREATE_POOL) {
-            _createPool(data);
+            (poolId, , ) = _createPool(data);
         } else if (instruction == CREATE_CURVE) {
             _createCurve(data);
         } else if (instruction == CREATE_PAIR) {
@@ -148,7 +148,6 @@ contract Compiler is HyperLiquidity, HyperSwap {
 
         uint256 global = globalReserves[token];
         uint256 actual = _balanceOf(token, address(this));
-
         if (global > actual) {
             uint256 deficit = global - actual;
             _applyDebit(token, deficit);
