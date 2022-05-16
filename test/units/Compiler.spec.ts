@@ -194,6 +194,7 @@ describe('Compiler', function () {
         .to.emit(contracts.main, 'CreatePool')
         .to.emit(contracts.main, 'CreateCurve')
         .to.emit(contracts.main, 'CreatePool')
+        .to.emit(contracts.main, 'Debit')
     })
 
     it('fallback#tests the fallback by sending data directly to contract', async function () {
