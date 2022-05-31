@@ -1,3 +1,6 @@
 [submodule "lib/solstat.git"]
 	path = lib/solstat.git
 	url = https://github.com/primitivefinance/solstat.git
+[submodule "lib/forge-std"]
+	path = lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
