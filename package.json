@@ -3,12 +3,15 @@
   "version": "0.0.1",
   "description": "Enigma Virtual Machine processes instructions for interacting with liquidity pools.",
   "scripts": {
-    "compile": "hardhat compile",
-    "typechain": "hardhat typechain",
-    "clean": "hardhat clean && hardhat compile && hardhat typechain",
-    "test": "hardhat test",
-    "prettier": "prettier --write .",
-    "prepare": "husky install"
+    "build": "hardhat compile --config ./hardhat.config.ts",
+    "test": "TS_NODE_TRANSPILE_ONLY=1 hardhat test --config ./hardhat.config.ts",
+    "test:forge": "FOUNDRY_PROFILE=test forge test -vvv",
+    "profile": "REPORT_GAS=true hardhat test --config ./hardhat.config.ts",
+    "coverage": "hardhat coverage --config ./hardhat-coverage.config.ts --solcoverjs ./config/.solcover.js",
+    "lint:check": "prettier --check **.sol && prettier --check **.js && prettier --check **.ts && hardhat compile --config ./hardhat.config.ts",
+    "lint:fix": "prettier --write **.sol && prettier --write **.js && prettier --write **.ts",
+    "prepare": "husky install",
+    "generate": "cd ./test/differential/scripts/ && npm run compile && npm run generate"
   },
   "repository": {
     "type": "git",
@@ -47,8 +50,13 @@
     "ts-node": "^10.7.0",
     "typescript": "^4.6.3"
   },
+  "engines": {
+    "node": ">=16.0.0"
+  },
   "lint-staged": {
-    "*.{js,css,md}": "prettier --write"
+    "*.sol": "prettier --write",
+    "*.js": "prettier --write",
+    "*.ts": "prettier --write"
   },
   "dependencies": {
     "@primitivefi/rmm-core": "^1.0.0",
@@ -56,5 +64,13 @@
     "@typechain/ethers-v5": "^10.0.0",
     "@typechain/hardhat": "^6.0.0",
     "typechain": "^8.0.0"
+  },
+  "resolutions": {
+    "async": ">=2.6.4",
+    "cross-fetch": ">=3.1.5",
+    "lodash": ">=4.17.21",
+    "node-fetch": ">=2.6.7",
+    "underscore": ">=1.12.1",
+    "yargs-parser": ">=5.0.1"
   }
 }

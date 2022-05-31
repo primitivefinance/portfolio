@@ -5,7 +5,7 @@ import { TestNewton } from 'typechain-types'
 import { toBn } from 'evm-bn'
 import { formatEther } from 'ethers/lib/utils'
 
-import { floatToFixedX64, fixedX64ToFloat } from '../../lib/units'
+import { floatToFixedX64, fixedX64ToFloat } from '../../compiler/units'
 
 describe('Newton', function () {
   let newton: TestNewton

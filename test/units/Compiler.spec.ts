@@ -13,7 +13,7 @@ import {
   encodeSwapExactTokens,
   fixedX64ToFloat,
   INSTRUCTION_JUMP,
-} from '../../lib'
+} from '../../compiler'
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
 import { BasicRealPool, Values } from '../shared/utils'
