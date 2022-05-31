@@ -1,0 +1,3 @@
+[submodule "lib/solstat.git"]
+	path = lib/solstat.git
+	url = https://github.com/primitivefinance/solstat.git
