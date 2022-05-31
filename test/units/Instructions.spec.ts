@@ -1,8 +1,8 @@
 import hre from 'hardhat'
 import { TestInstructions } from 'typechain-types'
-import * as instruct from '../../lib'
+import * as instruct from '../../compiler'
 import { expect } from 'chai'
-import { bytesToHex } from '../../lib'
+import { bytesToHex } from '../../compiler'
 import { BigNumber } from 'ethers'
 
 describe('Instructions', function () {

@@ -1,7 +1,26 @@
-artifacts
-cache
-node_modules
-typechain-types
 docs
+node_modules
 .env
+coverage
+coverage.json
+typechain-types
+yarn-error.log
+
+#Hardhat files
+artifacts/
+hh-cache/
+
+
+# Foundry
+cache
+out
+optimized-out
+
+.DS_Store
+
+# VScode
 .vscode
+
+# Differential testing
+test/differential/data
+test/differential/scripts/node_modules
