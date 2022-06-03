@@ -1,10 +1,10 @@
 import { ethers } from 'hardhat'
 import { BigNumberish, Signer } from 'ethers'
 import { HardhatRuntimeEnvironment } from 'hardhat/types'
-import { TestCompiler, TestEnigmaVirtualMachine, TestERC20, TestHyperLiquidity, TestHyperSwap } from 'typechain-types'
+import { TestDecompiler, TestEnigmaVirtualMachine, TestERC20, TestHyperLiquidity, TestHyperSwap } from 'typechain-types'
 
 export async function setupPool(
-  contract: TestCompiler,
+  contract: TestDecompiler,
   poolId: number,
   tokenBase: string,
   tokenQuote: string,
@@ -23,7 +23,7 @@ export async function mintAndApprove(token: TestERC20, user: string, spender: st
 }
 
 export interface Contracts {
-  main: TestCompiler
+  main: TestDecompiler
   base: TestERC20
   quote: TestERC20
 }
@@ -54,8 +54,8 @@ export async function contextFixture(hre: HardhatRuntimeEnvironment): Promise<Co
 }
 
 export async function fixture(hre: HardhatRuntimeEnvironment): Promise<Contracts> {
-  const mainFac = await hre.ethers.getContractFactory('TestCompiler')
-  const main = (await mainFac.deploy()) as TestCompiler
+  const mainFac = await hre.ethers.getContractFactory('TestDecompiler')
+  const main = (await mainFac.deploy()) as TestDecompiler
   await main.deployed()
   const base = (await (await hre.ethers.getContractFactory('TestERC20')).deploy('base', 'base', 18)) as TestERC20
   const quote = (await (await hre.ethers.getContractFactory('TestERC20')).deploy('quote', 'quote', 18)) as TestERC20

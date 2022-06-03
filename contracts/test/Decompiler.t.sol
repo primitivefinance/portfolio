@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "../Compiler.sol";
+import "../Decompiler.sol";
 
 import "./DSTest.sol";
 import "./Helpers.sol";
 
-contract TestExternalCompiler {
-    TestCompiler public compiler;
+contract TestExternalDecompiler {
+    TestDecompiler public compiler;
 
     constructor(address compiler_) {
-        compiler = TestCompiler(payable(compiler_));
+        compiler = TestDecompiler(payable(compiler_));
     }
 
     function testAddLiquidity() internal {
@@ -116,7 +116,7 @@ contract TestExternalCompiler {
     }
 }
 
-contract TestCompiler is DSTest, Helpers, Compiler {
+contract TestDecompiler is DSTest, Helpers, Decompiler {
     function _liquidityPolicy() internal pure override returns (uint256) {
         return 0;
     }
@@ -247,7 +247,7 @@ contract TestCompiler is DSTest, Helpers, Compiler {
 
     function testFund(address token, uint256 amount) public {}
 
-    // --- Old Compiler --- //
+    // --- Old Decompiler --- //
 
     uint256 public timestamp;
 

@@ -292,7 +292,7 @@ contract TestHyperLiquidity is DSTest, Helpers, HyperLiquidity {
 
     function testCreatePool(bytes calldata data, uint48 poolId) public {}
 
-    // --- Compiler --- //
+    // --- Decompiler --- //
     function fund(address, uint256) external override {}
 
     function draw(

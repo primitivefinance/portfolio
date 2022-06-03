@@ -7,8 +7,8 @@ import "./libraries/Decoder.sol";
 import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
 
-/// @title Enigma Virtual Machine
-/// @notice Defines the possible instruction set which must be processed in a higher-level compiler.
+/// @title Enigma Virtual Machine.
+/// @notice Defines the possible instruction set which must be processed in a higher-level decompiler.
 /// @dev Implements low-level `balanceOf`, re-entrancy guard, instruction constants and state.
 abstract contract EnigmaVirtualMachine is IEnigma {
     using SafeCast for uint256;

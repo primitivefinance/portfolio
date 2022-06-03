@@ -7,10 +7,10 @@ import "@rari-capital/solmate/src/tokens/ERC20.sol";
 import "./HyperLiquidity.sol";
 import "./HyperSwap.sol";
 
-/// @title Enigma Compiler
+/// @title Enigma Decompiler
 /// @notice Main contract of the Enigma that implements instruction processing.
 /// @dev Eliminates the use of function signatures. Expects encoded bytes as msg.data in the fallback.
-contract Compiler is HyperLiquidity, HyperSwap {
+contract Decompiler is HyperLiquidity, HyperSwap {
     // --- Fallback --- //
 
     /// @notice Main touchpoint for receiving calls.

@@ -18,7 +18,7 @@ interface IEnigmaEvents {
     /// @custom:security High.
     event DecreaseGlobal(address indexed token, uint256 amount);
 
-    // --- Compiler --- //
+    // --- Decompiler --- //
     /// @dev A payment requested by this contract that must be paid by the `msg.sender` account.
     event Debit(address indexed token, uint256 amount);
     /// @dev A payment that is paid out to the `msg.sender` account from this contract.

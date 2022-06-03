@@ -8,7 +8,7 @@ import "./DSTest.sol";
 contract EnigmaVirtualMachineActions is DSTest, EnigmaVirtualMachine {
     // --- Must Implement --- //
 
-    // --- Compiler --- //
+    // --- Decompiler --- //
     function fund(address, uint256) external override {}
 
     function draw(
