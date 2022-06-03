@@ -110,7 +110,7 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
         pool.internalLiquidity -= deltaLiquidity;
         pool.blockTimestamp = _blockTimestamp();
 
-        _decreasePosition(poolId, deltaLiquidity);
+        _decreasePositionCheckJit(poolId, deltaLiquidity);
 
         Pair memory pair = pairs[pairId];
         _decreaseGlobal(pair.tokenBase, deltaBase);

@@ -30,9 +30,9 @@ abstract contract EnigmaVirtualMachine is IEnigma {
         virtual
         returns (uint256 distance, uint256 timestamp)
     {
-        Position memory pos = positions[account][poolId];
+        uint256 previous = positions[account][poolId].blockTimestamp;
         timestamp = _blockTimestamp();
-        distance = timestamp - pos.blockTimestamp;
+        distance = timestamp - previous;
     }
 
     // --- Internal --- //
@@ -77,24 +77,31 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
         Position storage pos = positions[msg.sender][poolId];
+
         pos.liquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
-    /// @dev Equally important as `_decreasePosition`.
+    /// @dev Equally important as `_increasePosition`.
     /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
         Position storage pos = positions[msg.sender][poolId];
 
-        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId);
-        if (_liquidityPolicy() > distance) revert JitLiquidity(pos.blockTimestamp, timestamp);
-
         pos.liquidity -= deltaLiquidity.toUint128();
-        pos.blockTimestamp = timestamp.toUint128();
+        pos.blockTimestamp = _blockTimestamp();
 
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
+    }
+
+    /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
+    /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
+    function _decreasePositionCheckJit(uint48 poolId, uint256 deltaLiquidity) internal {
+        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId);
+        if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
+
+        _decreasePosition(poolId, deltaLiquidity);
     }
 
     // --- State --- //

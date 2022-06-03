@@ -50,7 +50,7 @@ interface IEnigmaErrors {
 
     // --- Special --- //
     /// @dev Thrown if the JIT liquidity condition is false.
-    error JitLiquidity(uint256 lastTime, uint256 timestamp);
+    error JitLiquidity(uint256 distance);
 
     // --- Swap --- //
     /// @dev Thrown if the effects of a swap put the pool in an invalid state according the the trading function.
