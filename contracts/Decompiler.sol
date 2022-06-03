@@ -30,10 +30,13 @@ contract Decompiler is HyperLiquidity, HyperSwap {
     /// @custom:security High. Without pairIds to loop through, no token amounts are settled.
     uint16[] internal _tempPairIds;
 
+    /// @dev Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
+    mapping(address => bool) internal _addressCache;
+
     /// @dev Flag set to `true` during `_process`. Set to `false` during `_settleToken`.
     /// @custom:security High. Referenced in settlement to pay for tokens due.
     function _cacheAddress(address token, bool flag) internal {
-        addressCache[token] = flag;
+        _addressCache[token] = flag;
     }
 
     // --- Internal --- //
@@ -119,8 +122,8 @@ contract Decompiler is HyperLiquidity, HyperSwap {
             _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
             // Caching the addresses to settle the pools interacted with in the fallback function.
             Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
-            if (!addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
-            if (!addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
+            if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
+            if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
         }
     }
 
@@ -144,7 +147,7 @@ contract Decompiler is HyperLiquidity, HyperSwap {
     /// @param token Target token to pay or credit.
     /// @custom:security Critical. Handles crediting accounts or requesting payment for debits.
     function _settleToken(address token) internal {
-        if (!addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
+        if (!_addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
         uint256 global = globalReserves[token];
         uint256 actual = _balanceOf(token, address(this));

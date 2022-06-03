@@ -8,8 +8,8 @@ import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
 
 /// @title Enigma Virtual Machine.
-/// @notice Defines the possible instruction set which must be processed in a higher-level decompiler.
-/// @dev Implements low-level `balanceOf`, re-entrancy guard, instruction constants and state.
+/// @notice Stores the state of the Enigma with functions to change state.
+/// @dev Implements low-level internal virtual functions, re-entrancy guard and state.
 abstract contract EnigmaVirtualMachine is IEnigma {
     using SafeCast for uint256;
     // --- Reentrancy --- //
@@ -87,6 +87,7 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
         Position storage pos = positions[msg.sender][poolId];
+
         (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId);
         if (_liquidityPolicy() > distance) revert JitLiquidity(pos.blockTimestamp, timestamp);
 
@@ -103,8 +104,6 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     mapping(uint48 => Pool) public pools;
     /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) public curves;
-    /// @dev Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
-    mapping(address => bool) public addressCache;
     /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
     mapping(bytes32 => uint32) public getCurveIds;
     /// @dev Token -> Physical Reserves.
