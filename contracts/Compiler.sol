@@ -18,7 +18,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
     /// @custom:mev Higher level security checks must be implemented by calling contract.
     fallback() external payable lock {
-        if (msg.data[0] != INSTRUCTION_JUMP) _process(msg.data);
+        if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
         else _jumpProcess(msg.data);
         _settleBalances();
     }
@@ -94,19 +94,19 @@ contract Compiler is HyperLiquidity, HyperSwap {
     function _process(bytes calldata data) internal returns (uint16 pairId) {
         uint48 poolId;
         bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == UNKNOWN) revert UnknownInstruction();
+        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
-        if (instruction == ADD_LIQUIDITY) {
+        if (instruction == Instructions.ADD_LIQUIDITY) {
             (poolId, ) = _addLiquidity(data);
-        } else if (instruction == REMOVE_LIQUIDITY) {
+        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
             (poolId, , ) = _removeLiquidity(data);
-        } else if (instruction == SWAP) {
+        } else if (instruction == Instructions.SWAP) {
             (poolId, ) = _swapExactForExact(data);
-        } else if (instruction == CREATE_POOL) {
+        } else if (instruction == Instructions.CREATE_POOL) {
             (poolId, , ) = _createPool(data);
-        } else if (instruction == CREATE_CURVE) {
+        } else if (instruction == Instructions.CREATE_CURVE) {
             _createCurve(data);
-        } else if (instruction == CREATE_PAIR) {
+        } else if (instruction == Instructions.CREATE_PAIR) {
             _createPair(data);
         } else {
             revert UnknownInstruction();

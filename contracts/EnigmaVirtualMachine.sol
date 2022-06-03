@@ -96,15 +96,6 @@ abstract contract EnigmaVirtualMachine is IEnigma {
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
-    // --- Instructions --- //
-    bytes1 public constant UNKNOWN = 0x00;
-    bytes1 public constant ADD_LIQUIDITY = 0x01;
-    bytes1 public constant REMOVE_LIQUIDITY = 0x03;
-    bytes1 public constant SWAP = 0x05;
-    bytes1 public constant CREATE_POOL = 0x0B;
-    bytes1 public constant CREATE_PAIR = 0x0C;
-    bytes1 public constant CREATE_CURVE = 0x0D;
-    bytes1 public constant INSTRUCTION_JUMP = 0xAA;
     // --- State --- //
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;

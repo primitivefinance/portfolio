@@ -337,7 +337,7 @@ contract TestCompiler is DSTest, Helpers, Compiler {
     }
 
     function testMain(bytes calldata data) public {
-        if (data[0] != INSTRUCTION_JUMP) {
+        if (data[0] != Instructions.INSTRUCTION_JUMP) {
             _process(data);
         } else {
             _jumpProcess(data);
