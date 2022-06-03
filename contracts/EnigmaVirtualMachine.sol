@@ -5,11 +5,13 @@ import "./interfaces/IEnigma.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Decoder.sol";
 import "./libraries/Instructions.sol";
+import "./libraries/SafeCast.sol";
 
 /// @title Enigma Virtual Machine
 /// @notice Defines the possible instruction set which must be processed in a higher-level compiler.
 /// @dev Implements low-level `balanceOf`, re-entrancy guard, instruction constants and state.
 abstract contract EnigmaVirtualMachine is IEnigma {
+    using SafeCast for uint256;
     // --- Reentrancy --- //
     modifier lock() {
         if (locked != 1) revert LockedError();
@@ -17,6 +19,20 @@ abstract contract EnigmaVirtualMachine is IEnigma {
         locked = 2;
         _;
         locked = 1;
+    }
+
+    // --- View --- //
+
+    /// @inheritdoc IEnigmaView
+    function checkJitLiquidity(address account, uint48 poolId)
+        public
+        view
+        virtual
+        returns (uint256 distance, uint256 timestamp)
+    {
+        Position memory pos = positions[account][poolId];
+        timestamp = _blockTimestamp();
+        distance = timestamp - pos.blockTimestamp;
     }
 
     // --- Internal --- //
@@ -37,6 +53,47 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     /// @dev Overridable in tests.
     function _liquidityPolicy() internal view virtual returns (uint256) {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
+    }
+
+    // --- Global --- //
+
+    /// @dev Most important function because it manages the solvency of the Engima.
+    /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
+    function _increaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] += amount;
+        emit IncreaseGlobal(token, amount);
+    }
+
+    /// @dev Equally important to `_increaseGlobal`.
+    /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
+    function _decreaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] -= amount;
+        emit DecreaseGlobal(token, amount);
+    }
+
+    // --- Positions --- //
+
+    /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
+    /// @custom:security High. Only method of increasing the liquidity held by accounts.
+    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][poolId];
+        pos.liquidity += deltaLiquidity.toUint128();
+        pos.blockTimestamp = _blockTimestamp();
+
+        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
+    }
+
+    /// @dev Equally important as `_decreasePosition`.
+    /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
+    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][poolId];
+        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId);
+        if (_liquidityPolicy() > distance) revert JitLiquidity(pos.blockTimestamp, timestamp);
+
+        pos.liquidity -= deltaLiquidity.toUint128();
+        pos.blockTimestamp = timestamp.toUint128();
+
+        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
     // --- Instructions --- //

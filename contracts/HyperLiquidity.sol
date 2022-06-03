@@ -2,7 +2,6 @@
 pragma solidity 0.8.10;
 
 import "@primitivefi/rmm-core/contracts/libraries/ReplicationMath.sol";
-import "@primitivefi/rmm-core/contracts/libraries/SafeCast.sol";
 
 import "./interfaces/IERC20.sol";
 import "./EnigmaVirtualMachine.sol";
@@ -14,17 +13,6 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
     using SafeCast for uint256;
 
     // --- View --- //
-
-    /// @inheritdoc IEnigmaView
-    function checkJitLiquidity(address account, uint48 poolId)
-        public
-        view
-        returns (uint256 distance, uint256 timestamp)
-    {
-        Position memory pos = positions[account][poolId];
-        timestamp = _blockTimestamp();
-        distance = timestamp - pos.blockTimestamp;
-    }
 
     /// @inheritdoc IEnigmaView
     function getLiquidityMinted(
@@ -39,47 +27,6 @@ abstract contract HyperLiquidity is EnigmaVirtualMachine {
     }
 
     // --- Internal --- //
-
-    // --- Global --- //
-
-    /// @dev Most important function because it manages the solvency of the Engima.
-    /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
-    function _increaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] += amount;
-        emit IncreaseGlobal(token, amount);
-    }
-
-    /// @dev Equally important to `_increaseGlobal`.
-    /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
-    function _decreaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] -= amount;
-        emit DecreaseGlobal(token, amount);
-    }
-
-    // --- Posiitons --- //
-
-    /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
-    /// @custom:security High. Only method of increasing the liquidity held by accounts.
-    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][poolId];
-        pos.liquidity += deltaLiquidity.toUint128();
-        pos.blockTimestamp = _blockTimestamp();
-
-        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
-    }
-
-    /// @dev Equally important as `_decreasePosition`.
-    /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
-    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][poolId];
-        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId);
-        if (_liquidityPolicy() > distance) revert JitLiquidity(pos.blockTimestamp, timestamp);
-
-        pos.liquidity -= deltaLiquidity.toUint128();
-        pos.blockTimestamp = timestamp.toUint128();
-
-        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
-    }
 
     // --- Liquidity --- //
 

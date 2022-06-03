@@ -178,4 +178,6 @@ contract Compiler is HyperLiquidity, HyperSwap {
         _applyCredit(token, amount);
         SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
+
+    // --- View --- //
 }

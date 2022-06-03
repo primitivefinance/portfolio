@@ -115,8 +115,6 @@ contract TestHyperSwap is DSTest, Helpers, HyperSwap {
         uint256
     ) public view override returns (uint256) {}
 
-    function checkJitLiquidity(address, uint48) external view returns (uint256, uint256) {}
-
     function fund(address, uint256) external override {}
 
     function draw(

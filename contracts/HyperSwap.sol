@@ -2,7 +2,6 @@
 pragma solidity 0.8.10;
 
 import "@primitivefi/rmm-core/contracts/libraries/ReplicationMath.sol";
-import "@primitivefi/rmm-core/contracts/libraries/SafeCast.sol";
 
 import "./EnigmaVirtualMachine.sol";
 
