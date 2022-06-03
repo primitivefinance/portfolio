@@ -9,6 +9,8 @@ contract EnigmaVirtualMachineActions is DSTest, EnigmaVirtualMachine {
     // --- Must Implement --- //
 
     // --- Decompiler --- //
+    function _process(bytes calldata data) internal override {}
+
     function fund(address, uint256) external override {}
 
     function draw(

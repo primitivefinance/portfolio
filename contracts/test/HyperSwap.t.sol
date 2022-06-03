@@ -115,6 +115,8 @@ contract TestHyperSwap is DSTest, Helpers, HyperSwap {
         uint256
     ) public view override returns (uint256) {}
 
+    function _process(bytes calldata data) internal override {}
+
     function fund(address, uint256) external override {}
 
     function draw(

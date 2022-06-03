@@ -64,37 +64,11 @@ contract Decompiler is HyperLiquidity, HyperSwap {
         emit Debit(token, amount);
     }
 
-    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
-    /// @dev Expects a special encoding method for multiple instructions.
-    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
-    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
-    function _jumpProcess(bytes calldata data) internal {
-        uint8 length = uint8(data[1]);
-        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
-        uint256 start;
-
-        // For each instruction set...
-        for (uint256 i; i != length; ++i) {
-            // Start at the index of the first byte of the next instruction.
-            start = pointer;
-
-            // Set the new pointer to the next instruction, located at the pointer.
-            pointer = uint8(data[pointer]);
-
-            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
-            if (pointer > data.length) revert JumpError(pointer);
-            bytes calldata instruction = data[start:pointer];
-
-            // Process the instruction.
-            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
-        }
-    }
-
     /// @notice Single instruction processor that will forward instruction to appropriate function.
     /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
     /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
     /// @custom:security Critical. Directly sends instructions to be executed.
-    function _process(bytes calldata data) internal returns (uint16 pairId) {
+    function _process(bytes calldata data) internal override {
         uint48 poolId;
         bytes1 instruction = bytes1(data[0] & 0x0f);
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
@@ -117,7 +91,7 @@ contract Decompiler is HyperLiquidity, HyperSwap {
 
         // note: Only pool interactions have a non-zero poolId.
         if (poolId != 0) {
-            pairId = uint16(poolId >> 32);
+            uint16 pairId = uint16(poolId >> 32);
             // Add the pair to the array to track all the pairs that have been interacted with.
             _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
             // Caching the addresses to settle the pools interacted with in the fallback function.

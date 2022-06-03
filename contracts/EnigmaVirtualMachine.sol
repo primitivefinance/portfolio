@@ -36,6 +36,36 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     }
 
     // --- Internal --- //
+    /// @dev Must be implemented by the highest level contract.
+    /// @notice Processing logic for instructions.
+    function _process(bytes calldata data) internal virtual;
+
+    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
+    /// @dev Expects a special encoding method for multiple instructions.
+    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
+    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
+    function _jumpProcess(bytes calldata data) internal {
+        uint8 length = uint8(data[1]);
+        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
+        uint256 start;
+
+        // For each instruction set...
+        for (uint256 i; i != length; ++i) {
+            // Start at the index of the first byte of the next instruction.
+            start = pointer;
+
+            // Set the new pointer to the next instruction, located at the pointer.
+            pointer = uint8(data[pointer]);
+
+            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
+            if (pointer > data.length) revert JumpError(pointer);
+            bytes calldata instruction = data[start:pointer];
+
+            // Process the instruction.
+            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
+        }
+    }
+
     /// @dev Gas optimized `balanceOf` method.
     function _balanceOf(address token, address account) internal view returns (uint256) {
         (bool success, bytes memory data) = token.staticcall(
