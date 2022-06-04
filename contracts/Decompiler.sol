@@ -7,10 +7,10 @@ import "@rari-capital/solmate/src/tokens/ERC20.sol";
 import "./HyperLiquidity.sol";
 import "./HyperSwap.sol";
 
-/// @title Enigma Compiler
+/// @title Enigma Decompiler
 /// @notice Main contract of the Enigma that implements instruction processing.
 /// @dev Eliminates the use of function signatures. Expects encoded bytes as msg.data in the fallback.
-contract Compiler is HyperLiquidity, HyperSwap {
+contract Decompiler is HyperLiquidity, HyperSwap {
     // --- Fallback --- //
 
     /// @notice Main touchpoint for receiving calls.
@@ -18,7 +18,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
     /// @custom:mev Higher level security checks must be implemented by calling contract.
     fallback() external payable lock {
-        if (msg.data[0] != INSTRUCTION_JUMP) _process(msg.data);
+        if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
         else _jumpProcess(msg.data);
         _settleBalances();
     }
@@ -30,10 +30,13 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @custom:security High. Without pairIds to loop through, no token amounts are settled.
     uint16[] internal _tempPairIds;
 
+    /// @dev Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
+    mapping(address => bool) internal _addressCache;
+
     /// @dev Flag set to `true` during `_process`. Set to `false` during `_settleToken`.
     /// @custom:security High. Referenced in settlement to pay for tokens due.
     function _cacheAddress(address token, bool flag) internal {
-        addressCache[token] = flag;
+        _addressCache[token] = flag;
     }
 
     // --- Internal --- //
@@ -61,52 +64,26 @@ contract Compiler is HyperLiquidity, HyperSwap {
         emit Debit(token, amount);
     }
 
-    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
-    /// @dev Expects a special encoding method for multiple instructions.
-    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
-    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
-    function _jumpProcess(bytes calldata data) internal {
-        uint8 length = uint8(data[1]);
-        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
-        uint256 start;
-
-        // For each instruction set...
-        for (uint256 i; i != length; ++i) {
-            // Start at the index of the first byte of the next instruction.
-            start = pointer;
-
-            // Set the new pointer to the next instruction, located at the pointer.
-            pointer = uint8(data[pointer]);
-
-            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
-            if (pointer > data.length) revert JumpError(pointer);
-            bytes calldata instruction = data[start:pointer];
-
-            // Process the instruction.
-            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
-        }
-    }
-
     /// @notice Single instruction processor that will forward instruction to appropriate function.
     /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
     /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
     /// @custom:security Critical. Directly sends instructions to be executed.
-    function _process(bytes calldata data) internal returns (uint16 pairId) {
+    function _process(bytes calldata data) internal override {
         uint48 poolId;
         bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == UNKNOWN) revert UnknownInstruction();
+        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
-        if (instruction == ADD_LIQUIDITY) {
+        if (instruction == Instructions.ADD_LIQUIDITY) {
             (poolId, ) = _addLiquidity(data);
-        } else if (instruction == REMOVE_LIQUIDITY) {
+        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
             (poolId, , ) = _removeLiquidity(data);
-        } else if (instruction == SWAP) {
+        } else if (instruction == Instructions.SWAP) {
             (poolId, ) = _swapExactForExact(data);
-        } else if (instruction == CREATE_POOL) {
+        } else if (instruction == Instructions.CREATE_POOL) {
             (poolId, , ) = _createPool(data);
-        } else if (instruction == CREATE_CURVE) {
+        } else if (instruction == Instructions.CREATE_CURVE) {
             _createCurve(data);
-        } else if (instruction == CREATE_PAIR) {
+        } else if (instruction == Instructions.CREATE_PAIR) {
             _createPair(data);
         } else {
             revert UnknownInstruction();
@@ -114,13 +91,13 @@ contract Compiler is HyperLiquidity, HyperSwap {
 
         // note: Only pool interactions have a non-zero poolId.
         if (poolId != 0) {
-            pairId = uint16(poolId >> 32);
+            uint16 pairId = uint16(poolId >> 32);
             // Add the pair to the array to track all the pairs that have been interacted with.
             _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
             // Caching the addresses to settle the pools interacted with in the fallback function.
             Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
-            if (!addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
-            if (!addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
+            if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
+            if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
         }
     }
 
@@ -144,7 +121,7 @@ contract Compiler is HyperLiquidity, HyperSwap {
     /// @param token Target token to pay or credit.
     /// @custom:security Critical. Handles crediting accounts or requesting payment for debits.
     function _settleToken(address token) internal {
-        if (!addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
+        if (!_addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
         uint256 global = globalReserves[token];
         uint256 actual = _balanceOf(token, address(this));
@@ -178,4 +155,6 @@ contract Compiler is HyperLiquidity, HyperSwap {
         _applyCredit(token, amount);
         SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
+
+    // --- View --- //
 }

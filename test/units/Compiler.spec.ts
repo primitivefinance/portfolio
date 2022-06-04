@@ -17,7 +17,7 @@ import {
 import { parseEther } from 'ethers/lib/utils'
 import { BigNumber } from 'ethers'
 import { BasicRealPool, Values } from '../shared/utils'
-import { TestCompiler, TestExternalCompiler } from 'typechain-types'
+import { TestDecompiler, TestExternalDecompiler } from 'typechain-types'
 
 function getSwapTokensFromDir(
   dir: number,
@@ -34,7 +34,7 @@ function getSwapTokensFromDir(
 }
 
 // Note: if any of these tests randomly breaks... look at what _blockTimestamp() is pointing to in the contracts.
-describe('Compiler', function () {
+describe('Decompiler', function () {
   let contracts: Contracts, context: Context
 
   beforeEach(async function () {
@@ -46,12 +46,12 @@ describe('Compiler', function () {
   })
 
   describe('Instruction Single & Multi Processing', function () {
-    let compiler: TestCompiler, caller: TestExternalCompiler
+    let compiler: TestDecompiler, caller: TestExternalDecompiler
     this.beforeEach(async function () {
-      compiler = (await (await hre.ethers.getContractFactory('TestCompiler')).deploy()) as TestCompiler
+      compiler = (await (await hre.ethers.getContractFactory('TestDecompiler')).deploy()) as TestDecompiler
       caller = (await (
-        await hre.ethers.getContractFactory('TestExternalCompiler')
-      ).deploy(compiler.address)) as TestExternalCompiler
+        await hre.ethers.getContractFactory('TestExternalDecompiler')
+      ).deploy(compiler.address)) as TestExternalDecompiler
       await mintAndApprove(contracts.base, context.user, compiler.address, Values.ETHER)
       await mintAndApprove(contracts.quote, context.user, compiler.address, Values.ETHER)
     })
@@ -142,7 +142,7 @@ describe('Compiler', function () {
     expect(fixedX64ToFloat(price)).to.be.eq(3.7647263806019016)
   }) */
 
-  describe('Compiler Fallback', function () {
+  describe('Decompiler Fallback', function () {
     it('testJumpProcess: creates a pair using the jump process', async function () {
       const [base, quote] = [contracts.base.address, contracts.quote.address]
       const data = encodeCreatePair(base, quote)
