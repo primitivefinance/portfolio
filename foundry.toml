@@ -7,6 +7,7 @@ test = 'test/foundry'
 remappings = [
     'ds-test=lib/ds-test/src/',
     'forge-std=lib/forge-std/src/',
+    'solstat/=lib/solstat/contracts/',
     'contracts/=contracts/',
 ]
 optimizer_runs = 15000
