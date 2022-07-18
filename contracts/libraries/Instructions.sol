@@ -4,7 +4,20 @@ pragma solidity 0.8.10;
 import "./Decoder.sol";
 
 library Instructions {
+    // --- Instructions --- //
+    bytes1 public constant UNKNOWN = 0x00;
+    bytes1 public constant ADD_LIQUIDITY = 0x01;
+    bytes1 public constant REMOVE_LIQUIDITY = 0x03;
+    bytes1 public constant SWAP = 0x05;
+    bytes1 public constant CREATE_POOL = 0x0B;
+    bytes1 public constant CREATE_PAIR = 0x0C;
+    bytes1 public constant CREATE_CURVE = 0x0D;
+    bytes1 public constant INSTRUCTION_JUMP = 0xAA;
+
+    // --- Errors --- //
     error DecodePairBytesLength(uint256 expected, uint256 length);
+
+    // --- Encoding & Decoding --- //
 
     /// @dev Encodes the arugments for the CREATE_CURVE instruction.
     function encodeCreateCurve(
@@ -13,14 +26,12 @@ library Instructions {
         uint16 fee,
         uint128 strike
     ) internal pure returns (bytes memory data) {
-        uint8 ecode = 0x0D;
-        data = abi.encodePacked(ecode, sigma, maturity, fee, strike);
+        data = abi.encodePacked(CREATE_CURVE, sigma, maturity, fee, strike);
     }
 
     /// @dev Encodes the arguments for the CREATE_PAIR instruction.
     function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
-        uint8 ecode = 0x0C;
-        data = abi.encodePacked(ecode, token0, token1);
+        data = abi.encodePacked(CREATE_PAIR, token0, token1);
     }
 
     /// @dev Encodes the arguments for the CREATE_POOL instruction.
@@ -29,8 +40,7 @@ library Instructions {
         uint128 basePerLiquidity,
         uint128 deltaLiquidity
     ) internal pure returns (bytes memory data) {
-        uint8 ecode = 0x0B;
-        data = abi.encodePacked(ecode, poolId, basePerLiquidity, deltaLiquidity);
+        data = abi.encodePacked(CREATE_POOL, poolId, basePerLiquidity, deltaLiquidity);
     }
 
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.

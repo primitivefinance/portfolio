@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.10;
 
-import "../Compiler.sol";
+import "../Decompiler.sol";
 
 import "./DSTest.sol";
 import "./Helpers.sol";
 
-contract TestExternalCompiler {
-    TestCompiler public compiler;
+contract TestExternalDecompiler {
+    TestDecompiler public compiler;
 
     constructor(address compiler_) {
-        compiler = TestCompiler(payable(compiler_));
+        compiler = TestDecompiler(payable(compiler_));
     }
 
     function testAddLiquidity() internal {
@@ -116,7 +116,7 @@ contract TestExternalCompiler {
     }
 }
 
-contract TestCompiler is DSTest, Helpers, Compiler {
+contract TestDecompiler is DSTest, Helpers, Decompiler {
     function _liquidityPolicy() internal pure override returns (uint256) {
         return 0;
     }
@@ -180,8 +180,8 @@ contract TestCompiler is DSTest, Helpers, Compiler {
 
         {
             // cache both tokens so the pairs grab them
-            addressCache[token0] = true;
-            addressCache[token1] = true;
+            _addressCache[token0] = true;
+            _addressCache[token1] = true;
 
             // create a debit for token0 token by having more global balance than actual
             globalReserves[token0] += 20;
@@ -211,20 +211,20 @@ contract TestCompiler is DSTest, Helpers, Compiler {
 
     function testSettleToken(address token) public {
         // First, settle a debt
-        addressCache[token] = true; // note: `_settleToken` will return early if not true
+        _addressCache[token] = true; // note: `_settleToken` will return early if not true
         globalReserves[token] += 10; // creates a debt that tokens must enter to fill
         _settleToken(token);
         uint256 balance = IERC20(token).balanceOf(address(this));
         assertEq(balance, 10, "settle-debit");
-        assertTrue(!addressCache[token], "address-cache-one");
+        assertTrue(!_addressCache[token], "address-cache-one");
 
         // Second, settle a payout
-        addressCache[token] = true;
+        _addressCache[token] = true;
         globalReserves[token] -= 10; // creates a credit, freeing tokens to be paid
         _settleToken(token);
         balance = balances[msg.sender][token]; // tokens are paid to credit accounts
         assertEq(balance, 10, "settle-credit");
-        assertTrue(!addressCache[token], "address-cache-two");
+        assertTrue(!_addressCache[token], "address-cache-two");
     }
 
     function testProcess(bytes calldata data, uint48 poolId) public {
@@ -247,7 +247,7 @@ contract TestCompiler is DSTest, Helpers, Compiler {
 
     function testFund(address token, uint256 amount) public {}
 
-    // --- Old Compiler --- //
+    // --- Old Decompiler --- //
 
     uint256 public timestamp;
 
@@ -337,7 +337,7 @@ contract TestCompiler is DSTest, Helpers, Compiler {
     }
 
     function testMain(bytes calldata data) public {
-        if (data[0] != INSTRUCTION_JUMP) {
+        if (data[0] != Instructions.INSTRUCTION_JUMP) {
             _process(data);
         } else {
             _jumpProcess(data);
