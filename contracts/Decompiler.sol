@@ -11,6 +11,11 @@ import "./HyperSwap.sol";
 /// @notice Main contract of the Enigma that implements instruction processing.
 /// @dev Eliminates the use of function signatures. Expects encoded bytes as msg.data in the fallback.
 contract Decompiler is HyperLiquidity, HyperSwap {
+    // Note: Not sure if we should always revert when receiving ETH
+    receive() external payable {
+        revert();
+    }
+
     // --- Fallback --- //
 
     /// @notice Main touchpoint for receiving calls.
