@@ -9,13 +9,10 @@
     "outDir": "dist",
     "noImplicitAny": false,
     "baseUrl": ".",
-    "paths": {
-      "@/lib/*": ["lib/**"]
-    }
   },
   "ts-node": {
     "files": true
   },
-  "include": ["test", "lib", "./scripts", "./types", "typechain-types"],
+  "include": ["./test", "./scripts", "./types", "typechain-types"],
   "files": ["./hardhat.config.ts"]
 }

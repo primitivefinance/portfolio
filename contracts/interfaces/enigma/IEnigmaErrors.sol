@@ -4,7 +4,7 @@ pragma solidity 0.8.10;
 /// @title IEnigmaErrors
 /// @dev All errors thrown by the Enigma and its higher level contracts.
 interface IEnigmaErrors {
-    // --- Compiler --- //
+    // --- Decompiler --- //
     /// @dev Thrown when attempting to remove more internal token balance than owned by `msg.sender`.
     error DrawBalance();
     /// @dev Thrown when the jump pointer is further than the length of the next instruction.
@@ -50,7 +50,7 @@ interface IEnigmaErrors {
 
     // --- Special --- //
     /// @dev Thrown if the JIT liquidity condition is false.
-    error JitLiquidity(uint256 lastTime, uint256 timestamp);
+    error JitLiquidity(uint256 distance);
 
     // --- Swap --- //
     /// @dev Thrown if the effects of a swap put the pool in an invalid state according the the trading function.

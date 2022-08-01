@@ -8,7 +8,9 @@ import "./DSTest.sol";
 contract EnigmaVirtualMachineActions is DSTest, EnigmaVirtualMachine {
     // --- Must Implement --- //
 
-    // --- Compiler --- //
+    // --- Decompiler --- //
+    function _process(bytes calldata data) internal override {}
+
     function fund(address, uint256) external override {}
 
     function draw(
@@ -23,8 +25,6 @@ contract EnigmaVirtualMachineActions is DSTest, EnigmaVirtualMachine {
         uint256,
         uint256
     ) public view returns (uint256) {}
-
-    function checkJitLiquidity(address, uint48) external view returns (uint256, uint256) {}
 
     // --- Swap --- //
     function updateLastTimestamp(uint48) public override lock returns (uint128) {

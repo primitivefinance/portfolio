@@ -5,11 +5,13 @@ import "./interfaces/IEnigma.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Decoder.sol";
 import "./libraries/Instructions.sol";
+import "./libraries/SafeCast.sol";
 
-/// @title Enigma Virtual Machine
-/// @notice Defines the possible instruction set which must be processed in a higher-level compiler.
-/// @dev Implements low-level `balanceOf`, re-entrancy guard, instruction constants and state.
+/// @title Enigma Virtual Machine.
+/// @notice Stores the state of the Enigma with functions to change state.
+/// @dev Implements low-level internal virtual functions, re-entrancy guard and state.
 abstract contract EnigmaVirtualMachine is IEnigma {
+    using SafeCast for uint256;
     // --- Reentrancy --- //
     modifier lock() {
         if (locked != 1) revert LockedError();
@@ -19,7 +21,51 @@ abstract contract EnigmaVirtualMachine is IEnigma {
         locked = 1;
     }
 
+    // --- View --- //
+
+    /// @inheritdoc IEnigmaView
+    function checkJitLiquidity(address account, uint48 poolId)
+        public
+        view
+        virtual
+        returns (uint256 distance, uint256 timestamp)
+    {
+        uint256 previous = positions[account][poolId].blockTimestamp;
+        timestamp = _blockTimestamp();
+        distance = timestamp - previous;
+    }
+
     // --- Internal --- //
+    /// @dev Must be implemented by the highest level contract.
+    /// @notice Processing logic for instructions.
+    function _process(bytes calldata data) internal virtual;
+
+    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
+    /// @dev Expects a special encoding method for multiple instructions.
+    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
+    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
+    function _jumpProcess(bytes calldata data) internal {
+        uint8 length = uint8(data[1]);
+        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
+        uint256 start;
+
+        // For each instruction set...
+        for (uint256 i; i != length; ++i) {
+            // Start at the index of the first byte of the next instruction.
+            start = pointer;
+
+            // Set the new pointer to the next instruction, located at the pointer.
+            pointer = uint8(data[pointer]);
+
+            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
+            if (pointer > data.length) revert JumpError(pointer);
+            bytes calldata instruction = data[start:pointer];
+
+            // Process the instruction.
+            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
+        }
+    }
+
     /// @dev Gas optimized `balanceOf` method.
     function _balanceOf(address token, address account) internal view returns (uint256) {
         (bool success, bytes memory data) = token.staticcall(
@@ -39,15 +85,55 @@ abstract contract EnigmaVirtualMachine is IEnigma {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
 
-    // --- Instructions --- //
-    bytes1 public constant UNKNOWN = 0x00;
-    bytes1 public constant ADD_LIQUIDITY = 0x01;
-    bytes1 public constant REMOVE_LIQUIDITY = 0x03;
-    bytes1 public constant SWAP = 0x05;
-    bytes1 public constant CREATE_POOL = 0x0B;
-    bytes1 public constant CREATE_PAIR = 0x0C;
-    bytes1 public constant CREATE_CURVE = 0x0D;
-    bytes1 public constant INSTRUCTION_JUMP = 0xAA;
+    // --- Global --- //
+
+    /// @dev Most important function because it manages the solvency of the Engima.
+    /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
+    function _increaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] += amount;
+        emit IncreaseGlobal(token, amount);
+    }
+
+    /// @dev Equally important to `_increaseGlobal`.
+    /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
+    function _decreaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] -= amount;
+        emit DecreaseGlobal(token, amount);
+    }
+
+    // --- Positions --- //
+
+    /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
+    /// @custom:security High. Only method of increasing the liquidity held by accounts.
+    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][poolId];
+
+        pos.liquidity += deltaLiquidity.toUint128();
+        pos.blockTimestamp = _blockTimestamp();
+
+        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
+    }
+
+    /// @dev Equally important as `_increasePosition`.
+    /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
+    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+        Position storage pos = positions[msg.sender][poolId];
+
+        pos.liquidity -= deltaLiquidity.toUint128();
+        pos.blockTimestamp = _blockTimestamp();
+
+        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
+    }
+
+    /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
+    /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
+    function _decreasePositionCheckJit(uint48 poolId, uint256 deltaLiquidity) internal {
+        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId);
+        if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
+
+        _decreasePosition(poolId, deltaLiquidity);
+    }
+
     // --- State --- //
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;
@@ -55,8 +141,6 @@ abstract contract EnigmaVirtualMachine is IEnigma {
     mapping(uint48 => Pool) public pools;
     /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) public curves;
-    /// @dev Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
-    mapping(address => bool) public addressCache;
     /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
     mapping(bytes32 => uint32) public getCurveIds;
     /// @dev Token -> Physical Reserves.
