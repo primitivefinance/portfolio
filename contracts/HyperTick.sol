@@ -50,6 +50,9 @@ abstract contract HyperTick is EnigmaVirtualMachine {
 
     error CdfErr(int256 cdf);
 
+    /// @dev X = 1 - N(d1)
+    /// d₁ = ( ln(S/K) + (σ²/2)τ ) / σ√τ
+    /// X = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
     function computeExpiryAsset(
         uint256 price,
         uint256 strike,
