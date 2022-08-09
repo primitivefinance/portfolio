@@ -60,7 +60,7 @@
   },
   "dependencies": {
     "@primitivefi/rmm-core": "^1.0.0",
-    "@rari-capital/solmate": "^6.3.0",
+    "@rari-capital/solmate": "^6.4.0",
     "@typechain/ethers-v5": "^10.0.0",
     "@typechain/hardhat": "^6.0.0",
     "typechain": "^8.0.0"

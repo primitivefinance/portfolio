@@ -3,10 +3,11 @@ via_ir = true
 src = 'contracts'
 out = 'out'
 libs = ['lib', 'node_modules']
-test = 'test/foundry'
+test = 'test/'
 remappings = [
     'ds-test=lib/ds-test/src/',
     'forge-std=lib/forge-std/src/',
+    'solstat/=lib/solstat/contracts/',
     'contracts/=contracts/',
 ]
 optimizer_runs = 15000
@@ -15,13 +16,13 @@ fuzz_max_local_rejects = 65536
 fuzz_max_global_rejects = 1024
 
 [optimized]
-solc = '0.8.10'
+solc = '0.8.13'
 out = 'optimized-out'
 
 [test]
-solc = '0.8.10'
+solc = '0.8.13'
 via_ir = false
-src = 'test/foundry'
+src = 'test/'
 gas_reports = ["*"]
 ffi = true
 fuzz_runs = 500

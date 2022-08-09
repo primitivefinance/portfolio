@@ -1,0 +1,5 @@
+ds-test/=./lib/ds-test/src/
+solmate/=./lib/solm/src/
+forge-std/=./lib/forge-std/src/
+@rari-capital/solmate=./lib/solm/
+solstat/=./lib/solstat/contracts/
