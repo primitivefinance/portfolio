@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "./interfaces/IEnigma.sol";
-import "./interfaces/IERC20.sol";
-import "./libraries/Decoder.sol";
-import "./libraries/Instructions.sol";
-import "./libraries/SafeCast.sol";
+import "../interfaces/IEnigma.sol";
+import "../interfaces/IERC20.sol";
+import "../libraries/Decoder.sol";
+import "../libraries/Instructions.sol";
+import "../libraries/SafeCast.sol";
 
 /// @title Enigma Virtual Machine.
 /// @notice Stores the state of the Enigma with functions to change state.
 /// @dev Implements low-level internal virtual functions, re-entrancy guard and state.
-abstract contract EnigmaVirtualMachine is IEnigma {
+abstract contract EnigmaVirtualMachinePoC is IEnigma {
     using SafeCast for uint256;
     // --- Reentrancy --- //
     modifier lock() {

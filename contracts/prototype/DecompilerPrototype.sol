@@ -4,13 +4,12 @@ pragma solidity 0.8.13;
 import "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
 import "@rari-capital/solmate/src/tokens/ERC20.sol";
 
-import "./HyperLiquidity.sol";
-import "./HyperSwap.sol";
+import "./HyperPrototype.sol";
 
 /// @title Enigma Decompiler
 /// @notice Main contract of the Enigma that implements instruction processing.
 /// @dev Eliminates the use of function signatures. Expects encoded bytes as msg.data in the fallback.
-contract Decompiler is HyperLiquidity, HyperSwap {
+contract DecompilerPrototype is HyperPrototype {
     // Note: Not sure if we should always revert when receiving ETH
     receive() external payable {
         revert();
