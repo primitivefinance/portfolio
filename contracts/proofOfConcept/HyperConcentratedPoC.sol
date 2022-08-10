@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
@@ -6,9 +5,10 @@ import "forge-std/Test.sol";
 import "solstat/Gaussian.sol";
 import "solstat/Invariant.sol";
 
-import "./EnigmaVirtualMachine.sol";
+import "./EnigmaVirtualMachinePoc.sol";
 
-abstract contract Hyper is EnigmaVirtualMachine {
+/// @dev Liquidity allocated to price space for either curve type, perpetual or expiring.
+abstract contract HyperConcentratedPoC is EnigmaVirtualMachinePoc {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 

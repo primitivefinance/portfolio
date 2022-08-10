@@ -2,12 +2,10 @@ pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
 
-import "../../contracts/EnigmaVirtualMachine.sol";
+import "../../contracts/prototype/EnigmaVirtualMachinePrototype.sol";
 
-contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachine {
-    // --- Implemented --- //
-
-    function _process(bytes calldata data) internal override {}
+contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
+    // --- HyperPrototype --- //
 
     function updateLastTimestamp(uint48) public override returns (uint128) {
         return _blockTimestamp();
@@ -35,6 +33,88 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachine {
         uint256,
         address
     ) external override {}
+
+    // --- Enigma Write --- //
+
+    function _process(bytes calldata data) internal override {}
+
+    // --- Enigma Read --- //
+
+    function checkJitLiquidity(address account, uint48 poolId)
+        external
+        view
+        override
+        returns (uint256 distance, uint256 timestamp)
+    {
+        _checkJitLiquidity(account, poolId);
+    }
+
+    function pairs(uint16 pairId)
+        external
+        view
+        override
+        returns (
+            address assetToken,
+            uint8 assetDecimals,
+            address quoteToken,
+            uint8 quoteDecimals
+        )
+    {
+        Pair memory p = _pairs[pairId];
+        (assetToken, assetDecimals, quoteToken, quoteDecimals) = (
+            p.tokenBase,
+            p.decimalsBase,
+            p.tokenQuote,
+            p.decimalsQuote
+        );
+    }
+
+    function curves(uint32 curveId)
+        external
+        view
+        override
+        returns (
+            uint128 strike,
+            uint24 sigma,
+            uint32 maturity,
+            uint32 gamma
+        )
+    {
+        Curve memory c = _curves[curveId];
+        (strike, sigma, maturity, gamma) = (c.strike, c.sigma, c.maturity, c.gamma);
+    }
+
+    function pools(uint48 poolId)
+        external
+        view
+        override
+        returns (
+            uint128 internalBase,
+            uint128 internalQuote,
+            uint128 internalLiquidity,
+            uint128 blockTimestamp
+        )
+    {
+        Pool memory p = _pools[poolId];
+        (internalBase, internalQuote, internalLiquidity, blockTimestamp) = (
+            p.internalBase,
+            p.internalQuote,
+            p.internalLiquidity,
+            p.blockTimestamp
+        );
+    }
+
+    function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
+        return _getCurveIds[packedCurve];
+    }
+
+    function getCurveNonce() external view override returns (uint256) {
+        return _curveNonce;
+    }
+
+    function getPairNonce() external view override returns (uint256) {
+        return _curveNonce;
+    }
 }
 
 contract BaseTest is Test, FakeEnigmaAbstractOverrides {}
