@@ -51,4 +51,22 @@ interface IEnigmaDataStructures {
         uint128 liquidity;
         uint128 blockTimestamp;
     }
+
+    /**
+     * @notice Individual pool state.
+     */
+    struct HyperPool {
+        uint256 lastPrice;
+        uint256 lastTick;
+        uint256 lastSwapTimestamp;
+    }
+
+    /**
+     * @notice Individual position within a pool.
+     */
+    struct HyperPosition {
+        uint256 hiTick;
+        uint256 loTick;
+        uint256 lastUpdate;
+    }
 }
