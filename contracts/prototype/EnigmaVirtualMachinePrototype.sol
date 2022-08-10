@@ -23,14 +23,13 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     // --- View --- //
 
-    /// @inheritdoc IEnigmaView
-    function checkJitLiquidity(address account, uint48 poolId)
-        public
+    function _checkJitLiquidity(address account, uint48 poolId)
+        internal
         view
         virtual
         returns (uint256 distance, uint256 timestamp)
     {
-        uint256 previous = positions[account][poolId].blockTimestamp;
+        uint256 previous = _positions[account][poolId].blockTimestamp;
         timestamp = _blockTimestamp();
         distance = timestamp - previous;
     }
@@ -90,14 +89,14 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev Most important function because it manages the solvency of the Engima.
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
     function _increaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] += amount;
+        _globalReserves[token] += amount;
         emit IncreaseGlobal(token, amount);
     }
 
     /// @dev Equally important to `_increaseGlobal`.
     /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
     function _decreaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] -= amount;
+        _globalReserves[token] -= amount;
         emit DecreaseGlobal(token, amount);
     }
 
@@ -106,7 +105,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][poolId];
+        Position storage pos = _positions[msg.sender][poolId];
 
         pos.liquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
@@ -117,7 +116,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev Equally important as `_increasePosition`.
     /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = positions[msg.sender][poolId];
+        Position storage pos = _positions[msg.sender][poolId];
 
         pos.liquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
@@ -128,7 +127,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
     /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
     function _decreasePositionCheckJit(uint48 poolId, uint256 deltaLiquidity) internal {
-        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId);
+        (uint256 distance, uint256 timestamp) = _checkJitLiquidity(msg.sender, poolId);
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
         _decreasePosition(poolId, deltaLiquidity);
@@ -136,39 +135,39 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     // --- State --- //
     /// @dev Pool id -> Pair of a Pool.
-    mapping(uint16 => Pair) public pairs;
+    mapping(uint16 => Pair) internal _pairs;
     /// @dev Pool id -> Pool Data Structure.
-    mapping(uint48 => Pool) public pools;
+    mapping(uint48 => Pool) internal _pools;
     /// @dev Pool id -> Curve Data Structure stores parameters.
-    mapping(uint32 => Curve) public curves;
+    mapping(uint32 => Curve) internal _curves;
     /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
-    mapping(bytes32 => uint32) public getCurveIds;
+    mapping(bytes32 => uint32) internal _getCurveIds;
     /// @dev Token -> Physical Reserves.
-    mapping(address => uint256) public globalReserves;
+    mapping(address => uint256) internal _globalReserves;
     /// @dev Base Token -> Quote Token -> Pair id
-    mapping(address => mapping(address => uint16)) public getPairId;
+    mapping(address => mapping(address => uint16)) internal _getPairId;
     /// @dev User -> Token -> Interal Balance.
-    mapping(address => mapping(address => uint256)) public balances;
+    mapping(address => mapping(address => uint256)) internal _balances;
     /// @dev User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint48 => Position)) public positions;
+    mapping(address => mapping(uint48 => Position)) internal _positions;
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
     /// @dev A value incremented by one on pair creation. Reduces calldata.
-    uint256 public pairNonce;
+    uint256 internal _pairNonce;
     /// @dev A value incremented by one on curve creation. Reduces calldata.
-    uint256 public curveNonce;
+    uint256 internal _curveNonce;
     /// @dev Amount of seconds of available time to swap past maturity of a pool.
-    uint256 public constant BUFFER = 300;
+    uint256 internal constant BUFFER = 300;
     /// @dev Constant amount of basis points. All percentage values are integers in basis points.
-    uint256 public constant PERCENTAGE = 1e4;
+    uint256 internal constant PERCENTAGE = 1e4;
     /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
-    uint256 public constant PRECISION = 1e18;
+    uint256 internal constant PRECISION = 1e18;
     /// @dev Maximum pool fee.
-    uint256 public constant MAX_POOL_FEE = 1e3;
+    uint256 internal constant MAX_POOL_FEE = 1e3;
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
-    uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
+    uint256 internal constant MIN_LIQUIDITY_FACTOR = 6;
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
-    uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
+    uint256 internal constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
     /// @dev Used as the first pointer for the jump process.
-    uint8 public constant JUMP_PROCESS_START_POINTER = 2;
+    uint8 internal constant JUMP_PROCESS_START_POINTER = 2;
 }

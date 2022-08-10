@@ -4,6 +4,43 @@ pragma solidity 0.8.13;
 /// @title IEnigmaView
 /// @dev Public view functions exposed by the Enigma's higher level contracts.
 interface IEnigmaView {
+    // --- Enigma --- //
+    function pairs(uint16 pairId)
+        external
+        view
+        returns (
+            address,
+            uint8,
+            address,
+            uint8
+        );
+
+    function curves(uint32 curveId)
+        external
+        view
+        returns (
+            uint128 strike,
+            uint24 sigma,
+            uint32 maturity,
+            uint32 gamma
+        );
+
+    function pools(uint48 poolId)
+        external
+        view
+        returns (
+            uint128,
+            uint128,
+            uint128,
+            uint128
+        );
+
+    function getCurveId(bytes32) external view returns (uint32);
+
+    function getCurveNonce() external view returns (uint256);
+
+    function getPairNonce() external view returns (uint256);
+
     // --- Liquidity --- //
 
     /// @notice Computes the amount of time passed since the Position's liquidity was updated.

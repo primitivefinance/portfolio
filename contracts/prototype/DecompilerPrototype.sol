@@ -50,7 +50,7 @@ contract DecompilerPrototype is HyperPrototype {
     ///      Therefore, it does not require a state change for the global reserves.
     /// @custom:security Critical. Only method which credits accounts with tokens.
     function _applyCredit(address token, uint256 amount) internal {
-        balances[msg.sender][token] += amount;
+        _balances[msg.sender][token] += amount;
         emit Credit(token, amount);
     }
 
@@ -63,7 +63,7 @@ contract DecompilerPrototype is HyperPrototype {
     ///      reserves must be increased.
     /// @custom:security Critical. Handles the payment of tokens for all pool actions.
     function _applyDebit(address token, uint256 amount) internal {
-        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
+        if (_balances[msg.sender][token] >= amount) _balances[msg.sender][token] -= amount;
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         emit Debit(token, amount);
     }
@@ -99,7 +99,7 @@ contract DecompilerPrototype is HyperPrototype {
             // Add the pair to the array to track all the pairs that have been interacted with.
             _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
             // Caching the addresses to settle the pools interacted with in the fallback function.
-            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
+            Pair memory pair = _pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
             if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
             if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
         }
@@ -113,7 +113,7 @@ contract DecompilerPrototype is HyperPrototype {
         if (len == 0) return; // note: Dangerous! If pools were interacted with, this return being trigerred would be a failure.
         for (uint256 i; i != len; ++i) {
             uint16 pairId = ids[i];
-            Pair memory pair = pairs[pairId];
+            Pair memory pair = _pairs[pairId];
             _settleToken(pair.tokenBase);
             _settleToken(pair.tokenQuote);
         }
@@ -127,7 +127,7 @@ contract DecompilerPrototype is HyperPrototype {
     function _settleToken(address token) internal {
         if (!_addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
-        uint256 global = globalReserves[token];
+        uint256 global = _globalReserves[token];
         uint256 actual = _balanceOf(token, address(this));
         if (global > actual) {
             uint256 deficit = global - actual;
@@ -149,7 +149,7 @@ contract DecompilerPrototype is HyperPrototype {
         address to
     ) external lock {
         // note: Would pull tokens without this conditional check.
-        if (balances[msg.sender][token] < amount) revert DrawBalance();
+        if (_balances[msg.sender][token] < amount) revert DrawBalance();
         _applyDebit(token, amount);
         SafeTransferLib.safeTransfer(ERC20(token), to, amount);
     }
@@ -161,4 +161,71 @@ contract DecompilerPrototype is HyperPrototype {
     }
 
     // --- View --- //
+
+    function pairs(uint16 pairId)
+        external
+        view
+        override
+        returns (
+            address assetToken,
+            uint8 assetDecimals,
+            address quoteToken,
+            uint8 quoteDecimals
+        )
+    {
+        Pair memory p = _pairs[pairId];
+        (assetToken, assetDecimals, quoteToken, quoteDecimals) = (
+            p.tokenBase,
+            p.decimalsBase,
+            p.tokenQuote,
+            p.decimalsQuote
+        );
+    }
+
+    function curves(uint32 curveId)
+        external
+        view
+        override
+        returns (
+            uint128 strike,
+            uint24 sigma,
+            uint32 maturity,
+            uint32 gamma
+        )
+    {
+        Curve memory c = _curves[curveId];
+        (strike, sigma, maturity, gamma) = (c.strike, c.sigma, c.maturity, c.gamma);
+    }
+
+    function pools(uint48 poolId)
+        external
+        view
+        override
+        returns (
+            uint128 internalBase,
+            uint128 internalQuote,
+            uint128 internalLiquidity,
+            uint128 blockTimestamp
+        )
+    {
+        Pool memory p = _pools[poolId];
+        (internalBase, internalQuote, internalLiquidity, blockTimestamp) = (
+            p.internalBase,
+            p.internalQuote,
+            p.internalLiquidity,
+            p.blockTimestamp
+        );
+    }
+
+    function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
+        return _getCurveIds[packedCurve];
+    }
+
+    function getCurveNonce() external view override returns (uint256) {
+        return _curveNonce;
+    }
+
+    function getPairNonce() external view override returns (uint256) {
+        return _curveNonce;
+    }
 }
