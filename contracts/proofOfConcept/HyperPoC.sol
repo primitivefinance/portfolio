@@ -34,7 +34,9 @@ contract HyperPoC is EnigmaVirtualMachinePoc {
     /// @custom:security High. Handles the state update of positions and the liquidity pool.
     /// @custom:mev Higher level peripheral contract should implement checks that desired liquidity is received.
     function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 deltaLiquidity) {
-        (uint8 useMax, uint48 poolId_, uint128 deltaBase, uint128 deltaQuote) = Instructions.decodeAddLiquidity(data);
+        (uint8 useMax, uint48 poolId_, uint128 deltaBase, uint128 deltaQuote) = InstructionsPoc.decodeAddLiquidity(
+            data
+        );
         poolId = poolId_;
 
         if (pools[poolId].blockTimestamp == 0) revert NonExistentPool(poolId);
@@ -88,7 +90,7 @@ contract HyperPoC is EnigmaVirtualMachinePoc {
             uint256 deltaQuote
         )
     {
-        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(
+        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = InstructionsPoc.decodeRemoveLiquidity(
             data
         );
         poolId = poolId_;
@@ -124,7 +126,7 @@ contract HyperPoC is EnigmaVirtualMachinePoc {
     /// @dev Sigma, maturity, and strike are validated implicitly by their limited size.
     /// @custom:security Medium. Does not handle tokens. Parameter selection is important, so choose carefully.
     function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data);
+        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = InstructionsPoc.decodeCreateCurve(data);
         bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trims the Enigma instruction.
         curveId = getCurveIds[rawCurveId];
 
@@ -145,7 +147,7 @@ contract HyperPoC is EnigmaVirtualMachinePoc {
     /// @dev Pair ids that are 2 bytes are cheaper to reference in calldata than 40 bytes.
     /// @custom:security Low. Does not handle tokens, only updates the state of the Enigma.
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
-        (address base, address quote) = Instructions.decodeCreatePair(data);
+        (address base, address quote) = InstructionsPoc.decodeCreatePair(data);
         if (base == quote) revert SameTokenError();
 
         pairId = getPairId[base][quote];
@@ -179,8 +181,13 @@ contract HyperPoC is EnigmaVirtualMachinePoc {
             uint256 deltaQuote
         )
     {
-        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 basePerLiquidity, uint128 deltaLiquidity) = Instructions
-            .decodeCreatePool(data);
+        (
+            uint48 poolId_,
+            uint16 pairId,
+            uint32 curveId,
+            uint128 basePerLiquidity,
+            uint128 deltaLiquidity
+        ) = InstructionsPoc.decodeCreatePool(data);
         poolId = poolId_;
         if (pools[poolId].blockTimestamp != 0) revert PoolExists();
 
@@ -268,7 +275,9 @@ contract HyperPoC is EnigmaVirtualMachinePoc {
 
     /// @dev Replaces the desired `deltaIn` amount with the `balanceOf` the `msg.sender` if the `useMax` flag is 1.
     function _swapExactForExact(bytes calldata data) internal returns (uint48 poolId, uint256 deltaOut) {
-        (uint8 useMax, uint48 poolId_, uint128 deltaIn, uint128 deltaOut_, uint8 dir) = Instructions.decodeSwap(data);
+        (uint8 useMax, uint48 poolId_, uint128 deltaIn, uint128 deltaOut_, uint8 dir) = InstructionsPoc.decodeSwap(
+            data
+        );
         poolId = poolId_;
         deltaOut = deltaOut_;
 

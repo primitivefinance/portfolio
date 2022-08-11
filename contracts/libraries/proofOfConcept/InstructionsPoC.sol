@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "./Decoder.sol";
+import "../Decoder.sol";
 
-library Instructions {
+library InstructionsPoC {
     // --- Instructions --- //
     bytes1 public constant UNKNOWN = 0x00;
     bytes1 public constant ADD_LIQUIDITY = 0x01;
@@ -37,10 +37,10 @@ library Instructions {
     /// @dev Encodes the arguments for the CREATE_POOL instruction.
     function encodeCreatePool(
         uint48 poolId,
-        uint128 price,
-        uint128 liquidity
+        uint128 basePerLiquidity,
+        uint128 deltaLiquidity
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(CREATE_POOL, poolId, price, liquidity);
+        data = abi.encodePacked(CREATE_POOL, poolId, basePerLiquidity, deltaLiquidity);
     }
 
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
@@ -94,9 +94,9 @@ library Instructions {
         tokenQuote = address(bytes20(data[21:]));
     }
 
-    /// @dev Expects a poolId and one left zero padded amount for `price`.
-    /// @param data Maximum 1 + 6 + 16 = 23 bytes.
-    /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes |
+    /// @dev Expects a poolId and two left zero padded amounts for `basePerLiquidity` and `deltaLiquidity`.
+    /// @param data Maximum 1 + 6 + 16 + 16 = 39 bytes.
+    /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes | left padded 16 bytes |
     function decodeCreatePool(bytes calldata data)
         internal
         pure
@@ -104,13 +104,15 @@ library Instructions {
             uint48 poolId,
             uint16 pairId,
             uint32 curveId,
-            uint128 price
+            uint128 basePerLiquidity,
+            uint128 deltaLiquidity
         )
     {
         poolId = uint48(bytes6(data[1:7])); // note: First byte is the create pool ecode.
         pairId = uint16(bytes2(data[1:3]));
         curveId = uint32(bytes4(data[3:7]));
-        price = uint128(bytes16(data[7:23]));
+        basePerLiquidity = uint128(bytes16(data[7:23]));
+        deltaLiquidity = uint128(bytes16(data[23:]));
     }
 
     /// @dev Expects a 6 byte left-pad `poolId`.

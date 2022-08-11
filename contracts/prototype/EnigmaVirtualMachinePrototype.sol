@@ -136,8 +136,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     // --- State --- //
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) internal _pairs;
-    /// @dev Pool id -> Pool Data Structure.
-    mapping(uint48 => Pool) internal _pools;
+    /// @dev Pool id -> HyperPool Data Structure.
+    mapping(uint48 => HyperPool) internal _pools;
     /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) internal _curves;
     /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
@@ -162,8 +162,10 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     uint256 internal constant PERCENTAGE = 1e4;
     /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
     uint256 internal constant PRECISION = 1e18;
-    /// @dev Maximum pool fee.
+    /// @dev Maximum pool fee. 10.00%.
     uint256 internal constant MAX_POOL_FEE = 1e3;
+    /// @dev Minimum pool fee. 0.01%.
+    uint256 internal constant MIN_POOL_FEE = 1;
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 internal constant MIN_LIQUIDITY_FACTOR = 6;
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.

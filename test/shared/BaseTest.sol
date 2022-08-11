@@ -89,19 +89,13 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
         view
         override
         returns (
-            uint128 internalBase,
-            uint128 internalQuote,
-            uint128 internalLiquidity,
-            uint128 blockTimestamp
+            uint256 lastPrice,
+            uint256 lastTick,
+            uint256 blockTimestamp
         )
     {
-        Pool memory p = _pools[poolId];
-        (internalBase, internalQuote, internalLiquidity, blockTimestamp) = (
-            p.internalBase,
-            p.internalQuote,
-            p.internalLiquidity,
-            p.blockTimestamp
-        );
+        HyperPool memory p = _pools[poolId];
+        (lastPrice, lastTick, blockTimestamp) = (p.lastPrice, p.lastTick, p.blockTimestamp);
     }
 
     function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
