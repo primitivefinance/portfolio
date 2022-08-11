@@ -18,6 +18,20 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
     function _swapExactForExact(bytes calldata data) internal returns (uint48 poolId, uint256 a) {}
 
+    function _increaseLiquidity(
+        uint48 poolId,
+        uint256 deltaR1,
+        uint256 deltaR2,
+        uint256 deltaLiquidity
+    ) internal {}
+
+    /**
+     * @notice Uses a pair and curve to instantiate a pool at a price.
+     *
+     * @custom:reverts If price is 0.
+     * @custom:reverts If pool with pair and curve has already been created.
+     * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
+     */
     function _createPool(bytes calldata data)
         internal
         returns (
@@ -25,7 +39,35 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 a,
             uint256 b
         )
-    {}
+    {
+        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Instructions.decodeCreatePool(data);
+
+        if (price == 0) revert ZeroPrice();
+        if (_doesPoolExist(poolId_)) revert PoolExists();
+
+        Curve memory curve = _curves[curveId];
+        (uint128 strike, uint48 maturity, uint24 sigma) = (curve.strike, curve.maturity, curve.sigma);
+        bool perpetual;
+        assembly {
+            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
+        }
+
+        uint128 timestamp = _blockTimestamp();
+        if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
+
+        // Write the pool to state with the desired price.
+        _pools[poolId] = HyperPool({
+            lastPrice: price,
+            lastTick: 0, // todo: implement tick and price grid.
+            blockTimestamp: timestamp
+        });
+
+        emit CreatePool(poolId, pairId, curveId, price);
+    }
+
+    function _doesPoolExist(uint48 poolId) internal view returns (bool exists) {
+        exists = _pools[poolId].blockTimestamp != 0;
+    }
 
     /**
      * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, and maturity.

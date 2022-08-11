@@ -29,10 +29,9 @@ interface IEnigmaView {
         external
         view
         returns (
-            uint128,
-            uint128,
-            uint128,
-            uint128
+            uint256,
+            uint256,
+            uint256
         );
 
     function getCurveId(bytes32) external view returns (uint32);

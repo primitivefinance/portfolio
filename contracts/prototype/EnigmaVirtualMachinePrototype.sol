@@ -136,8 +136,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     // --- State --- //
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) internal _pairs;
-    /// @dev Pool id -> Pool Data Structure.
-    mapping(uint48 => Pool) internal _pools;
+    /// @dev Pool id -> HyperPool Data Structure.
+    mapping(uint48 => HyperPool) internal _pools;
     /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) internal _curves;
     /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.

@@ -54,14 +54,7 @@ interface IEnigmaEvents {
     /// @dev Emitted on setting a new token pair in state with the key `pairId`.
     event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);
     /// @dev Emitted on creating a pool for a pair and curve.
-    event CreatePool(
-        uint48 indexed poolId,
-        uint16 indexed pairId,
-        uint32 indexed curveId,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    );
+    event CreatePool(uint48 indexed poolId, uint16 indexed pairId, uint32 indexed curveId, uint256 price);
 
     // --- Swap --- //
     /// @dev Emitted on a token swap in a single virtual pool.

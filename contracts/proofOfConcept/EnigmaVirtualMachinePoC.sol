@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "../interfaces/proofOfConcept/IEnigmaPoC.sol";
 import "../interfaces/IERC20.sol";
 import "../libraries/Decoder.sol";
-import "../libraries/Instructions.sol";
+import "../libraries/proofOfConcept/InstructionsPoC.sol";
 import "../libraries/SafeCast.sol";
 
 /// @title Enigma Virtual Machine.

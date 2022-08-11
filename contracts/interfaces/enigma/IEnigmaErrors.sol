@@ -49,6 +49,8 @@ interface IEnigmaErrors {
     error ZeroLiquidityError();
     /// @dev Thrown if fee is outside of bounds.
     error FeeOOB(uint16 fee);
+    /// @dev Thrown if attempting to create a pool with a zero price.
+    error ZeroPrice();
 
     // --- Special --- //
     /// @dev Thrown if the JIT liquidity condition is false.
