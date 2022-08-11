@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 import "./EnigmaVirtualMachinePrototype.sol";
+import "../libraries/HyperSwapLib.sol";
 
 abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {}
@@ -26,7 +27,45 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         )
     {}
 
-    function _createCurve(bytes calldata data) internal {}
+    /**
+     * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, and maturity.
+     * @dev Curves are used to create pools.
+     * It's possible to make a perpetual pool, by only specifying the fee parameter.
+     *
+     * @custom:reverts If set parameters have already been used to create a curve.
+     * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
+     * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
+     */
+    function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
+        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data); // Expects Enigma encoded data.
+
+        bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
+
+        curveId = _getCurveIds[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
+        if (curveId != 0) revert CurveExists(curveId);
+
+        if (!_isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
+
+        bool perpetual;
+        assembly {
+            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
+        }
+
+        if (!perpetual && sigma == 0) revert MinSigma(sigma);
+        if (!perpetual && strike == 0) revert MinStrike(strike);
+
+        unchecked {
+            curveId = uint32(++_curveNonce); // note: Unlikely to reach this limit.
+        }
+
+        uint32 gamma = uint32(HyperSwapLib.UNIT_PERCENT - fee); // gamma = 100% - fee %.
+
+        // Writes the curve to state with a reverse lookup.
+        _curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
+        _getCurveIds[rawCurveId] = curveId;
+
+        emit CreateCurve(curveId, strike, sigma, maturity, gamma);
+    }
 
     /**
      * @notice Maps a nonce to a pair of token addresses and their decimal places.
@@ -66,14 +105,22 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         emit CreatePair(pairId, asset, quote);
     }
 
-    function _isValidDecimals(uint8 decimals) internal view returns (bool valid) {
+    function _isValidDecimals(uint8 decimals) internal pure returns (bool valid) {
+        valid = _isBetween(decimals, 6, 18);
+    }
+
+    function _isBetween(
+        uint256 value,
+        uint256 lower,
+        uint256 upper
+    ) internal pure returns (bool valid) {
         assembly {
-            // Is `amount` between 6 and 18 decimals?
-            function isValid(amount) -> between {
-                between := iszero(sgt(mul(sub(amount, 6), sub(amount, 18)), 0)) // iszero(x > amount ? 1 : 0) ? true : false, (n - a) * (n - b) <= 0, n = amount, a = lower, b = upper
+            // Is `val` between lo and hi?
+            function isValid(val, lo, hi) -> between {
+                between := iszero(sgt(mul(sub(val, lo), sub(val, hi)), 0)) // iszero(x > amount ? 1 : 0) ? true : false, (n - a) * (n - b) <= 0, n = amount, a = lower, b = upper
             }
 
-            valid := isValid(decimals)
+            valid := isValid(value, lower, upper)
         }
     }
 }

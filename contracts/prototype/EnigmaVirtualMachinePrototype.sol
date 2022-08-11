@@ -162,8 +162,10 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     uint256 internal constant PERCENTAGE = 1e4;
     /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
     uint256 internal constant PRECISION = 1e18;
-    /// @dev Maximum pool fee.
+    /// @dev Maximum pool fee. 10.00%.
     uint256 internal constant MAX_POOL_FEE = 1e3;
+    /// @dev Minimum pool fee. 0.01%.
+    uint256 internal constant MIN_POOL_FEE = 1;
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 internal constant MIN_LIQUIDITY_FACTOR = 6;
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
