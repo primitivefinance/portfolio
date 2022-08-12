@@ -53,9 +53,10 @@ library Instructions {
         uint48 poolId,
         int24 loTick,
         int24 hiTick,
-        uint128 deltaLiquidity
+        uint8 power,
+        uint8 amount
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(ADD_LIQUIDITY, useMax, poolId, loTick, hiTick, deltaLiquidity, uint128(0));
+        data = abi.encodePacked(ADD_LIQUIDITY, useMax, poolId, loTick, hiTick, power, amount);
     }
 
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
@@ -69,7 +70,7 @@ library Instructions {
             uint48 poolId,
             int24 loTick,
             int24 hiTick,
-            uint128 deltaBase,
+            uint128 deltaLiquidity,
             uint128 deltaQuote
         )
     {
@@ -78,9 +79,10 @@ library Instructions {
         poolId = uint48(bytes6(data[1:7]));
         loTick = int24(uint24(bytes3(data[7:10])));
         hiTick = int24(uint24(bytes3(data[10:13])));
-        uint8 pointer = uint8(data[13]);
-        deltaBase = Decoder.toAmount(data[14:pointer]);
-        deltaQuote = Decoder.toAmount(data[pointer:]);
+        deltaLiquidity = Decoder.toAmount(data[13:]);
+        //uint8 pointer = uint8(data[13]);
+        //deltaBase = Decoder.toAmount(data[14:pointer]);
+        //deltaQuote = Decoder.toAmount(data[pointer:]);
     }
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.

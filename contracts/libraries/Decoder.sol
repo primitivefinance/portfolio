@@ -47,4 +47,27 @@ library Decoder {
         amount = uint128(toBytes16(raw[1:raw.length]));
         amount = amount * uint128(10**power);
     }
+
+    function runLengthEncode(uint256 amount) internal pure returns (uint256 encoded) {
+        encoded = (countEndZeroes(amount));
+    }
+
+    function countEndZeroes(uint256 amount) internal pure returns (uint256) {
+        uint256 n;
+
+        while (amount % 10 == 0) {
+            n++;
+            amount = amount / 10;
+        }
+
+        return n;
+    }
+
+    function removeZeroes(uint256 amount) internal pure returns (uint256) {
+        while (amount % 10 == 0) {
+            amount /= 10;
+        }
+
+        return amount;
+    }
 }

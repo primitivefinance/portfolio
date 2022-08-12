@@ -59,18 +59,19 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function process(bytes calldata data) external {
-        uint48 poolId;
+        uint48 poolId_;
         bytes1 instruction = bytes1(data[0] & 0x0f);
+        console.log("add liq", instruction == Instructions.ADD_LIQUIDITY);
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
         if (instruction == Instructions.ADD_LIQUIDITY) {
-            (poolId, ) = _addLiquidity(data);
+            (poolId_, ) = _addLiquidity(data);
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            (poolId, , ) = _removeLiquidity(data);
+            (poolId_, , ) = _removeLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
-            (poolId, ) = _swapExactForExact(data);
+            (poolId_, ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
-            (poolId, , ) = _createPool(data);
+            (poolId_, , ) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
             _createCurve(data);
         } else if (instruction == Instructions.CREATE_PAIR) {
@@ -112,11 +113,43 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         assertEq(_doesPoolExist(poolId), true);
         assertEq(_pools[poolId].lastTick != 0, true);
+        assertEq(_pools[poolId].liquidity == 0, true);
+    }
+
+    function testCountEndZeroes() public {
+        uint256 amount = 1000;
+        uint256 zeroes = uint256(Decoder.countEndZeroes(amount));
+        console.log(zeroes);
+    }
+
+    function testDefaultAddLiquidity() public {
+        uint8 power = uint8(0x06);
+        uint8 amount = uint8(0x04);
+        bytes memory data = Instructions.encodeAddLiquidity(
+            uint8(0),
+            poolId,
+            DEFAULT_TICK - 4,
+            DEFAULT_TICK + 4,
+            power,
+            amount
+        );
+
+        forwarder.pass(data);
+
+        uint256 globalR1 = _globalReserves[address(asset)];
+        assertEq(globalR1 > 0, true);
     }
 
     function testFailAttemptToCallNonExistentPool() public {
         uint48 randomPoolId = uint48(12825624);
-        bytes memory data = Instructions.encodeAddLiquidity(uint8(0), randomPoolId, int24(0), int24(0), uint128(0));
+        bytes memory data = Instructions.encodeAddLiquidity(
+            uint8(0),
+            randomPoolId,
+            int24(0),
+            int24(0),
+            uint8(0),
+            uint8(0)
+        );
         forwarder.pass(data);
     }
 
