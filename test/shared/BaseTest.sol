@@ -90,7 +90,7 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
         override
         returns (
             uint256 lastPrice,
-            uint256 lastTick,
+            int24 lastTick,
             uint256 blockTimestamp,
             uint256 liquidity
         )
@@ -112,4 +112,17 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
     }
 }
 
-contract BaseTest is Test, FakeEnigmaAbstractOverrides {}
+contract StandardHelpers {
+    uint128 public constant DEFAULT_STRIKE = 1e19;
+    uint24 public constant DEFAULT_SIGMA = 1e4;
+    uint32 public constant DEFAULT_MATURITY = 31556953; // adds 1
+    uint16 public constant DEFAULT_FEE = 100;
+    uint32 public constant DEFAULT_GAMMA = 9900;
+    uint128 public constant DEFAULT_R1_QUOTE = 3085375387260000000;
+    uint128 public constant DEFAULT_R2_ASSET = 308537538726000000;
+    uint128 public constant DEFAULT_LIQUIDITY = 1e18;
+    uint128 public constant DEFAULT_PRICE = 10e18;
+    int24 public constant DEFAULT_TICK = int24(23027); // 10e18
+}
+
+contract BaseTest is Test, StandardHelpers, FakeEnigmaAbstractOverrides {}

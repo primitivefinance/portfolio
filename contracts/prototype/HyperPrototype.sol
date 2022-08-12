@@ -15,10 +15,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      * @notice Enigma method to add liquidity to a range of prices in a pool.
      */
     function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 random0, uint128 random1) = Instructions
+        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity, ) = Instructions
             .decodeAddLiquidity(data);
-
-        uint256 delLiquidity = random0;
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId);
 
@@ -59,10 +57,10 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             .decodeRemoveLiquidity(data);
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId);
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         // Compute amounts of tokens for the real reserves.
-        Curve memory curve = _curves[uint32(poolId)];
+        Curve memory curve = _curves[uint32(poolId_)];
         HyperSlot memory slot = _slots[loTick];
         uint256 timestamp = _blockTimestamp();
         uint256 price = _computePriceGivenTickIndex(loTick);
@@ -86,7 +84,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         _decreaseGlobal(pair.tokenBase, deltaR1);
         _decreaseGlobal(pair.tokenQuote, deltaR2);
 
-        emit RemoveLiquidity(poolId, pairId, deltaR1, deltaR2, deltaLiquidity);
+        emit RemoveLiquidity(poolId_, pairId, deltaR1, deltaR2, deltaLiquidity);
     }
 
     function _increaseLiquidity(
@@ -189,6 +187,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         )
     {
         (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Instructions.decodeCreatePool(data);
+        poolId = poolId_;
 
         if (price == 0) revert ZeroPrice();
         if (_doesPoolExist(poolId_)) revert PoolExists();
@@ -204,14 +203,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
 
         // Write the pool to state with the desired price.
-        _pools[poolId] = HyperPool({
+        _pools[poolId_] = HyperPool({
             lastPrice: price,
-            lastTick: 0, // todo: implement tick and price grid.
+            lastTick: _computeTickIndexGivenPrice(price), // todo: implement tick and price grid.
             blockTimestamp: timestamp,
             liquidity: 0
         });
 
-        emit CreatePool(poolId, pairId, curveId, price);
+        emit CreatePool(poolId_, pairId, curveId, price);
     }
 
     function _doesPoolExist(uint48 poolId) internal view returns (bool exists) {
@@ -295,6 +294,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         emit CreatePair(pairId, asset, quote);
     }
+
+    // --- General Utils --- //
 
     function _isValidDecimals(uint8 decimals) internal pure returns (bool valid) {
         valid = _isBetween(decimals, 6, 18);

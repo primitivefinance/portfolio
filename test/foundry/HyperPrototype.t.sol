@@ -2,28 +2,136 @@ pragma solidity 0.8.13;
 
 import "../shared/BaseTest.sol";
 
+import "../../contracts/test/TestERC20.sol";
 import "../../contracts/prototype/HyperPrototype.sol";
 
+contract Forwarder is Test {
+    TestHyperPrototype public hyper;
+
+    constructor() {
+        hyper = TestHyperPrototype(msg.sender);
+    }
+
+    // Assumes Hyper calls this, for testing only.
+    function pass(bytes calldata data) external returns (bool) {
+        //payable(hyper).call{value: 0}(data)
+        try hyper.process(data) {
+            //emit log("sucess calling hyper");
+        } catch Error(string memory reason) {
+            emit log(reason);
+            revert("failed");
+        } catch (bytes memory reason) {
+            emit log_bytes(reason);
+            revert("failed");
+        }
+
+        return true;
+    }
+}
+
+/**
+ * @notice Testing the primary logic of the AMM is complicated because of the many parameters,
+ * and specific math involved. Here's a rough guide to thoroughly test if pools are working as expected.
+ *
+ * // --- Add Liquidity --- //
+ *
+ * Prerequesites:
+ * 1. Hyper contract deployed, two ERC20 token contracts deployed.
+ * 2. Pair created in Hyper.
+ * 3. Curve parameters created in Hyper.
+ * 4. Pool instantiated in Hyper.
+ *
+ * Adding liquidity:
+ * 1. Use Instructions library to encode add liquidity parameters as a single calldata byte string.
+ * 2. Call a contract with the data which forwards it to the Hyper contract.
+ */
 contract TestHyperPrototype is HyperPrototype, BaseTest {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
+    Forwarder public forwarder;
+    TestERC20 public asset;
+    TestERC20 public quote;
+    uint48 poolId;
+
+    function setUp() public {
+        (asset, quote) = handlePrerequesites();
+    }
+
+    function process(bytes calldata data) external {
+        uint48 poolId;
+        bytes1 instruction = bytes1(data[0] & 0x0f);
+        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
+
+        if (instruction == Instructions.ADD_LIQUIDITY) {
+            (poolId, ) = _addLiquidity(data);
+        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
+            (poolId, , ) = _removeLiquidity(data);
+        } else if (instruction == Instructions.SWAP) {
+            (poolId, ) = _swapExactForExact(data);
+        } else if (instruction == Instructions.CREATE_POOL) {
+            (poolId, , ) = _createPool(data);
+        } else if (instruction == Instructions.CREATE_CURVE) {
+            _createCurve(data);
+        } else if (instruction == Instructions.CREATE_PAIR) {
+            _createPair(data);
+        } else {
+            revert UnknownInstruction();
+        }
+    }
+
+    function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1) {
+        // Set the forwarder.
+        forwarder = new Forwarder();
+
+        // 1. Two token contracts.
+        token0 = new TestERC20("token0", "token0 name", 18);
+        token1 = new TestERC20("token1", "token1 name", 18);
+
+        // 2. Create pair
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+        uint16 pairId = uint16(_pairNonce);
+
+        // 3. Create curve
+        data = Instructions.encodeCreateCurve(
+            DEFAULT_SIGMA,
+            DEFAULT_MATURITY,
+            uint16(1e4 - DEFAULT_GAMMA),
+            DEFAULT_STRIKE
+        );
+        success = forwarder.pass(data);
+        uint32 curveId = uint32(_curveNonce);
+
+        poolId = Instructions.encodePoolId(pairId, curveId);
+        console.log("pool id", poolId);
+
+        // 4. Create pool
+        data = Instructions.encodeCreatePool(poolId, DEFAULT_PRICE, DEFAULT_LIQUIDITY);
+        forwarder.pass(data);
+
+        assertEq(_doesPoolExist(poolId), true);
+        assertEq(_pools[poolId].lastTick != 0, true);
+    }
+
+    function testFailAttemptToCallNonExistentPool() public {
+        uint48 randomPoolId = uint48(12825624);
+        bytes memory data = Instructions.encodeAddLiquidity(uint8(0), randomPoolId, int24(0), int24(0), uint128(0));
+        forwarder.pass(data);
+    }
+
     function testSlick() public {
+        assertEq(_doesPoolExist(poolId), true);
         bool perpetual = (0 | 1 | 0) == 0;
-        console.log("is perpetual?", perpetual);
         assembly {
             perpetual := iszero(or(0, or(1, 0))) // ((strike == 0 && sigma == 0) && maturity == 0)
         }
-
-        console.log("is perpetual?", perpetual);
+        assertEq(perpetual, false);
     }
 
     function testComputePriceWithTickFn() public {
         uint256 price = __computePriceGivenTickIndex(int24(512));
-        console.log(price);
-
         int24 tick = __computeTickIndexGivenPrice(price);
-        console.logInt(tick);
         assertEq(tick, int24(512));
     }
 

@@ -57,7 +57,7 @@ interface IEnigmaDataStructures {
      */
     struct HyperPool {
         uint256 lastPrice;
-        uint256 lastTick;
+        int24 lastTick;
         uint256 blockTimestamp;
         uint256 liquidity;
     }

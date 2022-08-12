@@ -19,6 +19,11 @@ library Instructions {
 
     // --- Encoding & Decoding --- //
 
+    function encodePoolId(uint16 pairId, uint32 curveId) internal pure returns (uint48 poolId) {
+        bytes memory data = abi.encodePacked(pairId, curveId);
+        poolId = uint48(bytes6(data));
+    }
+
     /// @dev Encodes the arugments for the CREATE_CURVE instruction.
     function encodeCreateCurve(
         uint24 sigma,
@@ -41,6 +46,16 @@ library Instructions {
         uint128 liquidity
     ) internal pure returns (bytes memory data) {
         data = abi.encodePacked(CREATE_POOL, poolId, price, liquidity);
+    }
+
+    function encodeAddLiquidity(
+        uint8 useMax,
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint128 deltaLiquidity
+    ) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(ADD_LIQUIDITY, useMax, poolId, loTick, hiTick, deltaLiquidity, uint128(0));
     }
 
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
