@@ -31,6 +31,7 @@ interface IEnigmaView {
         returns (
             uint256,
             uint256,
+            uint256,
             uint256
         );
 

@@ -3,9 +3,49 @@ pragma solidity 0.8.13;
 
 import "./EnigmaVirtualMachinePrototype.sol";
 import "../libraries/HyperSwapLib.sol";
+import "solstat/Invariant.sol";
 
 abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
-    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {}
+    using FixedPointMathLib for uint256;
+    using FixedPointMathLib for int256;
+
+    function _swapExactForExact(bytes calldata data) internal returns (uint48 poolId, uint256 a) {}
+
+    /**
+     * @notice Enigma method to add liquidity to a range of prices in a pool.
+     */
+    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 random0, uint128 random1) = Instructions
+            .decodeAddLiquidity(data);
+
+        uint256 delLiquidity = random0;
+
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId);
+
+        // Compute amounts of tokens for the real reserves.
+        Curve memory curve = _curves[uint32(poolId)];
+        HyperSlot memory slot = _slots[loTick];
+        uint256 timestamp = _blockTimestamp();
+        uint256 price = _computePriceGivenTickIndex(loTick);
+        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
+        uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
+        deltaR1 = deltaR1.mulWadDown(delLiquidity);
+        deltaR2 = deltaR2.mulWadDown(delLiquidity);
+
+        _increaseLiquidity(poolId_, loTick, hiTick, deltaR1, deltaR2, delLiquidity);
+    }
+
+    function _computePriceGivenTickIndex(int24 tickIndex) internal pure returns (uint256 price) {
+        int256 tickWad = int256(tickIndex) * int256(FixedPointMathLib.WAD);
+        price = uint256(FixedPointMathLib.powWad(1_0001e14, tickWad));
+    }
+
+    function _computeTickIndexGivenPrice(uint256 priceWad) internal pure returns (int24 tick) {
+        uint256 numerator = uint256(int256(priceWad).lnWad());
+        uint256 denominator = uint256(int256(1_0001e14).lnWad());
+        uint256 val = numerator / denominator + 1; // Values are in Fixed Point Q.96 format. Rounds up.
+        tick = int24(int256((numerator)) / int256(denominator) + 1);
+    }
 
     function _removeLiquidity(bytes calldata data)
         internal
@@ -14,16 +54,124 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 a,
             uint256 b
         )
-    {}
+    {
+        (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Instructions
+            .decodeRemoveLiquidity(data);
 
-    function _swapExactForExact(bytes calldata data) internal returns (uint48 poolId, uint256 a) {}
+        if (deltaLiquidity == 0) revert ZeroLiquidityError();
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId);
+
+        // Compute amounts of tokens for the real reserves.
+        Curve memory curve = _curves[uint32(poolId)];
+        HyperSlot memory slot = _slots[loTick];
+        uint256 timestamp = _blockTimestamp();
+        uint256 price = _computePriceGivenTickIndex(loTick);
+        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
+        uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
+        deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
+        deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
+
+        // Decrease amount of liquidity in each tick.
+        _decreaseSlotLiquidity(loTick, deltaLiquidity, false);
+        _decreaseSlotLiquidity(hiTick, deltaLiquidity, true);
+
+        // Todo: delete any slots if uninstantiated.
+
+        // Todo: update bitmap of instantiated/uninstantiated slots.
+
+        // Todo: update postition of caller.
+
+        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
+        Pair memory pair = _pairs[pairId];
+        _decreaseGlobal(pair.tokenBase, deltaR1);
+        _decreaseGlobal(pair.tokenQuote, deltaR2);
+
+        emit RemoveLiquidity(poolId, pairId, deltaR1, deltaR2, deltaLiquidity);
+    }
 
     function _increaseLiquidity(
         uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
         uint256 deltaR1,
         uint256 deltaR2,
         uint256 deltaLiquidity
-    ) internal {}
+    ) internal {
+        if (deltaLiquidity == 0) revert ZeroLiquidityError();
+
+        // Update the slots.
+        _increaseSlotLiquidity(loTick, deltaLiquidity, false);
+        _increaseSlotLiquidity(hiTick, deltaLiquidity, true);
+
+        // Todo: update bitmap of instantiated slots.
+
+        // Todo: update postition of caller.
+
+        // note: Global reserves are used at the end of instruction processing to settle transactions.
+        uint16 pairId = uint16(poolId >> 32);
+        Pair memory pair = _pairs[pairId];
+        _increaseGlobal(pair.tokenBase, deltaR1);
+        _increaseGlobal(pair.tokenQuote, deltaR2);
+
+        emit AddLiquidity(poolId, pairId, deltaR1, deltaR2, deltaLiquidity);
+    }
+
+    /**
+     * @notice Computes the R1 reserve given the R2 reserve and a price.
+     *
+     * @custom:math R1 / price = tradingFunction(...)
+     */
+    function computeR1GivenR2(
+        uint256 R2,
+        uint256 strike,
+        uint256 sigma,
+        uint256 maturity,
+        uint256 price
+    ) internal view returns (uint256 R1) {
+        uint256 tau = maturity - _blockTimestamp();
+        R1 = Invariant.getY(R2, strike, sigma, tau, 0); // todo: add non-zero invariant
+        R1 = R1.mulWadDown(price); // Multiplies price to calibrate to the price specified.
+    }
+
+    /**
+     * @notice Updates the liquidity of a slot, and returns a bool to reflect whether its instantiation state was changed.
+     */
+    function _increaseSlotLiquidity(
+        int24 tickIndex,
+        uint256 deltaLiquidity,
+        bool hi
+    ) internal returns (bool alterState) {
+        HyperSlot storage slot = _slots[tickIndex];
+
+        uint256 prevLiquidity = slot.totalLiquidity;
+        uint256 nextLiquidity = slot.totalLiquidity + deltaLiquidity;
+
+        alterState = (prevLiquidity == 0 && nextLiquidity != 0); // If the liquidity started at zero but was altered.
+
+        slot.totalLiquidity = nextLiquidity;
+        if (alterState) slot.instantiated = !slot.instantiated;
+        // todo: apply the liquidity delta depending on tick positioning in range.
+    }
+
+    /**
+     * @notice Updates the liquidity of a slot, and returns a bool to reflect whether its instantiation state was changed.
+     */
+    function _decreaseSlotLiquidity(
+        int24 tickIndex,
+        uint256 deltaLiquidity,
+        bool hi
+    ) internal returns (bool alterState) {
+        HyperSlot storage slot = _slots[tickIndex];
+
+        uint256 prevLiquidity = slot.totalLiquidity;
+        uint256 nextLiquidity = slot.totalLiquidity + deltaLiquidity;
+
+        alterState = !((prevLiquidity != 0) && (nextLiquidity == 0)); // If there was liquidity previously and all of it was removed.
+
+        slot.totalLiquidity = nextLiquidity;
+        if (alterState) slot.instantiated = !slot.instantiated;
+        // todo: apply the liquidity delta depending on tick positioning in range.
+    }
 
     /**
      * @notice Uses a pair and curve to instantiate a pool at a price.
@@ -59,7 +207,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         _pools[poolId] = HyperPool({
             lastPrice: price,
             lastTick: 0, // todo: implement tick and price grid.
-            blockTimestamp: timestamp
+            blockTimestamp: timestamp,
+            liquidity: 0
         });
 
         emit CreatePool(poolId, pairId, curveId, price);
