@@ -36,18 +36,21 @@ library HyperSwapLib {
         uint256 vol,
         uint256 tau
     ) internal view returns (uint256 R2) {
-        int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
-        uint256 tauYears = convertSecondsToWadYears(tau);
+        // todo: handle price when above strike.
+        if (prc != 0) {
+            int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
+            uint256 tauYears = convertSecondsToWadYears(tau);
 
-        uint256 sigmaWad = convertPercentageToWad(vol);
-        uint256 doubleSigma = (sigmaWad * sigmaWad) / uint256(Gaussian.TWO);
-        uint256 halfSigmaTau = doubleSigma * tauYears;
-        uint256 sqrtTauSigma = (tauYears.sqrt() * 1e9).mulWadDown(sigmaWad);
+            uint256 sigmaWad = convertPercentageToWad(vol);
+            uint256 doubleSigma = (sigmaWad * sigmaWad) / uint256(Gaussian.TWO);
+            uint256 halfSigmaTau = doubleSigma * tauYears;
+            uint256 sqrtTauSigma = (tauYears.sqrt() * 1e9).mulWadDown(sigmaWad);
 
-        int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
-        int256 cdf = Gaussian.cdf(lnOverVol);
-        if (cdf > Gaussian.ONE) revert CdfErr(cdf);
-        R2 = uint256(Gaussian.ONE - cdf);
+            int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
+            int256 cdf = Gaussian.cdf(lnOverVol);
+            if (cdf > Gaussian.ONE) revert CdfErr(cdf);
+            R2 = uint256(Gaussian.ONE - cdf);
+        }
     }
 
     /**

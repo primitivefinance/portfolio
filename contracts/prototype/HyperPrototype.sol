@@ -25,11 +25,19 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = _curves[uint32(poolId_)];
         HyperSlot memory slot = _slots[loTick];
+        HyperPool memory pool = _pools[poolId_];
         uint256 timestamp = _blockTimestamp();
         uint256 price = _computePriceGivenTickIndex(loTick);
+        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
+            pool.lastPrice,
+            curve.strike,
+            curve.sigma,
+            curve.maturity - timestamp
+        );
         uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
+        if (deltaR2 == 0) deltaR2 = currentR2;
+        else deltaR2 = currentR2.divWadDown(deltaR2);
         uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
-
         deltaR1 = deltaR1.mulWadDown(delLiquidity);
         deltaR2 = deltaR2.mulWadDown(delLiquidity);
 
@@ -65,9 +73,17 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = _curves[uint32(poolId_)];
         HyperSlot memory slot = _slots[loTick];
+        HyperPool memory pool = _pools[poolId_];
         uint256 timestamp = _blockTimestamp();
         uint256 price = _computePriceGivenTickIndex(loTick);
+        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
+            pool.lastPrice,
+            curve.strike,
+            curve.sigma,
+            curve.maturity - timestamp
+        );
         uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
+        deltaR2 = currentR2.divWadDown(deltaR2);
         uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
         deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
         deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
@@ -111,16 +127,16 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = _pairs[pairId];
-        _increaseGlobal(pair.tokenBase, deltaR1);
-        _increaseGlobal(pair.tokenQuote, deltaR2);
+        _increaseGlobal(pair.tokenBase, deltaR2);
+        _increaseGlobal(pair.tokenQuote, deltaR1);
 
-        emit AddLiquidity(poolId, pairId, deltaR1, deltaR2, deltaLiquidity);
+        emit AddLiquidity(poolId, pairId, deltaR2, deltaR1, deltaLiquidity);
     }
 
     /**
      * @notice Computes the R1 reserve given the R2 reserve and a price.
      *
-     * @custom:math R1 / price = tradingFunction(...)
+     * @custom:math R1 / price(hiTickIndex) = tradingFunction(...)
      */
     function computeR1GivenR2(
         uint256 R2,
@@ -131,7 +147,9 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     ) internal view returns (uint256 R1) {
         uint256 tau = maturity - _blockTimestamp();
         R1 = Invariant.getY(R2, strike, sigma, tau, 0); // todo: add non-zero invariant
-        R1 = R1.mulWadDown(price); // Multiplies price to calibrate to the price specified.
+        console.log(R2, strike, tau, R1);
+        // todo: add hiTick range
+        //R1 = R1.mulWadDown(price); // Multiplies price to calibrate to the price specified.
     }
 
     /**

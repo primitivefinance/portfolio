@@ -126,8 +126,8 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testDefaultAddLiquidity() public {
-        uint8 power = uint8(0x06);
-        uint8 amount = uint8(0x04);
+        uint8 power = uint8(0x06); // 6 zeroes
+        uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
         bytes memory data = Instructions.encodeAddLiquidity(
             uint8(0),
             poolId,
@@ -139,9 +139,34 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         forwarder.pass(data);
 
-        uint256 globalR1 = _globalReserves[address(asset)];
+        uint256 globalR1 = _globalReserves[address(quote)];
+        uint256 globalR2 = _globalReserves[address(asset)];
         assertEq(globalR1 > 0, true);
-        console.log("Global R1 after adding liq", globalR1);
+        assertEq(globalR2 > 0, true);
+    }
+
+    function testFullAddLiquidity() public {
+        uint256 price = _pools[poolId].lastPrice;
+        Curve memory curve = _curves[uint32(poolId)];
+        uint256 theoreticalR2 = HyperSwapLib.computeR2WithPrice(
+            price,
+            curve.strike,
+            curve.sigma,
+            curve.maturity - _blockTimestamp()
+        );
+        int24 min = int24(-887272);
+        int24 max = -min;
+        uint8 power = uint8(0x06); // 6 zeroes
+        uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
+        bytes memory data = Instructions.encodeAddLiquidity(uint8(0), poolId, min, max, power, amount);
+
+        forwarder.pass(data);
+
+        uint256 globalR1 = _globalReserves[address(quote)];
+        uint256 globalR2 = _globalReserves[address(asset)];
+        assertTrue(globalR1 > 0);
+        assertTrue(globalR2 > 0);
+        assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
     function testFailAttemptToCallNonExistentPool() public {
