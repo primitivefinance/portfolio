@@ -8,8 +8,14 @@ import "../../contracts/prototype/HyperPrototype.sol";
 contract Forwarder is Test {
     TestHyperPrototype public hyper;
 
+    bytes4 public expectedError;
+
     constructor() {
         hyper = TestHyperPrototype(msg.sender);
+    }
+
+    function set(bytes4 err) public {
+        expectedError = err;
     }
 
     // Assumes Hyper calls this, for testing only.
@@ -17,12 +23,10 @@ contract Forwarder is Test {
         //payable(hyper).call{value: 0}(data)
         try hyper.process(data) {
             //emit log("sucess calling hyper");
-        } catch Error(string memory reason) {
-            emit log(reason);
-            revert("failed");
         } catch (bytes memory reason) {
-            emit log_bytes(reason);
-            revert("failed");
+            assembly {
+                revert(add(32, reason), mload(reason))
+            }
         }
 
         return true;
@@ -61,7 +65,6 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     function process(bytes calldata data) external {
         uint48 poolId_;
         bytes1 instruction = bytes1(data[0] & 0x0f);
-        console.log("add liq", instruction == Instructions.ADD_LIQUIDITY);
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
         if (instruction == Instructions.ADD_LIQUIDITY) {
@@ -138,6 +141,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         uint256 globalR1 = _globalReserves[address(asset)];
         assertEq(globalR1 > 0, true);
+        console.log("Global R1 after adding liq", globalR1);
     }
 
     function testFailAttemptToCallNonExistentPool() public {

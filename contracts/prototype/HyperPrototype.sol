@@ -20,19 +20,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity, ) = Instructions
             .decodeAddLiquidity(data[1:]);
         poolId = poolId_;
-        console.log(poolId_);
-        console.log("decoded", poolId_);
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-        console.log("got here");
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = _curves[uint32(poolId_)];
         HyperSlot memory slot = _slots[loTick];
         uint256 timestamp = _blockTimestamp();
         uint256 price = _computePriceGivenTickIndex(loTick);
-        console.log("didnt get here", curve.maturity, timestamp);
         uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
-        console.log("got here 2");
         uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
 
         deltaR1 = deltaR1.mulWadDown(delLiquidity);
