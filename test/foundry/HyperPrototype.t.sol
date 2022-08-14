@@ -281,14 +281,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
     }
 
-    function testC_PrPairNonceIncrementedReturnsOne() public {
+    function testC_PrPairNonceIncrementedReturnsOneAdded() public {
         uint256 prevNonce = _pairNonce;
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         uint256 nonce = _pairNonce;
-        assertEq(nonce, nonce + 1);
+        assertEq(nonce, prevNonce + 1);
     }
 
     function testC_PrFetchesPairIdReturnsNonZero() public {
@@ -307,7 +307,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
-        uint256 pairId = _getPairId[token0][token1];
+        uint16 pairId = _getPairId[token0][token1];
         Pair memory pair = _pairs[pairId];
         assertEq(pair.tokenBase, token0);
         assertEq(pair.tokenQuote, token1);
@@ -319,7 +319,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     function testFailC_CuCurveExistsReverts() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, curve.fee, curve.strike);
+        bytes memory data = Instructions.encodeCreateCurve(
+            curve.sigma,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            curve.strike
+        );
         bool success = forwarder.pass(data);
     }
 
@@ -331,20 +336,25 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     function testFailC_CuExpiringPoolZeroSigmaReverts() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(0, curve.maturity, curve.fee, curve.strike);
+        bytes memory data = Instructions.encodeCreateCurve(0, curve.maturity, uint16(1e4 - curve.gamma), curve.strike);
         bool success = forwarder.pass(data);
     }
 
     function testFailC_CuExpiringPoolZeroStrikeReverts() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, curve.fee, 0);
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, uint16(1e4 - curve.gamma), 0);
         bool success = forwarder.pass(data);
     }
 
     function testC_CuCurveNonceIncrementReturnsOne() public {
         uint256 prevNonce = _curveNonce;
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bytes memory data = Instructions.encodeCreateCurve(
+            curve.sigma + 1,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            curve.strike
+        );
         bool success = forwarder.pass(data);
         uint256 nextNonce = _curveNonce;
         assertEq(prevNonce, nextNonce - 1);
@@ -352,8 +362,15 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     function testC_CuFetchesCurveIdReturnsNonZero() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
-        bytes32 rawCruveId = abi.encodePacked(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bytes memory data = Instructions.encodeCreateCurve(
+            curve.sigma + 1,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            curve.strike
+        );
+        bytes32 rawCurveId = Decoder.toBytes32(
+            abi.encodePacked(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike)
+        );
         bool success = forwarder.pass(data);
         uint32 curveId = _getCurveIds[rawCurveId];
         assertTrue(curveId != 0);
@@ -361,15 +378,22 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     function testC_CuFetchesCurveDataReturnsParametersSet() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
-        bytes32 rawCruveId = abi.encodePacked(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bytes memory data = Instructions.encodeCreateCurve(
+            curve.sigma + 1,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            curve.strike
+        );
+        bytes32 rawCurveId = Decoder.toBytes32(
+            abi.encodePacked(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike)
+        );
         bool success = forwarder.pass(data);
         uint32 curveId = _getCurveIds[rawCurveId];
         Curve memory newCurve = _curves[curveId];
-        assertEq(newCurve, curve.sigma + 1);
-        assertEq(newCurve, curve.maturity);
-        assertEq(newCurve, curve.fee);
-        assertEq(newCurve, curve.strike);
+        assertEq(newCurve.sigma, curve.sigma + 1);
+        assertEq(newCurve.maturity, curve.maturity);
+        assertEq(newCurve.gamma, curve.gamma);
+        assertEq(newCurve.strike, curve.strike);
     }
 
     // --- Create Pool --- //
@@ -384,6 +408,16 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
     }
 
+    function testFailC_PoZeroCurveIdReverts() public {
+        bytes memory data = Instructions.encodeCreatePool(0x010000, 1, 1);
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_PoZeroPairIdReverts() public {
+        bytes memory data = Instructions.encodeCreatePool(0x000001, 1, 1);
+        bool success = forwarder.pass(data);
+    }
+
     function testFailC_PoExpiringPoolExpiredReverts() public {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
@@ -392,13 +426,15 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         uint16 pairId = _getPairId[token0][token1];
 
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
-        bytes32 rawCurveId = abi.encodePacked(curve.sigma + 1, 0, curve.fee, curve.strike);
+        data = Instructions.encodeCreateCurve(curve.sigma + 1, uint32(0), uint16(1e4 - curve.gamma), curve.strike);
+        bytes32 rawCurveId = Decoder.toBytes32(
+            abi.encodePacked(curve.sigma + 1, uint32(0), uint16(1e4 - curve.gamma), curve.strike)
+        );
         success = forwarder.pass(data);
 
         uint32 curveId = _getCurveIds[rawCurveId];
         uint48 id = Instructions.encodePoolId(pairId, curveId);
-        data = Instructions.encodeCreatePool(poolId, 1_000, 1_000);
+        data = Instructions.encodeCreatePool(id, 1_000, 1_000);
         success = forwarder.pass(data);
     }
 
@@ -410,13 +446,15 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         uint16 pairId = _getPairId[token0][token1];
 
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
-        bytes32 rawCurveId = abi.encodePacked(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike);
+        bytes32 rawCurveId = Decoder.toBytes32(
+            abi.encodePacked(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike)
+        );
         success = forwarder.pass(data);
 
         uint32 curveId = _getCurveIds[rawCurveId];
         uint48 id = Instructions.encodePoolId(pairId, curveId);
-        data = Instructions.encodeCreatePool(poolId, 1_000, 1_000);
+        data = Instructions.encodeCreatePool(id, 1_000, 1_000);
         success = forwarder.pass(data);
 
         uint256 time = _pools[id].blockTimestamp;

@@ -209,6 +209,9 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // todo: apply the liquidity delta depending on tick positioning in range.
     }
 
+    error ZeroPairId();
+    error ZeroCurveId();
+
     /**
      * @notice Uses a pair and curve to instantiate a pool at a price.
      *
@@ -228,6 +231,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         poolId = poolId_;
 
         if (price == 0) revert ZeroPrice();
+        if (uint16(poolId >> 32) == 0) revert ZeroPairId();
+        if (uint32(poolId) == 0) revert ZeroCurveId();
         if (_doesPoolExist(poolId_)) revert PoolExists();
 
         Curve memory curve = _curves[curveId];
