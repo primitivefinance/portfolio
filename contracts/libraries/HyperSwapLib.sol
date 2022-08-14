@@ -7,6 +7,9 @@ import "solstat/Gaussian.sol";
  * @dev Comprehensive library to compute all related functions used with swaps.
  */
 library HyperSwapLib {
+    using FixedPointMathLib for uint256;
+    using FixedPointMathLib for int256;
+
     uint256 public constant UNIT_WAD = 1e18;
     uint256 public constant UNIT_YEAR = 31556953;
     uint256 public constant UNIT_PERCENT = 1e4;
@@ -21,6 +24,9 @@ library HyperSwapLib {
         uint256 tau
     ) internal pure returns (uint256 R1) {}
 
+    // temp: remove with better error
+    error CdfErr(int256 cdf);
+
     /**
      * @custom:math R2 = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
@@ -29,7 +35,23 @@ library HyperSwapLib {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) internal pure returns (uint256 R2) {}
+    ) internal view returns (uint256 R2) {
+        // todo: handle price when above strike.
+        if (prc != 0) {
+            int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
+            uint256 tauYears = convertSecondsToWadYears(tau);
+
+            uint256 sigmaWad = convertPercentageToWad(vol);
+            uint256 doubleSigma = (sigmaWad * sigmaWad) / uint256(Gaussian.TWO);
+            uint256 halfSigmaTau = doubleSigma * tauYears;
+            uint256 sqrtTauSigma = (tauYears.sqrt() * 1e9).mulWadDown(sigmaWad);
+
+            int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
+            int256 cdf = Gaussian.cdf(lnOverVol);
+            if (cdf > Gaussian.ONE) revert CdfErr(cdf);
+            R2 = uint256(Gaussian.ONE - cdf);
+        }
+    }
 
     /**
      * @custom:math

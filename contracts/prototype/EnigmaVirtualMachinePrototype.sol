@@ -105,9 +105,9 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = _positions[msg.sender][poolId];
+        HyperPosition storage pos = _positions[msg.sender][poolId];
 
-        pos.liquidity += deltaLiquidity.toUint128();
+        pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
@@ -116,9 +116,9 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev Equally important as `_increasePosition`.
     /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        Position storage pos = _positions[msg.sender][poolId];
+        HyperPosition storage pos = _positions[msg.sender][poolId];
 
-        pos.liquidity -= deltaLiquidity.toUint128();
+        pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
@@ -134,6 +134,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     }
 
     // --- State --- //
+    /// @dev Tick index -> Info of the price slot.
+    mapping(int24 => HyperSlot) internal _slots;
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) internal _pairs;
     /// @dev Pool id -> HyperPool Data Structure.
@@ -149,7 +151,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) internal _balances;
     /// @dev User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint48 => Position)) internal _positions;
+    mapping(address => mapping(uint48 => HyperPosition)) internal _positions;
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
     /// @dev A value incremented by one on pair creation. Reduces calldata.

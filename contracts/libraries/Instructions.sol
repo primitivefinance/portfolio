@@ -19,6 +19,11 @@ library Instructions {
 
     // --- Encoding & Decoding --- //
 
+    function encodePoolId(uint16 pairId, uint32 curveId) internal pure returns (uint48 poolId) {
+        bytes memory data = abi.encodePacked(pairId, curveId);
+        poolId = uint48(bytes6(data));
+    }
+
     /// @dev Encodes the arugments for the CREATE_CURVE instruction.
     function encodeCreateCurve(
         uint24 sigma,
@@ -43,25 +48,41 @@ library Instructions {
         data = abi.encodePacked(CREATE_POOL, poolId, price, liquidity);
     }
 
+    function encodeAddLiquidity(
+        uint8 useMax,
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint8 power,
+        uint8 amount
+    ) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(ADD_LIQUIDITY, useMax, poolId, loTick, hiTick, power, amount);
+    }
+
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
-    /// @param data Maximum 8 + 16 + 16 = 40 bytes.
-    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
+    /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
+    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
     function decodeAddLiquidity(bytes calldata data)
         internal
         pure
         returns (
             uint8 useMax,
             uint48 poolId,
-            uint128 deltaBase,
+            int24 loTick,
+            int24 hiTick,
+            uint128 deltaLiquidity,
             uint128 deltaQuote
         )
     {
         (bytes1 maxFlag, ) = Decoder.separate(data[0]);
         useMax = uint8(maxFlag);
         poolId = uint48(bytes6(data[1:7]));
-        uint8 pointer = uint8(data[7]);
-        deltaBase = Decoder.toAmount(data[8:pointer]);
-        deltaQuote = Decoder.toAmount(data[pointer:]);
+        loTick = int24(uint24(bytes3(data[7:10])));
+        hiTick = int24(uint24(bytes3(data[10:13])));
+        deltaLiquidity = Decoder.toAmount(data[13:]);
+        //uint8 pointer = uint8(data[13]);
+        //deltaBase = Decoder.toAmount(data[14:pointer]);
+        //deltaQuote = Decoder.toAmount(data[pointer:]);
     }
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
@@ -131,8 +152,8 @@ library Instructions {
     }
 
     /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
-    /// @param data Maximum 1 + 6 + 16 = 23 bytes.
-    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 1 byte amount power | amount in amount length bytes |.
+    /// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
+    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
     function decodeRemoveLiquidity(bytes calldata data)
         internal
         pure
@@ -140,13 +161,17 @@ library Instructions {
             uint8 useMax,
             uint48 poolId,
             uint16 pairId,
+            int24 loTick,
+            int24 hiTick,
             uint128 deltaLiquidity
         )
     {
         useMax = uint8(data[0] >> 4);
-        poolId = uint48(bytes6(data[1:7]));
         pairId = uint16(bytes2(data[1:3]));
-        deltaLiquidity = uint128(Decoder.toAmount(data[7:]));
+        poolId = uint48(bytes6(data[1:7]));
+        loTick = int24(uint24(bytes3(data[7:10])));
+        hiTick = int24(uint24(bytes3(data[10:13])));
+        deltaLiquidity = uint128(Decoder.toAmount(data[13:]));
     }
 
     /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.

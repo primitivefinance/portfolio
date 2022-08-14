@@ -57,8 +57,9 @@ interface IEnigmaDataStructures {
      */
     struct HyperPool {
         uint256 lastPrice;
-        uint256 lastTick;
+        int24 lastTick;
         uint256 blockTimestamp;
+        uint256 liquidity;
     }
 
     /**
@@ -68,5 +69,17 @@ interface IEnigmaDataStructures {
         uint256 hiTick;
         uint256 loTick;
         uint256 lastUpdate;
+        uint256 totalLiquidity;
+        uint256 blockTimestamp;
+    }
+
+    /**
+     * @notice Information of a tick at a tickIndex.
+     */
+    struct HyperSlot {
+        uint256 liquidityDelta;
+        uint256 totalLiquidity;
+        uint256 externalFeeGrowth;
+        bool instantiated;
     }
 }
