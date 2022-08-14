@@ -56,11 +56,52 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     Forwarder public forwarder;
     TestERC20 public asset;
     TestERC20 public quote;
-    uint48 poolId;
+    uint48 __poolId;
 
     function setUp() public {
         (asset, quote) = handlePrerequesites();
     }
+
+    function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1) {
+        // Set the forwarder.
+        forwarder = new Forwarder();
+
+        // 1. Two token contracts.
+        token0 = new TestERC20("token0", "token0 name", 18);
+        token1 = new TestERC20("token1", "token1 name", 18);
+
+        // 2. Create pair
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint16 pairId = uint16(_pairNonce);
+
+        // 3. Create curve
+        data = Instructions.encodeCreateCurve(
+            DEFAULT_SIGMA,
+            DEFAULT_MATURITY,
+            uint16(1e4 - DEFAULT_GAMMA),
+            DEFAULT_STRIKE
+        );
+        success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint32 curveId = uint32(_curveNonce);
+
+        __poolId = Instructions.encodePoolId(pairId, curveId);
+
+        // 4. Create pool
+        data = Instructions.encodeCreatePool(__poolId, DEFAULT_PRICE, DEFAULT_LIQUIDITY);
+        success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        assertEq(_doesPoolExist(__poolId), true);
+        assertEq(_pools[__poolId].lastTick != 0, true);
+        assertEq(_pools[__poolId].liquidity == 0, true);
+    }
+
+    // --- Implemented --- //
 
     function process(bytes calldata data) external {
         uint48 poolId_;
@@ -84,70 +125,31 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         }
     }
 
-    function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1) {
-        // Set the forwarder.
-        forwarder = new Forwarder();
+    // --- Helpers --- //
 
-        // 1. Two token contracts.
-        token0 = new TestERC20("token0", "token0 name", 18);
-        token1 = new TestERC20("token1", "token1 name", 18);
+    function getTickLiquidity(int24 tick) public view returns (uint256) {
+        return _slots[tick].totalLiquidity;
+    }
 
-        // 2. Create pair
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+    // --- Add liquidity --- //
+
+    function testFailA_LNonExistentPoolIdReverts() public {
+        uint48 random = uint48(48);
+        bytes memory data = Instructions.encodeAddLiquidity(0, random, 0, 0, 0x01, 0x01);
         bool success = forwarder.pass(data);
-        uint16 pairId = uint16(_pairNonce);
-
-        // 3. Create curve
-        data = Instructions.encodeCreateCurve(
-            DEFAULT_SIGMA,
-            DEFAULT_MATURITY,
-            uint16(1e4 - DEFAULT_GAMMA),
-            DEFAULT_STRIKE
-        );
-        success = forwarder.pass(data);
-        uint32 curveId = uint32(_curveNonce);
-
-        poolId = Instructions.encodePoolId(pairId, curveId);
-        console.log("pool id", poolId);
-
-        // 4. Create pool
-        data = Instructions.encodeCreatePool(poolId, DEFAULT_PRICE, DEFAULT_LIQUIDITY);
-        forwarder.pass(data);
-
-        assertEq(_doesPoolExist(poolId), true);
-        assertEq(_pools[poolId].lastTick != 0, true);
-        assertEq(_pools[poolId].liquidity == 0, true);
+        assertTrue(success, "forwarder call failed");
     }
 
-    function testCountEndZeroes() public {
-        uint256 amount = 1000;
-        uint256 zeroes = uint256(Decoder.countEndZeroes(amount));
-        console.log(zeroes);
+    function testFailA_LZeroLiquidityReverts() public {
+        uint8 liquidity = 0;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, 0, 0, 0x00, liquidity);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
     }
 
-    function testDefaultAddLiquidity() public {
-        uint8 power = uint8(0x06); // 6 zeroes
-        uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
-        bytes memory data = Instructions.encodeAddLiquidity(
-            uint8(0),
-            poolId,
-            DEFAULT_TICK - 4,
-            DEFAULT_TICK + 4,
-            power,
-            amount
-        );
-
-        forwarder.pass(data);
-
-        uint256 globalR1 = _globalReserves[address(quote)];
-        uint256 globalR2 = _globalReserves[address(asset)];
-        assertEq(globalR1 > 0, true);
-        assertEq(globalR2 > 0, true);
-    }
-
-    function testFullAddLiquidity() public {
-        uint256 price = _pools[poolId].lastPrice;
-        Curve memory curve = _curves[uint32(poolId)];
+    function testA_LFullAddLiquidity() public {
+        uint256 price = _pools[__poolId].lastPrice;
+        Curve memory curve = _curves[uint32(__poolId)];
         uint256 theoreticalR2 = HyperSwapLib.computeR2WithPrice(
             price,
             curve.strike,
@@ -158,7 +160,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         int24 max = -min;
         uint8 power = uint8(0x06); // 6 zeroes
         uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
-        bytes memory data = Instructions.encodeAddLiquidity(uint8(0), poolId, min, max, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, min, max, power, amount);
 
         forwarder.pass(data);
 
@@ -169,50 +171,255 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
-    function testFailAttemptToCallNonExistentPool() public {
-        uint48 randomPoolId = uint48(12825624);
-        bytes memory data = Instructions.encodeAddLiquidity(
-            uint8(0),
-            randomPoolId,
-            int24(0),
-            int24(0),
-            uint8(0),
-            uint8(0)
-        );
-        forwarder.pass(data);
+    function testA_LLowTickLiquidityIncrease() public {
+        int24 loTick = DEFAULT_TICK;
+        int24 hiTick = DEFAULT_TICK + 2;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint256 liquidity = getTickLiquidity(loTick);
+        assertEq(liquidity, 10);
     }
 
-    function testSlick() public {
-        assertEq(_doesPoolExist(poolId), true);
-        bool perpetual = (0 | 1 | 0) == 0;
-        assembly {
-            perpetual := iszero(or(0, or(1, 0))) // ((strike == 0 && sigma == 0) && maturity == 0)
-        }
-        assertEq(perpetual, false);
+    function testA_LHighTickLiquidityIncrease() public {
+        int24 loTick = DEFAULT_TICK;
+        int24 hiTick = DEFAULT_TICK + 2;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint256 liquidity = getTickLiquidity(hiTick);
+        assertEq(liquidity, 10);
     }
 
-    function testComputePriceWithTickFn() public {
-        uint256 price = __computePriceGivenTickIndex(int24(512));
-        int24 tick = __computeTickIndexGivenPrice(price);
-        assertEq(tick, int24(512));
+    function testA_LLowTickInstantiatedChange() public {
+        int24 tick = DEFAULT_TICK;
+        bool instantiated = _slots[tick].instantiated;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, tick, tick + 2, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        bool change = _slots[tick].instantiated;
+        assertTrue(instantiated != change);
     }
 
-    /**
-        e^(ln(1.0001) * tickIndex) = price
+    function testA_LHighTickInstantiatedChange() public {
+        int24 tick = DEFAULT_TICK;
+        bool instantiated = _slots[tick].instantiated;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, tick - 2, tick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
 
-        ln(price) = ln(1.0001) * tickIndex
-
-        tickIndex = ln(price) / ln(1.0001)
-     */
-    function __computePriceGivenTickIndex(int24 tickIndex) internal view returns (uint256 price) {
-        int256 tickWad = int256(tickIndex) * int256(FixedPointMathLib.WAD);
-        price = uint256(FixedPointMathLib.powWad(1_0001e14, tickWad));
+        bool change = _slots[tick].instantiated;
+        assertTrue(instantiated != change);
     }
 
-    function __computeTickIndexGivenPrice(uint256 priceWad) internal view returns (int24 tick) {
-        uint256 numerator = uint256(int256(priceWad).lnWad());
-        uint256 denominator = uint256(int256(1_0001e14).lnWad());
-        uint256 val = numerator / denominator + 1;
-        tick = int24(int256((numerator)) / int256(denominator) + 1);
+    function testA_LGlobalAssetIncrease() public {
+        uint256 prevGlobal = _globalReserves[address(asset)];
+        int24 loTick = DEFAULT_TICK;
+        int24 hiTick = DEFAULT_TICK + 2;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint256 nextGlobal = _globalReserves[address(asset)];
+        assertTrue(nextGlobal != 0, "next reserves is zero");
+        assertTrue(nextGlobal > prevGlobal, "reserves did not change");
+    }
+
+    function testA_LGlobalQuoteIncrease() public {
+        uint256 prevGlobal = _globalReserves[address(quote)];
+        int24 loTick = DEFAULT_TICK - 256; // Enough below to have quote.
+        int24 hiTick = DEFAULT_TICK + 2;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint256 nextGlobal = _globalReserves[address(quote)];
+        assertTrue(nextGlobal != 0, "next reserves is zero");
+        assertTrue(nextGlobal > prevGlobal, "reserves did not change");
+    }
+
+    // --- Create Pair --- //
+
+    function testFailC_PrSameTokensReverts() public {
+        address token = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(token, token);
+        bool success = forwarder.pass(data);
+        assertTrue(!success, "forwarder call failed");
+    }
+
+    function testFailC_PrPairExistsReverts() public {
+        bytes memory data = Instructions.encodeCreatePair(address(asset), address(quote));
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_PrLowerDecimalBoundsReverts() public {
+        address token0 = address(new TestERC20("t", "t", 5));
+        address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_PrUpperDecimalBoundsReverts() public {
+        address token0 = address(new TestERC20("t", "t", 24));
+        address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+    }
+
+    function testC_PrPairNonceIncrementedReturnsOne() public {
+        uint256 prevNonce = _pairNonce;
+        address token0 = address(new TestERC20("t", "t", 18));
+        address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+        uint256 nonce = _pairNonce;
+        assertEq(nonce, nonce + 1);
+    }
+
+    function testC_PrFetchesPairIdReturnsNonZero() public {
+        uint256 prevNonce = _pairNonce;
+        address token0 = address(new TestERC20("t", "t", 18));
+        address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+        uint256 pairId = _getPairId[token0][token1];
+        assertTrue(pairId != 0);
+    }
+
+    function testC_PrFetchesPairDataReturnsAddresses() public {
+        uint256 prevNonce = _pairNonce;
+        address token0 = address(new TestERC20("t", "t", 18));
+        address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+        uint256 pairId = _getPairId[token0][token1];
+        Pair memory pair = _pairs[pairId];
+        assertEq(pair.tokenBase, token0);
+        assertEq(pair.tokenQuote, token1);
+        assertEq(pair.decimalsBase, 18);
+        assertEq(pair.decimalsQuote, 18);
+    }
+
+    // --- Create Curve --- //
+
+    function testFailC_CuCurveExistsReverts() public {
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, curve.fee, curve.strike);
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_CuFeeParameterOutsideBoundsReverts() public {
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, 5e4, curve.strike);
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_CuExpiringPoolZeroSigmaReverts() public {
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(0, curve.maturity, curve.fee, curve.strike);
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_CuExpiringPoolZeroStrikeReverts() public {
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, curve.fee, 0);
+        bool success = forwarder.pass(data);
+    }
+
+    function testC_CuCurveNonceIncrementReturnsOne() public {
+        uint256 prevNonce = _curveNonce;
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bool success = forwarder.pass(data);
+        uint256 nextNonce = _curveNonce;
+        assertEq(prevNonce, nextNonce - 1);
+    }
+
+    function testC_CuFetchesCurveIdReturnsNonZero() public {
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bytes32 rawCruveId = abi.encodePacked(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bool success = forwarder.pass(data);
+        uint32 curveId = _getCurveIds[rawCurveId];
+        assertTrue(curveId != 0);
+    }
+
+    function testC_CuFetchesCurveDataReturnsParametersSet() public {
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bytes32 rawCruveId = abi.encodePacked(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bool success = forwarder.pass(data);
+        uint32 curveId = _getCurveIds[rawCurveId];
+        Curve memory newCurve = _curves[curveId];
+        assertEq(newCurve, curve.sigma + 1);
+        assertEq(newCurve, curve.maturity);
+        assertEq(newCurve, curve.fee);
+        assertEq(newCurve, curve.strike);
+    }
+
+    // --- Create Pool --- //
+
+    function testFailC_PoZeroPriceParameterReverts() public {
+        bytes memory data = Instructions.encodeCreatePool(1, 0, 1);
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_PoExistentPoolReverts() public {
+        bytes memory data = Instructions.encodeCreatePool(__poolId, 1, 1);
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_PoExpiringPoolExpiredReverts() public {
+        address token0 = address(new TestERC20("t", "t", 18));
+        address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+        uint16 pairId = _getPairId[token0][token1];
+
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bytes32 rawCurveId = abi.encodePacked(curve.sigma + 1, 0, curve.fee, curve.strike);
+        success = forwarder.pass(data);
+
+        uint32 curveId = _getCurveIds[rawCurveId];
+        uint48 id = Instructions.encodePoolId(pairId, curveId);
+        data = Instructions.encodeCreatePool(poolId, 1_000, 1_000);
+        success = forwarder.pass(data);
+    }
+
+    function testC_PoFetchesPoolDataReturnsNonZeroBlockTimestamp() public {
+        address token0 = address(new TestERC20("t", "t", 18));
+        address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bool success = forwarder.pass(data);
+        uint16 pairId = _getPairId[token0][token1];
+
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        bytes32 rawCurveId = abi.encodePacked(curve.sigma + 1, curve.maturity, curve.fee, curve.strike);
+        success = forwarder.pass(data);
+
+        uint32 curveId = _getCurveIds[rawCurveId];
+        uint48 id = Instructions.encodePoolId(pairId, curveId);
+        data = Instructions.encodeCreatePool(poolId, 1_000, 1_000);
+        success = forwarder.pass(data);
+
+        uint256 time = _pools[id].blockTimestamp;
+        assertTrue(time != 0);
     }
 }

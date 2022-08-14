@@ -15,26 +15,35 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
     /**
      * @notice Enigma method to add liquidity to a range of prices in a pool.
+     *
+     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
+     * @custom:reverts If attempting to add zero liquidity.
      */
     function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
         (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity, ) = Instructions
             .decodeAddLiquidity(data[1:]);
         poolId = poolId_;
 
+        if (delLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = _curves[uint32(poolId_)];
         HyperSlot memory slot = _slots[loTick];
         HyperPool memory pool = _pools[poolId_];
         uint256 timestamp = _blockTimestamp();
+
+        // Get lower price bound using the loTick index.
         uint256 price = _computePriceGivenTickIndex(loTick);
+        // Compute the current virtual reserves given the pool's lastPrice.
         uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
             pool.lastPrice,
             curve.strike,
             curve.sigma,
             curve.maturity - timestamp
         );
+        // Compute the real reserves given the lower price bound.
         uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
+        // If the real reserves are zero, then the tick is at the bounds and so we should use virtual reserves.
         if (deltaR2 == 0) deltaR2 = currentR2;
         else deltaR2 = currentR2.divWadDown(deltaR2);
         uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
@@ -44,6 +53,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         _increaseLiquidity(poolId_, loTick, hiTick, deltaR1, deltaR2, delLiquidity);
     }
 
+    /**
+        e^(ln(1.0001) * tickIndex) = price
+
+        ln(price) = ln(1.0001) * tickIndex
+
+        tickIndex = ln(price) / ln(1.0001)
+     */
     function _computePriceGivenTickIndex(int24 tickIndex) internal pure returns (uint256 price) {
         int256 tickWad = int256(tickIndex) * int256(FixedPointMathLib.WAD);
         price = uint256(FixedPointMathLib.powWad(1_0001e14, tickWad));
@@ -84,6 +100,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         );
         uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
         deltaR2 = currentR2.divWadDown(deltaR2);
+
         uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
         deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
         deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
