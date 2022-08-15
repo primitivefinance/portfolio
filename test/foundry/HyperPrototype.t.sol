@@ -223,7 +223,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(instantiated != change);
     }
 
-    function testA_LGlobalAssetIncrease() public {
+    function testA_LGlobalAssetIncreases() public {
         uint256 prevGlobal = _globalReserves[address(asset)];
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
@@ -238,7 +238,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(nextGlobal > prevGlobal, "reserves did not change");
     }
 
-    function testA_LGlobalQuoteIncrease() public {
+    function testA_LGlobalQuoteIncreases() public {
         uint256 prevGlobal = _globalReserves[address(quote)];
         int24 loTick = DEFAULT_TICK - 256; // Enough below to have quote.
         int24 hiTick = DEFAULT_TICK + 2;
@@ -251,6 +251,128 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         uint256 nextGlobal = _globalReserves[address(quote)];
         assertTrue(nextGlobal != 0, "next reserves is zero");
         assertTrue(nextGlobal > prevGlobal, "reserves did not change");
+    }
+
+    // --- Remove Liquidity --- //
+
+    function testFailR_LZeroLiquidityReverts() public {
+        bytes memory data = Instructions.encodeRemoveLiquidity(0, __poolId, 1, 1, 0x00, 0x00);
+        bool success = forwarder.pass(data);
+        assertTrue(!success);
+    }
+
+    function testFailR_LNonExistentPoolReverts() public {
+        bytes memory data = Instructions.encodeRemoveLiquidity(0, 42, 1, 1, 0x01, 0x01);
+        bool success = forwarder.pass(data);
+        assertTrue(!success);
+    }
+
+    function testR_LLowTickLiquidityDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 prev = _slots[lo].totalLiquidity;
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        uint256 next = _slots[lo].totalLiquidity;
+        assertTrue(next < prev);
+    }
+
+    function testR_LHighTickLiquidityDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 prev = _slots[hi].totalLiquidity;
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        uint256 next = _slots[hi].totalLiquidity;
+        assertTrue(next < prev);
+    }
+
+    function testR_LLowTickInstantiatedChanges() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        bool prev = _slots[lo].instantiated;
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        bool next = _slots[lo].instantiated;
+        assertTrue(next != prev);
+    }
+
+    function testR_LHighTickInstantiatedChanges() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        bool prev = _slots[hi].instantiated;
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        bool next = _slots[hi].instantiated;
+        assertTrue(next != prev);
+    }
+
+    function testR_LGlobalAssetDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 prev = _globalReserves[address(asset)];
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        uint256 next = _globalReserves[address(asset)];
+        assertTrue(next < prev, "reserves did not change");
+    }
+
+    function testR_LGlobalQuoteDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 prev = _globalReserves[address(quote)];
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        uint256 next = _globalReserves[address(quote)];
+        assertTrue(next < prev, "reserves did not change");
     }
 
     // --- Create Pair --- //

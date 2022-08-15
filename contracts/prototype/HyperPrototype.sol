@@ -81,7 +81,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         )
     {
         (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Instructions
-            .decodeRemoveLiquidity(data);
+            .decodeRemoveLiquidity(data[1:]); // Trims Enigma Instruction Code.
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
@@ -98,8 +98,10 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             curve.sigma,
             curve.maturity - timestamp
         );
+
         uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
-        deltaR2 = currentR2.divWadDown(deltaR2);
+        if (deltaR2 == 0) deltaR2 = currentR2;
+        else deltaR2 = currentR2.divWadDown(deltaR2);
 
         uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
         deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
@@ -117,8 +119,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         Pair memory pair = _pairs[pairId];
-        _decreaseGlobal(pair.tokenBase, deltaR1);
-        _decreaseGlobal(pair.tokenQuote, deltaR2);
+        _decreaseGlobal(pair.tokenBase, deltaR2);
+        _decreaseGlobal(pair.tokenQuote, deltaR1);
 
         emit RemoveLiquidity(poolId_, pairId, deltaR1, deltaR2, deltaLiquidity);
     }
@@ -164,7 +166,6 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     ) internal view returns (uint256 R1) {
         uint256 tau = maturity - _blockTimestamp();
         R1 = Invariant.getY(R2, strike, sigma, tau, 0); // todo: add non-zero invariant
-        console.log(R2, strike, tau, R1);
         // todo: add hiTick range
         //R1 = R1.mulWadDown(price); // Multiplies price to calibrate to the price specified.
     }
@@ -200,9 +201,9 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         HyperSlot storage slot = _slots[tickIndex];
 
         uint256 prevLiquidity = slot.totalLiquidity;
-        uint256 nextLiquidity = slot.totalLiquidity + deltaLiquidity;
+        uint256 nextLiquidity = slot.totalLiquidity - deltaLiquidity;
 
-        alterState = !((prevLiquidity != 0) && (nextLiquidity == 0)); // If there was liquidity previously and all of it was removed.
+        alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0); // If there was liquidity previously and all of it was removed.
 
         slot.totalLiquidity = nextLiquidity;
         if (alterState) slot.instantiated = !slot.instantiated;

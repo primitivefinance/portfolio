@@ -59,6 +59,17 @@ library Instructions {
         data = abi.encodePacked(ADD_LIQUIDITY, useMax, poolId, loTick, hiTick, power, amount);
     }
 
+    function encodeRemoveLiquidity(
+        uint8 useMax,
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint8 power,
+        uint8 amount
+    ) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(REMOVE_LIQUIDITY, useMax, poolId, loTick, hiTick, power, amount);
+    }
+
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
     /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
