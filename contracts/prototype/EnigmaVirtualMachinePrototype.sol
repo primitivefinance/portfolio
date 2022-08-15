@@ -135,7 +135,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     // --- State --- //
     /// @dev Tick index -> Info of the price slot.
-    mapping(int24 => HyperSlot) internal _slots;
+    mapping(uint48 => mapping(int24 => HyperSlot)) internal _slots;
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) internal _pairs;
     /// @dev Pool id -> HyperPool Data Structure.

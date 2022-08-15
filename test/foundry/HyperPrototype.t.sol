@@ -128,7 +128,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     // --- Helpers --- //
 
     function getTickLiquidity(int24 tick) public view returns (uint256) {
-        return _slots[tick].totalLiquidity;
+        return _slots[__poolId][tick].totalLiquidity;
     }
 
     // --- Add liquidity --- //
@@ -199,27 +199,27 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     function testA_LLowTickInstantiatedChange() public {
         int24 tick = DEFAULT_TICK;
-        bool instantiated = _slots[tick].instantiated;
+        bool instantiated = _slots[__poolId][tick].instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, tick, tick + 2, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bool change = _slots[tick].instantiated;
+        bool change = _slots[__poolId][tick].instantiated;
         assertTrue(instantiated != change);
     }
 
     function testA_LHighTickInstantiatedChange() public {
         int24 tick = DEFAULT_TICK;
-        bool instantiated = _slots[tick].instantiated;
+        bool instantiated = _slots[__poolId][tick].instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, tick - 2, tick, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bool change = _slots[tick].instantiated;
+        bool change = _slots[__poolId][tick].instantiated;
         assertTrue(instantiated != change);
     }
 
@@ -276,12 +276,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = _slots[lo].totalLiquidity;
+        uint256 prev = _slots[__poolId][lo].totalLiquidity;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = _slots[lo].totalLiquidity;
+        uint256 next = _slots[__poolId][lo].totalLiquidity;
         assertTrue(next < prev);
     }
 
@@ -294,12 +294,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = _slots[hi].totalLiquidity;
+        uint256 prev = _slots[__poolId][hi].totalLiquidity;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = _slots[hi].totalLiquidity;
+        uint256 next = _slots[__poolId][hi].totalLiquidity;
         assertTrue(next < prev);
     }
 
@@ -312,12 +312,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        bool prev = _slots[lo].instantiated;
+        bool prev = _slots[__poolId][lo].instantiated;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        bool next = _slots[lo].instantiated;
+        bool next = _slots[__poolId][lo].instantiated;
         assertTrue(next != prev);
     }
 
@@ -330,12 +330,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        bool prev = _slots[hi].instantiated;
+        bool prev = _slots[__poolId][hi].instantiated;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        bool next = _slots[hi].instantiated;
+        bool next = _slots[__poolId][hi].instantiated;
         assertTrue(next != prev);
     }
 

@@ -28,7 +28,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = _curves[uint32(poolId_)];
-        HyperSlot memory slot = _slots[loTick];
+        HyperSlot memory slot = _slots[poolId_][loTick];
         HyperPool memory pool = _pools[poolId_];
         uint256 timestamp = _blockTimestamp();
 
@@ -88,7 +88,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = _curves[uint32(poolId_)];
-        HyperSlot memory slot = _slots[loTick];
+        HyperSlot memory slot = _slots[poolId_][loTick];
         HyperPool memory pool = _pools[poolId_];
         uint256 timestamp = _blockTimestamp();
         uint256 price = _computePriceGivenTickIndex(loTick);
@@ -108,8 +108,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
 
         // Decrease amount of liquidity in each tick.
-        _decreaseSlotLiquidity(loTick, deltaLiquidity, false);
-        _decreaseSlotLiquidity(hiTick, deltaLiquidity, true);
+        _decreaseSlotLiquidity(poolId_, loTick, deltaLiquidity, false);
+        _decreaseSlotLiquidity(poolId_, hiTick, deltaLiquidity, true);
 
         // Todo: delete any slots if uninstantiated.
 
@@ -136,8 +136,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
 
         // Update the slots.
-        _increaseSlotLiquidity(loTick, deltaLiquidity, false);
-        _increaseSlotLiquidity(hiTick, deltaLiquidity, true);
+        _increaseSlotLiquidity(poolId, loTick, deltaLiquidity, false);
+        _increaseSlotLiquidity(poolId, hiTick, deltaLiquidity, true);
 
         // Todo: update bitmap of instantiated slots.
 
@@ -174,11 +174,12 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      * @notice Updates the liquidity of a slot, and returns a bool to reflect whether its instantiation state was changed.
      */
     function _increaseSlotLiquidity(
+        uint48 poolId,
         int24 tickIndex,
         uint256 deltaLiquidity,
         bool hi
     ) internal returns (bool alterState) {
-        HyperSlot storage slot = _slots[tickIndex];
+        HyperSlot storage slot = _slots[poolId][tickIndex];
 
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = slot.totalLiquidity + deltaLiquidity;
@@ -194,11 +195,12 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      * @notice Updates the liquidity of a slot, and returns a bool to reflect whether its instantiation state was changed.
      */
     function _decreaseSlotLiquidity(
+        uint48 poolId,
         int24 tickIndex,
         uint256 deltaLiquidity,
         bool hi
     ) internal returns (bool alterState) {
-        HyperSlot storage slot = _slots[tickIndex];
+        HyperSlot storage slot = _slots[poolId][tickIndex];
 
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = slot.totalLiquidity - deltaLiquidity;
