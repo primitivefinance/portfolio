@@ -77,9 +77,10 @@ interface IEnigmaDataStructures {
      * @notice Information of a tick at a tickIndex.
      */
     struct HyperSlot {
-        uint256 liquidityDelta;
+        int256 liquidityDelta;
         uint256 totalLiquidity;
         uint256 externalFeeGrowth;
         bool instantiated;
+        uint256 timestamp;
     }
 }
