@@ -388,7 +388,10 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         slot.totalLiquidity = nextLiquidity;
         if (alterState) slot.instantiated = !slot.instantiated;
-        // todo: apply the liquidity delta depending on tick positioning in range.
+
+        // If a tick is exited and is on the upper bound of the range, there is a "loss" of liquidity to the next tick.
+        if (hi) slot.liquidityDelta -= int256(deltaLiquidity);
+        else slot.liquidityDelta += int256(deltaLiquidity);
     }
 
     /**
@@ -409,7 +412,10 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         slot.totalLiquidity = nextLiquidity;
         if (alterState) slot.instantiated = !slot.instantiated;
-        // todo: apply the liquidity delta depending on tick positioning in range.
+
+        // Update liquidity deltas depending on the changed amount.
+        if (hi) slot.liquidityDelta += int256(deltaLiquidity);
+        else slot.liquidityDelta -= int256(deltaLiquidity);
     }
 
     error ZeroPairId();

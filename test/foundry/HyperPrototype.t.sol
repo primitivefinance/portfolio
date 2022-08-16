@@ -131,6 +131,10 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         return _slots[__poolId][tick].totalLiquidity;
     }
 
+    function getSlotLiquidityDelta(int24 slot) public view returns (int256) {
+        return _slots[__poolId][slot].liquidityDelta;
+    }
+
     // --- Add liquidity --- //
 
     function testFailA_LNonExistentPoolIdReverts() public {
@@ -169,6 +173,32 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(globalR1 > 0);
         assertTrue(globalR2 > 0);
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
+    }
+
+    function testA_LLowTickLiquidityDeltaIncrease() public {
+        int24 loTick = DEFAULT_TICK;
+        int24 hiTick = DEFAULT_TICK + 2;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        int256 liquidityDelta = getSlotLiquidityDelta(loTick);
+        assertTrue(liquidityDelta > 0);
+    }
+
+    function testA_LHighTickLiquidityDeltaDecrease() public {
+        int24 loTick = DEFAULT_TICK;
+        int24 hiTick = DEFAULT_TICK + 2;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        int256 liquidityDelta = getSlotLiquidityDelta(hiTick);
+        assertTrue(liquidityDelta < 0);
     }
 
     function testA_LLowTickLiquidityIncrease() public {
@@ -301,6 +331,42 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         uint256 next = _slots[__poolId][hi].totalLiquidity;
         assertTrue(next < prev);
+    }
+
+    function testR_LLowTickLiquidityDeltaDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 prev = getSlotLiquidityDelta(lo);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        int256 next = getSlotLiquidityDelta(lo);
+        assertTrue(next < prev);
+    }
+
+    function testR_LHighTickLiquidityDeltaIncreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 prev = getSlotLiquidityDelta(hi);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        int256 next = getSlotLiquidityDelta(hi);
+        assertTrue(next > prev);
     }
 
     function testR_LLowTickInstantiatedChanges() public {
