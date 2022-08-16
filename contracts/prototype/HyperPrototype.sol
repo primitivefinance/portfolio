@@ -11,7 +11,207 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
-    function _swapExactForExact(bytes calldata data) internal returns (uint48 poolId, uint256 a) {}
+    /**
+     * @notice Temporary variables used in the order filling loop.
+     * @param tick Current tick being swapped at this step.
+     * @param price Current price this swap is at.
+     * @param remainder Order amount to be filled.
+     * @param liquidity Pool total liquidity.
+     * @param input Total input amount.
+     * @param output Total output amount.
+     */
+    struct Iteration {
+        int24 tick;
+        uint256 price;
+        uint256 remainder;
+        uint256 liquidity;
+        uint256 input;
+        uint256 output;
+    }
+
+    /**
+     * @notice Specific pool info used to reference for swaps.
+     */
+    struct Transient {
+        uint48 poolId;
+        uint256 tau;
+        uint256 sigma;
+        uint256 gamma;
+        uint256 strike;
+        uint256 maturity;
+    }
+
+    Transient internal transient;
+
+    struct Order {
+        uint8 useMax;
+        uint48 poolId;
+        uint128 input;
+        uint128 limit;
+        uint8 direction;
+    }
+
+    function _swapExactForExact(bytes calldata data) internal returns (uint48 poolId, uint256 remainder) {
+        Order memory args;
+        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data[1:]);
+
+        if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
+
+        // Store the pool transiently, then delete after the swap.
+        Curve memory curve = _curves[uint32(args.poolId)];
+        transient = Transient({
+            poolId: args.poolId,
+            gamma: curve.gamma,
+            strike: curve.strike,
+            sigma: curve.sigma,
+            maturity: curve.maturity,
+            tau: curve.maturity - _blockTimestamp()
+        });
+
+        // Pool is used to fetch information and eventually have its state updated.
+        HyperPool storage pool = _pools[args.poolId];
+
+        // Get the variables for first iteration of the swap.
+        Iteration memory swap;
+        {
+            uint256 tau = curve.maturity - pool.blockTimestamp;
+            uint256 deltaTau = _blockTimestamp() - pool.blockTimestamp;
+
+            // Price is changing over time, so this is the actual price which swaps begin at.
+            uint256 livePrice = HyperSwapLib.computePriceWithChangeInTau(
+                curve.strike,
+                curve.sigma,
+                pool.lastPrice,
+                tau,
+                deltaTau
+            );
+            int24 liveTick = _computeTickIndexGivenPrice(livePrice);
+
+            swap = Iteration({
+                price: livePrice,
+                tick: liveTick,
+                remainder: args.input,
+                liquidity: pool.liquidity,
+                input: 0,
+                output: 0
+            });
+        }
+
+        // ----- Effects ----- //
+
+        // --- Warning: loop --- //
+        // Loops until a condition is met:
+        // 1. Order is filled.
+        // 2. Limit price is met.
+        do {
+            // Get the current and next tick info, along with current real reserves.
+            uint256 liveReserve = computeR2WithPriceTransient(swap.price);
+
+            // Use the next price to compute the max input of tokens to get to the next price.
+            int24 nextTick = swap.tick + TICK_SIZE;
+            uint256 nextPrice = _computePriceGivenTickIndex(nextTick);
+            uint256 nextReserve = computeR2WithPriceTransient(nextPrice);
+
+            // Get the max amount that can be filled for a max distance swap.
+            uint256 maxInput = (nextReserve - liveReserve).mulWadDown(swap.liquidity);
+
+            uint256 delta;
+            uint256 nextOtherReserve;
+            uint256 otherReserve = computeR1WithPriceTransient(swap.price);
+
+            // If we can't fill it, set the next price to swap at and reduce the remainder to fill.
+            if (swap.remainder >= maxInput) {
+                // Compute the amount in with respect to liquidity of this slot.
+                delta = maxInput; // Swap the most in. todo: making sure using liquidity as a multiplier works.
+                // Update the liquidity.
+                int256 liquidityDelta = transitionSlot(args.poolId, swap.tick);
+                if (liquidityDelta > 0) swap.liquidity += uint256(liquidityDelta);
+                else swap.liquidity -= uint256(liquidityDelta);
+                swap.tick = nextTick; // Set the next tick.
+                swap.price = nextPrice; // Set the next price according to the next tick.
+                swap.remainder -= delta; // Reduce the remainder of the order to fill.
+                swap.input += delta; // Add to the total input of the swap.
+                nextOtherReserve = computeR1WithR2Transient(liveReserve); // Compute other reserve to compute output amount.
+                swap.output += otherReserve - nextOtherReserve;
+            } else {
+                swap.price = computePriceWithInput(transient.poolId, swap.price, swap.remainder); // Compute new price given the input.
+                swap.input += swap.remainder; // Add the full amount remaining to the toal.
+                nextOtherReserve = computeR1WithR2Transient(liveReserve + swap.remainder); // Compute the other reserve to compute output amount.
+                swap.output += otherReserve - nextOtherReserve;
+                swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
+            }
+        } while (swap.remainder != 0 || args.limit > swap.price);
+
+        // Update Pool State Effects
+        transitionPool(pool, swap.tick, swap.price, swap.liquidity);
+
+        // Update Global Balance Effects
+        Pair memory pair = _pairs[uint16(transient.poolId >> 32)];
+        _increaseGlobal(pair.tokenBase, swap.input);
+        _decreaseGlobal(pair.tokenQuote, swap.output);
+
+        // Reset transient state.
+        delete transient;
+
+        emit Swap(args.poolId, swap.input, swap.output, pair.tokenBase, pair.tokenQuote);
+    }
+
+    /**
+     * @notice Effects on a Pool after a successful swap order has been filled.
+     */
+    function transitionPool(
+        HyperPool storage pool,
+        int24 tick,
+        uint256 price,
+        uint256 liquidity
+    ) internal returns (uint256 timeDelta) {
+        if (pool.lastPrice != price) pool.lastPrice = price;
+        if (pool.lastTick != tick) pool.lastTick = tick;
+        if (pool.liquidity != liquidity) pool.liquidity = liquidity;
+
+        uint256 timestamp = _blockTimestamp();
+        timeDelta = timestamp - pool.blockTimestamp;
+        pool.blockTimestamp = timestamp;
+    }
+
+    /**
+     * @notice Effects on a slot after its been transitioned to another slot.
+     */
+    function transitionSlot(uint48 poolId, int24 tick) internal returns (int256) {
+        HyperSlot storage slot = _slots[poolId][tick];
+        slot.timestamp = _blockTimestamp();
+        return slot.liquidityDelta;
+    }
+
+    function computeR1WithPriceTransient(uint256 price) internal view returns (uint256 R1) {
+        R1 = HyperSwapLib.computeR1WithPrice(price, transient.strike, transient.sigma, transient.tau);
+    }
+
+    function computeR2WithPriceTransient(uint256 price) internal view returns (uint256 R2) {
+        R2 = HyperSwapLib.computeR2WithPrice(price, transient.strike, transient.sigma, transient.tau);
+    }
+
+    function computeR1WithR2Transient(uint256 R1) internal view returns (uint256 R2) {
+        R2 = computeR1GivenR2(R1, transient.strike, transient.sigma, transient.maturity, 0);
+    }
+
+    int24 public constant TICK_SIZE = 2;
+
+    /**
+     * @notice Computes a price given a change in the respective reserve.
+     * custom:math Maybe? P_b = P_a e^{Φ^-1(amount)}
+     */
+    function computePriceWithInput(
+        uint48 poolId,
+        uint256 lastPrice,
+        uint256 swapAmount
+    ) public view returns (uint256 price) {
+        Curve memory curve = _curves[uint32(poolId)];
+        uint256 tau = curve.maturity - _blockTimestamp();
+        uint256 lastReserve = HyperSwapLib.computeR2WithPrice(lastPrice, curve.strike, curve.sigma, tau);
+        uint256 nextReserve = lastReserve + swapAmount;
+        price = HyperSwapLib.computePriceWithR2(nextReserve, curve.strike, curve.sigma, tau);
+    }
 
     /**
      * @notice Enigma method to add liquidity to a range of prices in a pool.

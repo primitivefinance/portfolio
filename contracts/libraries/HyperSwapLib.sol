@@ -11,8 +11,64 @@ library HyperSwapLib {
     using FixedPointMathLib for int256;
 
     uint256 public constant UNIT_WAD = 1e18;
+    uint256 public constant UNIT_DOUBLE_WAD = 2e18;
+    uint256 public constant SQRT_WAD = 1e9;
     uint256 public constant UNIT_YEAR = 31556953;
     uint256 public constant UNIT_PERCENT = 1e4;
+
+    struct Params {
+        uint256 strike;
+        uint256 sigma;
+        uint256 tau;
+    }
+
+    /**
+     * P(τ - ε) = ( P(τ)^(√(1 - ε/τ)) / K^2 )e^((1/2)(t^2)(√(τ)√(τ- ε) - (τ - ε)))
+     */
+    function computePriceWithChangeInTau(
+        uint256 stk,
+        uint256 vol,
+        uint256 prc,
+        uint256 tau,
+        uint256 epsilon
+    ) public view returns (uint256) {
+        Params memory params = Params(stk, vol, tau);
+
+        uint256 tauYears;
+        assembly {
+            tauYears := sdiv(mul(tau, UNIT_WAD), UNIT_YEAR) // tau * WAD / year = time in years scaled to WAD
+        }
+
+        uint256 epsilonYears;
+        assembly {
+            epsilonYears := sdiv(mul(epsilon, UNIT_WAD), UNIT_YEAR) // epsilon * WAD / year = epsilon in years scaled to WAD
+        }
+
+        uint256 term_0 = UNIT_WAD - (epsilonYears.divWadUp(tauYears)); // WAD - ((epsilon * WAD) / tau rounded down), units are WAD - WAD, time units cancel out
+        uint256 term_1 = term_0.sqrt(); // this sqrts WAD, so we end up with SQRT_WAD units
+
+        uint256 term_2 = prc.divWadUp(params.strike); // p(t) / K, both units are already WAD
+        uint256 term_3 = uint256(int256(term_2).powWad(int256(term_1 * SQRT_WAD)));
+
+        // -- other section -- //
+
+        uint256 term_7;
+        {
+            uint256 currentTau = tauYears - epsilonYears; // WAD - WAD = WAD
+            uint256 tausSqrt = tauYears.sqrt() * (currentTau).sqrt(); // sqrt(1e18) = 1e9, so 1e9 * 1e9 = 1e18
+            uint256 term_4 = tausSqrt - currentTau; // WAD - WAD = WAD
+
+            uint256 sigmaWad = (uint256(params.sigma) * UNIT_WAD) / 1e4;
+
+            uint256 term_5 = (sigmaWad * sigmaWad) / UNIT_DOUBLE_WAD; // 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
+
+            uint256 term_6 = uint256((int256(term_5.mulWadDown(term_4))).expWad()); // exp(WAD * WAD / WAD)
+            term_7 = uint256(params.strike).mulWadDown(term_6); // WAD * WAD / WAD
+        }
+
+        uint256 price = term_3.mulWadDown(term_7); // WAD * WAD / WAD = WAD
+        return price;
+    }
 
     /**
      * @custom:math
