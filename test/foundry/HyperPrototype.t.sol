@@ -333,6 +333,42 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next < prev);
     }
 
+    function testR_LLowTickLiquidityDeltaDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 prev = getSlotLiquidityDelta(lo);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        int256 next = getSlotLiquidityDelta(lo);
+        assertTrue(next < prev);
+    }
+
+    function testR_LHighTickLiquidityDeltaIncreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 prev = getSlotLiquidityDelta(hi);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+
+        int256 next = getSlotLiquidityDelta(hi);
+        assertTrue(next > prev);
+    }
+
     function testR_LLowTickInstantiatedChanges() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
