@@ -135,6 +135,62 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         return _slots[__poolId][slot].liquidityDelta;
     }
 
+    // --- Swap --- //
+
+    function testFailS_wNonExistentPoolIdReverts() public {
+        bytes memory data = Instructions.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
+        bool success = forwarder.pass(data);
+        assertTrue(!success);
+    }
+
+    function testFailS_wZeroSwapAmountReverts() public {
+        bytes memory data = Instructions.encodeSwap(0, __poolId, 0x01, 0x00, 0x01, 0x01, 0);
+        bool success = forwarder.pass(data);
+        assertTrue(!success);
+    }
+
+    /// @dev this ones tough... how do we know what tick was swapped in?
+    function testS_wSlotTimestampUpdatedWithSlotTransition() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _slots[__poolId][23028].timestamp; // todo: fix, I know this tick from console.log.
+
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _slots[__poolId][23028].timestamp;
+        assertTrue(next != prev);
+    }
+
+    function testS_wPoolPriceUpdated() public {}
+
+    function testS_wPoolSlotIndexUpdated() public {}
+
+    function testS_wPoolLiquidityUpdated() public {}
+
+    function testS_wPoolTimestampUpdated() public {}
+
+    function testS_wGlobalAssetBalanceIncreases() public {}
+
+    function testS_wGlobalQuoteBalanceDecreases() public {}
+
+    function testS_wTransientStateReturnsZeroAfterSwap() public {}
+
     // --- Add liquidity --- //
 
     function testFailA_LNonExistentPoolIdReverts() public {
