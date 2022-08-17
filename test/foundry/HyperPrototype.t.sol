@@ -177,19 +177,183 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next != prev);
     }
 
-    function testS_wPoolPriceUpdated() public {}
+    function testS_wPoolPriceUpdated() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
 
-    function testS_wPoolSlotIndexUpdated() public {}
+        uint256 prev = _pools[__poolId].lastPrice; // todo: fix, I know this tick from console.log.
 
-    function testS_wPoolLiquidityUpdated() public {}
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
 
-    function testS_wPoolTimestampUpdated() public {}
+        uint256 next = _pools[__poolId].lastPrice;
+        assertTrue(next != prev);
+    }
 
-    function testS_wGlobalAssetBalanceIncreases() public {}
+    function testS_wPoolSlotIndexUpdated() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
 
-    function testS_wGlobalQuoteBalanceDecreases() public {}
+        int256 prev = _pools[__poolId].lastTick; // todo: fix, I know this tick from console.log.
 
-    function testS_wTransientStateReturnsZeroAfterSwap() public {}
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 next = _pools[__poolId].lastTick;
+        assertTrue(next != prev);
+    }
+
+    function testS_wPoolLiquidityUnchanged() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+        uint256 prev = _pools[__poolId].liquidity; // todo: fix, I know this tick from console.log.
+
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _pools[__poolId].liquidity;
+        assertTrue(next == prev);
+    }
+
+    function testS_wPoolTimestampUpdated() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _pools[__poolId].blockTimestamp; // todo: fix, I know this tick from console.log.
+
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _pools[__poolId].blockTimestamp;
+        assertTrue(next != prev);
+    }
+
+    function testS_wGlobalAssetBalanceIncreases() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _globalReserves[address(asset)]; // todo: fix, I know this tick from console.log.
+
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _globalReserves[address(asset)];
+        assertTrue(next > prev);
+    }
+
+    function testS_wGlobalQuoteBalanceDecreases() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _globalReserves[address(quote)]; // todo: fix, I know this tick from console.log.
+
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _globalReserves[address(quote)];
+        assertTrue(next < prev);
+    }
+
+    function testS_wTransientStateReturnsZeroAfterSwap() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        // need to swap a large amount so we cross ticks. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        assertTrue(transient.poolId == 0);
+    }
 
     // --- Add liquidity --- //
 
