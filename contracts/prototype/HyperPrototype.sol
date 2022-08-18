@@ -90,7 +90,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 tau,
                 deltaTau
             );
-            int24 liveTick = _computeTickIndexGivenPrice(livePrice);
+            int24 liveTick = _computeTickGivenPrice(livePrice);
             int24 tick;
             if (
                 _isBetween(
@@ -131,13 +131,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             console.log("Iteration start price: ", swap.price);
             console.log("Iteration start liquidity: ", swap.liquidity);
             console.log("Iteration start remainder: ", swap.remainder);
-            // Get the current and next tick info, along with current real reserves.
+            // Get the current and next slot info, along with current real reserves.
             uint256 liveReserve = computeR2WithPriceTransient(swap.price);
 
             // Use the next price to compute the max input of tokens to get to the next price.
             // Next price is lower, because we are increasing reserves of the asset.
             int24 nextTick = swap.tick - TICK_SIZE;
-            uint256 nextPrice = _computePriceGivenTickIndex(nextTick);
+            uint256 nextPrice = _computePriceGivenTick(nextTick);
             uint256 nextReserve = computeR2WithPriceTransient(nextPrice);
 
             // Get the max amount that can be filled for a max distance swap.
@@ -156,8 +156,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 int256 liquidityDelta = transitionSlot(args.poolId, swap.tick);
                 if (liquidityDelta > 0) swap.liquidity += uint256(liquidityDelta);
                 else swap.liquidity -= uint256(liquidityDelta);
-                swap.tick = nextTick; // Set the next tick.
-                swap.price = nextPrice; // Set the next price according to the next tick.
+                swap.tick = nextTick; // Set the next slot.
+                swap.price = nextPrice; // Set the next price according to the next slot.
                 swap.remainder -= delta; // Reduce the remainder of the order to fill.
                 swap.input += delta; // Add to the total input of the swap.
                 nextOtherReserve = computeR1WithR2Transient(liveReserve); // Compute other reserve to compute output amount.
@@ -219,15 +219,15 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     /**
      * @notice Effects on a slot after its been transitioned to another slot.
      */
-    function transitionSlot(uint48 poolId, int24 slotIndex) internal returns (int256) {
-        HyperSlot storage slot = _slots[poolId][slotIndex];
+    function transitionSlot(uint48 poolId, int24 tick) internal returns (int256) {
+        HyperSlot storage slot = _slots[poolId][tick];
         console.log("transitioning", _blockTimestamp());
         slot.timestamp = _blockTimestamp();
-        emit SlotTransition(poolId, slotIndex, slot.liquidityDelta);
+        emit SlotTransition(poolId, tick, slot.liquidityDelta);
         return slot.liquidityDelta;
     }
 
-    event SlotTransition(uint48 indexed poolId, int24 indexed slot, int256 liquidityDelta);
+    event SlotTransition(uint48 indexed poolId, int24 indexed tick, int256 liquidityDelta);
 
     function computeR1WithPriceTransient(uint256 price) internal view returns (uint256 R1) {
         R1 = HyperSwapLib.computeR1WithPrice(price, transient.strike, transient.sigma, transient.tau);
@@ -283,7 +283,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         uint256 timestamp = _blockTimestamp();
 
         // Get lower price bound using the loTick index.
-        uint256 price = _computePriceGivenTickIndex(loTick);
+        uint256 price = _computePriceGivenTick(loTick);
         // Compute the current virtual reserves given the pool's lastPrice.
         uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
             pool.lastPrice,
@@ -293,7 +293,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         );
         // Compute the real reserves given the lower price bound.
         uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
-        // If the real reserves are zero, then the tick is at the bounds and so we should use virtual reserves.
+        // If the real reserves are zero, then the slot is at the bounds and so we should use virtual reserves.
         if (deltaR2 == 0) deltaR2 = currentR2;
         else deltaR2 = currentR2.divWadDown(deltaR2);
         uint256 deltaR1 = computeR1GivenR2(deltaR2, curve.strike, curve.sigma, curve.maturity, price); // todo: fix with using the hiTick.
@@ -304,18 +304,18 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     }
 
     /**
-        e^(ln(1.0001) * tickIndex) = price
+        e^(ln(1.0001) * tick) = price
 
-        ln(price) = ln(1.0001) * tickIndex
+        ln(price) = ln(1.0001) * tick
 
-        tickIndex = ln(price) / ln(1.0001)
+        tick = ln(price) / ln(1.0001)
      */
-    function _computePriceGivenTickIndex(int24 tickIndex) internal pure returns (uint256 price) {
-        int256 tickWad = int256(tickIndex) * int256(FixedPointMathLib.WAD);
+    function _computePriceGivenTick(int24 tick) internal pure returns (uint256 price) {
+        int256 tickWad = int256(tick) * int256(FixedPointMathLib.WAD);
         price = uint256(FixedPointMathLib.powWad(1_0001e14, tickWad));
     }
 
-    function _computeTickIndexGivenPrice(uint256 priceWad) internal pure returns (int24 tick) {
+    function _computeTickGivenPrice(uint256 priceWad) internal pure returns (int24 tick) {
         uint256 numerator = uint256(int256(priceWad).lnWad());
         uint256 denominator = uint256(int256(1_0001e14).lnWad());
         uint256 val = numerator / denominator + 1; // Values are in Fixed Point Q.96 format. Rounds up.
@@ -340,7 +340,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         Curve memory curve = _curves[uint32(poolId_)];
         HyperPool storage pool = _pools[poolId_];
         uint256 timestamp = _blockTimestamp();
-        uint256 price = _computePriceGivenTickIndex(loTick);
+        uint256 price = _computePriceGivenTick(loTick);
         uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
             pool.lastPrice,
             curve.strike,
@@ -356,7 +356,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
         deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
 
-        // Decrease amount of liquidity in each tick.
+        // Decrease amount of liquidity in each slot.
         _decreaseSlotLiquidity(poolId_, loTick, deltaLiquidity, false);
         _decreaseSlotLiquidity(poolId_, hiTick, deltaLiquidity, true);
 
@@ -418,7 +418,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     /**
      * @notice Computes the R1 reserve given the R2 reserve and a price.
      *
-     * @custom:math R1 / price(hiTickIndex) = tradingFunction(...)
+     * @custom:math R1 / price(hiSlotIndex) = tradingFunction(...)
      */
     function computeR1GivenR2(
         uint256 R2,
@@ -438,11 +438,11 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      */
     function _increaseSlotLiquidity(
         uint48 poolId,
-        int24 tickIndex,
+        int24 tick,
         uint256 deltaLiquidity,
         bool hi
     ) internal returns (bool alterState) {
-        HyperSlot storage slot = _slots[poolId][tickIndex];
+        HyperSlot storage slot = _slots[poolId][tick];
 
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = slot.totalLiquidity + deltaLiquidity;
@@ -452,7 +452,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         slot.totalLiquidity = nextLiquidity;
         if (alterState) slot.instantiated = !slot.instantiated;
 
-        // If a tick is exited and is on the upper bound of the range, there is a "loss" of liquidity to the next tick.
+        // If a slot is exited and is on the upper bound of the range, there is a "loss" of liquidity to the next slot.
         if (hi) slot.liquidityDelta -= int256(deltaLiquidity);
         else slot.liquidityDelta += int256(deltaLiquidity);
     }
@@ -462,11 +462,11 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      */
     function _decreaseSlotLiquidity(
         uint48 poolId,
-        int24 tickIndex,
+        int24 tick,
         uint256 deltaLiquidity,
         bool hi
     ) internal returns (bool alterState) {
-        HyperSlot storage slot = _slots[poolId][tickIndex];
+        HyperSlot storage slot = _slots[poolId][tick];
 
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = slot.totalLiquidity - deltaLiquidity;
@@ -520,7 +520,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // Write the pool to state with the desired price.
         _pools[poolId_] = HyperPool({
             lastPrice: price,
-            lastTick: _computeTickIndexGivenPrice(price), // todo: implement tick and price grid.
+            lastTick: _computeTickGivenPrice(price), // todo: implement slot and price grid.
             blockTimestamp: timestamp,
             liquidity: 0
         });
