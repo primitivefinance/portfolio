@@ -113,7 +113,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
             (poolId_, , ) = _removeLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
-            (poolId_, ) = _swapExactForExact(data);
+            (poolId_, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId_, , ) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
@@ -352,7 +352,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         success = forwarder.pass(data);
         assertTrue(success);
 
-        assertTrue(transient.poolId == 0);
+        assertTrue(_transient.poolId == 0);
     }
 
     // --- Add liquidity --- //

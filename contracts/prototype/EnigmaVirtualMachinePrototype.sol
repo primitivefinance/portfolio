@@ -158,6 +158,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     uint256 internal _pairNonce;
     /// @dev A value incremented by one on curve creation. Reduces calldata.
     uint256 internal _curveNonce;
+    /// @dev Distance between the location of prices on the price grid, so distance between price.
+    int24 public constant TICK_SIZE = 256;
     /// @dev Amount of seconds of available time to swap past maturity of a pool.
     uint256 internal constant BUFFER = 300;
     /// @dev Constant amount of basis points. All percentage values are integers in basis points.
