@@ -61,4 +61,6 @@ interface IEnigmaEvents {
     event Swap(uint256 id, uint256 input, uint256 output, address tokenIn, address tokenOut);
     /// @dev Emitted on external calls to `updateLastTimestamp` or `swap`. Syncs a pool's timestamp to block.timestamp.
     event UpdateLastTimestamp(uint48 poolId);
+    /// @dev Emitted when entering or exiting a slot when swapping.
+    event SlotTransition(uint48 indexed poolId, int24 indexed tick, int256 liquidityDelta);
 }

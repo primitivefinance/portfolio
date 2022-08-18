@@ -33,6 +33,10 @@ interface IEnigmaErrors {
     error SameTokenError();
     /// @dev Thrown if the amount of base tokens per liquidity is outside of the bounds 0 < x < 1.
     error PerLiquidityError(uint256 deltaBase);
+    /// @dev Thrown if pairId is zero.
+    error ZeroPairId();
+    /// @dev Thrown if curveId is zero.
+    error ZeroCurveId();
 
     // --- Validation --- //
     /// @dev Thrown when creating a pool that has one side of the pool have zero tokens.
