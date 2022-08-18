@@ -127,12 +127,232 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     // --- Helpers --- //
 
-    function getTickLiquidity(int24 tick) public view returns (uint256) {
-        return _slots[__poolId][tick].totalLiquidity;
+    function getSlotLiquidity(int24 slot) public view returns (uint256) {
+        return _slots[__poolId][slot].totalLiquidity;
     }
 
     function getSlotLiquidityDelta(int24 slot) public view returns (int256) {
         return _slots[__poolId][slot].liquidityDelta;
+    }
+
+    // --- Swap --- //
+
+    function testFailS_wNonExistentPoolIdReverts() public {
+        bytes memory data = Instructions.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
+        bool success = forwarder.pass(data);
+        assertTrue(!success);
+    }
+
+    function testFailS_wZeroSwapAmountReverts() public {
+        bytes memory data = Instructions.encodeSwap(0, __poolId, 0x01, 0x00, 0x01, 0x01, 0);
+        bool success = forwarder.pass(data);
+        assertTrue(!success);
+    }
+
+    /// @dev this ones tough... how do we know what slot was swapped in?
+    function testS_wSlotTimestampUpdatedWithSlotTransition() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _slots[__poolId][23028].timestamp; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _slots[__poolId][23028].timestamp;
+        assertTrue(next != prev);
+    }
+
+    function testS_wPoolPriceUpdated() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _pools[__poolId].lastPrice; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _pools[__poolId].lastPrice;
+        assertTrue(next != prev);
+    }
+
+    function testS_wPoolSlotIndexUpdated() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        int256 prev = _pools[__poolId].lastTick; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 next = _pools[__poolId].lastTick;
+        assertTrue(next != prev);
+    }
+
+    function testS_wPoolLiquidityUnchanged() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+        uint256 prev = _pools[__poolId].liquidity; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _pools[__poolId].liquidity;
+        assertTrue(next == prev);
+    }
+
+    function testS_wPoolTimestampUpdated() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _pools[__poolId].blockTimestamp; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _pools[__poolId].blockTimestamp;
+        assertTrue(next != prev);
+    }
+
+    function testS_wGlobalAssetBalanceIncreases() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _globalReserves[address(asset)]; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _globalReserves[address(asset)];
+        assertTrue(next > prev);
+    }
+
+    function testS_wGlobalQuoteBalanceDecreases() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = _globalReserves[address(quote)]; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = _globalReserves[address(quote)];
+        assertTrue(next < prev);
+    }
+
+    function testS_wTransientStateReturnsZeroAfterSwap() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        assertTrue(transient.poolId == 0);
     }
 
     // --- Add liquidity --- //
@@ -175,7 +395,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
-    function testA_LLowTickLiquidityDeltaIncrease() public {
+    function testA_LLowSlotLiquidityDeltaIncrease() public {
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -188,7 +408,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(liquidityDelta > 0);
     }
 
-    function testA_LHighTickLiquidityDeltaDecrease() public {
+    function testA_LHighSlotLiquidityDeltaDecrease() public {
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -201,7 +421,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(liquidityDelta < 0);
     }
 
-    function testA_LLowTickLiquidityIncrease() public {
+    function testA_LLowSlotLiquidityIncrease() public {
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -210,11 +430,11 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 liquidity = getTickLiquidity(loTick);
+        uint256 liquidity = getSlotLiquidity(loTick);
         assertEq(liquidity, 10);
     }
 
-    function testA_LHighTickLiquidityIncrease() public {
+    function testA_LHighSlotLiquidityIncrease() public {
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -223,33 +443,33 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 liquidity = getTickLiquidity(hiTick);
+        uint256 liquidity = getSlotLiquidity(hiTick);
         assertEq(liquidity, 10);
     }
 
-    function testA_LLowTickInstantiatedChange() public {
-        int24 tick = DEFAULT_TICK;
-        bool instantiated = _slots[__poolId][tick].instantiated;
+    function testA_LLowSlotInstantiatedChange() public {
+        int24 slot = DEFAULT_TICK;
+        bool instantiated = _slots[__poolId][slot].instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, tick, tick + 2, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, slot, slot + 2, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bool change = _slots[__poolId][tick].instantiated;
+        bool change = _slots[__poolId][slot].instantiated;
         assertTrue(instantiated != change);
     }
 
-    function testA_LHighTickInstantiatedChange() public {
-        int24 tick = DEFAULT_TICK;
-        bool instantiated = _slots[__poolId][tick].instantiated;
+    function testA_LHighSlotInstantiatedChange() public {
+        int24 slot = DEFAULT_TICK;
+        bool instantiated = _slots[__poolId][slot].instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, tick - 2, tick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, slot - 2, slot, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bool change = _slots[__poolId][tick].instantiated;
+        bool change = _slots[__poolId][slot].instantiated;
         assertTrue(instantiated != change);
     }
 
@@ -297,7 +517,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(!success);
     }
 
-    function testR_LLowTickLiquidityDecreases() public {
+    function testR_LLowSlotLiquidityDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -315,7 +535,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next < prev);
     }
 
-    function testR_LHighTickLiquidityDecreases() public {
+    function testR_LHighSlotLiquidityDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -333,7 +553,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next < prev);
     }
 
-    function testR_LLowTickLiquidityDeltaDecreases() public {
+    function testR_LLowSlotLiquidityDeltaDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -351,7 +571,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next < prev);
     }
 
-    function testR_LHighTickLiquidityDeltaIncreases() public {
+    function testR_LHighSlotLiquidityDeltaIncreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -369,7 +589,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next > prev);
     }
 
-    function testR_LLowTickInstantiatedChanges() public {
+    function testR_LLowSlotInstantiatedChanges() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -387,7 +607,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next != prev);
     }
 
-    function testR_LHighTickInstantiatedChanges() public {
+    function testR_LHighSlotInstantiatedChanges() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;

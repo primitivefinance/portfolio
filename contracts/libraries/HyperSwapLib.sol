@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 import "solstat/Gaussian.sol";
+import "forge-std/Test.sol";
 
 /**
  * @dev Comprehensive library to compute all related functions used with swaps.
@@ -15,6 +16,8 @@ library HyperSwapLib {
     uint256 public constant SQRT_WAD = 1e9;
     uint256 public constant UNIT_YEAR = 31556953;
     uint256 public constant UNIT_PERCENT = 1e4;
+
+    error OOB(uint256);
 
     struct Params {
         uint256 strike;
@@ -71,14 +74,30 @@ library HyperSwapLib {
     }
 
     /**
-     * @custom:math
+     * @custom:math R1 = KΦ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
     function computeR1WithPrice(
         uint256 prc,
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) internal pure returns (uint256 R1) {}
+    ) internal view returns (uint256 R1) {
+        // todo: handle price when above strike.
+        if (prc != 0) {
+            int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
+            uint256 tauYears = convertSecondsToWadYears(tau);
+
+            uint256 sigmaWad = convertPercentageToWad(vol);
+            uint256 doubleSigma = (sigmaWad * sigmaWad) / uint256(Gaussian.TWO);
+            uint256 halfSigmaTau = doubleSigma * tauYears; // todo: verify, might be Wad^2 ?
+            uint256 sqrtTauSigma = (tauYears.sqrt() * 1e9).mulWadDown(sigmaWad);
+
+            int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
+            int256 cdf = Gaussian.cdf(lnOverVol);
+            if (cdf > Gaussian.ONE) revert CdfErr(cdf);
+            R1 = stk.mulWadDown(uint256(cdf));
+        }
+    }
 
     // temp: remove with better error
     error CdfErr(int256 cdf);
@@ -100,7 +119,7 @@ library HyperSwapLib {
             uint256 sigmaWad = convertPercentageToWad(vol);
             uint256 doubleSigma = (sigmaWad * sigmaWad) / uint256(Gaussian.TWO);
             uint256 halfSigmaTau = doubleSigma * tauYears;
-            uint256 sqrtTauSigma = (tauYears.sqrt() * 1e9).mulWadDown(sigmaWad);
+            uint256 sqrtTauSigma = (tauYears.sqrt() * SQRT_WAD).mulWadDown(sigmaWad);
 
             int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
             int256 cdf = Gaussian.cdf(lnOverVol);
@@ -127,7 +146,24 @@ library HyperSwapLib {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) internal pure returns (uint256 prc) {}
+    ) internal view returns (uint256 prc) {
+        uint256 tauYears = convertSecondsToWadYears(tau);
+        uint256 volWad = convertPercentageToWad(vol);
+
+        if (uint256(Gaussian.ONE) < R2) revert CdfErr(int256(R2));
+        int256 input = Gaussian.ONE - int256(R2);
+        int256 ppf = Gaussian.ppf(input);
+        uint256 sqrtTauSigma = (tauYears.sqrt() * SQRT_WAD).mulWadDown(volWad);
+        int256 first = (ppf * int256(sqrtTauSigma)) / Gaussian.ONE; // Φ^-1(1 - R2)σ√τ
+        uint256 doubleSigma = (volWad * volWad) / uint256(Gaussian.TWO);
+        int256 halfSigmaTau = int256(doubleSigma * tauYears) / Gaussian.ONE; // 1/2σ^2τ
+
+        int256 exponent = first - halfSigmaTau;
+        console.logInt(exponent);
+        int256 exp = exponent.expWad();
+        console.logInt(exp);
+        prc = uint256(exp).mulWadDown(stk);
+    }
 
     // --- Utils --- //
 

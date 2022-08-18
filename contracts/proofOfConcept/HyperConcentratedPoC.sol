@@ -74,7 +74,7 @@ abstract contract HyperConcentratedPoC is EnigmaVirtualMachinePoc {
         Curve memory curve = curves[uint32(args.id)];
         uint256 tau = curve.maturity - info.lastTimestamp;
         uint256 timeDelta = _blockTimestamp() - grid[args.id].lastTimestamp;
-        // todo: handle double tick price crosses from theta
+        // todo: handle double slot price crosses from theta
         // Theoretical price at which swaps start at given the amount of time that has passed.
         args.livePrice = getLivePrice(args.id, args.lastPrice, tau, timeDelta);
 

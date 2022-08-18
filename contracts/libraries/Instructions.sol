@@ -70,6 +70,19 @@ library Instructions {
         data = abi.encodePacked(REMOVE_LIQUIDITY, useMax, poolId, loTick, hiTick, power, amount);
     }
 
+    function encodeSwap(
+        uint8 useMax,
+        uint48 poolId,
+        uint8 power0,
+        uint8 amount0,
+        uint8 power1,
+        uint8 amount1,
+        uint8 direction
+    ) internal returns (bytes memory data) {
+        uint8 pointer = 0x0a;
+        data = abi.encodePacked(SWAP, useMax, poolId, pointer, power0, amount0, power1, amount1, direction);
+    }
+
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
     /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
@@ -195,16 +208,16 @@ library Instructions {
         returns (
             uint8 useMax,
             uint48 poolId,
-            uint128 deltaIn,
-            uint128 deltaOut,
+            uint128 input,
+            uint128 limit,
             uint8 direction
         )
     {
         useMax = uint8(data[0] >> 4);
         poolId = uint48(bytes6(data[1:7]));
         uint8 pointer = uint8(data[7]);
-        deltaIn = uint128(Decoder.toAmount(data[8:pointer]));
-        deltaOut = uint128(Decoder.toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
+        input = uint128(Decoder.toAmount(data[8:pointer]));
+        limit = uint128(Decoder.toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
         direction = uint8(data[data.length - 1]);
     }
 }

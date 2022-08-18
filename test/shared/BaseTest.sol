@@ -122,7 +122,7 @@ contract StandardHelpers {
     uint128 public constant DEFAULT_R2_ASSET = 308537538726000000;
     uint128 public constant DEFAULT_LIQUIDITY = 1e18;
     uint128 public constant DEFAULT_PRICE = 10e18;
-    int24 public constant DEFAULT_TICK = int24(23027); // 10e18
+    int24 public constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
 }
 
 contract BaseTest is Test, StandardHelpers, FakeEnigmaAbstractOverrides {}

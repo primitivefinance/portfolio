@@ -59,4 +59,6 @@ interface IEnigmaErrors {
     // --- Swap --- //
     /// @dev Thrown if the effects of a swap put the pool in an invalid state according the the trading function.
     error InvariantError(int128 prev, int128 post);
+    /// @dev Thrown if zero swap amount in arguments.
+    error ZeroInput();
 }

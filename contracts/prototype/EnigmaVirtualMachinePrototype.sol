@@ -134,7 +134,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     }
 
     // --- State --- //
-    /// @dev Tick index -> Info of the price slot.
+    /// @dev Pool id -> Tick -> Slot has liquidity at a price.
     mapping(uint48 => mapping(int24 => HyperSlot)) internal _slots;
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) internal _pairs;
