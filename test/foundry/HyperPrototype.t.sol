@@ -92,7 +92,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         __poolId = Instructions.encodePoolId(pairId, curveId);
 
         // 4. Create pool
-        data = Instructions.encodeCreatePool(__poolId, DEFAULT_PRICE, DEFAULT_LIQUIDITY);
+        data = Instructions.encodeCreatePool(__poolId, DEFAULT_PRICE);
         success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -784,22 +784,22 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     // --- Create Pool --- //
 
     function testFailC_PoZeroPriceParameterReverts() public {
-        bytes memory data = Instructions.encodeCreatePool(1, 0, 1);
+        bytes memory data = Instructions.encodeCreatePool(1, 0);
         bool success = forwarder.pass(data);
     }
 
     function testFailC_PoExistentPoolReverts() public {
-        bytes memory data = Instructions.encodeCreatePool(__poolId, 1, 1);
+        bytes memory data = Instructions.encodeCreatePool(__poolId, 1);
         bool success = forwarder.pass(data);
     }
 
     function testFailC_PoZeroCurveIdReverts() public {
-        bytes memory data = Instructions.encodeCreatePool(0x010000, 1, 1);
+        bytes memory data = Instructions.encodeCreatePool(0x010000, 1);
         bool success = forwarder.pass(data);
     }
 
     function testFailC_PoZeroPairIdReverts() public {
-        bytes memory data = Instructions.encodeCreatePool(0x000001, 1, 1);
+        bytes memory data = Instructions.encodeCreatePool(0x000001, 1);
         bool success = forwarder.pass(data);
     }
 
@@ -819,7 +819,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         uint32 curveId = _getCurveIds[rawCurveId];
         uint48 id = Instructions.encodePoolId(pairId, curveId);
-        data = Instructions.encodeCreatePool(id, 1_000, 1_000);
+        data = Instructions.encodeCreatePool(id, 1_000);
         success = forwarder.pass(data);
     }
 
@@ -839,7 +839,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         uint32 curveId = _getCurveIds[rawCurveId];
         uint48 id = Instructions.encodePoolId(pairId, curveId);
-        data = Instructions.encodeCreatePool(id, 1_000, 1_000);
+        data = Instructions.encodeCreatePool(id, 1_000);
         success = forwarder.pass(data);
 
         uint256 time = _pools[id].blockTimestamp;

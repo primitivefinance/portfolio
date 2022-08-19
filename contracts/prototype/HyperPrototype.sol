@@ -94,7 +94,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         )
     {
         Order memory args;
-        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data[1:]);
+        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (args.input == 0) revert ZeroInput();
         if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
@@ -268,8 +268,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      * @custom:reverts If attempting to add zero liquidity.
      */
     function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity, ) = Instructions
-            .decodeAddLiquidity(data[1:]);
+        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity) = Instructions
+            .decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
 
         if (delLiquidity == 0) revert ZeroLiquidityError();
@@ -318,7 +318,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         )
     {
         (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Instructions
-            .decodeRemoveLiquidity(data[1:]); // Trims Enigma Instruction Code.
+            .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
