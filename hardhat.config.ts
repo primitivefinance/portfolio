@@ -1,19 +1,27 @@
 import * as dotenv from 'dotenv'
 
+import { subtask } from 'hardhat/config'
+import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/task-names'
 import { HardhatUserConfig } from 'hardhat/types'
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
-import '@nomiclabs/hardhat-waffle'
+import '@nomicfoundation/hardhat-chai-matchers'
 import '@primitivefi/hardhat-dodoc'
 import 'hardhat-gas-reporter'
 
 dotenv.config()
 
+subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, __, runSuper) => {
+  const paths = await runSuper()
+
+  return paths.filter((p) => !p.endsWith('PoC.sol'))
+})
+
 const config: HardhatUserConfig = {
   solidity: {
     compilers: [
       {
-        version: '0.8.10',
+        version: '0.8.13',
         settings: {
           viaIR: false,
           optimizer: {

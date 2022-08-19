@@ -176,4 +176,6 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     uint256 internal constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
     /// @dev Used as the first pointer for the jump process.
     uint8 internal constant JUMP_PROCESS_START_POINTER = 2;
+    uint8 internal constant MIN_DECIMALS = 6;
+    uint8 internal constant MAX_DECIMALS = 18;
 }
