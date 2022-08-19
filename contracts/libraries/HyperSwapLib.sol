@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
-import "solstat/Gaussian.sol";
+import "solstat/Invariant.sol";
+
+// temp
 import "forge-std/Test.sol";
 
 /**
@@ -11,20 +13,70 @@ library HyperSwapLib {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
-    int256 public constant TICK_BASE = 1_0001e14;
-    uint256 public constant UNIT_WAD = 1e18;
-    uint256 public constant UNIT_DOUBLE_WAD = 2e18;
-    uint256 public constant SQRT_WAD = 1e9;
-    uint256 public constant UNIT_YEAR = 31556953;
-    uint256 public constant UNIT_PERCENT = 1e4;
+    int256 internal constant TICK_BASE = 1_0001e14;
+    uint256 internal constant UNIT_WAD = 1e18;
+    uint256 internal constant UNIT_DOUBLE_WAD = 2e18;
+    uint256 internal constant SQRT_WAD = 1e9;
+    uint256 internal constant UNIT_YEAR = 31556953;
+    uint256 internal constant UNIT_PERCENT = 1e4;
 
-    error OOB(uint256);
+    /// @dev Thrown if value is greater than 1e18.
+    error AboveWAD(int256 cdf);
 
-    struct Params {
+    /**
+     * @notice Packaged data structure to easily compute single values from a set of parameters.
+     */
+    struct Expiring {
         uint256 strike;
         uint256 sigma;
         uint256 tau;
     }
+
+    // --- Class Methods --- //
+
+    function computeR1WithPrice(Expiring memory args, uint256 price) internal view returns (uint256 R1) {
+        R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
+    }
+
+    function computeR2WithPrice(Expiring memory args, uint256 price) internal view returns (uint256 R2) {
+        R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
+    }
+
+    function computePriceWithR1(Expiring memory args, uint256 R1) internal view returns (uint256 price) {
+        price = computePriceWithR1(R1, args.strike, args.sigma, args.tau);
+    }
+
+    function computePriceWithR2(Expiring memory args, uint256 R2) internal view returns (uint256 price) {
+        price = computePriceWithR2(R2, args.strike, args.sigma, args.tau);
+    }
+
+    function computeR1WithR2(
+        Expiring memory args,
+        uint256 R2,
+        uint256 price,
+        int256 invariant
+    ) internal view returns (uint256 R1) {
+        R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, price, invariant);
+    }
+
+    function computeR2WithR1(
+        Expiring memory args,
+        uint256 R1,
+        uint256 price,
+        int256 invariant
+    ) internal view returns (uint256 R2) {
+        R2 = computeR2WithR1(R1, args.strike, args.sigma, args.tau, price, invariant);
+    }
+
+    function computePriceWithChangeInTau(
+        Expiring memory args,
+        uint256 prc,
+        uint256 epsilon
+    ) internal view returns (uint256) {
+        return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
+    }
+
+    // --- Raw Functions --- //
 
     /**
      * P(τ - ε) = ( P(τ)^(√(1 - ε/τ)) / K^2 )e^((1/2)(t^2)(√(τ)√(τ- ε) - (τ - ε)))
@@ -35,8 +87,8 @@ library HyperSwapLib {
         uint256 prc,
         uint256 tau,
         uint256 epsilon
-    ) public view returns (uint256) {
-        Params memory params = Params(stk, vol, tau);
+    ) internal view returns (uint256) {
+        Expiring memory params = Expiring(stk, vol, tau);
 
         uint256 tauYears;
         assembly {
@@ -75,6 +127,38 @@ library HyperSwapLib {
     }
 
     /**
+     * @notice Computes the R1 reserve given the R2 reserve and a price.
+     *
+     * @custom:math R1 / price(hiSlotIndex) = tradingFunction(...)
+     */
+    function computeR1WithR2(
+        uint256 R2,
+        uint256 strike,
+        uint256 sigma,
+        uint256 tau,
+        uint256 price,
+        int256 invariant
+    ) internal view returns (uint256 R1) {
+        R1 = Invariant.getY(R2, strike, sigma, tau, invariant); // todo: use price for concentrated curve
+    }
+
+    /**
+     * @notice Computes the R1 reserve given the R2 reserve and a price.
+     *
+     * @custom:math R1 / price(hiSlotIndex) = tradingFunction(...)
+     */
+    function computeR2WithR1(
+        uint256 R1,
+        uint256 strike,
+        uint256 sigma,
+        uint256 tau,
+        uint256 price,
+        int256 invariant
+    ) internal view returns (uint256 R2) {
+        R2 = Invariant.getX(R1, strike, sigma, tau, invariant); // todo: use price for concentrated curve
+    }
+
+    /**
      * @custom:math R1 = KΦ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
     function computeR1WithPrice(
@@ -95,13 +179,10 @@ library HyperSwapLib {
 
             int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
             int256 cdf = Gaussian.cdf(lnOverVol);
-            if (cdf > Gaussian.ONE) revert CdfErr(cdf);
+            if (cdf > Gaussian.ONE) revert AboveWAD(cdf);
             R1 = stk.mulWadDown(uint256(cdf));
         }
     }
-
-    // temp: remove with better error
-    error CdfErr(int256 cdf);
 
     /**
      * @custom:math R2 = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
@@ -124,7 +205,7 @@ library HyperSwapLib {
 
             int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
             int256 cdf = Gaussian.cdf(lnOverVol);
-            if (cdf > Gaussian.ONE) revert CdfErr(cdf);
+            if (cdf > Gaussian.ONE) revert AboveWAD(cdf);
             R2 = uint256(Gaussian.ONE - cdf);
         }
     }
@@ -151,7 +232,7 @@ library HyperSwapLib {
         uint256 tauYears = convertSecondsToWadYears(tau);
         uint256 volWad = convertPercentageToWad(vol);
 
-        if (uint256(Gaussian.ONE) < R2) revert CdfErr(int256(R2));
+        if (uint256(Gaussian.ONE) < R2) revert AboveWAD(int256(R2));
         int256 input = Gaussian.ONE - int256(R2);
         int256 ppf = Gaussian.ppf(input);
         uint256 sqrtTauSigma = (tauYears.sqrt() * SQRT_WAD).mulWadDown(volWad);
@@ -174,7 +255,7 @@ library HyperSwapLib {
      * @param tick Key of a slot in a price/liquidity grid.
      * @return price Value on a key (tick) value pair of a price grid.
      */
-    function _computePriceWithTick(int24 tick) internal pure returns (uint256 price) {
+    function computePriceWithTick(int24 tick) internal pure returns (uint256 price) {
         int256 tickWad = int256(tick) * int256(FixedPointMathLib.WAD);
         price = uint256(FixedPointMathLib.powWad(TICK_BASE, tickWad));
     }
@@ -187,7 +268,7 @@ library HyperSwapLib {
      * @param price Value on a key (tick) value pair of a price grid.
      * @return tick Key of a slot in a price/liquidity grid.
      */
-    function _computeTickWithPrice(uint256 price) internal pure returns (int24 tick) {
+    function computeTickWithPrice(uint256 price) internal pure returns (int24 tick) {
         uint256 numerator = uint256(int256(price).lnWad());
         uint256 denominator = uint256(TICK_BASE.lnWad());
         uint256 val = numerator / denominator + 1; // Values are in Fixed Point Q.96 format. Rounds up.

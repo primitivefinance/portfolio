@@ -332,29 +332,6 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(next < prev);
     }
 
-    function testS_wTransientStateReturnsZeroAfterSwap() public {
-        // Add liquidity first
-        bytes memory data = Instructions.encodeAddLiquidity(
-            0,
-            __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
-            0x13, // 19 zeroes, so 10e19 liquidity
-            0x01
-        );
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-        // move some time
-        vm.warp(block.timestamp + 1);
-
-        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.pass(data);
-        assertTrue(success);
-
-        assertTrue(_transient.poolId == 0);
-    }
-
     // --- Add liquidity --- //
 
     function testFailA_LNonExistentPoolIdReverts() public {

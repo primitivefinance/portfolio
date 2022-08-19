@@ -10,6 +10,9 @@ interface IEnigmaEvents {
     /// @dev Emitted on removing liquidity only.
     event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
 
+    // --- Pools and Slots --- //
+    event PoolUpdate(uint48 indexed poolId, uint256 price, int24 indexed tick, uint256 liquidity);
+
     // --- Critical --- //
     /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
     /// @custom:security High. Use these to track the total value locked of a token.
