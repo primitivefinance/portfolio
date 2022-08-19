@@ -76,6 +76,19 @@ library HyperSwapLib {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
     }
 
+    function computeReservesWithTick(Expiring memory args, int24 tick)
+        internal
+        returns (
+            uint256 price,
+            uint256 R1,
+            uint256 R2
+        )
+    {
+        price = computePriceWithTick(tick);
+        R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
+        R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
+    }
+
     // --- Raw Functions --- //
 
     /**

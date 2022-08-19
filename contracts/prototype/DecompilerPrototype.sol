@@ -84,7 +84,7 @@ contract DecompilerPrototype is HyperPrototype {
         } else if (instruction == Instructions.SWAP) {
             (poolId, ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
-            (poolId, , ) = _createPool(data);
+            (poolId) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
             _createCurve(data);
         } else if (instruction == Instructions.CREATE_PAIR) {

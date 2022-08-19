@@ -115,7 +115,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         } else if (instruction == Instructions.SWAP) {
             (poolId_, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
-            (poolId_, , ) = _createPool(data);
+            (poolId_) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
             _createCurve(data);
         } else if (instruction == Instructions.CREATE_PAIR) {
@@ -261,7 +261,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             __poolId,
             DEFAULT_TICK - 2560,
             DEFAULT_TICK + 2560,
-            0x13, // 19 zeroes, so 10e19 liquidity
+            0x13, // 19 zeroes, so 10e19 liquidity, note: 0x0a amount breaks test? todo: handle case where insufficient liquidity
             0x01
         );
         bool success = forwarder.pass(data);
