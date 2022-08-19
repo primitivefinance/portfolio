@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
-import "solstat/Invariant.sol";
-
-// temp
-import "forge-std/Test.sol";
+import "./Invariant.sol";
 
 /**
  * @dev Comprehensive library to compute all related functions used with swaps.

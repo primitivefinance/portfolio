@@ -6,9 +6,6 @@ import {isBetween} from "../libraries/Utils.sol";
 import "../libraries/HyperSwapLib.sol";
 import "./EnigmaVirtualMachinePrototype.sol";
 
-// temp
-import "forge-std/Test.sol";
-
 abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     using HyperSwapLib for HyperSwapLib.Expiring;
     using FixedPointMathLib for uint256;
@@ -209,8 +206,6 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             else nextDependent = expiring.computeR2WithR1(nextIndependent, 0, 0);
             swap.output += liveDependent - nextDependent;
         } while (swap.remainder != 0 && args.limit > swap.price);
-
-        console.log("Doing swap with input/output", swap.input, swap.output);
 
         // Update Pool State Effects
         _updatePool(args.poolId, swap.tick, swap.price, swap.liquidity);

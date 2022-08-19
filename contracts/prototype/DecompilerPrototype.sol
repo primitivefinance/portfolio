@@ -82,7 +82,7 @@ contract DecompilerPrototype is HyperPrototype {
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
             (poolId, , ) = _removeLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
-            (poolId, ) = _swapExactForExact(data);
+            (poolId, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
@@ -202,19 +202,14 @@ contract DecompilerPrototype is HyperPrototype {
         view
         override
         returns (
-            uint128 internalBase,
-            uint128 internalQuote,
-            uint128 internalLiquidity,
-            uint128 blockTimestamp
+            uint256 lastPrice,
+            int24 lastTick,
+            uint256 blockTimestamp,
+            uint256 liquidity
         )
     {
-        Pool memory p = _pools[poolId];
-        (internalBase, internalQuote, internalLiquidity, blockTimestamp) = (
-            p.internalBase,
-            p.internalQuote,
-            p.internalLiquidity,
-            p.blockTimestamp
-        );
+        HyperPool memory p = _pools[poolId];
+        (lastPrice, lastTick, blockTimestamp, liquidity) = (p.lastPrice, p.lastTick, p.blockTimestamp, p.liquidity);
     }
 
     function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
@@ -228,4 +223,22 @@ contract DecompilerPrototype is HyperPrototype {
     function getPairNonce() external view override returns (uint256) {
         return _curveNonce;
     }
+
+    function checkJitLiquidity(address, uint48) external view override returns (uint256 distance, uint256 timestamp) {}
+
+    function getLiquidityMinted(
+        uint48 poolId,
+        uint256 deltaBase,
+        uint256 deltaQuote
+    ) external view returns (uint256 deltaLiquidity) {}
+
+    function getInvariant(uint48 poolId) external view returns (int128 invariant) {}
+
+    function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
+        external
+        view
+        returns (uint256 deltaBase, uint256 deltaQuote)
+    {}
+
+    function updateLastTimestamp(uint48) external override returns (uint128 blockTimestamp) {}
 }
