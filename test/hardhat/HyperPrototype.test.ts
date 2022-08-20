@@ -1,15 +1,16 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { expect } from 'chai'
 import hre, { ethers } from 'hardhat'
+import { Contract } from 'ethers'
+import { parseEther } from 'ethers/lib/utils'
+
 import HyperSDK from '../../compiler/sdk'
 import * as instructions from '../../compiler/instructions'
-import { hexlify, hexValue, parseEther } from 'ethers/lib/utils'
-import { Contract } from 'ethers'
 
 const params = {
   strike: parseEther('10'),
   sigma: 1e4,
-  maturity: 3157000,
+  maturity: 31556953,
   fee: 1e2,
   price: parseEther('10'),
   liquidity: parseEther('10'),
@@ -156,7 +157,58 @@ describe('HyperPrototype', function () {
       expect(await this.tokens[0].balanceOf(sdk.instance?.address)).to.be.greaterThan(0)
       expect(await this.tokens[1].balanceOf(sdk.instance?.address)).to.be.greaterThan(0)
     })
+
+    it('removes liquidity after adding it', async function () {
+      const hiTick = params.tick + 256
+      const loTick = params.tick - 256
+      let call = sdk.addLiquidity(poolId, loTick, hiTick, params.liquidity)
+      await call
+      call = sdk.removeLiquidity(false, poolId, loTick, hiTick, params.liquidity)
+      await expect(call).to.emit(sdk.instance, 'RemoveLiquidity')
+    })
   })
 
-  describe('Swap', function () {})
+  describe('Swap', function () {
+    let poolId: number
+    beforeEach(async function () {
+      const caller = await sdk.forwarder.caller()
+      // Mints tokens to the forwarder's caller contract.
+      await Promise.all([
+        this.tokens[0].mint(caller, parseEther('100')),
+        this.tokens[1].mint(caller, parseEther('100')),
+      ])
+
+      // Forwarder calls the caller's function to approve the token for the target address to pull from it
+      await Promise.all([
+        sdk.forwarder.approve(this.tokens[0].address, sdk.instance?.address),
+        sdk.forwarder.approve(this.tokens[1].address, sdk.instance?.address),
+      ])
+
+      const call = sdk.createPool(
+        tokens[0].address,
+        tokens[1].address,
+        params.strike,
+        params.sigma,
+        params.maturity,
+        params.fee,
+        params.price
+      )
+
+      await call
+
+      poolId = await sdk.forwarder.getPoolId(1, 1)
+
+      // mint tokens and approve hyper
+    })
+
+    it('swaps asset to quote', async function () {
+      const hiTick = params.tick + 256
+      const loTick = params.tick - 256
+      let call = sdk.addLiquidity(poolId, loTick, hiTick, params.liquidity)
+      await call
+
+      call = sdk.swapAssetToQuote(false, poolId, parseEther('1'), ethers.constants.MaxUint256, 0)
+      await expect(call).to.emit(sdk.instance, 'Swap')
+    })
+  })
 })

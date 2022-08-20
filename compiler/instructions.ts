@@ -187,15 +187,31 @@ export function encodeCreatePool(pairId: number, curveId: number, price: BigNumb
 export function encodeRemoveLiquidity(
   useMax: boolean,
   poolId: number,
-  deltaLiquidity: BigNumber
+  loTick: number,
+  hiTick: number,
+  liquidity: BigNumber
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.REMOVE_LIQUIDITY
   const firstByte = encodeFirstByte(useMax, opcode)
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
-  const { amount, decimals } = trailingRunLengthEncode(deltaLiquidity.toString())
-  const decimalBytes = encodeSecondByte(0, decimals)
+
   const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const bytes = [firstByte, ...hexToBytes(poolIdBytes), decimalBytes, ...hexToBytes(BigNumber.from(amount)._hex)]
+
+  const { amount, decimals } = trailingRunLengthEncode(liquidity.toString())
+  const amountBytes = hexToBytes(BigNumber.from(amount)._hex)
+  const powerByte = encodeSecondByte(0, decimals)
+
+  const loTickBytes = hexZeroPad(hexlify(loTick), 3)
+  const hiTickBytes = hexZeroPad(hexlify(hiTick), 3)
+
+  const bytes = [
+    firstByte,
+    ...hexToBytes(poolIdBytes),
+    ...hexToBytes(loTickBytes),
+    ...hexToBytes(hiTickBytes),
+    powerByte,
+    ...amountBytes,
+  ]
   return { bytes, hex: bytesToHex(bytes) }
 }
 
@@ -232,8 +248,8 @@ export function encodeAddLiquidity(
 export function encodeSwapExactTokens(
   useMax: boolean,
   poolId: number,
-  deltaIn: BigNumber,
-  deltaOut: BigNumber,
+  amount: BigNumber,
+  limit: BigNumber,
   direction: 0 | 1
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.SWAP
@@ -241,8 +257,8 @@ export function encodeSwapExactTokens(
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
   const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const { amount: input, decimals: inputDecimals } = trailingRunLengthEncode(deltaIn.toString())
-  const { amount: output, decimals: outputDecimals } = trailingRunLengthEncode(deltaOut.toString())
+  const { amount: input, decimals: inputDecimals } = trailingRunLengthEncode(amount.toString())
+  const { amount: output, decimals: outputDecimals } = trailingRunLengthEncode(limit.toString())
   const inputBytes = hexToBytes(BigNumber.from(input)._hex)
   const outputBytes = hexToBytes(BigNumber.from(output)._hex)
   const lastByte = hexToBytes(BigNumber.from(direction)._hex)

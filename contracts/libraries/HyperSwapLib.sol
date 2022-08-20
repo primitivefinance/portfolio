@@ -98,6 +98,8 @@ library HyperSwapLib {
         uint256 tau,
         uint256 epsilon
     ) internal view returns (uint256) {
+        if (epsilon == 0) return prc;
+
         Expiring memory params = Expiring(stk, vol, tau);
 
         uint256 tauYears;

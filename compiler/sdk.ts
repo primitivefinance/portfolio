@@ -38,29 +38,39 @@ export default class HyperSDK {
     fee: number,
     price: BigNumber
   ): Promise<any> {
-    if (typeof this.instance == 'undefined' || typeof this.forwarder == 'undefined')
-      throw new Error('Hyper not deployed, call deploy().')
-
     let { bytes: pairData } = instructions.encodeCreatePair(asset, quote)
     let { bytes: curveData } = instructions.encodeCreateCurve(BigNumber.from(strike), sigma, maturity, fee)
     let { bytes: poolData } = instructions.encodeCreatePool(1, 1, price)
     let { hex: data } = instructions.encodeJumpInstruction([pairData, curveData, poolData])
-    return this.forwarder.pass(this.instance.address, data)
+    return this.forward(data)
 
     //return this.signer.sendTransaction({ to: this.instance.address, value: BigInt(0), data })
   }
 
   async addLiquidity(poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
+    let { hex: data } = instructions.encodeAddLiquidity(false, poolId, loTick, hiTick, amount)
+    return this.forward(data)
+  }
+
+  async removeLiquidity(useMax: boolean, poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
+    let { hex: data } = instructions.encodeRemoveLiquidity(useMax, poolId, loTick, hiTick, amount)
+    return this.forward(data)
+  }
+
+  async swapAssetToQuote(useMax: boolean, poolId: number, amount: BigNumber, limit: BigNumber, direction: 0 | 1) {
+    let { hex: data } = instructions.encodeSwapExactTokens(useMax, poolId, amount, limit, direction)
+    return this.forward(data)
+  }
+
+  async swapQuoteToAsset(useMax: boolean, poolId: number, amount: BigNumber, limit: BigNumber, direction: 0 | 1) {
+    let { hex: data } = instructions.encodeSwapExactTokens(useMax, poolId, amount, limit, direction)
+    return this.forward(data)
+  }
+
+  private forward(data: string) {
     if (typeof this.instance == 'undefined' || typeof this.forwarder == 'undefined')
       throw new Error('Hyper not deployed, call deploy().')
 
-    let { hex: data } = instructions.encodeAddLiquidity(false, poolId, loTick, hiTick, amount)
     return this.forwarder.pass(this.instance.address, data)
   }
-
-  async removeLiquidity() {}
-
-  async swapAssetToQuote() {}
-
-  async swapQuoteToAsset() {}
 }
