@@ -1,5 +1,5 @@
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
-import { expect } from 'chai'
+import { assert, expect } from 'chai'
 import hre, { ethers } from 'hardhat'
 import { Contract } from 'ethers'
 import { parseEther } from 'ethers/lib/utils'
@@ -7,6 +7,7 @@ import { parseEther } from 'ethers/lib/utils'
 import HyperSDK from '../../compiler/sdk'
 import * as instructions from '../../compiler/instructions'
 
+// Default parameters for testing.
 const params = {
   strike: parseEther('10'),
   sigma: 1e4,
@@ -23,7 +24,11 @@ const params = {
  * @reverts With "NonExistentPool" error, if the `timestamp` public state variable of TestDecompiler is not set from zero.
  */
 describe('HyperPrototype', function () {
-  let deployer: SignerWithAddress, signers: SignerWithAddress[], sdk: HyperSDK, tokens: [Contract, Contract]
+  let sdk: HyperSDK
+  let deployer: SignerWithAddress, signers: SignerWithAddress[]
+  let tokens: [Contract, Contract]
+
+  // Setup
   before(async function () {
     signers = await ethers.getSigners()
     deployer = signers[0]
@@ -32,15 +37,38 @@ describe('HyperPrototype', function () {
       async (signer) => await hre.ethers.getContractFactory('TestDecompilerPrototype', signer),
       async (signer) => await hre.ethers.getContractFactory('HyperForwarderHelper', signer)
     )
-
-    const tokenFactory = await hre.ethers.getContractFactory('TestERC20')
-    tokens = await Promise.all([tokenFactory.deploy('Asset', 'AST', 18), tokenFactory.deploy('Quote', 'QT', 18)])
-    this.tokens = tokens
   })
 
+  // Global context for every test.
   beforeEach(async function () {
-    this.hyper = await sdk.deploy()
+    this.hyper = await sdk.deploy() // Deploys Hyper protocol.
+    assert(typeof sdk.instance != 'undefined', 'Hyper contract not there, did it get deployed?')
+    assert(typeof sdk.forwarder != 'undefined', 'Forwarder contract not there, did it get deployed?')
+
+    this.caller = await sdk.forwarder.caller()
+
+    // --- Prerequisites for testing --- //
+
+    // - IMPORTANT FOR TESTING - //
+    // This internally sets the timestamp for the contract's _blockTimestamp() function.
     await this.hyper.set(1)
+
+    // Deploys tokens.
+    const factory = await hre.ethers.getContractFactory('TestERC20')
+    tokens = await Promise.all([factory.deploy('Asset', 'AST', 18), factory.deploy('Quote', 'QT', 18)])
+    this.tokens = tokens
+
+    // Mints tokens to the forwarder's caller contract.
+    await Promise.all([
+      this.tokens[0].mint(this.caller, parseEther('100')),
+      this.tokens[1].mint(this.caller, parseEther('100')),
+    ])
+
+    // Forwarder calls the caller's function to approve the token for the target address to pull from it
+    await Promise.all([
+      sdk.forwarder.approve(this.tokens[0].address, sdk.instance?.address),
+      sdk.forwarder.approve(this.tokens[1].address, sdk.instance?.address),
+    ])
   })
 
   describe('Create', function () {
@@ -118,20 +146,8 @@ describe('HyperPrototype', function () {
 
   describe('Liquidity', function () {
     let poolId: number
+
     beforeEach(async function () {
-      const caller = await sdk.forwarder.caller()
-      // Mints tokens to the forwarder's caller contract.
-      await Promise.all([
-        this.tokens[0].mint(caller, parseEther('100')),
-        this.tokens[1].mint(caller, parseEther('100')),
-      ])
-
-      // Forwarder calls the caller's function to approve the token for the target address to pull from it
-      await Promise.all([
-        sdk.forwarder.approve(this.tokens[0].address, sdk.instance?.address),
-        sdk.forwarder.approve(this.tokens[1].address, sdk.instance?.address),
-      ])
-
       const call = sdk.createPool(
         tokens[0].address,
         tokens[1].address,
@@ -171,19 +187,6 @@ describe('HyperPrototype', function () {
   describe('Swap', function () {
     let poolId: number
     beforeEach(async function () {
-      const caller = await sdk.forwarder.caller()
-      // Mints tokens to the forwarder's caller contract.
-      await Promise.all([
-        this.tokens[0].mint(caller, parseEther('100')),
-        this.tokens[1].mint(caller, parseEther('100')),
-      ])
-
-      // Forwarder calls the caller's function to approve the token for the target address to pull from it
-      await Promise.all([
-        sdk.forwarder.approve(this.tokens[0].address, sdk.instance?.address),
-        sdk.forwarder.approve(this.tokens[1].address, sdk.instance?.address),
-      ])
-
       const call = sdk.createPool(
         tokens[0].address,
         tokens[1].address,
@@ -207,7 +210,7 @@ describe('HyperPrototype', function () {
       let call = sdk.addLiquidity(poolId, loTick, hiTick, params.liquidity)
       await call
 
-      call = sdk.swapAssetToQuote(false, poolId, parseEther('1'), ethers.constants.MaxUint256, 0)
+      call = sdk.swapAssetToQuote(false, poolId, parseEther('1'), ethers.constants.MaxUint256)
       await expect(call).to.emit(sdk.instance, 'Swap')
     })
   })
