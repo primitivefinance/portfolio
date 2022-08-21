@@ -466,11 +466,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      */
     function _createPool(bytes calldata data) internal returns (uint48 poolId) {
         (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Instructions.decodeCreatePool(data);
-        poolId = poolId_;
 
         if (price == 0) revert ZeroPrice();
-        if (pairId == 0) revert ZeroPairId();
-        if (curveId == 0) revert ZeroCurveId();
+
+        // Zero id values are magic variables, since no curve or pair can have an id of zero.
+        if (pairId == 0) pairId = uint16(_pairNonce);
+        if (curveId == 0) curveId = uint32(_curveNonce);
+        poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
         if (_doesPoolExist(poolId)) revert PoolExists();
 
         Curve memory curve = _curves[curveId];
