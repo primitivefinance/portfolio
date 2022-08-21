@@ -224,6 +224,10 @@ contract DecompilerPrototype is HyperPrototype {
         return _curveNonce;
     }
 
+    function getPairId(address asset, address quote) external view returns (uint256) {
+        return _getPairId[asset][quote];
+    }
+
     function checkJitLiquidity(address, uint48) external view override returns (uint256 distance, uint256 timestamp) {}
 
     function getLiquidityMinted(

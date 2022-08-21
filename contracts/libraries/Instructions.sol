@@ -40,12 +40,8 @@ library Instructions {
     }
 
     /// @dev Encodes the arguments for the CREATE_POOL instruction.
-    function encodeCreatePool(
-        uint48 poolId,
-        uint128 price,
-        uint128 liquidity
-    ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(CREATE_POOL, poolId, price, liquidity);
+    function encodeCreatePool(uint48 poolId, uint128 price) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(CREATE_POOL, poolId, price);
     }
 
     function encodeAddLiquidity(
@@ -56,7 +52,7 @@ library Instructions {
         uint8 power,
         uint8 amount
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(ADD_LIQUIDITY, useMax, poolId, loTick, hiTick, power, amount);
+        data = abi.encodePacked(Decoder.pack(bytes1(useMax), ADD_LIQUIDITY), poolId, loTick, hiTick, power, amount);
     }
 
     function encodeRemoveLiquidity(
@@ -67,7 +63,7 @@ library Instructions {
         uint8 power,
         uint8 amount
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(REMOVE_LIQUIDITY, useMax, poolId, loTick, hiTick, power, amount);
+        data = abi.encodePacked(Decoder.pack(bytes1(useMax), REMOVE_LIQUIDITY), poolId, loTick, hiTick, power, amount);
     }
 
     function encodeSwap(
@@ -80,7 +76,16 @@ library Instructions {
         uint8 direction
     ) internal returns (bytes memory data) {
         uint8 pointer = 0x0a;
-        data = abi.encodePacked(SWAP, useMax, poolId, pointer, power0, amount0, power1, amount1, direction);
+        data = abi.encodePacked(
+            Decoder.pack(bytes1(useMax), SWAP),
+            poolId,
+            pointer,
+            power0,
+            amount0,
+            power1,
+            amount1,
+            direction
+        );
     }
 
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
@@ -94,8 +99,7 @@ library Instructions {
             uint48 poolId,
             int24 loTick,
             int24 hiTick,
-            uint128 deltaLiquidity,
-            uint128 deltaQuote
+            uint128 deltaLiquidity
         )
     {
         (bytes1 maxFlag, ) = Decoder.separate(data[0]);

@@ -14,6 +14,10 @@ library Decoder {
         lower = data & 0x0f;
     }
 
+    function pack(bytes1 upper, bytes1 lower) internal pure returns (bytes1 data) {
+        data = (upper << 4) | lower;
+    }
+
     /// @dev           Converts an array of bytes into a byte32
     /// @param raw     Array of bytes to convert
     /// @return data   Converted data
