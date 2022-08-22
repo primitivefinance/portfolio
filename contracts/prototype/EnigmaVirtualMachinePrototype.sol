@@ -104,8 +104,12 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
-    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        HyperPosition storage pos = _positions[msg.sender][poolId];
+    function _increasePosition(
+        bytes32 positionId,
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) internal {
+        HyperPosition storage pos = _positions[msg.sender][positionId];
 
         pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
@@ -115,8 +119,12 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     /// @dev Equally important as `_increasePosition`.
     /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
-    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        HyperPosition storage pos = _positions[msg.sender][poolId];
+    function _decreasePosition(
+        bytes32 positionId,
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) internal {
+        HyperPosition storage pos = _positions[msg.sender][positionId];
 
         pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
@@ -126,11 +134,15 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
     /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
-    function _decreasePositionCheckJit(uint48 poolId, uint256 deltaLiquidity) internal {
+    function _decreasePositionCheckJit(
+        bytes32 positionId,
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) internal {
         (uint256 distance, uint256 timestamp) = _checkJitLiquidity(msg.sender, poolId);
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
-        _decreasePosition(poolId, deltaLiquidity);
+        _decreasePosition(positionId, poolId, deltaLiquidity);
     }
 
     // --- State --- //
@@ -150,8 +162,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     mapping(address => mapping(address => uint16)) internal _getPairId;
     /// @dev User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) internal _balances;
-    /// @dev User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint48 => HyperPosition)) internal _positions;
+    /// @dev User -> Position Id -> Liquidity Position.
+    mapping(address => mapping(bytes32 => HyperPosition)) internal _positions;
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
     /// @dev A value incremented by one on pair creation. Reduces calldata.

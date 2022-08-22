@@ -272,6 +272,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             .decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
 
+        bytes32 positionId = keccak256(data[1:13]); // converts poolId, loTick, hiTick into position identifier
+
         if (delLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
@@ -306,7 +308,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         deltaR1 = deltaR1.mulWadDown(delLiquidity);
         deltaR2 = deltaR2.mulWadDown(delLiquidity);
 
-        _increaseLiquidity(poolId_, loTick, hiTick, deltaR1, deltaR2, delLiquidity);
+        _increaseLiquidity(positionId, poolId_, loTick, hiTick, deltaR1, deltaR2, delLiquidity);
     }
 
     function _removeLiquidity(bytes calldata data)
@@ -319,6 +321,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     {
         (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Instructions
             .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
+
+        bytes32 positionId = keccak256(data[1:13]); // converts poolId, loTick, hiTick into position identifier
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
@@ -356,6 +360,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         // Update the pool state if liquidity is within the current pool's slot.
         if (hiTick > pool.lastTick) {
+            // note: need to check also greater than lower tick?
             pool.liquidity -= deltaLiquidity;
             pool.blockTimestamp = _blockTimestamp();
         }
@@ -364,7 +369,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         // Todo: update bitmap of instantiated/uninstantiated slots.
 
-        // Todo: update postition of caller.
+        _decreasePosition(positionId, poolId, deltaLiquidity);
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         Pair memory pair = _pairs[pairId];
@@ -375,6 +380,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     }
 
     function _increaseLiquidity(
+        bytes32 positionId,
         uint48 poolId,
         int24 loTick,
         int24 hiTick,
@@ -392,13 +398,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // Update the pool state if liquidity is within the current pool's slot.
         HyperPool storage pool = _pools[poolId];
         if (hiTick > pool.lastTick) {
+            // note: need to check also greater than lower tick?
             pool.liquidity += deltaLiquidity;
             pool.blockTimestamp = _blockTimestamp();
         }
 
         // Todo: update bitmap of instantiated slots.
 
-        // Todo: update postition of caller.
+        _increasePosition(positionId, poolId, deltaLiquidity);
 
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         uint16 pairId = uint16(poolId >> 32);

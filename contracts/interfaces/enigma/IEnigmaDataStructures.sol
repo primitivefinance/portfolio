@@ -68,8 +68,8 @@ interface IEnigmaDataStructures {
     struct HyperPosition {
         uint256 hiTick;
         uint256 loTick;
-        uint256 lastUpdate;
         uint256 totalLiquidity;
+        uint256 stakedLiquidity;
         uint256 blockTimestamp;
     }
 
