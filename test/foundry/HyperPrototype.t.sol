@@ -450,6 +450,25 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(instantiated != change);
     }
 
+    function testA_LPositionLowTickUpdated() public {
+        int24 hiTick = DEFAULT_TICK;
+        int24 loTick = hiTick - 2;
+        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+
+        int24 prevPositionLoTick = _positions[address(forwarder)][positionId].loTick;
+
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        int24 nextPositionLoTick = _positions[address(forwarder)][positionId].loTick;
+
+        assertTrue(prevPositionLoTick == 0);
+        assertTrue(nextPositionLoTick == loTick);
+    }
+
     function testA_LGlobalAssetIncreases() public {
         uint256 prevGlobal = _globalReserves[address(asset)];
         int24 loTick = DEFAULT_TICK;
