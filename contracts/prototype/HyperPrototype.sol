@@ -320,8 +320,6 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Instructions
             .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
 
-        bytes32 positionId = keccak256(data[1:13]); // converts poolId, loTick, hiTick into position identifier
-
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
