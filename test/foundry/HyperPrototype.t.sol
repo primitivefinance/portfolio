@@ -469,6 +469,63 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(nextPositionLoTick == loTick);
     }
 
+    function testA_LPositionHighTickUpdated() public {
+        int24 hiTick = DEFAULT_TICK;
+        int24 loTick = hiTick - 2;
+        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+
+        int24 prevPositionHiTick = _positions[address(forwarder)][positionId].hiTick;
+
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        int24 nextPositionHiTick = _positions[address(forwarder)][positionId].hiTick;
+
+        assertTrue(prevPositionHiTick == 0);
+        assertTrue(nextPositionHiTick == hiTick);
+    }
+
+    function testA_LPositionTimestampUpdated() public {
+        int24 hiTick = DEFAULT_TICK;
+        int24 loTick = hiTick - 2;
+        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+
+        uint256 prevPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint256 nextPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+
+        assertTrue(prevPositionTimestamp == 0);
+        assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
+    }
+
+    function testA_LPositionTotalLiquidityIncreases() public {
+        int24 hiTick = DEFAULT_TICK;
+        int24 loTick = hiTick - 2;
+        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+
+        uint256 prevPositionTotalLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        uint256 nextPositionTotalLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+
+        assertTrue(prevPositionTotalLiquidity == 0);
+        assertTrue(nextPositionTotalLiquidity > prevPositionTotalLiquidity);
+    }
+
     function testA_LGlobalAssetIncreases() public {
         uint256 prevGlobal = _globalReserves[address(asset)];
         int24 loTick = DEFAULT_TICK;
@@ -619,6 +676,49 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         bool next = _slots[__poolId][hi].instantiated;
         assertTrue(next != prev);
+    }
+
+    function testR_LPositionTimestampUpdated() public {
+        int24 hiTick = DEFAULT_TICK;
+        int24 loTick = DEFAULT_TICK - 256;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint256 prevPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+
+        uint256 warpTimestamp = block.timestamp + 1;
+        vm.warp(warpTimestamp);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        success = forwarder.pass(data);
+
+        uint256 nextPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+
+        assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
+    }
+
+    function testR_LPositionTotalLiquidityDecreases() public {
+        int24 hiTick = DEFAULT_TICK;
+        int24 loTick = DEFAULT_TICK - 256;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint256 prevPositionLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        success = forwarder.pass(data);
+
+        uint256 nextPositionLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+
+        assertTrue(nextPositionLiquidity < prevPositionLiquidity);
     }
 
     function testR_LGlobalAssetDecreases() public {
