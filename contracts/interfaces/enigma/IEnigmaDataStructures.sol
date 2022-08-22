@@ -66,8 +66,8 @@ interface IEnigmaDataStructures {
      * @notice Individual position within a pool.
      */
     struct HyperPosition {
-        uint256 hiTick;
-        uint256 loTick;
+        int24 loTick;
+        int24 hiTick;
         uint256 totalLiquidity;
         uint256 stakedLiquidity;
         uint256 blockTimestamp;
