@@ -23,13 +23,14 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     // --- View --- //
 
-    function _checkJitLiquidity(address account, uint48 poolId)
-        internal
-        view
-        virtual
-        returns (uint256 distance, uint256 timestamp)
-    {
-        uint256 previous = _positions[account][poolId].blockTimestamp;
+    function _checkJitLiquidity(
+        address account,
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick
+    ) internal view virtual returns (uint256 distance, uint256 timestamp) {
+        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
+        uint256 previous = _positions[account][positionId].blockTimestamp;
         timestamp = _blockTimestamp();
         distance = timestamp - previous;
     }
@@ -104,9 +105,20 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
-    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        HyperPosition storage pos = _positions[msg.sender][poolId];
+    function _increasePosition(
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint256 deltaLiquidity
+    ) internal {
+        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
 
+        HyperPosition storage pos = _positions[msg.sender][positionId];
+
+        if (pos.totalLiquidity == 0) {
+            pos.loTick = loTick;
+            pos.hiTick = hiTick;
+        }
         pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
@@ -115,8 +127,15 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     /// @dev Equally important as `_increasePosition`.
     /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
-    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        HyperPosition storage pos = _positions[msg.sender][poolId];
+    function _decreasePosition(
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint256 deltaLiquidity
+    ) internal {
+        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
+
+        HyperPosition storage pos = _positions[msg.sender][positionId];
 
         pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
@@ -126,11 +145,16 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
     /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
-    function _decreasePositionCheckJit(uint48 poolId, uint256 deltaLiquidity) internal {
-        (uint256 distance, uint256 timestamp) = _checkJitLiquidity(msg.sender, poolId);
+    function _decreasePositionCheckJit(
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint256 deltaLiquidity
+    ) internal {
+        (uint256 distance, uint256 timestamp) = _checkJitLiquidity(msg.sender, poolId, loTick, hiTick);
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
-        _decreasePosition(poolId, deltaLiquidity);
+        _decreasePosition(poolId, loTick, hiTick, deltaLiquidity);
     }
 
     // --- State --- //
@@ -150,8 +174,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     mapping(address => mapping(address => uint16)) internal _getPairId;
     /// @dev User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) internal _balances;
-    /// @dev User -> Pool id -> Liquidity Positions.
-    mapping(address => mapping(uint48 => HyperPosition)) internal _positions;
+    /// @dev User -> Position Id -> Liquidity Position.
+    mapping(address => mapping(uint96 => HyperPosition)) internal _positions;
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
     /// @dev A value incremented by one on pair creation. Reduces calldata.

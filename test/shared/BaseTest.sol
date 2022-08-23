@@ -40,13 +40,13 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
 
     // --- Enigma Read --- //
 
-    function checkJitLiquidity(address account, uint48 poolId)
-        external
-        view
-        override
-        returns (uint256 distance, uint256 timestamp)
-    {
-        _checkJitLiquidity(account, poolId);
+    function checkJitLiquidity(
+        address account,
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick
+    ) external view override returns (uint256 distance, uint256 timestamp) {
+        _checkJitLiquidity(account, poolId, loTick, hiTick);
     }
 
     function pairs(uint16 pairId)

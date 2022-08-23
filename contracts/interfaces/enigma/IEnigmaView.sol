@@ -49,10 +49,12 @@ interface IEnigmaView {
     /// If the distance is non-zero, it means liquidity was allocated and removed in different blocks.
     /// @custom:security High. An incorrectly computed distance could lead to possible
     /// negative (or positive) effects to accounts interacting with the Enigma.
-    function checkJitLiquidity(address account, uint48 poolId)
-        external
-        view
-        returns (uint256 distance, uint256 timestamp);
+    function checkJitLiquidity(
+        address account,
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick
+    ) external view returns (uint256 distance, uint256 timestamp);
 
     /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
     /// @dev Designed to round in a direction disadvantageous to the account minting liquidity.

@@ -356,6 +356,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         // Update the pool state if liquidity is within the current pool's slot.
         if (hiTick > pool.lastTick) {
+            // note: need to check also greater than lower tick?
             pool.liquidity -= deltaLiquidity;
             pool.blockTimestamp = _blockTimestamp();
         }
@@ -364,7 +365,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         // Todo: update bitmap of instantiated/uninstantiated slots.
 
-        // Todo: update postition of caller.
+        _decreasePosition(poolId_, loTick, hiTick, deltaLiquidity);
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         Pair memory pair = _pairs[pairId];
@@ -392,13 +393,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // Update the pool state if liquidity is within the current pool's slot.
         HyperPool storage pool = _pools[poolId];
         if (hiTick > pool.lastTick) {
+            // note: need to check also greater than lower tick?
             pool.liquidity += deltaLiquidity;
             pool.blockTimestamp = _blockTimestamp();
         }
 
         // Todo: update bitmap of instantiated slots.
 
-        // Todo: update postition of caller.
+        _increasePosition(poolId, loTick, hiTick, deltaLiquidity);
 
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         uint16 pairId = uint16(poolId >> 32);
