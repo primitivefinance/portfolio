@@ -228,7 +228,12 @@ contract DecompilerPrototype is HyperPrototype {
         return _getPairId[asset][quote];
     }
 
-    function checkJitLiquidity(address, uint48) external view override returns (uint256 distance, uint256 timestamp) {}
+    function checkJitLiquidity(
+        address,
+        uint48,
+        int24,
+        int24
+    ) external view override returns (uint256 distance, uint256 timestamp) {}
 
     function getLiquidityMinted(
         uint48 poolId,
