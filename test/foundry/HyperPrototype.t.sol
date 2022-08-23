@@ -453,7 +453,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     function testA_LPositionLowTickUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
         int24 prevPositionLoTick = _positions[address(forwarder)][positionId].loTick;
 
@@ -472,7 +472,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     function testA_LPositionHighTickUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
         int24 prevPositionHiTick = _positions[address(forwarder)][positionId].hiTick;
 
@@ -491,7 +491,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     function testA_LPositionTimestampUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
         uint256 prevPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
 
@@ -510,7 +510,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     function testA_LPositionTotalLiquidityIncreases() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
         uint256 prevPositionTotalLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
 
@@ -687,7 +687,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
         uint256 prevPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
 
         uint256 warpTimestamp = block.timestamp + 1;
@@ -710,7 +710,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bytes12 positionId = bytes12(abi.encodePacked(__poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
         uint256 prevPositionLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, loTick, hiTick, power, amount);

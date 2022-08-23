@@ -29,7 +29,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         int24 loTick,
         int24 hiTick
     ) internal view virtual returns (uint256 distance, uint256 timestamp) {
-        bytes12 positionId = bytes12(abi.encodePacked(poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
         uint256 previous = _positions[account][positionId].blockTimestamp;
         timestamp = _blockTimestamp();
         distance = timestamp - previous;
@@ -111,8 +111,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         int24 hiTick,
         uint256 deltaLiquidity
     ) internal {
-        // derive position id
-        bytes12 positionId = bytes12(abi.encodePacked(poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
 
         HyperPosition storage pos = _positions[msg.sender][positionId];
 
@@ -134,8 +133,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         int24 hiTick,
         uint256 deltaLiquidity
     ) internal {
-        // derive position id
-        bytes12 positionId = bytes12(abi.encodePacked(poolId, loTick, hiTick));
+        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
 
         HyperPosition storage pos = _positions[msg.sender][positionId];
 
@@ -177,7 +175,7 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev User -> Token -> Interal Balance.
     mapping(address => mapping(address => uint256)) internal _balances;
     /// @dev User -> Position Id -> Liquidity Position.
-    mapping(address => mapping(bytes12 => HyperPosition)) internal _positions;
+    mapping(address => mapping(uint96 => HyperPosition)) internal _positions;
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
     /// @dev A value incremented by one on pair creation. Reduces calldata.
