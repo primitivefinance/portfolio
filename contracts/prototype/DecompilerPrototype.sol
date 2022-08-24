@@ -83,6 +83,10 @@ contract DecompilerPrototype is HyperPrototype {
             (poolId, , ) = _removeLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
             (poolId, , , ) = _swapExactForExact(data);
+        } else if (instruction == Instructions.STAKE_POSITION) {
+            (poolId, ) = _stakePosition(data);
+        } else if (instruction == Instructions.UNSTAKE_POSITION) {
+            (poolId, ) = _unstakePosition(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {

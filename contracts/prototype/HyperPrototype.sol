@@ -435,6 +435,67 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         else slot.liquidityDelta += int256(deltaLiquidity);
     }
 
+    function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint48 poolId_, uint96 positionId) = Instructions.decodeStakePosition(data);
+        poolId = poolId_;
+
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        HyperPosition storage pos = _positions[msg.sender][positionId];
+        require(!pos.staked, "Position already staked");
+        require(pos.totalLiquidity > 0, "Position has no liquidity.");
+
+        HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
+        HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
+
+        // add staked delta to lo tick, remove from hi tick
+        loSlot.stakedLiquidityDelta += int256(pos.totalLiquidity);
+        hiSlot.stakedLiquidityDelta -= int256(pos.totalLiquidity);
+        // note: we don't need to account for totalStakedLiquidity at a tick
+        // since the "normal" liquidity ensures the tick remains instantiated
+
+        HyperPool storage pool = _pools[poolId_];
+        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
+            // if position's liquidity is in range, add to pool's current
+            // staked liquidity amount
+            pool.stakedLiquidity += pos.totalLiquidity;
+        }
+
+        pos.staked = true;
+
+        // emit Stake Position
+    }
+
+    function _unstakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint48 poolId_, uint96 positionId) = Instructions.decodeUnstakePosition(data);
+        poolId = poolId_;
+
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        HyperPosition storage pos = _positions[msg.sender][positionId];
+        require(pos.staked, "Position not staked");
+
+        HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
+        HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
+
+        // note: is it okay to remove staked liquidity now? will immediately stop earning rewards
+        loSlot.stakedLiquidityDelta -= int256(pos.totalLiquidity);
+        hiSlot.stakedLiquidityDelta += int256(pos.totalLiquidity);
+
+        HyperPool storage pool = _pools[poolId_];
+        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
+            // if position's liquidity is in range, remove staked liquidity amount
+            // from pool's state
+            pool.stakedLiquidity -= pos.totalLiquidity;
+        }
+
+        Epoch storage epoch = _epochs[poolId_];
+        pos.unstakeEpochId = epoch.id;
+        pos.staked = false;
+
+        // emit Unstake Position
+    }
+
     /**
      * @notice Updates the liquidity of a slot, and returns a bool to reflect whether its instantiation state was changed.
      */
@@ -493,7 +554,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             lastPrice: price,
             lastTick: HyperSwapLib.computeTickWithPrice(price), // todo: implement slot and price grid.
             blockTimestamp: timestamp,
-            liquidity: 0
+            liquidity: 0,
+            stakedLiquidity: 0
         });
 
         emit CreatePool(poolId, pairId, curveId, price);
