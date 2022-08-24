@@ -10,8 +10,7 @@ library Instructions {
     bytes1 public constant REMOVE_LIQUIDITY = 0x03;
     bytes1 public constant SWAP = 0x05;
     bytes1 public constant STAKE_POSITION = 0x06;
-    bytes1 public constant INITIATE_UNSTAKE_POSITION = 0x07;
-    bytes1 public constant UNSTAKE_POSITION = 0x08;
+    bytes1 public constant UNSTAKE_POSITION = 0x07;
     bytes1 public constant CREATE_POOL = 0x0B;
     bytes1 public constant CREATE_PAIR = 0x0C;
     bytes1 public constant CREATE_CURVE = 0x0D;
@@ -102,10 +101,6 @@ library Instructions {
 
     function encodeStakePosition(uint96 positionId) internal pure returns (bytes memory data) {
         data = abi.encodePacked(STAKE_POSITION, positionId);
-    }
-
-    function encodeInitiateUnstakePosition(uint96 positionId) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(INITIATE_UNSTAKE_POSITION, positionId);
     }
 
     function encodeUnstakePosition(uint96 positionId) internal pure returns (bytes memory data) {
