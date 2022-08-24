@@ -52,6 +52,12 @@ interface IEnigmaDataStructures {
         uint128 blockTimestamp;
     }
 
+    struct Epoch {
+        uint256 id;
+        uint256 endTime;
+        uint256 interval;
+    }
+
     /**
      * @notice Individual pool state.
      */
@@ -60,6 +66,7 @@ interface IEnigmaDataStructures {
         int24 lastTick;
         uint256 blockTimestamp;
         uint256 liquidity;
+        uint256 stakedLiquidity;
     }
 
     /**
@@ -69,8 +76,9 @@ interface IEnigmaDataStructures {
         int24 loTick;
         int24 hiTick;
         uint256 totalLiquidity;
-        uint256 stakedLiquidity;
         uint256 blockTimestamp;
+        bool staked;
+        uint256 unstakeEpochId;
     }
 
     /**
@@ -78,6 +86,7 @@ interface IEnigmaDataStructures {
      */
     struct HyperSlot {
         int256 liquidityDelta;
+        int256 stakedLiquidityDelta;
         uint256 totalLiquidity;
         uint256 externalFeeGrowth;
         bool instantiated;
