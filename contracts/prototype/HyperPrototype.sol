@@ -442,8 +442,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         HyperPosition storage pos = _positions[msg.sender][positionId];
-        require(!pos.staked, "Position already staked");
-        require(pos.totalLiquidity > 0, "Position has no liquidity.");
+        if (pos.staked) revert PositionStakedError(positionId);
+        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
 
         HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
         HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
@@ -473,7 +473,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         HyperPosition storage pos = _positions[msg.sender][positionId];
-        require(pos.staked, "Position not staked");
+        if (!pos.staked) revert PositionNotStakedError(positionId);
 
         HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
         HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
