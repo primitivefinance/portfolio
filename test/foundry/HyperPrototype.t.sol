@@ -114,6 +114,10 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             (poolId_, , ) = _removeLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
             (poolId_, , , ) = _swapExactForExact(data);
+        } else if (instruction == Instructions.STAKE_POSITION) {
+            (poolId_, ) = _stakePosition(data);
+        } else if (instruction == Instructions.UNSTAKE_POSITION) {
+            (poolId_, ) = _unstakePosition(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId_) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
@@ -755,6 +759,216 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         uint256 next = _globalReserves[address(quote)];
         assertTrue(next < prev, "reserves did not change");
+    }
+
+    // --- Stake Position --- //
+
+    function testS_PPositionStakedUpdated() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+
+        bool prevPositionStaked = _positions[address(forwarder)][positionId].staked;
+
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        bool nextPositionStaked = _positions[address(forwarder)][positionId].staked;
+
+        assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
+        assertTrue(nextPositionStaked, "Position staked is not true.");
+    }
+
+    function testS_PSlotLowTickStakedLiquidityDeltaIncreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 prevStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        int256 nextStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+
+        assertTrue(
+            nextStakedLiquidityDelta > prevStakedLiquidityDelta,
+            "Lo tick staked liquidity delta did not increase."
+        );
+    }
+
+    function testS_PSlotHiTickStakedLiquidityDeltaDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        int256 prevStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        int256 nextStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+
+        assertTrue(
+            nextStakedLiquidityDelta < prevStakedLiquidityDelta,
+            "Hi tick staked liquidity delta did not decrease."
+        );
+    }
+
+    function testS_PPoolStakedLiquidityUpdated() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 prevPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        uint256 nextPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+
+        if (lo <= _pools[__poolId].lastTick && hi > _pools[__poolId].lastTick) {
+            assertTrue(nextPoolStakedLiquidity > prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
+            assertTrue(
+                nextPoolStakedLiquidity == _positions[address(forwarder)][positionId].totalLiquidity,
+                "Pool staked liquidity not equal to liquidity of staked position."
+            );
+        } else {
+            assertTrue(
+                nextPoolStakedLiquidity == prevPoolStakedLiquidity,
+                "Pool staked liquidity changed even though position staked out of range."
+            );
+        }
+    }
+
+    // --- Unstake Position --- //
+
+    function testU_PPositionStakedUpdated() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        bool prevPositionStaked = _positions[address(forwarder)][positionId].staked;
+
+        data = Instructions.encodeUnstakePosition(positionId);
+        success = forwarder.pass(data);
+
+        bool nextPositionStaked = _positions[address(forwarder)][positionId].staked;
+
+        assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
+        assertTrue(!nextPositionStaked, "Position staked is true.");
+    }
+
+    function testU_PSlotLowTickStakedLiquidityDeltaDecreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        int256 prevStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+
+        data = Instructions.encodeUnstakePosition(positionId);
+        success = forwarder.pass(data);
+
+        int256 nextStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+
+        assertTrue(
+            nextStakedLiquidityDelta < prevStakedLiquidityDelta,
+            "Lo tick staked liquidity delta did not decrease."
+        );
+    }
+
+    function testU_PSlotHiTickStakedLiquidityDeltaIncreases() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        int256 prevStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+
+        data = Instructions.encodeUnstakePosition(positionId);
+        success = forwarder.pass(data);
+
+        int256 nextStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+
+        assertTrue(
+            nextStakedLiquidityDelta > prevStakedLiquidityDelta,
+            "Hi tick staked liquidity delta did not increase."
+        );
+    }
+
+    function testU_PPoolStakedLiquidityUpdated() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        uint256 prevPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+
+        data = Instructions.encodeUnstakePosition(positionId);
+        success = forwarder.pass(data);
+
+        uint256 nextPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+
+        if (lo <= _pools[__poolId].lastTick && hi > _pools[__poolId].lastTick) {
+            assertTrue(nextPoolStakedLiquidity < prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
+            assertTrue(nextPoolStakedLiquidity == 0, "Pool staked liquidity does not equal 0 after unstake.");
+        } else {
+            assertTrue(
+                nextPoolStakedLiquidity == prevPoolStakedLiquidity,
+                "Pool staked liquidity changed even though position staked out of range."
+            );
+        }
     }
 
     // --- Create Pair --- //

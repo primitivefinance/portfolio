@@ -61,4 +61,12 @@ interface IEnigmaErrors {
     error InvariantError(int128 prev, int128 post);
     /// @dev Thrown if zero swap amount in arguments.
     error ZeroInput();
+
+    // --- Staking --- //
+    /// @dev Thrown if position is already staked and trying to stake again.
+    error PositionStakedError(uint96 positionId);
+    /// @dev Thrown if position has zero liquidity and trying to stake.
+    error PositionZeroLiquidityError(uint96 positionId);
+    /// @dev Thrown if position is not staked and trying to unstake.
+    error PositionNotStakedError(uint96 positionId);
 }

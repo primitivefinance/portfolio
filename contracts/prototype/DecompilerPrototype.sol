@@ -83,6 +83,10 @@ contract DecompilerPrototype is HyperPrototype {
             (poolId, , ) = _removeLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
             (poolId, , , ) = _swapExactForExact(data);
+        } else if (instruction == Instructions.STAKE_POSITION) {
+            (poolId, ) = _stakePosition(data);
+        } else if (instruction == Instructions.UNSTAKE_POSITION) {
+            (poolId, ) = _unstakePosition(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
@@ -228,7 +232,12 @@ contract DecompilerPrototype is HyperPrototype {
         return _getPairId[asset][quote];
     }
 
-    function checkJitLiquidity(address, uint48) external view override returns (uint256 distance, uint256 timestamp) {}
+    function checkJitLiquidity(
+        address,
+        uint48,
+        int24,
+        int24
+    ) external view override returns (uint256 distance, uint256 timestamp) {}
 
     function getLiquidityMinted(
         uint48 poolId,
