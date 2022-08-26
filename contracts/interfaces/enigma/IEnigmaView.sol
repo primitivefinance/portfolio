@@ -22,7 +22,8 @@ interface IEnigmaView {
             uint128 strike,
             uint24 sigma,
             uint32 maturity,
-            uint32 gamma
+            uint32 gamma,
+            uint32 priorityGamma
         );
 
     function pools(uint48 poolId)
@@ -32,7 +33,8 @@ interface IEnigmaView {
             uint256,
             int24,
             uint256,
-            uint256
+            uint256,
+            address
         );
 
     function getCurveId(bytes32) external view returns (uint32);

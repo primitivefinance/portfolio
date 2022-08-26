@@ -52,7 +52,8 @@ interface IEnigmaEvents {
         uint128 strike,
         uint24 sigma,
         uint32 indexed maturity,
-        uint32 indexed gamma
+        uint32 indexed gamma,
+        uint32 priorityGamma
     );
     /// @dev Emitted on setting a new token pair in state with the key `pairId`.
     event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);

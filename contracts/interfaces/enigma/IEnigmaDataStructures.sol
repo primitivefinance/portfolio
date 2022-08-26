@@ -11,11 +11,13 @@ interface IEnigmaDataStructures {
     /// @param sigma Percentage value in basis points, the "implied volatility" of a curve.
     /// @param maturity Swaps are paused in this pool once the block.timestamp reaches the maturity.
     /// @param gamma Percentage value in basis points, effectively applies the swap fee using the amount in method.
+    /// @param priorityGamma Percentage value in basis points for priority swapper, effectively applies the priority swap fee using the amount in method.
     struct Curve {
         uint128 strike;
         uint24 sigma;
         uint32 maturity;
         uint32 gamma;
+        uint32 priorityGamma;
     }
 
     /// @dev Immutable pair data.
@@ -67,6 +69,7 @@ interface IEnigmaDataStructures {
         uint256 blockTimestamp;
         uint256 liquidity;
         uint256 stakedLiquidity;
+        address prioritySwapper;
     }
 
     /**
