@@ -114,7 +114,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
                 sigma: curve.sigma,
-                tau: curve.maturity - _blockTimestamp()
+                tau: curve.maturity - _blockTimestamp(),
+                gamma: curve.gamma
             });
         }
 
