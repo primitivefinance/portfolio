@@ -40,9 +40,10 @@ library Instructions {
         uint24 sigma,
         uint32 maturity,
         uint16 fee,
+        uint16 priorityFee,
         uint128 strike
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(CREATE_CURVE, sigma, maturity, fee, strike);
+        data = abi.encodePacked(CREATE_CURVE, sigma, maturity, fee, priorityFee, strike);
     }
 
     /// @dev Encodes the arguments for the CREATE_PAIR instruction.
@@ -133,9 +134,9 @@ library Instructions {
     }
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
-    /// @dev Expects a 25 length byte array of left padded parameters.
-    /// @param data Maximum 1 + 3 + 4 + 2 + 16 = 26 bytes.
-    /// | 0x | 1 byte enigma code | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 16 bytes strike |
+    /// @dev Expects a 27 length byte array of left padded parameters.
+    /// @param data Maximum 1 + 3 + 4 + 2 + 2 + 16 = 28 bytes.
+    /// | 0x | 1 byte enigma code | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 2 bytes priority fee | 16 bytes strike |
     function decodeCreateCurve(bytes calldata data)
         internal
         pure
@@ -143,6 +144,7 @@ library Instructions {
             uint24 sigma,
             uint32 maturity,
             uint16 fee,
+            uint16 priorityFee,
             uint128 strike
         )
     {
@@ -150,7 +152,8 @@ library Instructions {
         sigma = uint24(bytes3(data[1:4])); // note: First byte is the create pair ecode.
         maturity = uint32(bytes4(data[4:8]));
         fee = uint16(bytes2(data[8:10]));
-        strike = uint128(bytes16(data[10:]));
+        priorityFee = uint16(bytes2(data[10:12]));
+        strike = uint128(bytes16(data[12:]));
     }
 
     /// @dev Expects a 41-byte length array with two addresses packed into it.

@@ -82,6 +82,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             DEFAULT_SIGMA,
             DEFAULT_MATURITY,
             uint16(1e4 - DEFAULT_GAMMA),
+            uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
             DEFAULT_STRIKE
         );
         success = forwarder.pass(data);
@@ -1041,6 +1042,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             curve.sigma,
             curve.maturity,
             uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
         bool success = forwarder.pass(data);
@@ -1048,19 +1050,49 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     function testFailC_CuFeeParameterOutsideBoundsReverts() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, 5e4, curve.strike);
+        bytes memory data = Instructions.encodeCreateCurve(
+            curve.sigma,
+            curve.maturity,
+            5e4,
+            uint16(1e4 - curve.priorityGamma),
+            curve.strike
+        );
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailC_CuPriorityFeeParameterOutsideBoundsReverts() public {
+        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        bytes memory data = Instructions.encodeCreateCurve(
+            curve.sigma,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            5e4,
+            curve.strike
+        );
         bool success = forwarder.pass(data);
     }
 
     function testFailC_CuExpiringPoolZeroSigmaReverts() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(0, curve.maturity, uint16(1e4 - curve.gamma), curve.strike);
+        bytes memory data = Instructions.encodeCreateCurve(
+            0,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
+            curve.strike
+        );
         bool success = forwarder.pass(data);
     }
 
     function testFailC_CuExpiringPoolZeroStrikeReverts() public {
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(curve.sigma, curve.maturity, uint16(1e4 - curve.gamma), 0);
+        bytes memory data = Instructions.encodeCreateCurve(
+            curve.sigma,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
+            0
+        );
         bool success = forwarder.pass(data);
     }
 
@@ -1071,6 +1103,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             curve.sigma + 1,
             curve.maturity,
             uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
         bool success = forwarder.pass(data);
@@ -1084,10 +1117,17 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             curve.sigma + 1,
             curve.maturity,
             uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
         bytes32 rawCurveId = Decoder.toBytes32(
-            abi.encodePacked(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike)
+            abi.encodePacked(
+                curve.sigma + 1,
+                curve.maturity,
+                uint16(1e4 - curve.gamma),
+                uint16(1e4 - curve.priorityGamma),
+                curve.strike
+            )
         );
         bool success = forwarder.pass(data);
         uint32 curveId = _getCurveIds[rawCurveId];
@@ -1100,10 +1140,17 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             curve.sigma + 1,
             curve.maturity,
             uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
         bytes32 rawCurveId = Decoder.toBytes32(
-            abi.encodePacked(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike)
+            abi.encodePacked(
+                curve.sigma + 1,
+                curve.maturity,
+                uint16(1e4 - curve.gamma),
+                uint16(1e4 - curve.priorityGamma),
+                curve.strike
+            )
         );
         bool success = forwarder.pass(data);
         uint32 curveId = _getCurveIds[rawCurveId];
@@ -1111,6 +1158,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertEq(newCurve.sigma, curve.sigma + 1);
         assertEq(newCurve.maturity, curve.maturity);
         assertEq(newCurve.gamma, curve.gamma);
+        assertEq(newCurve.priorityGamma, curve.priorityGamma);
         assertEq(newCurve.strike, curve.strike);
     }
 
@@ -1144,7 +1192,13 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         uint16 pairId = _getPairId[token0][token1];
 
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        data = Instructions.encodeCreateCurve(curve.sigma + 1, uint32(0), uint16(1e4 - curve.gamma), curve.strike);
+        data = Instructions.encodeCreateCurve(
+            curve.sigma + 1,
+            uint32(0),
+            uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
+            curve.strike
+        );
         bytes32 rawCurveId = Decoder.toBytes32(
             abi.encodePacked(curve.sigma + 1, uint32(0), uint16(1e4 - curve.gamma), curve.strike)
         );
@@ -1164,9 +1218,21 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         uint16 pairId = _getPairId[token0][token1];
 
         Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
-        data = Instructions.encodeCreateCurve(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike);
+        data = Instructions.encodeCreateCurve(
+            curve.sigma + 1,
+            curve.maturity,
+            uint16(1e4 - curve.gamma),
+            uint16(1e4 - curve.priorityGamma),
+            curve.strike
+        );
         bytes32 rawCurveId = Decoder.toBytes32(
-            abi.encodePacked(curve.sigma + 1, curve.maturity, uint16(1e4 - curve.gamma), curve.strike)
+            abi.encodePacked(
+                curve.sigma + 1,
+                curve.maturity,
+                uint16(1e4 - curve.gamma),
+                uint16(1e4 - curve.priorityGamma),
+                curve.strike
+            )
         );
         success = forwarder.pass(data);
 

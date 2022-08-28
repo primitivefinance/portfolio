@@ -49,6 +49,8 @@ interface IEnigmaErrors {
     error ZeroLiquidityError();
     /// @dev Thrown if fee is outside of bounds.
     error FeeOOB(uint16 fee);
+    /// @dev Thrown if priority fee is outside of bounds.
+    error PriorityFeeOOB(uint16 priorityFee);
     /// @dev Thrown if attempting to create a pool with a zero price.
     error ZeroPrice();
 

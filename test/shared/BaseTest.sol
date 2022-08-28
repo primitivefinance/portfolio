@@ -77,11 +77,12 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
             uint128 strike,
             uint24 sigma,
             uint32 maturity,
-            uint32 gamma
+            uint32 gamma,
+            uint32 priorityGamma
         )
     {
         Curve memory c = _curves[curveId];
-        (strike, sigma, maturity, gamma) = (c.strike, c.sigma, c.maturity, c.gamma);
+        (strike, sigma, maturity, gamma, priorityGamma) = (c.strike, c.sigma, c.maturity, c.gamma, c.priorityGamma);
     }
 
     function pools(uint48 poolId)
@@ -92,11 +93,18 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
             uint256 lastPrice,
             int24 lastTick,
             uint256 blockTimestamp,
-            uint256 liquidity
+            uint256 liquidity,
+            address prioritySwapper
         )
     {
         HyperPool memory p = _pools[poolId];
-        (lastPrice, lastTick, blockTimestamp, liquidity) = (p.lastPrice, p.lastTick, p.blockTimestamp, p.liquidity);
+        (lastPrice, lastTick, blockTimestamp, liquidity, prioritySwapper) = (
+            p.lastPrice,
+            p.lastTick,
+            p.blockTimestamp,
+            p.liquidity,
+            p.prioritySwapper
+        );
     }
 
     function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
@@ -108,7 +116,7 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
     }
 
     function getPairNonce() external view override returns (uint256) {
-        return _curveNonce;
+        return _pairNonce;
     }
 }
 
@@ -118,6 +126,7 @@ contract StandardHelpers {
     uint32 public constant DEFAULT_MATURITY = 31556953; // adds 1
     uint16 public constant DEFAULT_FEE = 100;
     uint32 public constant DEFAULT_GAMMA = 9900;
+    uint32 public constant DEFAULT_PRIORITY_GAMMA = 9950;
     uint128 public constant DEFAULT_R1_QUOTE = 3085375387260000000;
     uint128 public constant DEFAULT_R2_ASSET = 308537538726000000;
     uint128 public constant DEFAULT_LIQUIDITY = 1e18;

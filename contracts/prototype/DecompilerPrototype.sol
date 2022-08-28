@@ -194,11 +194,12 @@ contract DecompilerPrototype is HyperPrototype {
             uint128 strike,
             uint24 sigma,
             uint32 maturity,
-            uint32 gamma
+            uint32 gamma,
+            uint32 priorityGamma
         )
     {
         Curve memory c = _curves[curveId];
-        (strike, sigma, maturity, gamma) = (c.strike, c.sigma, c.maturity, c.gamma);
+        (strike, sigma, maturity, gamma, priorityGamma) = (c.strike, c.sigma, c.maturity, c.gamma, c.priorityGamma);
     }
 
     function pools(uint48 poolId)
@@ -209,11 +210,18 @@ contract DecompilerPrototype is HyperPrototype {
             uint256 lastPrice,
             int24 lastTick,
             uint256 blockTimestamp,
-            uint256 liquidity
+            uint256 liquidity,
+            address prioritySwapper
         )
     {
         HyperPool memory p = _pools[poolId];
-        (lastPrice, lastTick, blockTimestamp, liquidity) = (p.lastPrice, p.lastTick, p.blockTimestamp, p.liquidity);
+        (lastPrice, lastTick, blockTimestamp, liquidity, prioritySwapper) = (
+            p.lastPrice,
+            p.lastTick,
+            p.blockTimestamp,
+            p.liquidity,
+            p.prioritySwapper
+        );
     }
 
     function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
@@ -225,7 +233,7 @@ contract DecompilerPrototype is HyperPrototype {
     }
 
     function getPairNonce() external view override returns (uint256) {
-        return _curveNonce;
+        return _pairNonce;
     }
 
     function getPairId(address asset, address quote) external view returns (uint256) {

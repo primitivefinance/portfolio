@@ -555,23 +555,26 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             lastTick: HyperSwapLib.computeTickWithPrice(price), // todo: implement slot and price grid.
             blockTimestamp: timestamp,
             liquidity: 0,
-            stakedLiquidity: 0
+            stakedLiquidity: 0,
+            prioritySwapper: address(0)
         });
 
         emit CreatePool(poolId, pairId, curveId, price);
     }
 
     /**
-     * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, and maturity.
+     * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
      * @dev Curves are used to create pools.
-     * It's possible to make a perpetual pool, by only specifying the fee parameter.
+     * It's possible to make a perpetual pool, by only specifying the fee parameters.
      *
      * @custom:reverts If set parameters have already been used to create a curve.
      * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
+     * @custom:reverts If priority fee parameter is outside the bounds of 0.01% to fee parameter, inclusive.
      * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
      */
     function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint24 sigma, uint32 maturity, uint16 fee, uint128 strike) = Instructions.decodeCreateCurve(data); // Expects Enigma encoded data.
+        (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = Instructions
+            .decodeCreateCurve(data); // Expects Enigma encoded data.
 
         bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
 
@@ -579,6 +582,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (curveId != 0) revert CurveExists(curveId);
 
         if (!isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
+        if (!isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
 
         bool perpetual;
         assembly {
@@ -593,12 +597,19 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         }
 
         uint32 gamma = uint32(HyperSwapLib.UNIT_PERCENT - fee); // gamma = 100% - fee %.
+        uint32 priorityGamma = uint32(HyperSwapLib.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
 
         // Writes the curve to state with a reverse lookup.
-        _curves[curveId] = Curve({strike: strike, sigma: sigma, maturity: maturity, gamma: gamma});
+        _curves[curveId] = Curve({
+            strike: strike,
+            sigma: sigma,
+            maturity: maturity,
+            gamma: gamma,
+            priorityGamma: priorityGamma
+        });
         _getCurveIds[rawCurveId] = curveId;
 
-        emit CreateCurve(curveId, strike, sigma, maturity, gamma);
+        emit CreateCurve(curveId, strike, sigma, maturity, gamma, priorityGamma);
     }
 
     /**
