@@ -111,12 +111,16 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         {
             // Curve stores the parameters of the trading function.
             Curve memory curve = _curves[uint32(args.poolId)];
+
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
                 sigma: curve.sigma,
-                tau: curve.maturity - _blockTimestamp(),
-                gamma: curve.gamma
+                tau: curve.maturity - _blockTimestamp()
             });
+
+            // Calculate the amount to swap (amount in minus the fees)
+            uint256 gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
+            args.input = uint128((args.input * gamma) / 10_000);
         }
 
         // Get the variables for first iteration of the swap.
