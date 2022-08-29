@@ -27,7 +27,6 @@ library HyperSwapLib {
         uint256 strike;
         uint256 sigma;
         uint256 tau;
-        uint256 gamma;
     }
 
     // --- Class Methods --- //
