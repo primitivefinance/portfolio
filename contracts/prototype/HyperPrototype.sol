@@ -267,7 +267,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             }
         }
 
-        emit PoolUpdate(poolId, pool.lastPrice, pool.lastTick, pool.liquidity);
+        emit PoolUpdate(
+            poolId,
+            pool.lastPrice,
+            pool.lastTick,
+            pool.liquidity,
+            sell ? feesGrowth : 0,
+            sell ? 0 : feesGrowth
+        );
     }
 
     /**

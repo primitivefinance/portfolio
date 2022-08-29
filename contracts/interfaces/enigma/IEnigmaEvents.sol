@@ -11,7 +11,14 @@ interface IEnigmaEvents {
     event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
 
     // --- Pools and Slots --- //
-    event PoolUpdate(uint48 indexed poolId, uint256 price, int24 indexed tick, uint256 liquidity);
+    event PoolUpdate(
+        uint48 indexed poolId,
+        uint256 price,
+        int24 indexed tick,
+        uint256 liquidity,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    );
 
     // --- Critical --- //
     /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
