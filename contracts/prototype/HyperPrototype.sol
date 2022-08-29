@@ -72,8 +72,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         int256 lo = int256(pool.lastTick - TICK_SIZE);
         tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
         // 6. Write changes to the pool.
-        _updatePool(poolId, tick, price, pool.liquidity);
+        _updatePool(poolId, tick, price, pool.liquidity, false, 0);
     }
+
+    // FIXME: Temporary variables to avoid the hideous stack too deep errors
+    uint256 _gamma;
+    uint256 _fees;
+    uint256 _growthFeesToAdd;
 
     /**
      * @notice Engima method to swap tokens.
@@ -93,6 +98,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 output
         )
     {
+        _growthFeesToAdd = 0;
+
         Order memory args;
         (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
 
@@ -118,9 +125,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 tau: curve.maturity - _blockTimestamp()
             });
 
-            // Calculate the amount to swap (amount in minus the fees)
-            uint256 gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
-            args.input = uint128((args.input * gamma) / 10_000);
+            // Fetch the correct gamma to calculate the fees.
+            _gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
         }
 
         // Get the variables for first iteration of the swap.
@@ -180,6 +186,11 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
 
+            // Calculate the amount of fees to deduct from the amount in
+            _fees = (swap.remainder * _gamma) / 10_000;
+            _growthFeesToAdd += _fees;
+            swap.remainder -= _fees;
+
             // Compute amount to swap in this step.
             // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
             if (swap.remainder >= maxInput) {
@@ -213,7 +224,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         } while (swap.remainder != 0 && args.limit > swap.price);
 
         // Update Pool State Effects
-        _updatePool(args.poolId, swap.tick, swap.price, swap.liquidity);
+        _updatePool(args.poolId, swap.tick, swap.price, swap.liquidity, sell, _growthFeesToAdd);
         // Update Global Balance Effects
         _increaseGlobal(pair.tokenBase, swap.input);
         _decreaseGlobal(pair.tokenQuote, swap.output);
@@ -235,7 +246,9 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         uint48 poolId,
         int24 tick,
         uint256 price,
-        uint256 liquidity
+        uint256 liquidity,
+        bool sell,
+        uint256 feesGrowth
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = _pools[poolId];
         if (pool.lastPrice != price) pool.lastPrice = price;
@@ -245,6 +258,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         uint256 timestamp = _blockTimestamp();
         timeDelta = timestamp - pool.blockTimestamp;
         pool.blockTimestamp = timestamp;
+
+        if (feesGrowth > 0) {
+            if (sell) {
+                pool.feeGrowthGlobalAsset += feesGrowth;
+            } else {
+                pool.feeGrowthGlobalQuote += feesGrowth;
+            }
+        }
 
         emit PoolUpdate(poolId, pool.lastPrice, pool.lastTick, pool.liquidity);
     }
@@ -561,7 +582,9 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             blockTimestamp: timestamp,
             liquidity: 0,
             stakedLiquidity: 0,
-            prioritySwapper: address(0)
+            prioritySwapper: address(0),
+            feeGrowthGlobalAsset: 0,
+            feeGrowthGlobalQuote: 0
         });
 
         emit CreatePool(poolId, pairId, curveId, price);
