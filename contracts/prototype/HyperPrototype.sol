@@ -186,15 +186,11 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
 
-            // Calculate the amount of fees to deduct from the amount in
-            _fees = (swap.remainder * _gamma) / 10_000;
-            _growthFeesToAdd += _fees;
-            swap.remainder -= _fees;
-
             // Compute amount to swap in this step.
             // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
             if (swap.remainder >= maxInput) {
-                delta = maxInput;
+                _fees = (maxInput * _gamma) / 10_000;
+                delta = maxInput - _fees;
 
                 {
                     // Entering or exiting the tick will transition the pool's active range.
@@ -206,16 +202,19 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 // Update variables for next iteration.
                 swap.tick = nextTick; // Set the next slot.
                 swap.price = nextPrice; // Set the next price according to the next slot.
-                swap.remainder -= delta; // Reduce the remainder of the order to fill.
+                swap.remainder -= delta + _fees; // Reduce the remainder of the order to fill.
                 swap.input += delta; // Add to the total input of the swap.
             } else {
                 // Reaching this block will fill the order. Set the swap input
-                delta = swap.remainder;
+                _fees = (maxInput * _gamma) / 10_000;
+                delta = swap.remainder - _fees;
                 nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
 
                 swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
                 swap.input += delta; // Add the full amount remaining to the toal.
             }
+
+            _growthFeesToAdd += _fees;
 
             // Compute the output of the swap by computing the difference between the dependent reserves.
             if (sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
