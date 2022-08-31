@@ -72,7 +72,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         int256 lo = int256(pool.lastTick - TICK_SIZE);
         tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
         // 6. Write changes to the pool.
-        _updatePool(poolId, tick, price, pool.liquidity, false, 0);
+        _updatePool(poolId, tick, price, pool.liquidity, 0, 0);
     }
 
     // FIXME: Temporary variables to avoid the hideous stack too deep errors
@@ -223,7 +223,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         } while (swap.remainder != 0 && args.limit > swap.price);
 
         // Update Pool State Effects
-        _updatePool(args.poolId, swap.tick, swap.price, swap.liquidity, sell, _growthFeesToAdd);
+        _updatePool(
+            args.poolId,
+            swap.tick,
+            swap.price,
+            swap.liquidity,
+            sell ? _growthFeesToAdd : 0,
+            sell ? 0 : _growthFeesToAdd
+        );
         // Update Global Balance Effects
         _increaseGlobal(pair.tokenBase, swap.input);
         _decreaseGlobal(pair.tokenQuote, swap.output);
@@ -246,8 +253,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         int24 tick,
         uint256 price,
         uint256 liquidity,
-        bool sell,
-        uint256 feesGrowth
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = _pools[poolId];
         if (pool.lastPrice != price) pool.lastPrice = price;
@@ -258,21 +265,16 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         timeDelta = timestamp - pool.blockTimestamp;
         pool.blockTimestamp = timestamp;
 
-        if (feesGrowth > 0) {
-            if (sell) {
-                pool.feeGrowthGlobalAsset += feesGrowth;
-            } else {
-                pool.feeGrowthGlobalQuote += feesGrowth;
-            }
-        }
+        if (feeGrowthGlobalAsset > 0) pool.feeGrowthGlobalAsset += feeGrowthGlobalAsset;
+        if (feeGrowthGlobalQuote > 0) pool.feeGrowthGlobalQuote += feeGrowthGlobalQuote;
 
         emit PoolUpdate(
             poolId,
             pool.lastPrice,
             pool.lastTick,
             pool.liquidity,
-            sell ? feesGrowth : 0,
-            sell ? 0 : feesGrowth
+            feeGrowthGlobalAsset,
+            feeGrowthGlobalQuote
         );
     }
 
