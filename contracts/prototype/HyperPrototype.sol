@@ -186,10 +186,11 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
 
+            _fees = (maxInput * _gamma) / 10_000;
+
             // Compute amount to swap in this step.
             // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
             if (swap.remainder >= maxInput) {
-                _fees = (maxInput * _gamma) / 10_000;
                 delta = maxInput - _fees;
 
                 {
@@ -206,7 +207,6 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 swap.input += delta; // Add to the total input of the swap.
             } else {
                 // Reaching this block will fill the order. Set the swap input
-                _fees = (maxInput * _gamma) / 10_000;
                 delta = swap.remainder - _fees;
                 nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
 
