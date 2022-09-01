@@ -200,6 +200,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     uint256 internal constant MIN_LIQUIDITY_FACTOR = 6;
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
     uint256 internal constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
+    /// @dev Amount of seconds that an epoch lasts.
+    uint256 internal constant EPOCH_INTERVAL = 300;
     /// @dev Used as the first pointer for the jump process.
     uint8 internal constant JUMP_PROCESS_START_POINTER = 2;
     uint8 internal constant MIN_DECIMALS = 6;

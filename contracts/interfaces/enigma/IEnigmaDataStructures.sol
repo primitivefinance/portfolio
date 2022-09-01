@@ -69,9 +69,11 @@ interface IEnigmaDataStructures {
         uint256 blockTimestamp;
         uint256 liquidity;
         uint256 stakedLiquidity;
+        int256 epochStakedLiquidityDelta;
         address prioritySwapper;
         uint256 feeGrowthGlobalAsset;
         uint256 feeGrowthGlobalQuote;
+        mapping(uint256 => uint256) epochRewardGrowthGlobal;
     }
 
     /**
@@ -82,10 +84,11 @@ interface IEnigmaDataStructures {
         int24 hiTick;
         uint256 totalLiquidity;
         uint256 blockTimestamp;
-        bool staked;
-        uint256 unstakeEpochId;
         uint256 lastFeeGrowthQuote;
         uint256 lastFeeGrowthAsset;
+        uint256 stakeEpochId;
+        uint256 unstakeEpochId;
+        uint256 lastRewardGrowth;
     }
 
     /**
@@ -94,9 +97,12 @@ interface IEnigmaDataStructures {
     struct HyperSlot {
         int256 liquidityDelta;
         int256 stakedLiquidityDelta;
+        int256 epochStakedLiquidityDelta;
         uint256 totalLiquidity;
         uint256 feeGrowthOutsideAsset;
         uint256 feeGrowthOutsideQuote;
+        uint256 rewardGrowthOutside;
+        mapping(uint256 => uint256) epochRewardGrowthOutside;
         bool instantiated;
         uint256 timestamp;
     }

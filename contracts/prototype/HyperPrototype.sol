@@ -55,7 +55,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      */
     function _syncExpiringPoolTimeAndPrice(uint48 poolId) internal returns (uint256 price, int24 tick) {
         // Read the pool's info.
-        HyperPool memory pool = _pools[poolId];
+        HyperPool storage pool = _pools[poolId];
         // Use curve parameters to compute time remaining.
         Curve memory curve = _curves[uint32(poolId)];
         // 1. Compute previous time until maturity.
@@ -111,23 +111,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         // Pair is used to update global reserves and check msg.sender balance.
         Pair memory pair = _pairs[uint16(args.poolId >> 32)];
         // Pool is used to fetch information and eventually have its state updated.
-        HyperPool memory pool = _pools[args.poolId];
-
-        // Store the pool transiently, then delete after the swap.
-        HyperSwapLib.Expiring memory expiring;
-        {
-            // Curve stores the parameters of the trading function.
-            Curve memory curve = _curves[uint32(args.poolId)];
-
-            expiring = HyperSwapLib.Expiring({
-                strike: curve.strike,
-                sigma: curve.sigma,
-                tau: curve.maturity - _blockTimestamp()
-            });
-
-            // Fetch the correct gamma to calculate the fees.
-            _gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
-        }
+        HyperPool storage pool = _pools[args.poolId];
 
         // Get the variables for first iteration of the swap.
         Iteration memory swap;
@@ -145,6 +129,22 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 input: 0,
                 output: 0
             });
+        }
+
+        // Store the pool transiently, then delete after the swap.
+        HyperSwapLib.Expiring memory expiring;
+        {
+            // Curve stores the parameters of the trading function.
+            Curve memory curve = _curves[uint32(args.poolId)];
+
+            expiring = HyperSwapLib.Expiring({
+                strike: curve.strike,
+                sigma: curve.sigma,
+                tau: curve.maturity - _blockTimestamp()
+            });
+
+            // Fetch the correct gamma to calculate the fees after pool synced.
+            _gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
         }
 
         // ----- Effects ----- //
@@ -194,9 +194,19 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
                 {
                     // Entering or exiting the tick will transition the pool's active range.
-                    int256 liquidityDelta = _transitionSlot(args.poolId, swap.tick);
+                    (
+                        int256 liquidityDelta,
+                        int256 stakedLiquidityDelta,
+                        int256 epochStakedLiquidityDelta
+                    ) = _transitionSlot(args.poolId, swap.tick); // note: shouldn't this use nextTick?
                     if (liquidityDelta > 0) swap.liquidity += uint256(liquidityDelta);
                     else swap.liquidity -= uint256(liquidityDelta);
+
+                    // update pool staked liquidity values
+                    if (stakedLiquidityDelta > 0) pool.stakedLiquidity += uint256(stakedLiquidityDelta);
+                    else pool.stakedLiquidity -= uint256(stakedLiquidityDelta);
+
+                    pool.epochStakedLiquidityDelta += epochStakedLiquidityDelta;
                 }
 
                 // Update variables for next iteration.
@@ -261,8 +271,26 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (pool.lastTick != tick) pool.lastTick = tick;
         if (pool.liquidity != liquidity) pool.liquidity = liquidity;
 
+        Epoch storage epoch = _epochs[poolId];
         uint256 timestamp = _blockTimestamp();
-        timeDelta = timestamp - pool.blockTimestamp;
+        uint256 prevTimestamp = pool.blockTimestamp;
+        if (prevTimestamp < epoch.endTime && timestamp >= epoch.endTime) {
+            // transition epoch
+            epoch.id += 1;
+            epoch.endTime += epoch.interval;
+            // todo: update staking reward growth
+            // update staked liquidity values for new epoch
+            if (pool.epochStakedLiquidityDelta > 0) {
+                pool.stakedLiquidity += uint256(pool.epochStakedLiquidityDelta);
+            } else {
+                pool.stakedLiquidity -= uint256(pool.epochStakedLiquidityDelta);
+            }
+            pool.epochStakedLiquidityDelta = 0;
+            // reset priority swapper since epoch ended
+            pool.prioritySwapper = address(0);
+            // todo: kickoff new priority auction
+        }
+        timeDelta = timestamp - prevTimestamp;
         pool.blockTimestamp = timestamp;
 
         if (feeGrowthGlobalAsset > 0) pool.feeGrowthGlobalAsset += feeGrowthGlobalAsset;
@@ -285,11 +313,31 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      * @param tick Key of the slot specified to be transitioned.
      * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
      */
-    function _transitionSlot(uint48 poolId, int24 tick) internal returns (int256 liquidityDelta) {
+    function _transitionSlot(uint48 poolId, int24 tick)
+        internal
+        returns (
+            int256 liquidityDelta,
+            int256 stakedLiquidityDelta,
+            int256 epochStakedLiquidityDelta
+        )
+    {
         HyperSlot storage slot = _slots[poolId][tick];
-        slot.timestamp = _blockTimestamp();
-        liquidityDelta = slot.liquidityDelta;
+        Epoch storage epoch = _epochs[poolId];
+        uint256 timestamp = _blockTimestamp();
+        uint256 prevTimestamp = slot.timestamp;
+        // note: assumes epoch would have already been transitioned
+        if (prevTimestamp < epoch.endTime - epoch.interval) {
+            // if prevTimestamp was before start of current epoch, update staked liquidity values
+            slot.stakedLiquidityDelta += slot.epochStakedLiquidityDelta;
+            slot.epochStakedLiquidityDelta = 0;
+        }
+        slot.timestamp = timestamp;
 
+        liquidityDelta = slot.liquidityDelta;
+        stakedLiquidityDelta = slot.stakedLiquidityDelta;
+        epochStakedLiquidityDelta = slot.epochStakedLiquidityDelta;
+
+        // todo: update transition event
         emit SlotTransition(poolId, tick, slot.liquidityDelta);
     }
 
@@ -311,8 +359,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
 
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = _curves[uint32(poolId_)];
-        HyperSlot memory slot = _slots[poolId_][loTick];
-        HyperPool memory pool = _pools[poolId_];
+        HyperSlot storage slot = _slots[poolId_][loTick];
+        HyperPool storage pool = _pools[poolId_];
         uint256 timestamp = _blockTimestamp();
 
         // Get lower price bound using the loTick index.
@@ -476,26 +524,28 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         HyperPosition storage pos = _positions[msg.sender][positionId];
-        if (pos.staked) revert PositionStakedError(positionId);
+        if (pos.stakeEpochId != 0) revert PositionStakedError(positionId);
         if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
 
         HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
         HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
 
-        // add staked delta to lo tick, remove from hi tick
-        loSlot.stakedLiquidityDelta += int256(pos.totalLiquidity);
-        hiSlot.stakedLiquidityDelta -= int256(pos.totalLiquidity);
-        // note: we don't need to account for totalStakedLiquidity at a tick
-        // since the "normal" liquidity ensures the tick remains instantiated
+        // todo: check if slots need to be updated for epoch transition
+
+        // add staked delta to lo tick, remove from hi tick for next epoch
+        loSlot.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
+        hiSlot.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
 
         HyperPool storage pool = _pools[poolId_];
         if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
-            // if position's liquidity is in range, add to pool's current
-            // staked liquidity amount
-            pool.stakedLiquidity += pos.totalLiquidity;
+            // if position's liquidity is in range, add to next epoch's delta
+            pool.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
         }
 
-        pos.staked = true;
+        Epoch storage epoch = _epochs[poolId_];
+        pos.stakeEpochId = epoch.id + 1;
+
+        // note: do we need to update position blockTimestamp?
 
         // emit Stake Position
     }
@@ -507,25 +557,27 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         HyperPosition storage pos = _positions[msg.sender][positionId];
-        if (!pos.staked) revert PositionNotStakedError(positionId);
+        if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(positionId);
 
         HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
         HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
 
-        // note: is it okay to remove staked liquidity now? will immediately stop earning rewards
-        loSlot.stakedLiquidityDelta -= int256(pos.totalLiquidity);
-        hiSlot.stakedLiquidityDelta += int256(pos.totalLiquidity);
+        // todo: check if slots need to be updated for epoch transition
+
+        // remove staked delta from lo tick, add to hi tick for next epoch
+        loSlot.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
+        hiSlot.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
 
         HyperPool storage pool = _pools[poolId_];
         if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
-            // if position's liquidity is in range, remove staked liquidity amount
-            // from pool's state
-            pool.stakedLiquidity -= pos.totalLiquidity;
+            // if position's liquidity is in range, add to next epoch's delta
+            pool.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
         }
 
         Epoch storage epoch = _epochs[poolId_];
-        pos.unstakeEpochId = epoch.id;
-        pos.staked = false;
+        pos.unstakeEpochId = epoch.id + 1;
+
+        // note: do we need to update position blockTimestamp?
 
         // emit Unstake Position
     }
@@ -583,17 +635,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         uint128 timestamp = _blockTimestamp();
         if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
 
+        // Write the epoch data
+        _epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
+
         // Write the pool to state with the desired price.
-        _pools[poolId] = HyperPool({
-            lastPrice: price,
-            lastTick: HyperSwapLib.computeTickWithPrice(price), // todo: implement slot and price grid.
-            blockTimestamp: timestamp,
-            liquidity: 0,
-            stakedLiquidity: 0,
-            prioritySwapper: address(0),
-            feeGrowthGlobalAsset: 0,
-            feeGrowthGlobalQuote: 0
-        });
+        _pools[poolId].lastPrice = price;
+        _pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price); // todo: implement slot and price grid.
+        _pools[poolId].blockTimestamp = timestamp;
 
         emit CreatePool(poolId, pairId, curveId, price);
     }
