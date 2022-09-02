@@ -157,6 +157,42 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         _decreasePosition(poolId, loTick, hiTick, deltaLiquidity);
     }
 
+    function getFeeGrowthInside(
+        uint48 poolId,
+        int24 hi,
+        int24 lo,
+        int24 current,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    ) internal view returns (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) {
+        HyperSlot memory hiTick = _slots[poolId][hi];
+        HyperSlot memory loTick = _slots[poolId][lo];
+
+        uint256 feeGrowthBelowAsset;
+        uint256 feeGrowthBelowQuote;
+
+        if (current >= lo) {
+            feeGrowthBelowAsset = loTick.feeGrowthOutsideAsset;
+            feeGrowthBelowQuote = loTick.feeGrowthOutsideQuote;
+        } else {
+            feeGrowthBelowAsset = feeGrowthGlobalAsset - loTick.feeGrowthOutsideAsset;
+            feeGrowthBelowQuote = feeGrowthGlobalQuote - loTick.feeGrowthOutsideQuote;
+        }
+
+        uint256 feeGrowthAboveAsset;
+        uint256 feeGrowthAboveQuote;
+        if (current < hi) {
+            feeGrowthAboveAsset = hiTick.feeGrowthOutsideAsset;
+            feeGrowthAboveQuote = hiTick.feeGrowthOutsideQuote;
+        } else {
+            feeGrowthAboveAsset = feeGrowthGlobalAsset - hiTick.feeGrowthOutsideAsset;
+            feeGrowthAboveQuote = feeGrowthGlobalQuote - hiTick.feeGrowthOutsideQuote;
+        }
+
+        feeGrowthInsideAsset = feeGrowthGlobalAsset - feeGrowthBelowAsset - feeGrowthAboveAsset;
+        feeGrowthInsideQuote = feeGrowthGlobalQuote - feeGrowthBelowQuote - feeGrowthAboveQuote;
+    }
+
     // --- State --- //
     /// @dev Pool id -> Tick -> Slot has liquidity at a price.
     mapping(uint48 => mapping(int24 => HyperSlot)) internal _slots;
