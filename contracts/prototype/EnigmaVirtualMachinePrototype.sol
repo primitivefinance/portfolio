@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "@rari-capital/solmate/src/utils/FixedPointMathLib.sol";
+
 import "../interfaces/IEnigma.sol";
 import "../interfaces/IERC20.sol";
 import "../libraries/Decoder.sol";
@@ -103,6 +105,29 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     // --- Positions --- //
 
+    function _updatePositionFees(
+        HyperPosition storage pos,
+        uint48 poolId,
+        uint256 feeGrowthInsideAsset,
+        uint256 feeGrowthInsideQuote
+    ) internal {
+        uint256 tokensOwedAsset = FixedPointMathLib.divWadDown(
+            feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
+            _pools[poolId].liquidity
+        );
+
+        uint256 tokensOwedQuote = FixedPointMathLib.divWadDown(
+            feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
+            _pools[poolId].liquidity
+        );
+
+        pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
+        pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
+
+        pos.tokensOwedAsset += tokensOwedAsset;
+        pos.tokensOwedQuote += tokensOwedQuote;
+    }
+
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(
@@ -122,6 +147,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
+        // TODO: Call _increasePosition to update fee related variables
+
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
@@ -139,6 +166,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
         pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
+
+        // TODO: Call _increasePosition to update fee related variables
 
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
