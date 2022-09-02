@@ -147,7 +147,16 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
-        // TODO: Call _increasePosition to update fee related variables
+        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = getFeeGrowthInside(
+            poolId,
+            hiTick,
+            loTick,
+            _pools[poolId].lastTick,
+            _pools[poolId].feeGrowthGlobalAsset,
+            _pools[poolId].feeGrowthGlobalQuote
+        );
+
+        _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
 
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
@@ -167,7 +176,16 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
-        // TODO: Call _increasePosition to update fee related variables
+        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = getFeeGrowthInside(
+            poolId,
+            hiTick,
+            loTick,
+            _pools[poolId].lastTick,
+            _pools[poolId].feeGrowthGlobalAsset,
+            _pools[poolId].feeGrowthGlobalQuote
+        );
+
+        _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
 
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
