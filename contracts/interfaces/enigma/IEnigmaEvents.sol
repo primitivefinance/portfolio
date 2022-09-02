@@ -74,4 +74,7 @@ interface IEnigmaEvents {
     event UpdateLastTimestamp(uint48 poolId);
     /// @dev Emitted when entering or exiting a slot when swapping.
     event SlotTransition(uint48 indexed poolId, int24 indexed tick, int256 liquidityDelta);
+
+    // --- Fees --- ///
+    event Collect(uint96 indexed positionId, address to, uint256 tokensCollectedAsset, uint256 tokensCollectedQuote);
 }
