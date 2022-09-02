@@ -82,6 +82,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         uint256 feeGrowthGlobal;
     }
 
+    SwapState state;
+
     /**
      * @notice Engima method to swap tokens.
      * @dev Swaps exact input of tokens for an output of tokens in the specified direction.
@@ -100,7 +102,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 output
         )
     {
-        SwapState memory state;
+        // SwapState memory state;
 
         Order memory args;
         (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
