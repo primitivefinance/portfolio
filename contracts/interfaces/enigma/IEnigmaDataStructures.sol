@@ -84,8 +84,10 @@ interface IEnigmaDataStructures {
         uint256 blockTimestamp;
         bool staked;
         uint256 unstakeEpochId;
-        uint256 feeGrowthInsideAsset;
-        uint256 feeGrowthInsideQuote;
+        uint256 feeGrowthInsideAssetLast;
+        uint256 feeGrowthInsideQuoteLast;
+        uint256 tokensOwedAsset;
+        uint256 tokensOwedQuote;
     }
 
     /**
