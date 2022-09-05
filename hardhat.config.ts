@@ -30,6 +30,9 @@ const config: HardhatUserConfig = {
           },
         },
       },
+      {
+        version: '0.4.18',
+      },
     ],
   },
   networks: {
@@ -43,7 +46,7 @@ const config: HardhatUserConfig = {
     currency: 'USD',
   },
   // Avoid foundry cache conflict.
-  paths: { cache: 'hh-cache' },
+  paths: { sources: './contracts', cache: 'hh-cache' },
 }
 
 export default config

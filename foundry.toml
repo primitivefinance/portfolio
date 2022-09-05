@@ -1,15 +1,16 @@
 [profile.default]
 via_ir = true
 src = 'contracts'
-out = 'out'
+out = 'artifacts/contracts'
 libs = ['lib', 'node_modules']
-test = 'test/'
+test = 'test/foundry'
+cache_path = 'forge-cache'
 remappings = [
-    'ds-test=lib/ds-test/src/',
-    'forge-std=lib/forge-std/src/',
+    'ds-test/=lib/solmate/lib/ds-test/src/',
+    'forge-std/=lib/forge-std/src/',
+    'solmate/=lib/solmate/src/',
     'solstat/=lib/solstat/contracts/',
     'contracts/=contracts/',
-    'solmate/=lib/solmate/src/',
     'lib/=lib/'
 ]
 optimizer_runs = 15000
@@ -25,6 +26,9 @@ out = 'optimized-out'
 solc = '0.8.13'
 via_ir = false
 src = 'test/'
+out = 'artifacts/contracts'
+cache_path = 'forge-cache'
+libs = ['lib', 'node_modules']
 gas_reports = ["*"]
 ffi = true
 fuzz_runs = 500

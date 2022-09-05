@@ -11,7 +11,8 @@
     "lint:check": "prettier --check **.sol && prettier --check **.js && prettier --check **.ts && hardhat compile --config ./hardhat.config.ts",
     "lint:fix": "prettier --write **.sol && prettier --write **.js && prettier --write **.ts",
     "prepare": "husky install",
-    "generate": "cd ./test/differential/scripts/ && npm run compile && npm run generate"
+    "generate": "cd ./test/differential/scripts/ && npm run compile && npm run generate",
+    "sync-deps": "forge remappings > remappings.txt"
   },
   "repository": {
     "type": "git",
