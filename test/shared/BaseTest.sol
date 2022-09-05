@@ -51,62 +51,20 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
         _checkJitLiquidity(account, poolId, loTick, hiTick);
     }
 
-    function pairs(uint16 pairId)
-        external
-        view
-        override
-        returns (
-            address assetToken,
-            uint8 assetDecimals,
-            address quoteToken,
-            uint8 quoteDecimals
-        )
-    {
-        Pair memory p = _pairs[pairId];
-        (assetToken, assetDecimals, quoteToken, quoteDecimals) = (
-            p.tokenBase,
-            p.decimalsBase,
-            p.tokenQuote,
-            p.decimalsQuote
-        );
+    function pairs(uint16 pairId) external view override returns (Pair memory p) {
+        p = _pairs[pairId];
     }
 
-    function curves(uint32 curveId)
-        external
-        view
-        override
-        returns (
-            uint128 strike,
-            uint24 sigma,
-            uint32 maturity,
-            uint32 gamma,
-            uint32 priorityGamma
-        )
-    {
-        Curve memory c = _curves[curveId];
-        (strike, sigma, maturity, gamma, priorityGamma) = (c.strike, c.sigma, c.maturity, c.gamma, c.priorityGamma);
+    function curves(uint32 curveId) external view override returns (Curve memory c) {
+        c = _curves[curveId];
     }
 
-    function pools(uint48 poolId)
-        external
-        view
-        override
-        returns (
-            uint256 lastPrice,
-            int24 lastTick,
-            uint256 blockTimestamp,
-            uint256 liquidity,
-            address prioritySwapper
-        )
-    {
-        HyperPool storage p = _pools[poolId];
-        (lastPrice, lastTick, blockTimestamp, liquidity, prioritySwapper) = (
-            p.lastPrice,
-            p.lastTick,
-            p.blockTimestamp,
-            p.liquidity,
-            p.prioritySwapper
-        );
+    function pools(uint48 poolId) external view override returns (HyperPool memory p) {
+        p = _pools[poolId];
+    }
+
+    function getPairId(address token0, address token1) external view returns (uint16) {
+        return _getPairId[token0][token1];
     }
 
     function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
@@ -119,6 +77,18 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
 
     function getPairNonce() external view override returns (uint256) {
         return _pairNonce;
+    }
+
+    function reserves(address asset) external view override returns (uint256) {
+        return _globalReserves[asset];
+    }
+
+    function slots(uint48 poolId, int24 slot) external view returns (IEnigmaDataStructures.HyperSlot memory) {
+        return _slots[poolId][slot];
+    }
+
+    function positions(address owner, uint96 id) external view returns (HyperPosition memory p) {
+        p = _positions[owner][id];
     }
 }
 
@@ -136,6 +106,4 @@ contract StandardHelpers {
     int24 public constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
 }
 
-contract BaseTest is Test, StandardHelpers, FakeEnigmaAbstractOverrides {
-    constructor(address weth) FakeEnigmaAbstractOverrides(weth) {}
-}
+contract BaseTest is Test, StandardHelpers {}

@@ -1,17 +1,21 @@
 pragma solidity 0.8.13;
 
+import "solmate/tokens/WETH.sol";
+
+import "../../contracts/interfaces/enigma/IEnigmaDataStructures.sol";
+
 import "../shared/BaseTest.sol";
+import "../shared/TestPrototype.sol";
 
 import "../../contracts/test/TestERC20.sol";
-import "../../contracts/prototype/HyperPrototype.sol";
 
 contract Forwarder is Test {
-    TestHyperPrototype public hyper;
+    TestPrototype public hyper;
 
     bytes4 public expectedError;
 
-    constructor() {
-        hyper = TestHyperPrototype(msg.sender);
+    constructor(address prototype) {
+        hyper = TestPrototype(prototype);
     }
 
     function set(bytes4 err) public {
@@ -49,24 +53,27 @@ contract Forwarder is Test {
  * 1. Use Instructions library to encode add liquidity parameters as a single calldata byte string.
  * 2. Call a contract with the data which forwards it to the Hyper contract.
  */
-contract TestHyperPrototype is HyperPrototype, BaseTest {
+contract TestHyperPrototype is BaseTest {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
+    TestPrototype public __prototype;
+
+    WETH public weth;
     Forwarder public forwarder;
     TestERC20 public asset;
     TestERC20 public quote;
     uint48 __poolId;
 
-    constructor(address weth) BaseTest(weth) {}
-
     function setUp() public {
+        weth = new WETH();
+        __prototype = new TestPrototype(address(weth));
         (asset, quote) = handlePrerequesites();
     }
 
     function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1) {
         // Set the forwarder.
-        forwarder = new Forwarder();
+        forwarder = new Forwarder(address(__prototype));
 
         // 1. Two token contracts.
         token0 = new TestERC20("token0", "token0 name", 18);
@@ -77,7 +84,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint16 pairId = uint16(_pairNonce);
+        uint16 pairId = uint16(__prototype.getPairNonce());
 
         // 3. Create curve
         data = Instructions.encodeCreateCurve(
@@ -90,7 +97,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint32 curveId = uint32(_curveNonce);
+        uint32 curveId = uint32(__prototype.getCurveNonce());
 
         __poolId = Instructions.encodePoolId(pairId, curveId);
 
@@ -99,47 +106,19 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        assertEq(_doesPoolExist(__poolId), true);
-        assertEq(_pools[__poolId].lastTick != 0, true);
-        assertEq(_pools[__poolId].liquidity == 0, true);
-    }
-
-    // --- Implemented --- //
-
-    function process(bytes calldata data) external {
-        uint48 poolId_;
-        bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
-
-        if (instruction == Instructions.ADD_LIQUIDITY) {
-            (poolId_, ) = _addLiquidity(data);
-        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            (poolId_, , ) = _removeLiquidity(data);
-        } else if (instruction == Instructions.SWAP) {
-            (poolId_, , , ) = _swapExactForExact(data);
-        } else if (instruction == Instructions.STAKE_POSITION) {
-            (poolId_, ) = _stakePosition(data);
-        } else if (instruction == Instructions.UNSTAKE_POSITION) {
-            (poolId_, ) = _unstakePosition(data);
-        } else if (instruction == Instructions.CREATE_POOL) {
-            (poolId_) = _createPool(data);
-        } else if (instruction == Instructions.CREATE_CURVE) {
-            _createCurve(data);
-        } else if (instruction == Instructions.CREATE_PAIR) {
-            _createPair(data);
-        } else {
-            revert UnknownInstruction();
-        }
+        assertEq(__prototype.doesPoolExist(__poolId), true);
+        assertEq(__prototype.pools(__poolId).lastTick != 0, true);
+        assertEq(__prototype.pools(__poolId).liquidity == 0, true);
     }
 
     // --- Helpers --- //
 
     function getSlotLiquidity(int24 slot) public view returns (uint256) {
-        return _slots[__poolId][slot].totalLiquidity;
+        return __prototype.slots(__poolId, slot).totalLiquidity;
     }
 
     function getSlotLiquidityDelta(int24 slot) public view returns (int256) {
-        return _slots[__poolId][slot].liquidityDelta;
+        return __prototype.slots(__poolId, slot).liquidityDelta;
     }
 
     // --- Swap --- //
@@ -173,14 +152,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = _slots[__poolId][23028].timestamp; // todo: fix, I know this slot from console.log.
+        uint256 prev = __prototype.slots(__poolId, 23028).timestamp; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = _slots[__poolId][23028].timestamp;
+        uint256 next = __prototype.slots(__poolId, 23028).timestamp;
         assertTrue(next != prev);
     }
 
@@ -199,14 +178,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = _pools[__poolId].lastPrice; // todo: fix, I know this slot from console.log.
+        uint256 prev = __prototype.pools(__poolId).lastPrice; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = _pools[__poolId].lastPrice;
+        uint256 next = __prototype.pools(__poolId).lastPrice;
         assertTrue(next != prev);
     }
 
@@ -225,14 +204,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        int256 prev = _pools[__poolId].lastTick; // todo: fix, I know this slot from console.log.
+        int256 prev = __prototype.pools(__poolId).lastTick; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        int256 next = _pools[__poolId].lastTick;
+        int256 next = __prototype.pools(__poolId).lastTick;
         assertTrue(next != prev);
     }
 
@@ -250,14 +229,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(success);
         // move some time
         vm.warp(block.timestamp + 1);
-        uint256 prev = _pools[__poolId].liquidity; // todo: fix, I know this slot from console.log.
+        uint256 prev = __prototype.pools(__poolId).liquidity; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = _pools[__poolId].liquidity;
+        uint256 next = __prototype.pools(__poolId).liquidity;
         assertTrue(next == prev);
     }
 
@@ -276,14 +255,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = _pools[__poolId].blockTimestamp; // todo: fix, I know this slot from console.log.
+        uint256 prev = __prototype.pools(__poolId).blockTimestamp; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = _pools[__poolId].blockTimestamp;
+        uint256 next = __prototype.pools(__poolId).blockTimestamp;
         assertTrue(next != prev);
     }
 
@@ -302,14 +281,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = _globalReserves[address(asset)]; // todo: fix, I know this slot from console.log.
+        uint256 prev = __prototype.reserves(address(asset)); // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = _globalReserves[address(asset)];
+        uint256 next = __prototype.reserves(address(asset));
         assertTrue(next > prev);
     }
 
@@ -328,14 +307,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = _globalReserves[address(quote)]; // todo: fix, I know this slot from console.log.
+        uint256 prev = __prototype.reserves(address(quote)); // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = _globalReserves[address(quote)];
+        uint256 next = __prototype.reserves(address(quote));
         assertTrue(next < prev);
     }
 
@@ -356,13 +335,13 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testA_LFullAddLiquidity() public {
-        uint256 price = _pools[__poolId].lastPrice;
-        Curve memory curve = _curves[uint32(__poolId)];
+        uint256 price = __prototype.pools(__poolId).lastPrice;
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId));
         uint256 theoreticalR2 = HyperSwapLib.computeR2WithPrice(
             price,
             curve.strike,
             curve.sigma,
-            curve.maturity - _blockTimestamp()
+            curve.maturity - block.timestamp
         );
         int24 min = int24(-887272);
         int24 max = -min;
@@ -372,8 +351,8 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
         forwarder.pass(data);
 
-        uint256 globalR1 = _globalReserves[address(quote)];
-        uint256 globalR2 = _globalReserves[address(asset)];
+        uint256 globalR1 = __prototype.reserves(address(quote));
+        uint256 globalR2 = __prototype.reserves(address(asset));
         assertTrue(globalR1 > 0);
         assertTrue(globalR2 > 0);
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
@@ -433,27 +412,27 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     function testA_LLowSlotInstantiatedChange() public {
         int24 slot = DEFAULT_TICK;
-        bool instantiated = _slots[__poolId][slot].instantiated;
+        bool instantiated = __prototype.slots(__poolId, slot).instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, slot, slot + 2, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bool change = _slots[__poolId][slot].instantiated;
+        bool change = __prototype.slots(__poolId, slot).instantiated;
         assertTrue(instantiated != change);
     }
 
     function testA_LHighSlotInstantiatedChange() public {
         int24 slot = DEFAULT_TICK;
-        bool instantiated = _slots[__poolId][slot].instantiated;
+        bool instantiated = __prototype.slots(__poolId, slot).instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, slot - 2, slot, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        bool change = _slots[__poolId][slot].instantiated;
+        bool change = __prototype.slots(__poolId, slot).instantiated;
         assertTrue(instantiated != change);
     }
 
@@ -462,7 +441,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         int24 loTick = hiTick - 2;
         uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
-        int24 prevPositionLoTick = _positions[address(forwarder)][positionId].loTick;
+        int24 prevPositionLoTick = __prototype.positions(address(forwarder), positionId).loTick;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -470,7 +449,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        int24 nextPositionLoTick = _positions[address(forwarder)][positionId].loTick;
+        int24 nextPositionLoTick = __prototype.positions(address(forwarder), positionId).loTick;
 
         assertTrue(prevPositionLoTick == 0);
         assertTrue(nextPositionLoTick == loTick);
@@ -481,7 +460,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         int24 loTick = hiTick - 2;
         uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
-        int24 prevPositionHiTick = _positions[address(forwarder)][positionId].hiTick;
+        int24 prevPositionHiTick = __prototype.positions(address(forwarder), positionId).hiTick;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -489,7 +468,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        int24 nextPositionHiTick = _positions[address(forwarder)][positionId].hiTick;
+        int24 nextPositionHiTick = __prototype.positions(address(forwarder), positionId).hiTick;
 
         assertTrue(prevPositionHiTick == 0);
         assertTrue(nextPositionHiTick == hiTick);
@@ -500,7 +479,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         int24 loTick = hiTick - 2;
         uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
-        uint256 prevPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+        uint256 prevPositionTimestamp = __prototype.positions(address(forwarder), positionId).blockTimestamp;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -508,7 +487,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+        uint256 nextPositionTimestamp = __prototype.positions(address(forwarder), positionId).blockTimestamp;
 
         assertTrue(prevPositionTimestamp == 0);
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
@@ -519,7 +498,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         int24 loTick = hiTick - 2;
         uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
 
-        uint256 prevPositionTotalLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+        uint256 prevPositionTotalLiquidity = __prototype.positions(address(forwarder), positionId).totalLiquidity;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -527,14 +506,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextPositionTotalLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+        uint256 nextPositionTotalLiquidity = __prototype.positions(address(forwarder), positionId).totalLiquidity;
 
         assertTrue(prevPositionTotalLiquidity == 0);
         assertTrue(nextPositionTotalLiquidity > prevPositionTotalLiquidity);
     }
 
     function testA_LGlobalAssetIncreases() public {
-        uint256 prevGlobal = _globalReserves[address(asset)];
+        uint256 prevGlobal = __prototype.reserves(address(asset));
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -543,13 +522,13 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextGlobal = _globalReserves[address(asset)];
+        uint256 nextGlobal = __prototype.reserves(address(asset));
         assertTrue(nextGlobal != 0, "next reserves is zero");
         assertTrue(nextGlobal > prevGlobal, "reserves did not change");
     }
 
     function testA_LGlobalQuoteIncreases() public {
-        uint256 prevGlobal = _globalReserves[address(quote)];
+        uint256 prevGlobal = __prototype.reserves(address(quote));
         int24 loTick = DEFAULT_TICK - 256; // Enough below to have quote.
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -558,7 +537,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextGlobal = _globalReserves[address(quote)];
+        uint256 nextGlobal = __prototype.reserves(address(quote));
         assertTrue(nextGlobal != 0, "next reserves is zero");
         assertTrue(nextGlobal > prevGlobal, "reserves did not change");
     }
@@ -586,12 +565,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = _slots[__poolId][lo].totalLiquidity;
+        uint256 prev = __prototype.slots(__poolId, lo).totalLiquidity;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = _slots[__poolId][lo].totalLiquidity;
+        uint256 next = __prototype.slots(__poolId, lo).totalLiquidity;
         assertTrue(next < prev);
     }
 
@@ -604,12 +583,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = _slots[__poolId][hi].totalLiquidity;
+        uint256 prev = __prototype.slots(__poolId, hi).totalLiquidity;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = _slots[__poolId][hi].totalLiquidity;
+        uint256 next = __prototype.slots(__poolId, hi).totalLiquidity;
         assertTrue(next < prev);
     }
 
@@ -658,12 +637,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        bool prev = _slots[__poolId][lo].instantiated;
+        bool prev = __prototype.slots(__poolId, lo).instantiated;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        bool next = _slots[__poolId][lo].instantiated;
+        bool next = __prototype.slots(__poolId, lo).instantiated;
         assertTrue(next != prev);
     }
 
@@ -676,12 +655,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        bool prev = _slots[__poolId][hi].instantiated;
+        bool prev = __prototype.slots(__poolId, hi).instantiated;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        bool next = _slots[__poolId][hi].instantiated;
+        bool next = __prototype.slots(__poolId, hi).instantiated;
         assertTrue(next != prev);
     }
 
@@ -695,7 +674,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(success, "forwarder call failed");
 
         uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
-        uint256 prevPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+        uint256 prevPositionTimestamp = __prototype.positions(address(forwarder), positionId).blockTimestamp;
 
         uint256 warpTimestamp = block.timestamp + 1;
         vm.warp(warpTimestamp);
@@ -703,7 +682,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         data = Instructions.encodeRemoveLiquidity(0, __poolId, loTick, hiTick, power, amount);
         success = forwarder.pass(data);
 
-        uint256 nextPositionTimestamp = _positions[address(forwarder)][positionId].blockTimestamp;
+        uint256 nextPositionTimestamp = __prototype.positions(address(forwarder), positionId).blockTimestamp;
 
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
     }
@@ -718,12 +697,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         assertTrue(success, "forwarder call failed");
 
         uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
-        uint256 prevPositionLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+        uint256 prevPositionLiquidity = __prototype.positions(address(forwarder), positionId).totalLiquidity;
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, loTick, hiTick, power, amount);
         success = forwarder.pass(data);
 
-        uint256 nextPositionLiquidity = _positions[address(forwarder)][positionId].totalLiquidity;
+        uint256 nextPositionLiquidity = __prototype.positions(address(forwarder), positionId).totalLiquidity;
 
         assertTrue(nextPositionLiquidity < prevPositionLiquidity);
     }
@@ -737,12 +716,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = _globalReserves[address(asset)];
+        uint256 prev = __prototype.reserves(address(asset));
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = _globalReserves[address(asset)];
+        uint256 next = __prototype.reserves(address(asset));
         assertTrue(next < prev, "reserves did not change");
     }
 
@@ -755,16 +734,38 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = _globalReserves[address(quote)];
+        uint256 prev = __prototype.reserves(address(quote));
 
         data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = _globalReserves[address(quote)];
+        uint256 next = __prototype.reserves(address(quote));
         assertTrue(next < prev, "reserves did not change");
     }
 
     // --- Stake Position --- //
+
+    function testS_PPositionStakedUpdated() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+
+        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+
+        assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
+        assertTrue(nextPositionStaked, "Position staked is not true.");
+    }
 
     function testS_PSlotLowTickStakedLiquidityDeltaIncreases() public {
         int24 lo = DEFAULT_TICK - 256;
@@ -775,13 +776,13 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        int256 prevStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = __prototype.slots(__poolId, lo).stakedLiquidityDelta;
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = __prototype.slots(__poolId, lo).stakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta > prevStakedLiquidityDelta,
@@ -798,13 +799,13 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        int256 prevStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = __prototype.slots(__poolId, hi).stakedLiquidityDelta;
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = __prototype.slots(__poolId, hi).stakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta < prevStakedLiquidityDelta,
@@ -821,18 +822,18 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prevPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+        uint256 prevPoolStakedLiquidity = __prototype.pools(__poolId).stakedLiquidity;
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        uint256 nextPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+        uint256 nextPoolStakedLiquidity = __prototype.pools(__poolId).stakedLiquidity;
 
-        if (lo <= _pools[__poolId].lastTick && hi > _pools[__poolId].lastTick) {
+        if (lo <= __prototype.pools(__poolId).lastTick && hi > __prototype.pools(__poolId).lastTick) {
             assertTrue(nextPoolStakedLiquidity > prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
             assertTrue(
-                nextPoolStakedLiquidity == _positions[address(forwarder)][positionId].totalLiquidity,
+                nextPoolStakedLiquidity == __prototype.positions(address(forwarder), positionId).totalLiquidity,
                 "Pool staked liquidity not equal to liquidity of staked position."
             );
         } else {
@@ -844,6 +845,30 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     // --- Unstake Position --- //
+
+    function testU_PPositionStakedUpdated() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+
+        data = Instructions.encodeUnstakePosition(positionId);
+        success = forwarder.pass(data);
+
+        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+
+        assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
+        assertTrue(!nextPositionStaked, "Position staked is true.");
+    }
 
     function testU_PSlotLowTickStakedLiquidityDeltaDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
@@ -858,12 +883,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 prevStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = __prototype.slots(__poolId, lo).stakedLiquidityDelta;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = _slots[__poolId][lo].stakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = __prototype.slots(__poolId, lo).stakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta < prevStakedLiquidityDelta,
@@ -884,12 +909,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 prevStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = __prototype.slots(__poolId, hi).stakedLiquidityDelta;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = _slots[__poolId][hi].stakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = __prototype.slots(__poolId, hi).stakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta > prevStakedLiquidityDelta,
@@ -910,14 +935,14 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        uint256 prevPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+        uint256 prevPoolStakedLiquidity = __prototype.pools(__poolId).stakedLiquidity;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        uint256 nextPoolStakedLiquidity = _pools[__poolId].stakedLiquidity;
+        uint256 nextPoolStakedLiquidity = __prototype.pools(__poolId).stakedLiquidity;
 
-        if (lo <= _pools[__poolId].lastTick && hi > _pools[__poolId].lastTick) {
+        if (lo <= __prototype.pools(__poolId).lastTick && hi > __prototype.pools(__poolId).lastTick) {
             assertTrue(nextPoolStakedLiquidity < prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
             assertTrue(nextPoolStakedLiquidity == 0, "Pool staked liquidity does not equal 0 after unstake.");
         } else {
@@ -957,33 +982,33 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testC_PrPairNonceIncrementedReturnsOneAdded() public {
-        uint256 prevNonce = _pairNonce;
+        uint256 prevNonce = __prototype.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
-        uint256 nonce = _pairNonce;
+        uint256 nonce = __prototype.getPairNonce();
         assertEq(nonce, prevNonce + 1);
     }
 
     function testC_PrFetchesPairIdReturnsNonZero() public {
-        uint256 prevNonce = _pairNonce;
+        uint256 prevNonce = __prototype.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
-        uint256 pairId = _getPairId[token0][token1];
+        uint256 pairId = __prototype.getPairId(token0, token1);
         assertTrue(pairId != 0);
     }
 
     function testC_PrFetchesPairDataReturnsAddresses() public {
-        uint256 prevNonce = _pairNonce;
+        uint256 prevNonce = __prototype.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
-        uint16 pairId = _getPairId[token0][token1];
-        Pair memory pair = _pairs[pairId];
+        uint16 pairId = __prototype.getPairId(token0, token1);
+        IEnigmaDataStructures.Pair memory pair = __prototype.pairs(pairId);
         assertEq(pair.tokenBase, token0);
         assertEq(pair.tokenQuote, token1);
         assertEq(pair.decimalsBase, 18);
@@ -993,7 +1018,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     // --- Create Curve --- //
 
     function testFailC_CuCurveExistsReverts() public {
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1005,7 +1030,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testFailC_CuFeeParameterOutsideBoundsReverts() public {
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1017,7 +1042,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testFailC_CuPriorityFeeParameterOutsideBoundsReverts() public {
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1029,7 +1054,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testFailC_CuExpiringPoolZeroSigmaReverts() public {
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             0,
             curve.maturity,
@@ -1041,7 +1066,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testFailC_CuExpiringPoolZeroStrikeReverts() public {
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1053,8 +1078,8 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     function testC_CuCurveNonceIncrementReturnsOne() public {
-        uint256 prevNonce = _curveNonce;
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        uint256 prevNonce = __prototype.getCurveNonce();
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1063,12 +1088,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             curve.strike
         );
         bool success = forwarder.pass(data);
-        uint256 nextNonce = _curveNonce;
+        uint256 nextNonce = __prototype.getCurveNonce();
         assertEq(prevNonce, nextNonce - 1);
     }
 
     function testC_CuFetchesCurveIdReturnsNonZero() public {
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1086,12 +1111,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             )
         );
         bool success = forwarder.pass(data);
-        uint32 curveId = _getCurveIds[rawCurveId];
+        uint32 curveId = __prototype.getCurveId(rawCurveId);
         assertTrue(curveId != 0);
     }
 
     function testC_CuFetchesCurveDataReturnsParametersSet() public {
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1109,8 +1134,8 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
             )
         );
         bool success = forwarder.pass(data);
-        uint32 curveId = _getCurveIds[rawCurveId];
-        Curve memory newCurve = _curves[curveId];
+        uint32 curveId = __prototype.getCurveId(rawCurveId);
+        IEnigmaDataStructures.Curve memory newCurve = __prototype.curves(curveId);
         assertEq(newCurve.sigma, curve.sigma + 1);
         assertEq(newCurve.maturity, curve.maturity);
         assertEq(newCurve.gamma, curve.gamma);
@@ -1145,9 +1170,9 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
-        uint16 pairId = _getPairId[token0][token1];
+        uint16 pairId = __prototype.getPairId(token0, token1);
 
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             uint32(0),
@@ -1160,7 +1185,7 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         );
         success = forwarder.pass(data);
 
-        uint32 curveId = _getCurveIds[rawCurveId];
+        uint32 curveId = __prototype.getCurveId(rawCurveId);
         uint48 id = Instructions.encodePoolId(pairId, curveId);
         data = Instructions.encodeCreatePool(id, 1_000);
         success = forwarder.pass(data);
@@ -1171,9 +1196,9 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
-        uint16 pairId = _getPairId[token0][token1];
+        uint16 pairId = __prototype.getPairId(token0, token1);
 
-        Curve memory curve = _curves[uint32(__poolId)]; // Existing curve from helper setup
+        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1192,12 +1217,12 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
         );
         success = forwarder.pass(data);
 
-        uint32 curveId = _getCurveIds[rawCurveId];
+        uint32 curveId = __prototype.getCurveId(rawCurveId);
         uint48 id = Instructions.encodePoolId(pairId, curveId);
         data = Instructions.encodeCreatePool(id, 1_000);
         success = forwarder.pass(data);
 
-        uint256 time = _pools[id].blockTimestamp;
+        uint256 time = __prototype.pools(id).blockTimestamp;
         assertTrue(time != 0);
     }
 }
