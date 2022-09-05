@@ -58,6 +58,8 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     TestERC20 public quote;
     uint48 __poolId;
 
+    constructor(address weth) BaseTest(weth) {}
+
     function setUp() public {
         (asset, quote) = handlePrerequesites();
     }

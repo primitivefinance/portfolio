@@ -27,6 +27,7 @@ describe('HyperPrototype', function () {
   let sdk: HyperSDK
   let deployer: SignerWithAddress, signers: SignerWithAddress[]
   let tokens: [Contract, Contract]
+  let weth: Contract
 
   // Setup
   before(async function () {
@@ -37,11 +38,12 @@ describe('HyperPrototype', function () {
       async (signer) => await hre.ethers.getContractFactory('TestDecompilerPrototype', signer),
       async (signer) => await hre.ethers.getContractFactory('HyperForwarderHelper', signer)
     )
+    weth = await (await hre.ethers.getContractFactory('WETH9', signers[0])).deploy()
   })
 
   // Global context for every test.
   beforeEach(async function () {
-    this.hyper = await sdk.deploy() // Deploys Hyper protocol.
+    this.hyper = await sdk.deploy(weth.address) // Deploys Hyper protocol.
     assert(typeof sdk.instance != 'undefined', 'Hyper contract not there, did it get deployed?')
     assert(typeof sdk.forwarder != 'undefined', 'Forwarder contract not there, did it get deployed?')
 
