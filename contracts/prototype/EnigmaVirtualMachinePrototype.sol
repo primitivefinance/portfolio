@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "@rari-capital/solmate/src/utils/FixedPointMathLib.sol";
+
 import "../interfaces/IEnigma.sol";
 import "../interfaces/IERC20.sol";
 import "../libraries/Decoder.sol";
@@ -103,6 +105,29 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
 
     // --- Positions --- //
 
+    function _updatePositionFees(
+        HyperPosition storage pos,
+        uint48 poolId,
+        uint256 feeGrowthInsideAsset,
+        uint256 feeGrowthInsideQuote
+    ) internal {
+        uint256 tokensOwedAsset = FixedPointMathLib.divWadDown(
+            feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
+            _pools[poolId].liquidity
+        );
+
+        uint256 tokensOwedQuote = FixedPointMathLib.divWadDown(
+            feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
+            _pools[poolId].liquidity
+        );
+
+        pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
+        pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
+
+        pos.tokensOwedAsset += tokensOwedAsset;
+        pos.tokensOwedQuote += tokensOwedQuote;
+    }
+
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(
@@ -122,6 +147,17 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
+        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = getFeeGrowthInside(
+            poolId,
+            hiTick,
+            loTick,
+            _pools[poolId].lastTick,
+            _pools[poolId].feeGrowthGlobalAsset,
+            _pools[poolId].feeGrowthGlobalQuote
+        );
+
+        _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
+
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
@@ -140,6 +176,17 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
+        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = getFeeGrowthInside(
+            poolId,
+            hiTick,
+            loTick,
+            _pools[poolId].lastTick,
+            _pools[poolId].feeGrowthGlobalAsset,
+            _pools[poolId].feeGrowthGlobalQuote
+        );
+
+        _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
+
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
@@ -155,6 +202,42 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
         _decreasePosition(poolId, loTick, hiTick, deltaLiquidity);
+    }
+
+    function getFeeGrowthInside(
+        uint48 poolId,
+        int24 hi,
+        int24 lo,
+        int24 current,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    ) internal view returns (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) {
+        HyperSlot memory hiTick = _slots[poolId][hi];
+        HyperSlot memory loTick = _slots[poolId][lo];
+
+        uint256 feeGrowthBelowAsset;
+        uint256 feeGrowthBelowQuote;
+
+        if (current >= lo) {
+            feeGrowthBelowAsset = loTick.feeGrowthOutsideAsset;
+            feeGrowthBelowQuote = loTick.feeGrowthOutsideQuote;
+        } else {
+            feeGrowthBelowAsset = feeGrowthGlobalAsset - loTick.feeGrowthOutsideAsset;
+            feeGrowthBelowQuote = feeGrowthGlobalQuote - loTick.feeGrowthOutsideQuote;
+        }
+
+        uint256 feeGrowthAboveAsset;
+        uint256 feeGrowthAboveQuote;
+        if (current < hi) {
+            feeGrowthAboveAsset = hiTick.feeGrowthOutsideAsset;
+            feeGrowthAboveQuote = hiTick.feeGrowthOutsideQuote;
+        } else {
+            feeGrowthAboveAsset = feeGrowthGlobalAsset - hiTick.feeGrowthOutsideAsset;
+            feeGrowthAboveQuote = feeGrowthGlobalQuote - hiTick.feeGrowthOutsideQuote;
+        }
+
+        feeGrowthInsideAsset = feeGrowthGlobalAsset - feeGrowthBelowAsset - feeGrowthAboveAsset;
+        feeGrowthInsideQuote = feeGrowthGlobalQuote - feeGrowthBelowQuote - feeGrowthAboveQuote;
     }
 
     // --- State --- //

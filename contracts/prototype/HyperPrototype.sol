@@ -42,6 +42,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         int24 tick;
         uint256 price;
         uint256 remainder;
+        uint256 feeAmount;
         uint256 liquidity;
         uint256 input;
         uint256 output;
@@ -75,10 +76,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         _updatePool(poolId, tick, price, pool.liquidity, 0, 0);
     }
 
-    // FIXME: Temporary variables to avoid the hideous stack too deep errors
-    uint256 _gamma;
-    uint256 _fees;
-    uint256 _growthFeesToAdd;
+    struct SwapState {
+        bool sell;
+        uint256 gamma;
+        uint256 feeGrowthGlobal;
+    }
+
+    SwapState state;
 
     /**
      * @notice Engima method to swap tokens.
@@ -98,7 +102,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 output
         )
     {
-        _growthFeesToAdd = 0;
+        // SwapState memory state;
 
         Order memory args;
         (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
@@ -106,12 +110,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         if (args.input == 0) revert ZeroInput();
         if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
 
-        bool sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
+        state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
 
         // Pair is used to update global reserves and check msg.sender balance.
         Pair memory pair = _pairs[uint16(args.poolId >> 32)];
         // Pool is used to fetch information and eventually have its state updated.
         HyperPool storage pool = _pools[args.poolId];
+
+        state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
 
         // Get the variables for first iteration of the swap.
         Iteration memory swap;
@@ -124,6 +130,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             swap = Iteration({
                 price: price,
                 tick: tick,
+                feeAmount: 0,
                 remainder: remainder,
                 liquidity: pool.liquidity,
                 input: 0,
@@ -171,7 +178,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 liveDependent;
             uint256 nextDependent;
             // Compute them conditionally based on direction in arguments.
-            if (sell) {
+            if (state.sell) {
                 // Independent = asset, dependent = quote.
                 liveIndependent = expiring.computeR2WithPrice(swap.price);
                 (nextPrice, , nextIndependent) = expiring.computeReservesWithTick(nextTick);
@@ -186,11 +193,14 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
 
+            // Calculate the amount of fees paid at this tick.
+            swap.feeAmount = (swap.remainder >= maxInput ? maxInput : swap.remainder * state.gamma) / 10_000;
+            state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
+
             // Compute amount to swap in this step.
             // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
             if (swap.remainder >= maxInput) {
-                _fees = (maxInput * _gamma) / 10_000;
-                delta = maxInput - _fees;
+                delta = maxInput - swap.feeAmount;
 
                 {
                     // Entering or exiting the tick will transition the pool's active range.
@@ -198,7 +208,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                         int256 liquidityDelta,
                         int256 stakedLiquidityDelta,
                         int256 epochStakedLiquidityDelta
-                    ) = _transitionSlot(args.poolId, swap.tick); // note: shouldn't this use nextTick?
+                    ) = _transitionSlot(
+                        args.poolId,
+                        swap.tick,
+                        (state.sell ? state.feeGrowthGlobal : pool.feeGrowthGlobalAsset),
+                        (state.sell ? pool.feeGrowthGlobalQuote : state.feeGrowthGlobal)
+                    );
+                    
                     if (liquidityDelta > 0) swap.liquidity += uint256(liquidityDelta);
                     else swap.liquidity -= uint256(liquidityDelta);
 
@@ -212,22 +228,19 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 // Update variables for next iteration.
                 swap.tick = nextTick; // Set the next slot.
                 swap.price = nextPrice; // Set the next price according to the next slot.
-                swap.remainder -= delta + _fees; // Reduce the remainder of the order to fill.
+                swap.remainder -= delta + swap.feeAmount; // Reduce the remainder of the order to fill.
                 swap.input += delta; // Add to the total input of the swap.
             } else {
                 // Reaching this block will fill the order. Set the swap input
-                _fees = (maxInput * _gamma) / 10_000;
-                delta = swap.remainder - _fees;
+                delta = swap.remainder - swap.feeAmount;
                 nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
 
                 swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
                 swap.input += delta; // Add the full amount remaining to the toal.
             }
 
-            _growthFeesToAdd += _fees;
-
             // Compute the output of the swap by computing the difference between the dependent reserves.
-            if (sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
+            if (state.sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
             else nextDependent = expiring.computeR2WithR1(nextIndependent, 0, 0);
             swap.output += liveDependent - nextDependent;
         } while (swap.remainder != 0 && args.limit > swap.price);
@@ -238,8 +251,8 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             swap.tick,
             swap.price,
             swap.liquidity,
-            sell ? _growthFeesToAdd : 0,
-            sell ? 0 : _growthFeesToAdd
+            state.sell ? state.feeGrowthGlobal : 0,
+            state.sell ? 0 : state.feeGrowthGlobal
         );
         // Update Global Balance Effects
         _increaseGlobal(pair.tokenBase, swap.input);
@@ -313,13 +326,16 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      * @param tick Key of the slot specified to be transitioned.
      * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
      */
-    function _transitionSlot(uint48 poolId, int24 tick)
-        internal
-        returns (
+    function _transitionSlot(
+        uint48 poolId,
+        int24 tick,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    ) internal returns (
             int256 liquidityDelta,
             int256 stakedLiquidityDelta,
             int256 epochStakedLiquidityDelta
-        )
+        ) 
     {
         HyperSlot storage slot = _slots[poolId][tick];
         Epoch storage epoch = _epochs[poolId];
@@ -338,6 +354,10 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         epochStakedLiquidityDelta = slot.epochStakedLiquidityDelta;
 
         // todo: update transition event
+
+        slot.feeGrowthOutsideAsset = feeGrowthGlobalAsset - slot.feeGrowthOutsideAsset;
+        slot.feeGrowthOutsideQuote = feeGrowthGlobalQuote - slot.feeGrowthOutsideQuote;
+
         emit SlotTransition(poolId, tick, slot.liquidityDelta);
     }
 

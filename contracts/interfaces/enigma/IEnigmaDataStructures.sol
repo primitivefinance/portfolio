@@ -84,11 +84,13 @@ interface IEnigmaDataStructures {
         int24 hiTick;
         uint256 totalLiquidity;
         uint256 blockTimestamp;
-        uint256 lastFeeGrowthQuote;
-        uint256 lastFeeGrowthAsset;
         uint256 stakeEpochId;
         uint256 unstakeEpochId;
         uint256 lastRewardGrowth;
+        uint256 feeGrowthInsideAssetLast;
+        uint256 feeGrowthInsideQuoteLast;
+        uint256 tokensOwedAsset;
+        uint256 tokensOwedQuote;
     }
 
     /**
