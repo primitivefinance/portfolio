@@ -212,8 +212,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     ) internal view returns (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) {
-        HyperSlot memory hiTick = _slots[poolId][hi];
-        HyperSlot memory loTick = _slots[poolId][lo];
+        HyperSlot storage hiTick = _slots[poolId][hi];
+        HyperSlot storage loTick = _slots[poolId][lo];
 
         uint256 feeGrowthBelowAsset;
         uint256 feeGrowthBelowQuote;

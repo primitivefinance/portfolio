@@ -151,7 +151,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             });
 
             // Fetch the correct gamma to calculate the fees after pool synced.
-            _gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
+            state.gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
         }
 
         // ----- Effects ----- //
@@ -209,12 +209,12 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                         int256 stakedLiquidityDelta,
                         int256 epochStakedLiquidityDelta
                     ) = _transitionSlot(
-                        args.poolId,
-                        swap.tick,
-                        (state.sell ? state.feeGrowthGlobal : pool.feeGrowthGlobalAsset),
-                        (state.sell ? pool.feeGrowthGlobalQuote : state.feeGrowthGlobal)
-                    );
-                    
+                            args.poolId,
+                            swap.tick,
+                            (state.sell ? state.feeGrowthGlobal : pool.feeGrowthGlobalAsset),
+                            (state.sell ? pool.feeGrowthGlobalQuote : state.feeGrowthGlobal)
+                        );
+
                     if (liquidityDelta > 0) swap.liquidity += uint256(liquidityDelta);
                     else swap.liquidity -= uint256(liquidityDelta);
 
@@ -331,11 +331,13 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         int24 tick,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
-    ) internal returns (
+    )
+        internal
+        returns (
             int256 liquidityDelta,
             int256 stakedLiquidityDelta,
             int256 epochStakedLiquidityDelta
-        ) 
+        )
     {
         HyperSlot storage slot = _slots[poolId][tick];
         Epoch storage epoch = _epochs[poolId];

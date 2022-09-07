@@ -97,7 +97,7 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
             address prioritySwapper
         )
     {
-        HyperPool memory p = _pools[poolId];
+        HyperPool storage p = _pools[poolId];
         (lastPrice, lastTick, blockTimestamp, liquidity, prioritySwapper) = (
             p.lastPrice,
             p.lastTick,
