@@ -756,12 +756,12 @@ contract TestHyperPrototype is BaseTest {
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
 
-        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked, "Position staked is not true.");
@@ -859,12 +859,12 @@ contract TestHyperPrototype is BaseTest {
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(!nextPositionStaked, "Position staked is true.");

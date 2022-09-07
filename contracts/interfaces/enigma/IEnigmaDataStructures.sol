@@ -73,7 +73,6 @@ interface IEnigmaDataStructures {
         address prioritySwapper;
         uint256 feeGrowthGlobalAsset;
         uint256 feeGrowthGlobalQuote;
-        mapping(uint256 => uint256) epochRewardGrowthGlobal;
     }
 
     /**
@@ -104,7 +103,6 @@ interface IEnigmaDataStructures {
         uint256 feeGrowthOutsideAsset;
         uint256 feeGrowthOutsideQuote;
         uint256 rewardGrowthOutside;
-        mapping(uint256 => uint256) epochRewardGrowthOutside;
         bool instantiated;
         uint256 timestamp;
     }

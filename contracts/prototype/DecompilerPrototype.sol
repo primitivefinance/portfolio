@@ -192,7 +192,7 @@ contract DecompilerPrototype is HyperPrototype {
         c = _curves[curveId];
     }
 
-    function pools(uint48 poolId) external view override returns (HyperPool memory p) {
+    function pools(uint48 poolId) external view override returns (HyperPool memory) {
         p = _pools[poolId];
     }
 

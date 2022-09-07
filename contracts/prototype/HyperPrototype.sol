@@ -203,26 +203,30 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 delta = maxInput - swap.feeAmount;
 
                 {
+                    Order memory _args = args;
+                    SwapState memory _state = state;
+                    Iteration memory _swap = swap;
+                    HyperPool storage _pool = pool;
                     // Entering or exiting the tick will transition the pool's active range.
                     (
                         int256 liquidityDelta,
                         int256 stakedLiquidityDelta,
                         int256 epochStakedLiquidityDelta
                     ) = _transitionSlot(
-                            args.poolId,
-                            swap.tick,
-                            (state.sell ? state.feeGrowthGlobal : pool.feeGrowthGlobalAsset),
-                            (state.sell ? pool.feeGrowthGlobalQuote : state.feeGrowthGlobal)
+                            _args.poolId,
+                            _swap.tick,
+                            (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
+                            (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal)
                         );
 
-                    if (liquidityDelta > 0) swap.liquidity += uint256(liquidityDelta);
-                    else swap.liquidity -= uint256(liquidityDelta);
+                    if (liquidityDelta > 0) _swap.liquidity += uint256(liquidityDelta);
+                    else _swap.liquidity -= uint256(liquidityDelta);
 
-                    // update pool staked liquidity values
-                    if (stakedLiquidityDelta > 0) pool.stakedLiquidity += uint256(stakedLiquidityDelta);
-                    else pool.stakedLiquidity -= uint256(stakedLiquidityDelta);
+                    // update _pool staked liquidity values
+                    if (stakedLiquidityDelta > 0) _pool.stakedLiquidity += uint256(stakedLiquidityDelta);
+                    else _pool.stakedLiquidity -= uint256(stakedLiquidityDelta);
 
-                    pool.epochStakedLiquidityDelta += epochStakedLiquidityDelta;
+                    _pool.epochStakedLiquidityDelta += epochStakedLiquidityDelta;
                 }
 
                 // Update variables for next iteration.
