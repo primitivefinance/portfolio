@@ -764,28 +764,6 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
 
     // --- Stake Position --- //
 
-    function testS_PPositionStakedUpdated() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
-
-        bool prevPositionStaked = _positions[address(forwarder)][positionId].staked;
-
-        data = Instructions.encodeStakePosition(positionId);
-        success = forwarder.pass(data);
-
-        bool nextPositionStaked = _positions[address(forwarder)][positionId].staked;
-
-        assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
-        assertTrue(nextPositionStaked, "Position staked is not true.");
-    }
-
     function testS_PSlotLowTickStakedLiquidityDeltaIncreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
@@ -864,30 +842,6 @@ contract TestHyperPrototype is HyperPrototype, BaseTest {
     }
 
     // --- Unstake Position --- //
-
-    function testU_PPositionStakedUpdated() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
-        data = Instructions.encodeStakePosition(positionId);
-        success = forwarder.pass(data);
-
-        bool prevPositionStaked = _positions[address(forwarder)][positionId].staked;
-
-        data = Instructions.encodeUnstakePosition(positionId);
-        success = forwarder.pass(data);
-
-        bool nextPositionStaked = _positions[address(forwarder)][positionId].staked;
-
-        assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
-        assertTrue(!nextPositionStaked, "Position staked is true.");
-    }
 
     function testU_PSlotLowTickStakedLiquidityDeltaDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
