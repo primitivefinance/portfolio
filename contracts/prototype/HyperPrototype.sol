@@ -42,6 +42,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         int24 tick;
         uint256 price;
         uint256 remainder;
+        uint256 feeAmount;
         uint256 liquidity;
         uint256 input;
         uint256 output;
@@ -72,8 +73,16 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         int256 lo = int256(pool.lastTick - TICK_SIZE);
         tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
         // 6. Write changes to the pool.
-        _updatePool(poolId, tick, price, pool.liquidity);
+        _updatePool(poolId, tick, price, pool.liquidity, 0, 0);
     }
+
+    struct SwapState {
+        bool sell;
+        uint256 gamma;
+        uint256 feeGrowthGlobal;
+    }
+
+    SwapState state;
 
     /**
      * @notice Engima method to swap tokens.
@@ -93,29 +102,37 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 output
         )
     {
+        // SwapState memory state;
+
         Order memory args;
         (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (args.input == 0) revert ZeroInput();
         if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
 
-        bool sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
+        state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
 
         // Pair is used to update global reserves and check msg.sender balance.
         Pair memory pair = _pairs[uint16(args.poolId >> 32)];
         // Pool is used to fetch information and eventually have its state updated.
-        HyperPool memory pool = _pools[args.poolId];
+        HyperPool storage pool = _pools[args.poolId];
+
+        state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
 
         // Store the pool transiently, then delete after the swap.
         HyperSwapLib.Expiring memory expiring;
         {
             // Curve stores the parameters of the trading function.
             Curve memory curve = _curves[uint32(args.poolId)];
+
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
                 sigma: curve.sigma,
                 tau: curve.maturity - _blockTimestamp()
             });
+
+            // Fetch the correct gamma to calculate the fees.
+            state.gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
         }
 
         // Get the variables for first iteration of the swap.
@@ -129,6 +146,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             swap = Iteration({
                 price: price,
                 tick: tick,
+                feeAmount: 0,
                 remainder: remainder,
                 liquidity: pool.liquidity,
                 input: 0,
@@ -160,7 +178,7 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             uint256 liveDependent;
             uint256 nextDependent;
             // Compute them conditionally based on direction in arguments.
-            if (sell) {
+            if (state.sell) {
                 // Independent = asset, dependent = quote.
                 liveIndependent = expiring.computeR2WithPrice(swap.price);
                 (nextPrice, , nextIndependent) = expiring.computeReservesWithTick(nextTick);
@@ -175,14 +193,23 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
 
+            // Calculate the amount of fees paid at this tick.
+            swap.feeAmount = (swap.remainder >= maxInput ? maxInput : swap.remainder * state.gamma) / 10_000;
+            state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
+
             // Compute amount to swap in this step.
             // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
             if (swap.remainder >= maxInput) {
-                delta = maxInput;
+                delta = maxInput - swap.feeAmount;
 
                 {
                     // Entering or exiting the tick will transition the pool's active range.
-                    int256 liquidityDelta = _transitionSlot(args.poolId, swap.tick);
+                    int256 liquidityDelta = _transitionSlot(
+                        args.poolId,
+                        swap.tick,
+                        (state.sell ? state.feeGrowthGlobal : pool.feeGrowthGlobalAsset),
+                        (state.sell ? pool.feeGrowthGlobalQuote : state.feeGrowthGlobal)
+                    );
                     if (liquidityDelta > 0) swap.liquidity += uint256(liquidityDelta);
                     else swap.liquidity -= uint256(liquidityDelta);
                 }
@@ -190,11 +217,11 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
                 // Update variables for next iteration.
                 swap.tick = nextTick; // Set the next slot.
                 swap.price = nextPrice; // Set the next price according to the next slot.
-                swap.remainder -= delta; // Reduce the remainder of the order to fill.
+                swap.remainder -= delta + swap.feeAmount; // Reduce the remainder of the order to fill.
                 swap.input += delta; // Add to the total input of the swap.
             } else {
                 // Reaching this block will fill the order. Set the swap input
-                delta = swap.remainder;
+                delta = swap.remainder - swap.feeAmount;
                 nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
 
                 swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
@@ -202,13 +229,20 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             }
 
             // Compute the output of the swap by computing the difference between the dependent reserves.
-            if (sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
+            if (state.sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
             else nextDependent = expiring.computeR2WithR1(nextIndependent, 0, 0);
             swap.output += liveDependent - nextDependent;
         } while (swap.remainder != 0 && args.limit > swap.price);
 
         // Update Pool State Effects
-        _updatePool(args.poolId, swap.tick, swap.price, swap.liquidity);
+        _updatePool(
+            args.poolId,
+            swap.tick,
+            swap.price,
+            swap.liquidity,
+            state.sell ? state.feeGrowthGlobal : 0,
+            state.sell ? 0 : state.feeGrowthGlobal
+        );
         // Update Global Balance Effects
         _increaseGlobal(pair.tokenBase, swap.input);
         _decreaseGlobal(pair.tokenQuote, swap.output);
@@ -230,7 +264,9 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         uint48 poolId,
         int24 tick,
         uint256 price,
-        uint256 liquidity
+        uint256 liquidity,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = _pools[poolId];
         if (pool.lastPrice != price) pool.lastPrice = price;
@@ -241,7 +277,17 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
         timeDelta = timestamp - pool.blockTimestamp;
         pool.blockTimestamp = timestamp;
 
-        emit PoolUpdate(poolId, pool.lastPrice, pool.lastTick, pool.liquidity);
+        if (feeGrowthGlobalAsset > 0) pool.feeGrowthGlobalAsset += feeGrowthGlobalAsset;
+        if (feeGrowthGlobalQuote > 0) pool.feeGrowthGlobalQuote += feeGrowthGlobalQuote;
+
+        emit PoolUpdate(
+            poolId,
+            pool.lastPrice,
+            pool.lastTick,
+            pool.liquidity,
+            feeGrowthGlobalAsset,
+            feeGrowthGlobalQuote
+        );
     }
 
     /**
@@ -251,10 +297,18 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
      * @param tick Key of the slot specified to be transitioned.
      * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
      */
-    function _transitionSlot(uint48 poolId, int24 tick) internal returns (int256 liquidityDelta) {
+    function _transitionSlot(
+        uint48 poolId,
+        int24 tick,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    ) internal returns (int256 liquidityDelta) {
         HyperSlot storage slot = _slots[poolId][tick];
         slot.timestamp = _blockTimestamp();
         liquidityDelta = slot.liquidityDelta;
+
+        slot.feeGrowthOutsideAsset = feeGrowthGlobalAsset - slot.feeGrowthOutsideAsset;
+        slot.feeGrowthOutsideQuote = feeGrowthGlobalQuote - slot.feeGrowthOutsideQuote;
 
         emit SlotTransition(poolId, tick, slot.liquidityDelta);
     }
@@ -556,7 +610,9 @@ abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
             blockTimestamp: timestamp,
             liquidity: 0,
             stakedLiquidity: 0,
-            prioritySwapper: address(0)
+            prioritySwapper: address(0),
+            feeGrowthGlobalAsset: 0,
+            feeGrowthGlobalQuote: 0
         });
 
         emit CreatePool(poolId, pairId, curveId, price);

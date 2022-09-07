@@ -11,7 +11,14 @@ interface IEnigmaEvents {
     event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
 
     // --- Pools and Slots --- //
-    event PoolUpdate(uint48 indexed poolId, uint256 price, int24 indexed tick, uint256 liquidity);
+    event PoolUpdate(
+        uint48 indexed poolId,
+        uint256 price,
+        int24 indexed tick,
+        uint256 liquidity,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    );
 
     // --- Critical --- //
     /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
@@ -67,4 +74,7 @@ interface IEnigmaEvents {
     event UpdateLastTimestamp(uint48 poolId);
     /// @dev Emitted when entering or exiting a slot when swapping.
     event SlotTransition(uint48 indexed poolId, int24 indexed tick, int256 liquidityDelta);
+
+    // --- Fees --- ///
+    event Collect(uint96 indexed positionId, address to, uint256 tokensCollectedAsset, uint256 tokensCollectedQuote);
 }

@@ -70,6 +70,8 @@ interface IEnigmaDataStructures {
         uint256 liquidity;
         uint256 stakedLiquidity;
         address prioritySwapper;
+        uint256 feeGrowthGlobalAsset;
+        uint256 feeGrowthGlobalQuote;
     }
 
     /**
@@ -82,6 +84,10 @@ interface IEnigmaDataStructures {
         uint256 blockTimestamp;
         bool staked;
         uint256 unstakeEpochId;
+        uint256 feeGrowthInsideAssetLast;
+        uint256 feeGrowthInsideQuoteLast;
+        uint256 tokensOwedAsset;
+        uint256 tokensOwedQuote;
     }
 
     /**
@@ -91,7 +97,8 @@ interface IEnigmaDataStructures {
         int256 liquidityDelta;
         int256 stakedLiquidityDelta;
         uint256 totalLiquidity;
-        uint256 externalFeeGrowth;
+        uint256 feeGrowthOutsideAsset;
+        uint256 feeGrowthOutsideQuote;
         bool instantiated;
         uint256 timestamp;
     }
