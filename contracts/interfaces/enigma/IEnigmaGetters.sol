@@ -3,9 +3,9 @@ pragma solidity 0.8.13;
 
 import "./IEnigmaDataStructures.sol";
 
-/// @title IEnigmaView
+/// @title IEnigmaGetters
 /// @dev Public view functions exposed by the Enigma's higher level contracts.
-interface IEnigmaView {
+interface IEnigmaGetters {
     // --- Enigma --- //
     function pairs(uint16 pairId) external view returns (IEnigmaDataStructures.Pair memory);
 
