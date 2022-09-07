@@ -5,6 +5,8 @@ import "forge-std/Test.sol";
 import "../../contracts/prototype/EnigmaVirtualMachinePrototype.sol";
 
 contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
+    constructor(address weth) EnigmaVirtualMachinePrototype(weth) {}
+
     // --- HyperPrototype --- //
 
     function updateLastTimestamp(uint48) public override returns (uint128) {
@@ -26,7 +28,7 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
         returns (uint256 deltaBase, uint256 deltaQuote)
     {}
 
-    function fund(address, uint256) external override {}
+    function fund(address, uint256) external payable override {}
 
     function draw(
         address,
@@ -134,4 +136,6 @@ contract StandardHelpers {
     int24 public constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
 }
 
-contract BaseTest is Test, StandardHelpers, FakeEnigmaAbstractOverrides {}
+contract BaseTest is Test, StandardHelpers, FakeEnigmaAbstractOverrides {
+    constructor(address weth) FakeEnigmaAbstractOverrides(weth) {}
+}

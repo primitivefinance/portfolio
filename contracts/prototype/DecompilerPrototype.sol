@@ -10,6 +10,12 @@ import "./HyperPrototype.sol";
 /// @notice Main contract of the Enigma that implements instruction processing.
 /// @dev Eliminates the use of function signatures. Expects encoded bytes as msg.data in the fallback.
 contract DecompilerPrototype is HyperPrototype {
+    // --- Constructor --- //
+
+    constructor(address weth) EnigmaVirtualMachinePrototype(weth) {}
+
+    // --- Receive ETH fallback --- //
+
     // Note: Not sure if we should always revert when receiving ETH
     receive() external payable {
         revert();
@@ -131,6 +137,9 @@ contract DecompilerPrototype is HyperPrototype {
     function _settleToken(address token) internal {
         if (!_addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
+        // If the token is WETH, make sure to wrap any ETH sent to the contract.
+        if (token == WETH && msg.value > 0) _wrap();
+
         uint256 global = _globalReserves[token];
         uint256 actual = _balanceOf(token, address(this));
         if (global > actual) {
@@ -155,16 +164,21 @@ contract DecompilerPrototype is HyperPrototype {
         // note: Would pull tokens without this conditional check.
         if (_balances[msg.sender][token] < amount) revert DrawBalance();
         _applyDebit(token, amount);
-        SafeTransferLib.safeTransfer(ERC20(token), to, amount);
+
+        if (token == WETH) _dangerousUnwrap(to, amount);
+        else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
     }
 
     /// @inheritdoc IEnigmaActions
-    function fund(address token, uint256 amount) external override lock {
+    function fund(address token, uint256 amount) external payable override lock {
         _applyCredit(token, amount);
-        SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
+        if (token == WETH) _wrap();
+        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
 
     // --- View --- //
+
+    // todo: check for hash collisions with instruction calldata and fix.
 
     function pairs(uint16 pairId)
         external

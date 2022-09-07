@@ -3,11 +3,17 @@ pragma solidity 0.8.13;
 
 import "@rari-capital/solmate/src/utils/FixedPointMathLib.sol";
 
+import "../interfaces/IWETH.sol";
 import "../interfaces/IEnigma.sol";
 import "../interfaces/IERC20.sol";
 import "../libraries/Decoder.sol";
 import "../libraries/Instructions.sol";
 import "../libraries/SafeCast.sol";
+
+function dangerousTransferETH(address to, uint256 value) {
+    (bool success, ) = to.call{value: value}(new bytes(0));
+    require(success, "ETH transfer error");
+}
 
 /// @title Enigma Virtual Machine.
 /// @notice Stores the state of the Enigma with functions to change state.
@@ -21,6 +27,12 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
         locked = 2;
         _;
         locked = 1;
+    }
+
+    // --- Constructor --- //
+
+    constructor(address weth) {
+        WETH = weth;
     }
 
     // --- View --- //
@@ -85,6 +97,19 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @dev Overridable in tests.
     function _liquidityPolicy() internal view virtual returns (uint256) {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
+    }
+
+    // --- Wrapped Ether --- //
+
+    function _wrap() internal virtual {
+        IWETH(WETH).deposit{value: msg.value}();
+    }
+
+    function _dangerousUnwrap(address to, uint256 amount) internal virtual {
+        IWETH(WETH).withdraw(amount);
+
+        // Marked as dangerous because it makes an external call to the `to` address.
+        dangerousTransferETH(to, amount);
     }
 
     // --- Global --- //
@@ -289,4 +314,6 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     uint8 internal constant JUMP_PROCESS_START_POINTER = 2;
     uint8 internal constant MIN_DECIMALS = 6;
     uint8 internal constant MAX_DECIMALS = 18;
+
+    address public immutable WETH;
 }
