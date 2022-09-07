@@ -1,41 +1,21 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "./IEnigmaDataStructures.sol";
+
 /// @title IEnigmaView
 /// @dev Public view functions exposed by the Enigma's higher level contracts.
 interface IEnigmaView {
     // --- Enigma --- //
-    function pairs(uint16 pairId)
-        external
-        view
-        returns (
-            address,
-            uint8,
-            address,
-            uint8
-        );
+    function pairs(uint16 pairId) external view returns (IEnigmaDataStructures.Pair memory);
 
-    function curves(uint32 curveId)
-        external
-        view
-        returns (
-            uint128 strike,
-            uint24 sigma,
-            uint32 maturity,
-            uint32 gamma,
-            uint32 priorityGamma
-        );
+    function curves(uint32 curveId) external view returns (IEnigmaDataStructures.Curve memory);
 
-    function pools(uint48 poolId)
-        external
-        view
-        returns (
-            uint256,
-            int24,
-            uint256,
-            uint256,
-            address
-        );
+    function pools(uint48 poolId) external view returns (IEnigmaDataStructures.HyperPool memory);
+
+    function slots(uint48 poolId, int24 slot) external view returns (IEnigmaDataStructures.HyperSlot memory);
+
+    function reserves(address asset) external view returns (uint256);
 
     function getCurveId(bytes32) external view returns (uint32);
 

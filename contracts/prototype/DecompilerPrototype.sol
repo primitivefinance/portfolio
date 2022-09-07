@@ -180,62 +180,24 @@ contract DecompilerPrototype is HyperPrototype {
 
     // todo: check for hash collisions with instruction calldata and fix.
 
-    function pairs(uint16 pairId)
-        external
-        view
-        override
-        returns (
-            address assetToken,
-            uint8 assetDecimals,
-            address quoteToken,
-            uint8 quoteDecimals
-        )
-    {
-        Pair memory p = _pairs[pairId];
-        (assetToken, assetDecimals, quoteToken, quoteDecimals) = (
-            p.tokenBase,
-            p.decimalsBase,
-            p.tokenQuote,
-            p.decimalsQuote
-        );
+    function slots(uint48 poolId, int24 slot) external view returns (IEnigmaDataStructures.HyperSlot memory) {
+        return _slots[poolId][slot];
     }
 
-    function curves(uint32 curveId)
-        external
-        view
-        override
-        returns (
-            uint128 strike,
-            uint24 sigma,
-            uint32 maturity,
-            uint32 gamma,
-            uint32 priorityGamma
-        )
-    {
-        Curve memory c = _curves[curveId];
-        (strike, sigma, maturity, gamma, priorityGamma) = (c.strike, c.sigma, c.maturity, c.gamma, c.priorityGamma);
+    function pairs(uint16 pairId) external view override returns (Pair memory p) {
+        p = _pairs[pairId];
     }
 
-    function pools(uint48 poolId)
-        external
-        view
-        override
-        returns (
-            uint256 lastPrice,
-            int24 lastTick,
-            uint256 blockTimestamp,
-            uint256 liquidity,
-            address prioritySwapper
-        )
-    {
-        HyperPool storage p = _pools[poolId];
-        (lastPrice, lastTick, blockTimestamp, liquidity, prioritySwapper) = (
-            p.lastPrice,
-            p.lastTick,
-            p.blockTimestamp,
-            p.liquidity,
-            p.prioritySwapper
-        );
+    function curves(uint32 curveId) external view override returns (Curve memory c) {
+        c = _curves[curveId];
+    }
+
+    function pools(uint48 poolId) external view override returns (HyperPool memory p) {
+        p = _pools[poolId];
+    }
+
+    function reserves(address asset) external view override returns (uint256) {
+        return _globalReserves[asset];
     }
 
     function getCurveId(bytes32 packedCurve) external view override returns (uint32) {

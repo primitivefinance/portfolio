@@ -14,4 +14,8 @@ contract TestDecompilerPrototype is DecompilerPrototype {
     function _blockTimestamp() internal view override returns (uint128) {
         return uint128(timestamp);
     }
+
+    function positions(address owner, uint96 id) external view returns (HyperPosition memory p) {
+        p = _positions[owner][id];
+    }
 }
