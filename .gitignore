@@ -12,7 +12,7 @@ hh-cache/
 
 
 # Foundry
-cache
+forge-cache/
 out
 optimized-out
 
