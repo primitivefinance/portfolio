@@ -42,6 +42,7 @@
     "evm-bn": "^1.1.1",
     "hardhat": "^2.10.2",
     "hardhat-gas-reporter": "^1.0.8",
+    "hardhat-preprocessor": "^0.1.5",
     "hardhat-tracer": "^1.1.0-rc.5",
     "husky": ">=6",
     "lint-staged": ">=10",

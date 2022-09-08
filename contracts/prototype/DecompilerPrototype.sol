@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
-import "@rari-capital/solmate/src/tokens/ERC20.sol";
+import "solmate/utils/SafeTransferLib.sol";
+import "solmate/tokens/ERC20.sol";
 
 import "./HyperPrototype.sol";
 
@@ -180,7 +180,7 @@ contract DecompilerPrototype is HyperPrototype {
 
     // todo: check for hash collisions with instruction calldata and fix.
 
-    function slots(uint48 poolId, int24 slot) external view returns (IEnigmaDataStructures.HyperSlot memory) {
+    function slots(uint48 poolId, int24 slot) external view returns (HyperSlot memory) {
         return _slots[poolId][slot];
     }
 
@@ -192,7 +192,7 @@ contract DecompilerPrototype is HyperPrototype {
         c = _curves[curveId];
     }
 
-    function pools(uint48 poolId) external view override returns (HyperPool memory) {
+    function pools(uint48 poolId) external view override returns (HyperPool memory p) {
         p = _pools[poolId];
     }
 
