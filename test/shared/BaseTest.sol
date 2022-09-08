@@ -83,7 +83,7 @@ contract FakeEnigmaAbstractOverrides is EnigmaVirtualMachinePrototype {
         return _globalReserves[asset];
     }
 
-    function slots(uint48 poolId, int24 slot) external view returns (IEnigmaDataStructures.HyperSlot memory) {
+    function slots(uint48 poolId, int24 slot) external view returns (HyperSlot memory) {
         return _slots[poolId][slot];
     }
 

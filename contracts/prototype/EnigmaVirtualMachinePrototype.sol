@@ -3,6 +3,8 @@ pragma solidity 0.8.13;
 
 import "@rari-capital/solmate/src/utils/FixedPointMathLib.sol";
 
+import "./EnigmaTypes.sol";
+
 import "../interfaces/IWETH.sol";
 import "../interfaces/IEnigma.sol";
 import "../interfaces/IERC20.sol";

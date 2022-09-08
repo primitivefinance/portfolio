@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "./IEnigmaDataStructures.sol";
+import {Pair, Curve, HyperPool, HyperSlot} from "../../prototype/EnigmaTypes.sol";
 
 /// @title IEnigmaGetters
 /// @dev Public view functions exposed by the Enigma's higher level contracts.
 interface IEnigmaGetters {
     // --- Enigma --- //
-    function pairs(uint16 pairId) external view returns (IEnigmaDataStructures.Pair memory);
+    function pairs(uint16 pairId) external view returns (Pair memory);
 
-    function curves(uint32 curveId) external view returns (IEnigmaDataStructures.Curve memory);
+    function curves(uint32 curveId) external view returns (Curve memory);
 
-    function pools(uint48 poolId) external view returns (IEnigmaDataStructures.HyperPool memory);
+    function pools(uint48 poolId) external view returns (HyperPool memory);
 
-    function slots(uint48 poolId, int24 slot) external view returns (IEnigmaDataStructures.HyperSlot memory);
+    function slots(uint48 poolId, int24 slot) external view returns (HyperSlot memory);
 
     function reserves(address asset) external view returns (uint256);
 
