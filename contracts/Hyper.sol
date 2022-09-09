@@ -148,6 +148,7 @@ contract Hyper is IHyper {
         // todo: access control
         uint128 fees = auctionFees[poolId];
         if (fees > 0) {
+            auctionFees[poolId] = 0;
             uint16 pairId = uint16(poolId >> 32);
             Pair memory pair = pairs[pairId];
             SafeTransferLib.safeTransfer(ERC20(pair.tokenQuote), msg.sender, fees);
