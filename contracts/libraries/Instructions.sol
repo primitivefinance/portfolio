@@ -107,11 +107,11 @@ library Instructions {
 
     function encodeFillPriorityAuction(
         uint48 poolId,
-        address winner,
-        uint8 power,
-        uint8 amount
+        address priorityOwner,
+        uint8 limitPower,
+        uint8 limitAmount
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(FILL_PRIORITY_AUCTION, poolId, winner, power, amount);
+        data = abi.encodePacked(FILL_PRIORITY_AUCTION, poolId, priorityOwner, limitPower, limitAmount);
     }
 
     function encodeUnstakePosition(uint96 positionId) internal pure returns (bytes memory data) {
@@ -280,12 +280,12 @@ library Instructions {
         pure
         returns (
             uint48 poolId,
-            address winner,
-            uint128 auctionAmount
+            address priorityOwner,
+            uint128 limitOwner
         )
     {
         poolId = uint48(bytes6(data[1:7]));
-        winner = address(bytes20(data[7:27]));
-        auctionAmount = uint128(Decoder.toAmount(data[28:]));
+        priorityOwner = address(bytes20(data[7:27]));
+        limitOwner = uint128(Decoder.toAmount(data[28:]));
     }
 }
