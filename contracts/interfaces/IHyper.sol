@@ -64,6 +64,8 @@ interface IHyperEvents {
     event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);
     /// @dev Emitted on creating a pool for a pair and curve.
     event CreatePool(uint48 indexed poolId, uint16 indexed pairId, uint32 indexed curveId, uint256 price);
+    /// @dev Emitted when auction parameters for a pool are updated.
+    event SetAuctionParams(uint48 indexed poolId, uint256 startPrice, uint256 endPrice, uint256 fee, uint256 length);
 
     // --- Swap --- //
     /// @dev Emitted on a token swap in a single virtual pool.
