@@ -85,7 +85,7 @@ contract PriorityAuction {
         (, , address tokenQuote, ) = IHyperGetters(hyper).pairs(pairId);
         // transfer in total auction amount, transfer auction net amount to Hyper
         SafeTransferLib.safeTransferFrom(ERC20(tokenQuote), msg.sender, address(this), auctionPayment);
-        SafeTransferLib.safeTransferFrom(ERC20(tokenQuote), address(this), hyper, auctionNet);
+        SafeTransferLib.safeTransfer(ERC20(tokenQuote), hyper, auctionNet);
 
         // todo: call into hyper to fill priority auction
     }
