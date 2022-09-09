@@ -13,6 +13,7 @@ hh-cache/
 
 # Foundry
 forge-cache/
+cache
 out
 optimized-out
 
