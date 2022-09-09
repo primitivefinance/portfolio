@@ -66,8 +66,6 @@ contract PriorityAuction {
     ) external {
         require(priorityOwner != address(0));
 
-        // todo: check Hyper pool exists
-
         // todo: if hyper epoch needs advancing, advance it
 
         AuctionParams memory poolAuctionParams = auctionParams[poolId];

@@ -940,6 +940,7 @@ contract Hyper is IHyper {
     function _fillPriorityAuction(bytes calldata data) internal returns (uint48 poolId) {
         (uint48 poolId_, address winner, uint128 auctionAmount) = Instructions.decodeFillPriorityAuction(data);
 
+        if (!_doesPoolExist(poolId_)) revert();
         if (winner == address(0)) revert();
         if (auctionAmount == uint128(0)) revert();
 
