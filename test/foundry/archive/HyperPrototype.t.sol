@@ -2,7 +2,7 @@ pragma solidity 0.8.13;
 
 import "solmate/tokens/WETH.sol";
 
-import {Pair, Curve, HyperPool, HyperSlot} from "../../../contracts/prototype/EnigmaTypes.sol";
+import {Pair, Curve, HyperPool, HyperSlot} from "../../../contracts/prototype/EnigmaTypesPrototype.sol";
 
 import "../../shared/BaseTest.sol";
 import "../../shared/TestPrototype.sol";

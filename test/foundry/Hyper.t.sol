@@ -75,6 +75,10 @@ contract StandardHelpers {
     int24 public constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
 }
 
+interface IHyperStruct {
+    function pools(uint48 poolId) external view returns (HyperPool memory);
+}
+
 contract TestHyperSingle is StandardHelpers, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
@@ -93,7 +97,7 @@ contract TestHyperSingle is StandardHelpers, Test {
     }
 
     function testHyper() public {
-        HyperPool memory p = __hyper.pools(1);
+        HyperPool memory p = IHyperStruct(address(__hyper)).pools(1);
     }
 
     function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1) {
@@ -132,7 +136,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(success, "forwarder call failed");
 
         assertEq(__hyper.doesPoolExist(__poolId), true);
-        assertEq(__hyper.pools(__poolId).lastTick != 0, true);
-        assertEq(__hyper.pools(__poolId).liquidity == 0, true);
+        assertEq(IHyperStruct(address(__hyper)).pools(__poolId).lastTick != 0, true);
+        assertEq(IHyperStruct(address(__hyper)).pools(__poolId).liquidity == 0, true);
     }
 }

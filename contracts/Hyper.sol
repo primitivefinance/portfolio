@@ -3,9 +3,9 @@ pragma solidity 0.8.13;
 
 import "solmate/utils/SafeTransferLib.sol";
 
-import "./prototype/EnigmaTypes.sol";
+import "./EnigmaTypes.sol";
 import "./interfaces/IWETH.sol";
-import "./interfaces/IEnigma.sol";
+import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Utils.sol";
 import "./libraries/Decoder.sol";
@@ -21,8 +21,70 @@ function dangerousTransferETH(address to, uint256 value) {
 /// @title Enigma Virtual Machine.
 /// @notice Stores the state of the Enigma with functions to change state.
 /// @dev Implements low-level internal virtual functions, re-entrancy guard and state.
-contract Hyper is IEnigma {
+contract Hyper is IHyper {
     using SafeCast for uint256;
+    using FixedPointMathLib for int256;
+    using FixedPointMathLib for uint256;
+    using HyperSwapLib for HyperSwapLib.Expiring;
+    // --- Constants --- //
+    /// @dev Canonical Wrapped Ether contract.
+    address public immutable WETH;
+    /// @dev Distance between the location of prices on the price grid, so distance between price.
+    int24 public constant TICK_SIZE = 256;
+    /// @dev Used as the first pointer for the jump process.
+    uint8 public constant JUMP_PROCESS_START_POINTER = 2;
+    /// @dev Minimum amount of decimals supported for ERC20 tokens.
+    uint8 public constant MIN_DECIMALS = 6;
+    /// @dev Maximum amount of decimals supported for ERC20 tokens.
+    uint8 public constant MAX_DECIMALS = 18;
+    /// @dev Amount of seconds of available time to swap past maturity of a pool.
+    uint256 public constant BUFFER = 300;
+    /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
+    uint256 public constant PRECISION = 1e18;
+    /// @dev Constant amount of basis points. All percentage values are integers in basis points.
+    uint256 public constant PERCENTAGE = 1e4;
+    /// @dev Minimum pool fee. 0.01%.
+    uint256 public constant MIN_POOL_FEE = 1;
+    /// @dev Maximum pool fee. 10.00%.
+    uint256 public constant MAX_POOL_FEE = 1e3;
+    /// @dev Amount of seconds that an epoch lasts.
+    uint256 public constant EPOCH_INTERVAL = 300;
+    /// @dev Used to compute the amount of liquidity to burn on creating a pool.
+    uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
+    /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
+    uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
+    // --- State --- //
+    /// @dev Reentrancy guard initialized to state
+    uint256 private locked = 1;
+    /// @dev A value incremented by one on pair creation. Reduces calldata.
+    uint256 public getPairNonce;
+    /// @dev A value incremented by one on curve creation. Reduces calldata.
+    uint256 public getCurveNonce;
+    /// @dev Pool id -> Pair of a Pool.
+    mapping(uint16 => Pair) public pairs;
+    /// @dev Pool id -> Epoch Data Structure.
+    mapping(uint48 => Epoch) public epochs;
+    /// @dev Pool id -> Curve Data Structure stores parameters.
+    mapping(uint32 => Curve) public curves;
+    /// @dev Pool id -> HyperPool Data Structure.
+    mapping(uint48 => HyperPool) public pools;
+    /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
+    mapping(bytes32 => uint32) public getCurveId;
+    /// @dev Token -> Physical Reserves.
+    mapping(address => uint256) public globalReserves;
+    /// @dev Pool id -> Tick -> Slot has liquidity at a price.
+    mapping(uint48 => mapping(int24 => HyperSlot)) public slots;
+    /// @dev Base Token -> Quote Token -> Pair id
+    mapping(address => mapping(address => uint16)) public getPairId;
+    /// @dev User -> Token -> Internal Balance.
+    mapping(address => mapping(address => uint256)) public balances;
+    /// @dev User -> Position Id -> Liquidity Position.
+    mapping(address => mapping(uint96 => HyperPosition)) public positions;
+    /// @dev Amount of rewards globally tracked per epoch.
+    mapping(uint48 => mapping(uint256 => uint256)) internal epochRewardGrowthGlobal;
+    /// @dev Individual rewards of a position.
+    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
+
     // --- Reentrancy --- //
     modifier lock() {
         if (locked != 1) revert LockedError();
@@ -38,21 +100,78 @@ contract Hyper is IEnigma {
         WETH = weth;
     }
 
-    // --- View --- //
+    // --- External --- //
 
-    function _checkJitLiquidity(
-        address account,
-        uint48 poolId,
-        int24 loTick,
-        int24 hiTick
-    ) internal view virtual returns (uint256 distance, uint256 timestamp) {
-        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
-        uint256 previous = _positions[account][positionId].blockTimestamp;
-        timestamp = _blockTimestamp();
-        distance = timestamp - previous;
+    /// @inheritdoc IHyperActions
+    function draw(
+        address token,
+        uint256 amount,
+        address to
+    ) external lock {
+        // note: Would pull tokens without this conditional check.
+        if (balances[msg.sender][token] < amount) revert DrawBalance();
+        _applyDebit(token, amount);
+
+        if (token == WETH) _dangerousUnwrap(to, amount);
+        else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
+    }
+
+    /// @inheritdoc IHyperActions
+    function fund(address token, uint256 amount) external payable override lock {
+        _applyCredit(token, amount);
+        if (token == WETH) _safeWrap();
+        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
+    }
+
+    // Note: Not sure if we should always revert when receiving ETH
+    receive() external payable {
+        revert();
+    }
+
+    // --- Fallback --- //
+
+    /// @notice Main touchpoint for receiving calls.
+    /// @dev Critical: data must be encoded properly to be processed.
+    /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
+    /// @custom:mev Higher level security checks must be implemented by calling contract.
+    fallback() external payable lock {
+        if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
+        else _jumpProcess(msg.data);
+        _settleBalances();
     }
 
     // --- Internal --- //
+
+    /// @dev Overridable in tests.
+    function _blockTimestamp() internal view virtual returns (uint128) {
+        return uint128(block.timestamp);
+    }
+
+    /// @dev Overridable in tests.
+    function _liquidityPolicy() internal view virtual returns (uint256) {
+        return JUST_IN_TIME_LIQUIDITY_POLICY;
+    }
+
+    /// @dev Gas optimized `balanceOf` method.
+    function _balanceOf(address token, address account) internal view returns (uint256) {
+        (bool success, bytes memory data) = token.staticcall(
+            abi.encodeWithSelector(IERC20.balanceOf.selector, account)
+        );
+        if (!success || data.length != 32) revert BalanceError();
+        return abi.decode(data, (uint256));
+    }
+
+    function _safeWrap() internal {
+        IWETH(WETH).deposit{value: msg.value}();
+    }
+
+    function _dangerousUnwrap(address to, uint256 amount) internal {
+        IWETH(WETH).withdraw(amount);
+
+        // Marked as dangerous because it makes an external call to the `to` address.
+        dangerousTransferETH(to, amount);
+    }
+
     /// @dev Must be implemented by the highest level contract.
     /// @notice Processing logic for instructions.
     /* function _process(bytes calldata data) internal virtual; */
@@ -83,51 +202,19 @@ contract Hyper is IEnigma {
         }
     }
 
-    /// @dev Gas optimized `balanceOf` method.
-    function _balanceOf(address token, address account) internal view returns (uint256) {
-        (bool success, bytes memory data) = token.staticcall(
-            abi.encodeWithSelector(IERC20.balanceOf.selector, account)
-        );
-        if (!success || data.length != 32) revert BalanceError();
-        return abi.decode(data, (uint256));
-    }
-
-    /// @dev Overridable in tests.
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
-    }
-
-    /// @dev Overridable in tests.
-    function _liquidityPolicy() internal view virtual returns (uint256) {
-        return JUST_IN_TIME_LIQUIDITY_POLICY;
-    }
-
-    // --- Wrapped Ether --- //
-
-    function _wrap() internal virtual {
-        IWETH(WETH).deposit{value: msg.value}();
-    }
-
-    function _dangerousUnwrap(address to, uint256 amount) internal virtual {
-        IWETH(WETH).withdraw(amount);
-
-        // Marked as dangerous because it makes an external call to the `to` address.
-        dangerousTransferETH(to, amount);
-    }
-
     // --- Global --- //
 
     /// @dev Most important function because it manages the solvency of the Engima.
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
     function _increaseGlobal(address token, uint256 amount) internal {
-        _globalReserves[token] += amount;
+        globalReserves[token] += amount;
         emit IncreaseGlobal(token, amount);
     }
 
     /// @dev Equally important to `_increaseGlobal`.
     /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
     function _decreaseGlobal(address token, uint256 amount) internal {
-        _globalReserves[token] -= amount;
+        globalReserves[token] -= amount;
         emit DecreaseGlobal(token, amount);
     }
 
@@ -141,12 +228,12 @@ contract Hyper is IEnigma {
     ) internal {
         uint256 tokensOwedAsset = FixedPointMathLib.divWadDown(
             feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
-            _pools[poolId].liquidity
+            pools[poolId].liquidity
         );
 
         uint256 tokensOwedQuote = FixedPointMathLib.divWadDown(
             feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
-            _pools[poolId].liquidity
+            pools[poolId].liquidity
         );
 
         pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
@@ -166,7 +253,7 @@ contract Hyper is IEnigma {
     ) internal {
         uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
 
-        HyperPosition storage pos = _positions[msg.sender][positionId];
+        HyperPosition storage pos = positions[msg.sender][positionId];
 
         if (pos.totalLiquidity == 0) {
             pos.loTick = loTick;
@@ -175,13 +262,13 @@ contract Hyper is IEnigma {
         pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
-        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = getFeeGrowthInside(
+        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
             poolId,
             hiTick,
             loTick,
-            _pools[poolId].lastTick,
-            _pools[poolId].feeGrowthGlobalAsset,
-            _pools[poolId].feeGrowthGlobalQuote
+            pools[poolId].lastTick,
+            pools[poolId].feeGrowthGlobalAsset,
+            pools[poolId].feeGrowthGlobalQuote
         );
 
         _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
@@ -199,18 +286,18 @@ contract Hyper is IEnigma {
     ) internal {
         uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
 
-        HyperPosition storage pos = _positions[msg.sender][positionId];
+        HyperPosition storage pos = positions[msg.sender][positionId];
 
         pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
-        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = getFeeGrowthInside(
+        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
             poolId,
             hiTick,
             loTick,
-            _pools[poolId].lastTick,
-            _pools[poolId].feeGrowthGlobalAsset,
-            _pools[poolId].feeGrowthGlobalQuote
+            pools[poolId].lastTick,
+            pools[poolId].feeGrowthGlobalAsset,
+            pools[poolId].feeGrowthGlobalQuote
         );
 
         _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
@@ -226,13 +313,13 @@ contract Hyper is IEnigma {
         int24 hiTick,
         uint256 deltaLiquidity
     ) internal {
-        (uint256 distance, uint256 timestamp) = _checkJitLiquidity(msg.sender, poolId, loTick, hiTick);
+        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId, loTick, hiTick);
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
         _decreasePosition(poolId, loTick, hiTick, deltaLiquidity);
     }
 
-    function getFeeGrowthInside(
+    function _getFeeGrowthInside(
         uint48 poolId,
         int24 hi,
         int24 lo,
@@ -240,8 +327,8 @@ contract Hyper is IEnigma {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     ) internal view returns (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) {
-        HyperSlot storage hiTick = _slots[poolId][hi];
-        HyperSlot storage loTick = _slots[poolId][lo];
+        HyperSlot storage hiTick = slots[poolId][hi];
+        HyperSlot storage loTick = slots[poolId][lo];
 
         uint256 feeGrowthBelowAsset;
         uint256 feeGrowthBelowQuote;
@@ -268,100 +355,7 @@ contract Hyper is IEnigma {
         feeGrowthInsideQuote = feeGrowthGlobalQuote - feeGrowthBelowQuote - feeGrowthAboveQuote;
     }
 
-    // --- State --- //
-    /// @dev Pool id -> Tick -> Slot has liquidity at a price.
-    mapping(uint48 => mapping(int24 => HyperSlot)) internal _slots;
-    mapping(uint48 => mapping(uint256 => uint256)) internal epochRewardGrowthGlobal;
-    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
-    /// @dev Pool id -> Pair of a Pool.
-    mapping(uint16 => Pair) internal _pairs;
-    /// @dev Pool id -> HyperPool Data Structure.
-    mapping(uint48 => HyperPool) internal _pools;
-    /// @dev Pool id -> Epoch Data Structure.
-    mapping(uint48 => Epoch) internal _epochs;
-    /// @dev Pool id -> Curve Data Structure stores parameters.
-    mapping(uint32 => Curve) internal _curves;
-    /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
-    mapping(bytes32 => uint32) internal _getCurveIds;
-    /// @dev Token -> Physical Reserves.
-    mapping(address => uint256) internal _globalReserves;
-    /// @dev Base Token -> Quote Token -> Pair id
-    mapping(address => mapping(address => uint16)) internal _getPairId;
-    /// @dev User -> Token -> Interal Balance.
-    mapping(address => mapping(address => uint256)) internal _balances;
-    /// @dev User -> Position Id -> Liquidity Position.
-    mapping(address => mapping(uint96 => HyperPosition)) internal _positions;
-    /// @dev Reentrancy guard initialized to state
-    uint256 private locked = 1;
-    /// @dev A value incremented by one on pair creation. Reduces calldata.
-    uint256 internal _pairNonce;
-    /// @dev A value incremented by one on curve creation. Reduces calldata.
-    uint256 internal _curveNonce;
-    /// @dev Distance between the location of prices on the price grid, so distance between price.
-    int24 public constant TICK_SIZE = 256;
-    /// @dev Amount of seconds of available time to swap past maturity of a pool.
-    uint256 internal constant BUFFER = 300;
-    /// @dev Constant amount of basis points. All percentage values are integers in basis points.
-    uint256 internal constant PERCENTAGE = 1e4;
-    /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
-    uint256 internal constant PRECISION = 1e18;
-    /// @dev Maximum pool fee. 10.00%.
-    uint256 internal constant MAX_POOL_FEE = 1e3;
-    /// @dev Minimum pool fee. 0.01%.
-    uint256 internal constant MIN_POOL_FEE = 1;
-    /// @dev Used to compute the amount of liquidity to burn on creating a pool.
-    uint256 internal constant MIN_LIQUIDITY_FACTOR = 6;
-    /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
-    uint256 internal constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
-    /// @dev Amount of seconds that an epoch lasts.
-    uint256 internal constant EPOCH_INTERVAL = 300;
-    /// @dev Used as the first pointer for the jump process.
-    uint8 internal constant JUMP_PROCESS_START_POINTER = 2;
-    uint8 internal constant MIN_DECIMALS = 6;
-    uint8 internal constant MAX_DECIMALS = 18;
-
-    address public immutable WETH;
-
-    using HyperSwapLib for HyperSwapLib.Expiring;
-    using FixedPointMathLib for uint256;
-    using FixedPointMathLib for int256;
-
     // --- Swap --- //
-
-    /**
-     * @notice Parameters used to submit a swap order.
-     * @param useMax Use the caller's total balance of the pair's token to do the swap.
-     * @param poolId Identifier of the pool.
-     * @param input Amount of tokens to input in the swap.
-     * @param limit Maximum price paid to fill the swap order.
-     * @param direction Specifies asset token in, quote token out with '0', and quote token in, asset token out with '1'.
-     */
-    struct Order {
-        uint8 useMax;
-        uint48 poolId;
-        uint128 input;
-        uint128 limit;
-        uint8 direction;
-    }
-
-    /**
-     * @notice Temporary variables utilized in the order filling loop.
-     * @param tick Key of the slot being used to fill the swap at.
-     * @param price Price of the slot being used to fill this swap step at.
-     * @param remainder Order amount left to fill.
-     * @param liquidity Liquidity available at this slot.
-     * @param input Cumulative sum of input amounts for each swap step.
-     * @param output Cumulative sum of output amounts for each swap step.
-     */
-    struct Iteration {
-        int24 tick;
-        uint256 price;
-        uint256 remainder;
-        uint256 feeAmount;
-        uint256 liquidity;
-        uint256 input;
-        uint256 output;
-    }
 
     /**
      * @notice Computes the price of the pool, which changes over time and write to the pool if ut of sync.
@@ -371,9 +365,9 @@ contract Hyper is IEnigma {
      */
     function _syncExpiringPoolTimeAndPrice(uint48 poolId) internal returns (uint256 price, int24 tick) {
         // Read the pool's info.
-        HyperPool storage pool = _pools[poolId];
+        HyperPool storage pool = pools[poolId];
         // Use curve parameters to compute time remaining.
-        Curve memory curve = _curves[uint32(poolId)];
+        Curve memory curve = curves[uint32(poolId)];
         // 1. Compute previous time until maturity.
         uint256 tau = curve.maturity - pool.blockTimestamp;
         // 2. Compute time elapsed since last update.
@@ -389,12 +383,6 @@ contract Hyper is IEnigma {
         tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
         // 6. Write changes to the pool.
         _updatePool(poolId, tick, price, pool.liquidity, 0, 0);
-    }
-
-    struct SwapState {
-        bool sell;
-        uint256 gamma;
-        uint256 feeGrowthGlobal;
     }
 
     SwapState state;
@@ -428,9 +416,9 @@ contract Hyper is IEnigma {
         state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
 
         // Pair is used to update global reserves and check msg.sender balance.
-        Pair memory pair = _pairs[uint16(args.poolId >> 32)];
+        Pair memory pair = pairs[uint16(args.poolId >> 32)];
         // Pool is used to fetch information and eventually have its state updated.
-        HyperPool storage pool = _pools[args.poolId];
+        HyperPool storage pool = pools[args.poolId];
 
         state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
 
@@ -457,7 +445,7 @@ contract Hyper is IEnigma {
         HyperSwapLib.Expiring memory expiring;
         {
             // Curve stores the parameters of the trading function.
-            Curve memory curve = _curves[uint32(args.poolId)];
+            Curve memory curve = curves[uint32(args.poolId)];
 
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
@@ -598,12 +586,12 @@ contract Hyper is IEnigma {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     ) internal returns (uint256 timeDelta) {
-        HyperPool storage pool = _pools[poolId];
+        HyperPool storage pool = pools[poolId];
         if (pool.lastPrice != price) pool.lastPrice = price;
         if (pool.lastTick != tick) pool.lastTick = tick;
         if (pool.liquidity != liquidity) pool.liquidity = liquidity;
 
-        Epoch storage epoch = _epochs[poolId];
+        Epoch storage epoch = epochs[poolId];
         uint256 timestamp = _blockTimestamp();
         uint256 prevTimestamp = pool.blockTimestamp;
         if (prevTimestamp < epoch.endTime && timestamp >= epoch.endTime) {
@@ -658,8 +646,8 @@ contract Hyper is IEnigma {
             int256 epochStakedLiquidityDelta
         )
     {
-        HyperSlot storage slot = _slots[poolId][tick];
-        Epoch storage epoch = _epochs[poolId];
+        HyperSlot storage slot = slots[poolId][tick];
+        Epoch storage epoch = epochs[poolId];
         uint256 timestamp = _blockTimestamp();
         uint256 prevTimestamp = slot.timestamp;
         // note: assumes epoch would have already been transitioned
@@ -682,7 +670,7 @@ contract Hyper is IEnigma {
         emit SlotTransition(poolId, tick, slot.liquidityDelta);
     }
 
-    // --- Add Liquidity --- //
+    // --- Liquidity --- //
 
     /**
      * @notice Enigma method to add liquidity to a range of prices in a pool.
@@ -699,9 +687,9 @@ contract Hyper is IEnigma {
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         // Compute amounts of tokens for the real reserves.
-        Curve memory curve = _curves[uint32(poolId_)];
-        HyperSlot storage slot = _slots[poolId_][loTick];
-        HyperPool storage pool = _pools[poolId_];
+        Curve memory curve = curves[uint32(poolId_)];
+        HyperSlot storage slot = slots[poolId_][loTick];
+        HyperPool storage pool = pools[poolId_];
         uint256 timestamp = _blockTimestamp();
 
         // Get lower price bound using the loTick index.
@@ -747,8 +735,8 @@ contract Hyper is IEnigma {
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         // Compute amounts of tokens for the real reserves.
-        Curve memory curve = _curves[uint32(poolId_)];
-        HyperPool storage pool = _pools[poolId_];
+        Curve memory curve = curves[uint32(poolId_)];
+        HyperPool storage pool = pools[poolId_];
         uint256 timestamp = _blockTimestamp();
         uint256 price = HyperSwapLib.computePriceWithTick(loTick);
         uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
@@ -791,7 +779,7 @@ contract Hyper is IEnigma {
         _decreasePosition(poolId_, loTick, hiTick, deltaLiquidity);
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
-        Pair memory pair = _pairs[pairId];
+        Pair memory pair = pairs[pairId];
         _decreaseGlobal(pair.tokenBase, deltaR2);
         _decreaseGlobal(pair.tokenQuote, deltaR1);
 
@@ -814,7 +802,7 @@ contract Hyper is IEnigma {
 
         // Update the pool state if liquidity is within the current pool's slot.
         // Update the pool state if liquidity is within the current pool's slot.
-        HyperPool storage pool = _pools[poolId];
+        HyperPool storage pool = pools[poolId];
         if (hiTick > pool.lastTick) {
             // note: need to check also greater than lower tick?
             pool.liquidity += deltaLiquidity;
@@ -827,7 +815,7 @@ contract Hyper is IEnigma {
 
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         uint16 pairId = uint16(poolId >> 32);
-        Pair memory pair = _pairs[pairId];
+        Pair memory pair = pairs[pairId];
         _increaseGlobal(pair.tokenBase, deltaR2);
         _increaseGlobal(pair.tokenQuote, deltaR1);
 
@@ -843,7 +831,7 @@ contract Hyper is IEnigma {
         uint256 deltaLiquidity,
         bool hi
     ) internal returns (bool alterState) {
-        HyperSlot storage slot = _slots[poolId][tick];
+        HyperSlot storage slot = slots[poolId][tick];
 
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = slot.totalLiquidity + deltaLiquidity;
@@ -864,12 +852,12 @@ contract Hyper is IEnigma {
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
-        HyperPosition storage pos = _positions[msg.sender][positionId];
+        HyperPosition storage pos = positions[msg.sender][positionId];
         if (pos.stakeEpochId != 0) revert PositionStakedError(positionId);
         if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
 
-        HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
-        HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
+        HyperSlot storage loSlot = slots[poolId_][pos.loTick];
+        HyperSlot storage hiSlot = slots[poolId_][pos.hiTick];
 
         // todo: check if slots need to be updated for epoch transition
 
@@ -877,13 +865,13 @@ contract Hyper is IEnigma {
         loSlot.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
         hiSlot.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
 
-        HyperPool storage pool = _pools[poolId_];
+        HyperPool storage pool = pools[poolId_];
         if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
             // if position's liquidity is in range, add to next epoch's delta
             pool.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
         }
 
-        Epoch storage epoch = _epochs[poolId_];
+        Epoch storage epoch = epochs[poolId_];
         pos.stakeEpochId = epoch.id + 1;
 
         // note: do we need to update position blockTimestamp?
@@ -897,11 +885,11 @@ contract Hyper is IEnigma {
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
-        HyperPosition storage pos = _positions[msg.sender][positionId];
+        HyperPosition storage pos = positions[msg.sender][positionId];
         if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(positionId);
 
-        HyperSlot storage loSlot = _slots[poolId_][pos.loTick];
-        HyperSlot storage hiSlot = _slots[poolId_][pos.hiTick];
+        HyperSlot storage loSlot = slots[poolId_][pos.loTick];
+        HyperSlot storage hiSlot = slots[poolId_][pos.hiTick];
 
         // todo: check if slots need to be updated for epoch transition
 
@@ -909,13 +897,13 @@ contract Hyper is IEnigma {
         loSlot.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
         hiSlot.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
 
-        HyperPool storage pool = _pools[poolId_];
+        HyperPool storage pool = pools[poolId_];
         if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
             // if position's liquidity is in range, add to next epoch's delta
             pool.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
         }
 
-        Epoch storage epoch = _epochs[poolId_];
+        Epoch storage epoch = epochs[poolId_];
         pos.unstakeEpochId = epoch.id + 1;
 
         // note: do we need to update position blockTimestamp?
@@ -932,7 +920,7 @@ contract Hyper is IEnigma {
         uint256 deltaLiquidity,
         bool hi
     ) internal returns (bool alterState) {
-        HyperSlot storage slot = _slots[poolId][tick];
+        HyperSlot storage slot = slots[poolId][tick];
 
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = slot.totalLiquidity - deltaLiquidity;
@@ -947,6 +935,8 @@ contract Hyper is IEnigma {
         else slot.liquidityDelta -= int256(deltaLiquidity);
     }
 
+    // --- Creation --- //
+
     /**
      * @notice Uses a pair and curve to instantiate a pool at a price.
      *
@@ -960,12 +950,12 @@ contract Hyper is IEnigma {
         if (price == 0) revert ZeroPrice();
 
         // Zero id values are magic variables, since no curve or pair can have an id of zero.
-        if (pairId == 0) pairId = uint16(_pairNonce);
-        if (curveId == 0) curveId = uint32(_curveNonce);
+        if (pairId == 0) pairId = uint16(getPairNonce);
+        if (curveId == 0) curveId = uint32(getCurveNonce);
         poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
         if (_doesPoolExist(poolId)) revert PoolExists();
 
-        Curve memory curve = _curves[curveId];
+        Curve memory curve = curves[curveId];
         (uint128 strike, uint48 maturity, uint24 sigma) = (curve.strike, curve.maturity, curve.sigma);
 
         bool perpetual;
@@ -977,12 +967,12 @@ contract Hyper is IEnigma {
         if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
 
         // Write the epoch data
-        _epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
+        epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
 
         // Write the pool to state with the desired price.
-        _pools[poolId].lastPrice = price;
-        _pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price); // todo: implement slot and price grid.
-        _pools[poolId].blockTimestamp = timestamp;
+        pools[poolId].lastPrice = price;
+        pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price); // todo: implement slot and price grid.
+        pools[poolId].blockTimestamp = timestamp;
 
         emit CreatePool(poolId, pairId, curveId, price);
     }
@@ -1003,7 +993,7 @@ contract Hyper is IEnigma {
 
         bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
 
-        curveId = _getCurveIds[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
+        curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
         if (curveId != 0) revert CurveExists(curveId);
 
         if (!isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
@@ -1018,21 +1008,21 @@ contract Hyper is IEnigma {
         if (!perpetual && strike == 0) revert MinStrike(strike);
 
         unchecked {
-            curveId = uint32(++_curveNonce); // note: Unlikely to reach this limit.
+            curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
         }
 
         uint32 gamma = uint32(HyperSwapLib.UNIT_PERCENT - fee); // gamma = 100% - fee %.
         uint32 priorityGamma = uint32(HyperSwapLib.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
 
         // Writes the curve to state with a reverse lookup.
-        _curves[curveId] = Curve({
+        curves[curveId] = Curve({
             strike: strike,
             sigma: sigma,
             maturity: maturity,
             gamma: gamma,
             priorityGamma: priorityGamma
         });
-        _getCurveIds[rawCurveId] = curveId;
+        getCurveId[rawCurveId] = curveId;
 
         emit CreateCurve(curveId, strike, sigma, maturity, gamma, priorityGamma);
     }
@@ -1049,7 +1039,7 @@ contract Hyper is IEnigma {
         (address asset, address quote) = Instructions.decodeCreatePair(data); // Expects Engima encoded data.
         if (asset == quote) revert SameTokenError();
 
-        pairId = _getPairId[asset][quote];
+        pairId = getPairId[asset][quote];
         if (pairId != 0) revert PairExists(pairId);
 
         (uint8 assetDecimals, uint8 quoteDecimals) = (IERC20(asset).decimals(), IERC20(quote).decimals());
@@ -1058,14 +1048,14 @@ contract Hyper is IEnigma {
         if (!_isValidDecimals(quoteDecimals)) revert DecimalsError(quoteDecimals);
 
         unchecked {
-            pairId = uint16(++_pairNonce); // Increments the pair nonce, returning the nonce for this pair.
+            pairId = uint16(++getPairNonce); // Increments the pair nonce, returning the nonce for this pair.
         }
 
         // Writes the pairId into a fetchable mapping using its tokens.
-        _getPairId[asset][quote] = pairId; // note: No reverse lookup, because order matters!
+        getPairId[asset][quote] = pairId; // note: No reverse lookup, because order matters!
 
         // Writes the pair into Enigma state.
-        _pairs[pairId] = Pair({
+        pairs[pairId] = Pair({
             tokenBase: asset,
             decimalsBase: assetDecimals,
             tokenQuote: quote,
@@ -1078,30 +1068,11 @@ contract Hyper is IEnigma {
     // --- General Utils --- //
 
     function _doesPoolExist(uint48 poolId) internal view returns (bool exists) {
-        exists = _pools[poolId].blockTimestamp != 0;
+        exists = pools[poolId].blockTimestamp != 0;
     }
 
     function _isValidDecimals(uint8 decimals) internal pure returns (bool valid) {
         valid = isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
-    }
-
-    // --- Receive ETH fallback --- //
-
-    // Note: Not sure if we should always revert when receiving ETH
-    receive() external payable {
-        revert();
-    }
-
-    // --- Fallback --- //
-
-    /// @notice Main touchpoint for receiving calls.
-    /// @dev Critical: data must be encoded properly to be processed.
-    /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
-    /// @custom:mev Higher level security checks must be implemented by calling contract.
-    fallback() external payable lock {
-        if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
-        else _jumpProcess(msg.data);
-        _settleBalances();
     }
 
     // --- Private --- //
@@ -1127,7 +1098,7 @@ contract Hyper is IEnigma {
     ///      Therefore, it does not require a state change for the global reserves.
     /// @custom:security Critical. Only method which credits accounts with tokens.
     function _applyCredit(address token, uint256 amount) internal {
-        _balances[msg.sender][token] += amount;
+        balances[msg.sender][token] += amount;
         emit Credit(token, amount);
     }
 
@@ -1140,7 +1111,7 @@ contract Hyper is IEnigma {
     ///      reserves must be increased.
     /// @custom:security Critical. Handles the payment of tokens for all pool actions.
     function _applyDebit(address token, uint256 amount) internal {
-        if (_balances[msg.sender][token] >= amount) _balances[msg.sender][token] -= amount;
+        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         emit Debit(token, amount);
     }
@@ -1180,7 +1151,7 @@ contract Hyper is IEnigma {
             // Add the pair to the array to track all the pairs that have been interacted with.
             _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
             // Caching the addresses to settle the pools interacted with in the fallback function.
-            Pair memory pair = _pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
+            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
             if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
             if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
         }
@@ -1194,7 +1165,7 @@ contract Hyper is IEnigma {
         if (len == 0) return; // note: Dangerous! If pools were interacted with, this return being trigerred would be a failure.
         for (uint256 i; i != len; ++i) {
             uint16 pairId = ids[i];
-            Pair memory pair = _pairs[pairId];
+            Pair memory pair = pairs[pairId];
             _settleToken(pair.tokenBase);
             _settleToken(pair.tokenQuote);
         }
@@ -1209,9 +1180,9 @@ contract Hyper is IEnigma {
         if (!_addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
         // If the token is WETH, make sure to wrap any ETH sent to the contract.
-        if (token == WETH && msg.value > 0) _wrap();
+        if (token == WETH && msg.value > 0) _safeWrap();
 
-        uint256 global = _globalReserves[token];
+        uint256 global = globalReserves[token];
         uint256 actual = _balanceOf(token, address(this));
         if (global > actual) {
             uint256 deficit = global - actual;
@@ -1224,75 +1195,21 @@ contract Hyper is IEnigma {
         _cacheAddress(token, false); // note: Effectively saying "any pool with this token was paid for in full".
     }
 
-    // --- External --- //
-
-    /// @inheritdoc IEnigmaActions
-    function draw(
-        address token,
-        uint256 amount,
-        address to
-    ) external lock {
-        // note: Would pull tokens without this conditional check.
-        if (_balances[msg.sender][token] < amount) revert DrawBalance();
-        _applyDebit(token, amount);
-
-        if (token == WETH) _dangerousUnwrap(to, amount);
-        else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
-    }
-
-    /// @inheritdoc IEnigmaActions
-    function fund(address token, uint256 amount) external payable override lock {
-        _applyCredit(token, amount);
-        if (token == WETH) _wrap();
-        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-    }
-
     // --- View --- //
 
     // todo: check for hash collisions with instruction calldata and fix.
 
-    function slots(uint48 poolId, int24 slot) external view returns (HyperSlot memory) {
-        return _slots[poolId][slot];
-    }
-
-    function pairs(uint16 pairId) external view override returns (Pair memory p) {
-        p = _pairs[pairId];
-    }
-
-    function curves(uint32 curveId) external view override returns (Curve memory c) {
-        c = _curves[curveId];
-    }
-
-    function pools(uint48 poolId) external view override returns (HyperPool memory p) {
-        p = _pools[poolId];
-    }
-
-    function reserves(address asset) external view override returns (uint256) {
-        return _globalReserves[asset];
-    }
-
-    function getCurveId(bytes32 packedCurve) external view override returns (uint32) {
-        return _getCurveIds[packedCurve];
-    }
-
-    function getCurveNonce() external view override returns (uint256) {
-        return _curveNonce;
-    }
-
-    function getPairNonce() external view override returns (uint256) {
-        return _pairNonce;
-    }
-
-    function getPairId(address asset, address quote) external view returns (uint256) {
-        return _getPairId[asset][quote];
-    }
-
     function checkJitLiquidity(
-        address,
-        uint48,
-        int24,
-        int24
-    ) external view override returns (uint256 distance, uint256 timestamp) {}
+        address account,
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick
+    ) public view returns (uint256 distance, uint256 timestamp) {
+        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
+        uint256 previous = positions[account][positionId].blockTimestamp;
+        timestamp = _blockTimestamp();
+        distance = timestamp - previous;
+    }
 
     function getLiquidityMinted(
         uint48 poolId,
