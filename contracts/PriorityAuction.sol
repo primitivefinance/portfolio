@@ -91,7 +91,7 @@ contract PriorityAuction {
     }
 
     function collectFee(address token, uint256 amount) external onlyController {
-        SafeTransferLib.safeTransferFrom(ERC20(token), address(this), controller, amount);
+        SafeTransferLib.safeTransfer(ERC20(token), controller, amount);
     }
 
     function _calculateAuctionPayment(
