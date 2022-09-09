@@ -11,6 +11,7 @@ library Instructions {
     bytes1 public constant SWAP = 0x05;
     bytes1 public constant STAKE_POSITION = 0x06;
     bytes1 public constant UNSTAKE_POSITION = 0x07;
+    bytes1 public constant FILL_PRIORITY_AUCTION = 0x08;
     bytes1 public constant CREATE_POOL = 0x0B;
     bytes1 public constant CREATE_PAIR = 0x0C;
     bytes1 public constant CREATE_CURVE = 0x0D;
@@ -102,6 +103,15 @@ library Instructions {
 
     function encodeStakePosition(uint96 positionId) internal pure returns (bytes memory data) {
         data = abi.encodePacked(STAKE_POSITION, positionId);
+    }
+
+    function encodeFillPriorityAuction(
+        uint48 poolId,
+        address winner,
+        uint8 power,
+        uint8 amount
+    ) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(FILL_PRIORITY_AUCTION, poolId, winner, power, amount);
     }
 
     function encodeUnstakePosition(uint96 positionId) internal pure returns (bytes memory data) {
@@ -261,5 +271,21 @@ library Instructions {
     function decodeUnstakePosition(bytes calldata data) internal pure returns (uint48 poolId, uint96 positionId) {
         poolId = uint48(bytes6(data[1:7]));
         positionId = uint96(bytes12(data[1:13]));
+    }
+
+    /// @param data Maximum 1 + 6 + 20 + 8 + 8 = 43 bytes.
+    /// | 0x | 1 byte enigma code | 6 byte poolId | 20 bytes winner | 8 byte power | 8 byte amount|.
+    function decodeFillPriorityAuction(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint48 poolId,
+            address winner,
+            uint128 auctionAmount
+        )
+    {
+        poolId = uint48(bytes6(data[1:7]));
+        winner = address(bytes20(data[7:27]));
+        auctionAmount = uint128(Decoder.toAmount(data[28:]));
     }
 }
