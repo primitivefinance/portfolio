@@ -935,6 +935,34 @@ contract Hyper is IHyper {
         else slot.liquidityDelta -= int256(deltaLiquidity);
     }
 
+    // --- Priority Auction --- //
+
+    function _fillPriorityAuction(bytes calldata data) internal returns (uint48 poolId) {
+        (uint48 poolId_, address winner, uint128 auctionAmount) = Instructions.decodeFillPriorityAuction(data);
+
+        if (winner == address(0)) revert();
+        if (auctionAmount == uint128(0)) revert();
+
+        HyperPool storage pool = pools[poolId_];
+        // todo: if pool auction contract != msg.sender, revert
+        if (pool.prioritySwapper != address(0)) revert();
+
+        Epoch memory epoch = epochs[poolId_];
+        if (epoch.endTime <= block.timestamp) revert();
+
+        // calculate and store payment per second from auction
+        uint256 epochTimeRemaining = block.timestamp - epoch.endTime;
+        pool.priorityPaymentPerSecond = FixedPointMathLib.divWadDown(auctionAmount, epochTimeRemaining);
+
+        // set new priority swapper
+        pool.prioritySwapper = winner;
+
+        // add debit payable by auction contract
+        uint16 pairId = uint16(poolId >> 32);
+        Pair memory pair = pairs[pairId];
+        _increaseGlobal(pair.tokenQuote, auctionAmount);
+    }
+
     // --- Creation --- //
 
     /**
@@ -1135,6 +1163,8 @@ contract Hyper is IHyper {
             (poolId, ) = _stakePosition(data);
         } else if (instruction == Instructions.UNSTAKE_POSITION) {
             (poolId, ) = _unstakePosition(data);
+        } else if (instruction == Instructions.FILL_PRIORITY_AUCTION) {
+            (poolId) = _fillPriorityAuction(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {

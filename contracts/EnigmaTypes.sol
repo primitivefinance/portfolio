@@ -92,6 +92,7 @@ struct HyperPool {
     uint256 stakedLiquidity;
     int256 epochStakedLiquidityDelta;
     address prioritySwapper;
+    uint256 priorityPaymentPerSecond;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
 }
