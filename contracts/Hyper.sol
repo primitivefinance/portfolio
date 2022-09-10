@@ -13,6 +13,8 @@ import "./libraries/HyperSwapLib.sol";
 import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
 
+import "forge-std/Test.sol";
+
 function dangerousTransferETH(address to, uint256 value) {
     (bool success, ) = to.call{value: value}(new bytes(0));
     require(success, "ETH transfer error");
@@ -102,6 +104,13 @@ contract Hyper is IHyper {
 
     constructor(address weth) {
         WETH = weth;
+    }
+
+    // --- Temp --- //
+
+    modifier preActionPoolEffects(uint48 poolId) {
+        _syncExpiringPoolTimeAndPrice(poolId);
+        _;
     }
 
     // --- External --- //
@@ -246,6 +255,7 @@ contract Hyper is IHyper {
     /// @dev Equally important to `_increaseGlobal`.
     /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
     function _decreaseGlobal(address token, uint256 amount) internal {
+        require(globalReserves[token] >= amount, "Not enough reserves");
         globalReserves[token] -= amount;
         emit DecreaseGlobal(token, amount);
     }
@@ -258,12 +268,12 @@ contract Hyper is IHyper {
         uint256 feeGrowthInsideAsset,
         uint256 feeGrowthInsideQuote
     ) internal {
-        uint256 tokensOwedAsset = FixedPointMathLib.divWadDown(
+        uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
             feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
             pools[poolId].liquidity
         );
 
-        uint256 tokensOwedQuote = FixedPointMathLib.divWadDown(
+        uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(
             feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
             pools[poolId].liquidity
         );
@@ -414,7 +424,24 @@ contract Hyper is IHyper {
         int256 lo = int256(pool.lastTick - TICK_SIZE);
         tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
         // 6. Write changes to the pool.
-        _updatePool(poolId, tick, price, pool.liquidity, 0, 0);
+        {
+            uint48 id = poolId;
+            int24 index = tick;
+            uint256 price0 = price;
+            (uint256 fee0, uint256 fee1) = (pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+            (int256 liquidityDelta, int256 stakedLiquidityDelta, int256 epochStakedLiquidityDelta) = _transitionSlot(
+                id,
+                index,
+                fee0,
+                fee1
+            );
+
+            uint256 liquidity = pool.liquidity;
+            if (liquidityDelta > 0) liquidity += uint256(liquidityDelta);
+            else liquidity -= uint256(liquidityDelta);
+
+            _updatePool(id, index, price0, liquidity, fee0, fee1);
+        }
     }
 
     SwapState state;
@@ -525,11 +552,12 @@ contract Hyper is IHyper {
                 liveDependent = expiring.computeR2WithPrice(swap.price);
             }
 
+            // todo: get the next tick with active liquidity.
+
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
-
             // Calculate the amount of fees paid at this tick.
-            swap.feeAmount = (swap.remainder >= maxInput ? maxInput : swap.remainder * state.gamma) / 10_000;
+            swap.feeAmount = ((swap.remainder >= maxInput ? maxInput : swap.remainder) * state.gamma) / 10_000;
             state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
 
             // Compute amount to swap in this step.
@@ -568,19 +596,17 @@ contract Hyper is IHyper {
                 swap.tick = nextTick; // Set the next slot.
                 swap.price = nextPrice; // Set the next price according to the next slot.
                 swap.remainder -= delta + swap.feeAmount; // Reduce the remainder of the order to fill.
-                swap.input += delta; // Add to the total input of the swap.
             } else {
                 // Reaching this block will fill the order. Set the swap input
                 delta = swap.remainder - swap.feeAmount;
                 nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
-
                 swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
-                swap.input += delta; // Add the full amount remaining to the toal.
             }
 
             // Compute the output of the swap by computing the difference between the dependent reserves.
             if (state.sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
             else nextDependent = expiring.computeR2WithR1(nextIndependent, 0, 0);
+            swap.input += delta; // Add to the total input of the swap.
             swap.output += liveDependent - nextDependent;
         } while (swap.remainder != 0 && args.limit > swap.price);
 
@@ -594,11 +620,12 @@ contract Hyper is IHyper {
             state.sell ? 0 : state.feeGrowthGlobal
         );
         // Update Global Balance Effects
-        _increaseGlobal(pair.tokenBase, swap.input);
-        _decreaseGlobal(pair.tokenQuote, swap.output);
         // Return variables and swap event.
         (remainder, input, output) = (swap.remainder, swap.input, swap.output);
         emit Swap(args.poolId, swap.input, swap.output, pair.tokenBase, pair.tokenQuote);
+
+        _increaseGlobal(pair.tokenBase, swap.input);
+        _decreaseGlobal(pair.tokenQuote, swap.output);
     }
 
     /**
@@ -635,7 +662,8 @@ contract Hyper is IHyper {
             if (pool.epochStakedLiquidityDelta > 0) {
                 pool.stakedLiquidity += uint256(pool.epochStakedLiquidityDelta);
             } else {
-                pool.stakedLiquidity -= uint256(pool.epochStakedLiquidityDelta);
+                require(pool.stakedLiquidity >= abs(pool.epochStakedLiquidityDelta), "not enough liquidity");
+                pool.stakedLiquidity -= abs(pool.epochStakedLiquidityDelta);
             }
             pool.epochStakedLiquidityDelta = 0;
             // reset priority swapper since epoch ended
@@ -714,6 +742,7 @@ contract Hyper is IHyper {
         (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity) = Instructions
             .decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
+        _syncExpiringPoolTimeAndPrice(poolId);
 
         if (delLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
@@ -748,7 +777,6 @@ contract Hyper is IHyper {
         ); // todo: fix with using the hiTick.
         deltaR1 = deltaR1.mulWadDown(delLiquidity);
         deltaR2 = deltaR2.mulWadDown(delLiquidity);
-
         _increaseLiquidity(poolId_, loTick, hiTick, deltaR1, deltaR2, delLiquidity);
     }
 
@@ -915,6 +943,8 @@ contract Hyper is IHyper {
         (uint48 poolId_, uint96 positionId) = Instructions.decodeUnstakePosition(data);
         poolId = poolId_;
 
+        _syncExpiringPoolTimeAndPrice(poolId);
+
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
         HyperPosition storage pos = positions[msg.sender][positionId];
@@ -981,20 +1011,20 @@ contract Hyper is IHyper {
         if (pool.prioritySwapper != address(0)) revert();
 
         Epoch memory epoch = epochs[poolId_];
-        if (epoch.endTime <= block.timestamp) revert();
+        if (epoch.endTime <= _blockTimestamp()) revert();
 
         AuctionParams memory poolAuctionParams = auctionParams[poolId];
         uint128 auctionPayment = _calculateAuctionPayment(
             poolAuctionParams.startPrice,
             poolAuctionParams.endPrice,
             0,
-            block.timestamp
+            _blockTimestamp()
         );
         require(auctionPayment <= limitAmount);
 
         uint128 auctionFee = _calculateAuctionFee(auctionPayment, poolAuctionParams.fee);
         uint128 auctionNet = auctionPayment - auctionFee;
-        uint256 epochTimeRemaining = block.timestamp - epoch.endTime;
+        uint256 epochTimeRemaining = _blockTimestamp() - epoch.endTime;
 
         // save pool's priority payment per second
         pool.priorityPaymentPerSecond = FixedPointMathLib.divWadDown(auctionNet, epochTimeRemaining);
