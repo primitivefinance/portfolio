@@ -28,7 +28,9 @@ contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using HyperSwapLib for HyperSwapLib.Expiring;
+
     // --- Constants --- //
+    string public constant VERSION = "prototype-v1.0.0";
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
     /// @dev Distance between the location of prices on the price grid, so distance between price.
@@ -557,9 +559,8 @@ contract Hyper is IHyper {
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
             // Calculate the amount of fees paid at this tick.
-            swap.feeAmount = ((swap.remainder >= maxInput ? maxInput : swap.remainder) * state.gamma) / 10_000;
+            swap.feeAmount = ((swap.remainder >= maxInput ? maxInput : swap.remainder) * (1e4 - state.gamma)) / 10_000;
             state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
-
             // Compute amount to swap in this step.
             // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
             if (swap.remainder >= maxInput) {
@@ -600,6 +601,8 @@ contract Hyper is IHyper {
                 // Reaching this block will fill the order. Set the swap input
                 delta = swap.remainder - swap.feeAmount;
                 nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
+
+                delta = swap.remainder; // the swap input should increment the non-fee applied amount
                 swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
             }
 
@@ -621,7 +624,7 @@ contract Hyper is IHyper {
         );
         // Update Global Balance Effects
         // Return variables and swap event.
-        (remainder, input, output) = (swap.remainder, swap.input, swap.output);
+        (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
         emit Swap(args.poolId, swap.input, swap.output, pair.tokenBase, pair.tokenQuote);
 
         _increaseGlobal(pair.tokenBase, swap.input);
@@ -742,10 +745,11 @@ contract Hyper is IHyper {
         (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity) = Instructions
             .decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
-        _syncExpiringPoolTimeAndPrice(poolId);
 
         if (delLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        _syncExpiringPoolTimeAndPrice(poolId);
 
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = curves[uint32(poolId_)];
