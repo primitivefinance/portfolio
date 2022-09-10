@@ -39,6 +39,8 @@ interface IHyperStruct {
 }
 
 contract HyperCaller is StandardHelpers {
+    error InvalidToken(address);
+
     Hyper public hyper;
 
     constructor(address hyper_) {
@@ -75,37 +77,59 @@ contract HyperCaller is StandardHelpers {
         uint32 gamma,
         uint32 priorityGamma
     ) public {
-        uint16 pairId = hyper.getPairId(token0, token1);
-        if (pairId == 0) {
-            address(hyper).call(Instructions.encodeCreatePair(token0, token1));
-            pairId = uint16(hyper.getPairNonce());
-        }
-        Pair memory pair = IHyperStruct(address(hyper)).pairs(pairId);
-        bytes32 rawCurveId = bytes32(
-            abi.encodePacked(sigma, maturity, uint16(1e4 - gamma), uint16(1e4 - priorityGamma), strike)
+        (Pair memory pair, uint16 pairId) = createPair(token0, token1);
+        (Curve memory curve, uint32 curveId) = createCurve(
+            strike,
+            sigma,
+            maturity,
+            uint16(1e4 - gamma),
+            uint16(1e4 - priorityGamma)
         );
-        uint32 curveId = hyper.getCurveId(rawCurveId);
-        if (curveId == 0) {
-            address(hyper).call(
-                Instructions.encodeCreateCurve(
-                    sigma,
-                    maturity,
-                    uint16(1e4 - gamma),
-                    uint16(1e4 - priorityGamma),
-                    strike
-                )
-            );
-            curveId = uint32(hyper.getCurveNonce());
-        }
-        Curve memory curve = IHyperStruct(address(hyper)).curves(curveId);
-        uint48 poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
-        HyperPool memory pool = IHyperStruct(address(hyper)).pools(poolId);
         uint128 price = 10e18;
-        if (pool.blockTimestamp == 0) address(hyper).call(Instructions.encodeCreatePool(poolId, price));
+        (, uint48 poolId) = createPool(pairId, curveId, price);
         loaded = LoadedParameters({poolId: poolId, curve: curve, pair: pair});
     }
 
-    error InvalidToken(address);
+    /**
+     * @notice Creates a pool using an already created pair and curve.
+     */
+    function createPool(
+        uint16 pairId,
+        uint32 curveId,
+        uint128 price
+    ) public returns (HyperPool memory, uint48) {
+        uint48 poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
+        HyperPool memory pool = IHyperStruct(address(hyper)).pools(poolId);
+        if (pool.blockTimestamp == 0) send(Instructions.encodeCreatePool(poolId, price));
+        return (pool, poolId);
+    }
+
+    function createPair(address token0, address token1) public returns (Pair memory, uint16) {
+        uint16 pairId = hyper.getPairId(token0, token1);
+        if (pairId == 0) {
+            send(Instructions.encodeCreatePair(token0, token1));
+            pairId = uint16(hyper.getPairNonce());
+        }
+        Pair memory pair = IHyperStruct(address(hyper)).pairs(pairId);
+        return (pair, pairId);
+    }
+
+    function createCurve(
+        uint128 strike,
+        uint24 sigma,
+        uint32 maturity,
+        uint16 fee,
+        uint16 priorityFee
+    ) public returns (Curve memory, uint32) {
+        bytes32 rawCurveId = bytes32(abi.encodePacked(sigma, maturity, fee, priorityFee, strike));
+        uint32 curveId = hyper.getCurveId(rawCurveId);
+        if (curveId == 0) {
+            send(Instructions.encodeCreateCurve(sigma, maturity, fee, priorityFee, strike));
+            curveId = uint32(hyper.getCurveNonce());
+        }
+        Curve memory curve = IHyperStruct(address(hyper)).curves(curveId);
+        return (curve, curveId);
+    }
 
     function addLiquidity(
         uint256 amount,
@@ -177,6 +201,9 @@ contract HyperCaller is StandardHelpers {
         send(data);
     }
 
+    /**
+     * @notice Low level call to Hyper, which receives the payload as msg.data and processes it.
+     */
     function send(bytes memory data) internal {
         (bool success, bytes memory reason) = address(hyper).call(data);
         if (!success) {
