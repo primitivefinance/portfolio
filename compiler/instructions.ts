@@ -146,18 +146,21 @@ export function encodeCreateCurve(
   strike: BigNumber,
   sigma: number,
   maturity: number,
-  fee: number
+  fee: number,
+  priorityFee: number
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.CREATE_CURVE
   const strikeByte = hexZeroPad(strike.toHexString(), 16)
   const sigmaByte = hexZeroPad(hexlify(sigma), 3)
   const maturityByte = hexZeroPad(hexlify(maturity), 4)
   const feeByte = hexZeroPad(hexlify(fee), 2)
+  const priorityFeeByte = hexZeroPad(hexlify(priorityFee), 2)
   const bytes = [
     ...hexToBytes(hexlify(opcode)),
     ...hexToBytes(sigmaByte),
     ...hexToBytes(maturityByte),
     ...hexToBytes(feeByte),
+    ...hexToBytes(priorityFeeByte),
     ...hexToBytes(strikeByte),
   ]
   return { bytes, hex: bytesToHex(bytes) }

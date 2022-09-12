@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "../interfaces/proofOfConcept/IEnigmaPoC.sol";
-import "../interfaces/IERC20.sol";
-import "../libraries/Decoder.sol";
-import "../libraries/proofOfConcept/InstructionsPoC.sol";
-import "../libraries/SafeCast.sol";
+import "../IEnigmaPoC.sol";
+import "../InstructionsPoC.sol";
+import "../../contracts/interfaces/IERC20.sol";
+import "../../contracts/libraries/Decoder.sol";
+import "../../contracts/libraries/SafeCast.sol";
 
 /// @title Enigma Virtual Machine.
 /// @notice Stores the state of the Enigma with functions to change state.

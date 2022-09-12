@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {Pair, Curve, HyperPool, HyperSlot} from "../../prototype/EnigmaTypesPrototype.sol";
+import {Pair, Curve, HyperPool, HyperSlot} from "../EnigmaTypesPrototype.sol";
 
 /// @title IEnigmaGetters
 /// @dev Public view functions exposed by the Enigma's higher level contracts.

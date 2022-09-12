@@ -3,8 +3,8 @@ pragma solidity 0.8.13;
 
 import "@primitivefi/rmm-core/contracts/libraries/ReplicationMath.sol";
 
-import "../interfaces/IERC20.sol";
 import "./EnigmaVirtualMachinePoc.sol";
+import "../../contracts/interfaces/IERC20.sol";
 
 contract HyperPoC is EnigmaVirtualMachinePoc {
     using SafeCast for uint256;

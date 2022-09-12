@@ -3,14 +3,14 @@ pragma solidity 0.8.13;
 
 import "solmate/utils/FixedPointMathLib.sol";
 
+import "./IEnigma.sol";
 import "./EnigmaTypesPrototype.sol";
 
-import "../interfaces/IWETH.sol";
-import "../interfaces/IEnigma.sol";
-import "../interfaces/IERC20.sol";
-import "../libraries/Decoder.sol";
-import "../libraries/Instructions.sol";
-import "../libraries/SafeCast.sol";
+import "../../contracts/interfaces/IWETH.sol";
+import "../../contracts/interfaces/IERC20.sol";
+import "../../contracts/libraries/Decoder.sol";
+import "../../contracts/libraries/Instructions.sol";
+import "../../contracts/libraries/SafeCast.sol";
 
 function dangerousTransferETH(address to, uint256 value) {
     (bool success, ) = to.call{value: value}(new bytes(0));

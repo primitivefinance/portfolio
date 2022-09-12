@@ -1,6 +1,6 @@
 pragma solidity 0.8.13;
 
-import "../prototype/DecompilerPrototype.sol";
+import "./DecompilerPrototype.sol";
 
 contract TestDecompilerPrototype is DecompilerPrototype {
     constructor(address weth) DecompilerPrototype(weth) {}

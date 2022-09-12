@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {isBetween} from "../libraries/Utils.sol";
-
-import "../libraries/HyperSwapLib.sol";
 import "./EnigmaVirtualMachinePrototype.sol";
+
+import "../../contracts/libraries/HyperSwapLib.sol";
+import {isBetween} from "../../contracts/libraries/Utils.sol";
 
 abstract contract HyperPrototype is EnigmaVirtualMachinePrototype {
     using HyperSwapLib for HyperSwapLib.Expiring;
