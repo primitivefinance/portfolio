@@ -13,6 +13,7 @@ const params = {
   sigma: 1e4,
   maturity: 31556953,
   fee: 1e2,
+  priorityFee: 1e1,
   price: parseEther('10'),
   liquidity: parseEther('10'),
   tick: 23027, // ~$10, rounded up
@@ -35,7 +36,7 @@ describe('HyperPrototype', function () {
     deployer = signers[0]
     sdk = new HyperSDK(
       deployer,
-      async (signer) => await hre.ethers.getContractFactory('TestDecompilerPrototype', signer),
+      async (signer) => await hre.ethers.getContractFactory('TestHyperTime', signer),
       async (signer) => await hre.ethers.getContractFactory('HyperForwarderHelper', signer)
     )
     weth = await (await hre.ethers.getContractFactory('WETH9', signers[0])).deploy()
@@ -82,6 +83,7 @@ describe('HyperPrototype', function () {
         params.sigma,
         params.maturity,
         params.fee,
+        params.priorityFee,
         params.price
       )
 
@@ -99,13 +101,14 @@ describe('HyperPrototype', function () {
         params.sigma,
         params.maturity,
         params.fee,
+        params.priorityFee,
         params.price
       )
 
       await expect(call)
         .to.emit(sdk.forwarder, 'Success')
         .to.emit(sdk.instance, 'CreateCurve')
-        .withArgs(1, params.strike, params.sigma, params.maturity, 1e4 - params.fee)
+        .withArgs(1, params.strike, params.sigma, params.maturity, 1e4 - params.fee, 1e4 - params.priorityFee)
     })
 
     it('Creates a pool in the createPool call', async function () {
@@ -116,6 +119,7 @@ describe('HyperPrototype', function () {
         params.sigma,
         params.maturity,
         params.fee,
+        params.priorityFee,
         params.price
       )
 
@@ -124,7 +128,7 @@ describe('HyperPrototype', function () {
         .to.emit(sdk.instance, 'CreatePair')
         .withArgs(0x01, tokens[0].address, tokens[1].address)
         .to.emit(sdk.instance, 'CreateCurve')
-        .withArgs(0x0001, params.strike, params.sigma, params.maturity, 1e4 - params.fee)
+        .withArgs(0x0001, params.strike, params.sigma, params.maturity, 1e4 - params.fee, 1e4 - params.priorityFee)
         .to.emit(sdk.instance, 'CreatePool')
         .withArgs(0x0100000001, 1, 1, params.price)
     })
@@ -157,6 +161,7 @@ describe('HyperPrototype', function () {
         params.sigma,
         params.maturity,
         params.fee,
+        params.priorityFee,
         params.price
       )
 
@@ -196,6 +201,7 @@ describe('HyperPrototype', function () {
         params.sigma,
         params.maturity,
         params.fee,
+        params.priorityFee,
         params.price
       )
 

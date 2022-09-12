@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "@rari-capital/solmate/src/utils/FixedPointMathLib.sol";
+import "solmate/utils/FixedPointMathLib.sol";
 
-import "../interfaces/IWETH.sol";
-import "../interfaces/IEnigma.sol";
-import "../interfaces/IERC20.sol";
-import "../libraries/Decoder.sol";
-import "../libraries/Instructions.sol";
-import "../libraries/SafeCast.sol";
+import "./IEnigma.sol";
+import "./EnigmaTypesPrototype.sol";
+
+import "../../contracts/interfaces/IWETH.sol";
+import "../../contracts/interfaces/IERC20.sol";
+import "../../contracts/libraries/Decoder.sol";
+import "../../contracts/libraries/Instructions.sol";
+import "../../contracts/libraries/SafeCast.sol";
 
 function dangerousTransferETH(address to, uint256 value) {
     (bool success, ) = to.call{value: value}(new bytes(0));
@@ -268,6 +270,8 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     // --- State --- //
     /// @dev Pool id -> Tick -> Slot has liquidity at a price.
     mapping(uint48 => mapping(int24 => HyperSlot)) internal _slots;
+    mapping(uint48 => mapping(uint256 => uint256)) internal epochRewardGrowthGlobal;
+    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) internal _pairs;
     /// @dev Pool id -> HyperPool Data Structure.

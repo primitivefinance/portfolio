@@ -2,12 +2,12 @@ pragma solidity 0.8.13;
 
 import "solmate/tokens/WETH.sol";
 
-import "../../contracts/interfaces/enigma/IEnigmaDataStructures.sol";
+import {Pair, Curve, HyperPool, HyperSlot} from "../../../contracts/prototype/EnigmaTypesPrototype.sol";
 
-import "../shared/BaseTest.sol";
-import "../shared/TestPrototype.sol";
+import "../../shared/BaseTest.sol";
+import "../../shared/TestPrototype.sol";
 
-import "../../contracts/test/TestERC20.sol";
+import "../../../contracts/test/TestERC20.sol";
 
 contract Forwarder is Test {
     TestPrototype public hyper;
@@ -336,7 +336,7 @@ contract TestHyperPrototype is BaseTest {
 
     function testA_LFullAddLiquidity() public {
         uint256 price = __prototype.pools(__poolId).lastPrice;
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId));
+        Curve memory curve = __prototype.curves(uint32(__poolId));
         uint256 theoreticalR2 = HyperSwapLib.computeR2WithPrice(
             price,
             curve.strike,
@@ -756,12 +756,12 @@ contract TestHyperPrototype is BaseTest {
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
 
-        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked, "Position staked is not true.");
@@ -859,12 +859,12 @@ contract TestHyperPrototype is BaseTest {
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool prevPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).staked;
+        bool nextPositionStaked = __prototype.positions(address(forwarder), positionId).stakeEpochId != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(!nextPositionStaked, "Position staked is true.");
@@ -1008,7 +1008,7 @@ contract TestHyperPrototype is BaseTest {
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         uint16 pairId = __prototype.getPairId(token0, token1);
-        IEnigmaDataStructures.Pair memory pair = __prototype.pairs(pairId);
+        Pair memory pair = __prototype.pairs(pairId);
         assertEq(pair.tokenBase, token0);
         assertEq(pair.tokenQuote, token1);
         assertEq(pair.decimalsBase, 18);
@@ -1018,7 +1018,7 @@ contract TestHyperPrototype is BaseTest {
     // --- Create Curve --- //
 
     function testFailC_CuCurveExistsReverts() public {
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1030,7 +1030,7 @@ contract TestHyperPrototype is BaseTest {
     }
 
     function testFailC_CuFeeParameterOutsideBoundsReverts() public {
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1042,7 +1042,7 @@ contract TestHyperPrototype is BaseTest {
     }
 
     function testFailC_CuPriorityFeeParameterOutsideBoundsReverts() public {
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1054,7 +1054,7 @@ contract TestHyperPrototype is BaseTest {
     }
 
     function testFailC_CuExpiringPoolZeroSigmaReverts() public {
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             0,
             curve.maturity,
@@ -1066,7 +1066,7 @@ contract TestHyperPrototype is BaseTest {
     }
 
     function testFailC_CuExpiringPoolZeroStrikeReverts() public {
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1079,7 +1079,7 @@ contract TestHyperPrototype is BaseTest {
 
     function testC_CuCurveNonceIncrementReturnsOne() public {
         uint256 prevNonce = __prototype.getCurveNonce();
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1093,7 +1093,7 @@ contract TestHyperPrototype is BaseTest {
     }
 
     function testC_CuFetchesCurveIdReturnsNonZero() public {
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1116,7 +1116,7 @@ contract TestHyperPrototype is BaseTest {
     }
 
     function testC_CuFetchesCurveDataReturnsParametersSet() public {
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1135,7 +1135,7 @@ contract TestHyperPrototype is BaseTest {
         );
         bool success = forwarder.pass(data);
         uint32 curveId = __prototype.getCurveId(rawCurveId);
-        IEnigmaDataStructures.Curve memory newCurve = __prototype.curves(curveId);
+        Curve memory newCurve = __prototype.curves(curveId);
         assertEq(newCurve.sigma, curve.sigma + 1);
         assertEq(newCurve.maturity, curve.maturity);
         assertEq(newCurve.gamma, curve.gamma);
@@ -1172,7 +1172,7 @@ contract TestHyperPrototype is BaseTest {
         bool success = forwarder.pass(data);
         uint16 pairId = __prototype.getPairId(token0, token1);
 
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             uint32(0),
@@ -1198,7 +1198,7 @@ contract TestHyperPrototype is BaseTest {
         bool success = forwarder.pass(data);
         uint16 pairId = __prototype.getPairId(token0, token1);
 
-        IEnigmaDataStructures.Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = __prototype.curves(uint32(__poolId)); // Existing curve from helper setup
         data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,

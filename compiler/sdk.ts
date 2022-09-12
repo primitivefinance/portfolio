@@ -46,11 +46,12 @@ export default class HyperSDK {
     sigma: number,
     maturity: number,
     fee: number,
+    priorityFee: number,
     price: BigNumber
   ): Promise<any> {
     const magicVariable = 0 // Used in this jump instructions set to reference the recently created pair and curve.
     let { bytes: pairData } = instructions.encodeCreatePair(asset, quote)
-    let { bytes: curveData } = instructions.encodeCreateCurve(BigNumber.from(strike), sigma, maturity, fee)
+    let { bytes: curveData } = instructions.encodeCreateCurve(BigNumber.from(strike), sigma, maturity, fee, priorityFee)
     let { bytes: poolData } = instructions.encodeCreatePool(magicVariable, magicVariable, price)
     let { hex: data } = instructions.encodeJumpInstruction([pairData, curveData, poolData])
     return this.forward(data)
