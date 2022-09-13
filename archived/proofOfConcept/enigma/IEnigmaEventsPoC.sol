@@ -13,16 +13,16 @@ interface IEnigmaEventsPoC {
     // --- Critical --- //
     /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
     /// @custom:security High. Use these to track the total value locked of a token.
-    event IncreaseGlobal(address indexed token, uint256 amount);
+    event IncreaseGlobalBalance(address indexed token, uint256 amount);
     /// @dev Emitted on any pool interaction which decreases one of the pool's reserves.
     /// @custom:security High.
-    event DecreaseGlobal(address indexed token, uint256 amount);
+    event DecreaseGlobalBalance(address indexed token, uint256 amount);
 
     // --- Decompiler --- //
     /// @dev A payment requested by this contract that must be paid by the `msg.sender` account.
-    event Debit(address indexed token, uint256 amount);
+    event DecreaseUserBalance(address indexed token, uint256 amount);
     /// @dev A payment that is paid out to the `msg.sender` account from this contract.
-    event Credit(address indexed token, uint256 amount);
+    event IncreaseUserBalance(address indexed token, uint256 amount);
 
     // --- Liquidity --- //
     /// @dev Emitted on increasing the internal reserves of a pool.

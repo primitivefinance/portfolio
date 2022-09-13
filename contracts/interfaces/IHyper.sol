@@ -2,55 +2,18 @@
 pragma solidity 0.8.13;
 
 interface IHyperEvents {
-    // --- Accounts --- //
-    /// @dev Emitted on increasing liquidity or creating a pool.
-    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-    /// @dev Emitted on removing liquidity only.
-    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-
-    // --- Pools and Slots --- //
-    event PoolUpdate(
-        uint48 indexed poolId,
-        uint256 price,
-        int24 indexed tick,
-        uint256 liquidity,
-        uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote
-    );
-
-    // --- Critical --- //
-    /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
-    /// @custom:security High. Use these to track the total value locked of a token.
-    event IncreaseGlobal(address indexed token, uint256 amount);
-    /// @dev Emitted on any pool interaction which decreases one of the pool's reserves.
-    /// @custom:security High.
-    event DecreaseGlobal(address indexed token, uint256 amount);
-
-    // --- Decompiler --- //
-    /// @dev A payment requested by this contract that must be paid by the `msg.sender` account.
-    event Debit(address indexed token, uint256 amount);
-    /// @dev A payment that is paid out to the `msg.sender` account from this contract.
-    event Credit(address indexed token, uint256 amount);
-
-    // --- Liquidity --- //
-    /// @dev Emitted on increasing the internal reserves of a pool.
-    event AddLiquidity(
-        uint48 indexed poolId,
+    // --- Pairs --- //
+    /// @dev Emitted on setting a new token pair in state with the key `pairId`.
+    event CreatePair(
         uint16 indexed pairId,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    );
-    /// @dev Emitted on decreasing the internal reserves of a pool.
-    event RemoveLiquidity(
-        uint48 indexed poolId,
-        uint16 indexed pairId,
-        uint256 deltaBase,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
+        address indexed asset,
+        address indexed quote,
+        uint8 assetDecimals,
+        uint8 quoteDecimals
     );
 
-    // --- Uncommon --- //
+    // --- Curves --- //
+
     /// @dev Emitted on setting a new curve parameter set in state with key `curveId`.
     event CreateCurve(
         uint32 indexed curveId,
@@ -60,23 +23,82 @@ interface IHyperEvents {
         uint32 indexed gamma,
         uint32 priorityGamma
     );
-    /// @dev Emitted on setting a new token pair in state with the key `pairId`.
-    event CreatePair(uint16 indexed pairId, address indexed base, address indexed quote);
+    // --- Balances --- //
+    /// @dev A payment requested by this contract that must be paid by the `msg.sender` account.
+    event DecreaseUserBalance(address indexed token, uint256 amount);
+    /// @dev A payment that is paid out to the `msg.sender` account from this contract.
+    event IncreaseUserBalance(address indexed token, uint256 amount);
+
+    // --- Global Reserves --- //
+    /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
+    /// @custom:security High. Use these to track the total value locked of a token.
+    event IncreaseGlobalBalance(address indexed token, uint256 amount);
+    /// @dev Emitted on any pool interaction which decreases one of the pool's reserves.
+    /// @custom:security High.
+    event DecreaseGlobalBalance(address indexed token, uint256 amount);
+
+    // --- Pools --- //
     /// @dev Emitted on creating a pool for a pair and curve.
     event CreatePool(uint48 indexed poolId, uint16 indexed pairId, uint32 indexed curveId, uint256 price);
+
+    event PoolUpdate(
+        uint48 indexed poolId,
+        uint256 price,
+        int24 indexed tick,
+        uint256 liquidity,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    );
+    /// @dev Emitted on increasing the internal reserves of a pool.
+    event AddLiquidity(
+        uint48 indexed poolId,
+        address indexed asset,
+        address indexed quote,
+        uint256 deltaAsset,
+        uint256 deltaQuote,
+        uint256 deltaLiquidity
+    );
+    /// @dev Emitted on decreasing the internal reserves of a pool.
+    event RemoveLiquidity(
+        uint48 indexed poolId,
+        address indexed asset,
+        address indexed quote,
+        uint256 deltaAsset,
+        uint256 deltaQuote,
+        uint256 deltaLiquidity
+    );
+
+    // -- Auction Params -- //
     /// @dev Emitted when auction parameters for a pool are updated.
     event SetAuctionParams(uint48 indexed poolId, uint256 startPrice, uint256 endPrice, uint256 fee, uint256 length);
 
-    // --- Swap --- //
+    // -- Positions -- //
+    /// @dev Emitted on increasing liquidity or creating a pool.
+    event IncreasePosition(address indexed account, uint96 indexed positionId, uint256 deltaLiquidity);
+    /// @dev Emitted on removing liquidity only.
+    event DecreasePosition(address indexed account, uint96 indexed positionId, uint256 deltaLiquidity);
+
+    // - Fees - //
+    event Collect(
+        uint96 indexed positionId,
+        address indexed to,
+        uint256 tokensCollectedAsset,
+        address asset,
+        uint256 tokensCollectedQuote,
+        address quote
+    );
+
+    // -- Swaps -- //
     /// @dev Emitted on a token swap in a single virtual pool.
-    event Swap(uint256 id, uint256 input, uint256 output, address tokenIn, address tokenOut);
+    event Swap(uint48 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
+
+    // - Sync pool - //
     /// @dev Emitted on external calls to `updateLastTimestamp` or `swap`. Syncs a pool's timestamp to block.timestamp.
-    event UpdateLastTimestamp(uint48 poolId);
+    event UpdateLastTimestamp(uint48 indexed poolId);
+
+    // - Slots - //
     /// @dev Emitted when entering or exiting a slot when swapping.
     event SlotTransition(uint48 indexed poolId, int24 indexed tick, int256 liquidityDelta);
-
-    // --- Fees --- ///
-    event Collect(uint96 indexed positionId, address to, uint256 tokensCollectedAsset, uint256 tokensCollectedQuote);
 }
 
 /// @title IHyperGetters
@@ -87,8 +109,8 @@ interface IHyperGetters {
         external
         view
         returns (
-            address tokenBase,
-            uint8 decimalsBase,
+            address tokenasset,
+            uint8 decimalsasset,
             address tokenQuote,
             uint8 decimalsQuote
         );
@@ -167,12 +189,12 @@ interface IHyperGetters {
         int24 hiTick
     ) external view returns (uint256 distance, uint256 timestamp);
 
-    /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaBase` and `deltaQuote` amounts.
+    /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaAsset` and `deltaQuote` amounts.
     /// @dev Designed to round in a direction disadvantageous to the account minting liquidity.
     /// @custom:security High. Liquidity amounts minted have a direct impact on liquidity pools.
     function getLiquidityMinted(
         uint48 poolId,
-        uint256 deltaBase,
+        uint256 deltaAsset,
         uint256 deltaQuote
     ) external view returns (uint256 deltaLiquidity);
 
@@ -184,13 +206,13 @@ interface IHyperGetters {
     /// @return invariant FixedPoint64.64 invariant value denominated in `quoteToken` units.
     function getInvariant(uint48 poolId) external view returns (int128 invariant);
 
-    /// @notice Computes amount of base and quote tokens entitled to `liquidity` amount.
+    /// @notice Computes amount of asset and quote tokens entitled to `liquidity` amount.
     /// @dev Can be used to fetch the expected amount of tokens withdrawn from removing `liquidity`.
     /// @custom:security Medium. Designed to round in a direction disadvantageous to the liquidity owner.
     function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
         external
         view
-        returns (uint256 deltaBase, uint256 deltaQuote);
+        returns (uint256 deltaAsset, uint256 deltaQuote);
 }
 
 interface IHyperActions {
