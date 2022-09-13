@@ -917,6 +917,8 @@ contract Hyper is IHyper {
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
+        _syncPool(poolId);
+
         HyperPosition storage pos = positions[msg.sender][positionId];
         if (pos.stakeEpochId != 0) revert PositionStakedError(positionId);
         if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
@@ -948,9 +950,9 @@ contract Hyper is IHyper {
         (uint48 poolId_, uint96 positionId) = Instructions.decodeUnstakePosition(data);
         poolId = poolId_;
 
-        _syncPool(poolId);
-
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        _syncPool(poolId);
 
         HyperPosition storage pos = positions[msg.sender][positionId];
         if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(positionId);
@@ -1010,7 +1012,7 @@ contract Hyper is IHyper {
         if (!_doesPoolExist(poolId_)) revert();
         if (priorityOwner == address(0)) revert();
 
-        // todo: if hyper epoch needs advancing, advance it
+        _syncPool(poolId);
 
         HyperPool storage pool = pools[poolId_];
         if (pool.prioritySwapper != address(0)) revert();
