@@ -297,12 +297,11 @@ contract Hyper is IHyper {
 
         HyperPosition storage pos = positions[msg.sender][positionId];
 
-        if (pos.totalLiquidity == 0) {
+        // initialize the position's ticks if not previously set
+        if (pos.loTick == 0 && pos.hiTick == 0) {
             pos.loTick = loTick;
             pos.hiTick = hiTick;
         }
-        pos.totalLiquidity += deltaLiquidity.toUint128();
-        pos.blockTimestamp = _blockTimestamp();
 
         (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
             poolId,
@@ -314,6 +313,9 @@ contract Hyper is IHyper {
         );
 
         _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
+
+        pos.totalLiquidity += deltaLiquidity.toUint128();
+        pos.blockTimestamp = _blockTimestamp();
 
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
