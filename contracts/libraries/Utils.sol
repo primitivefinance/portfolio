@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+function signedAdd(uint256 unsigned, int256 signed) pure returns (uint256 value) {
+    if (signed > 0) {
+        value = unsigned + uint256(signed);
+    } else {
+        value = unsigned - uint256(signed);
+    }
+}
+
 function isBetween(
     int256 value,
     int256 lower,

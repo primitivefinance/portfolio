@@ -157,12 +157,14 @@ struct Order {
  * @param input Cumulative sum of input amounts for each swap step.
  * @param output Cumulative sum of output amounts for each swap step.
  */
-struct Iteration {
+struct SwapIteration {
     int24 tick;
     uint256 price;
     uint256 remainder;
     uint256 feeAmount;
     uint256 liquidity;
+    uint256 stakedLiquidity;
+    int256 epochStakedLiquidityDelta;
     uint256 input;
     uint256 output;
 }
@@ -171,4 +173,11 @@ struct SwapState {
     bool sell;
     uint256 gamma;
     uint256 feeGrowthGlobal;
+}
+
+struct SyncIteration {
+    int24 tick;
+    uint256 liquidity;
+    uint256 stakedLiquidity;
+    int256 epochStakedLiquidityDelta;
 }
