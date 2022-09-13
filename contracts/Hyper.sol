@@ -270,12 +270,12 @@ contract Hyper is IHyper {
     ) internal {
         uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
             feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
-            pools[poolId].liquidity
+            pos.totalLiquidity
         );
 
         uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(
             feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
-            pools[poolId].liquidity
+            pos.totalLiquidity
         );
 
         pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
