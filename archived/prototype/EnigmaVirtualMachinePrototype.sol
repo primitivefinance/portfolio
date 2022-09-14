@@ -120,14 +120,14 @@ abstract contract EnigmaVirtualMachinePrototype is IEnigma {
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
     function _increaseGlobal(address token, uint256 amount) internal {
         _globalReserves[token] += amount;
-        emit IncreaseGlobal(token, amount);
+        emit IncreaseGlobalBalance(token, amount);
     }
 
     /// @dev Equally important to `_increaseGlobal`.
     /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
     function _decreaseGlobal(address token, uint256 amount) internal {
         _globalReserves[token] -= amount;
-        emit DecreaseGlobal(token, amount);
+        emit DecreaseGlobalBalance(token, amount);
     }
 
     // --- Positions --- //
