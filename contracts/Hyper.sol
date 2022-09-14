@@ -418,8 +418,7 @@ contract Hyper is IHyper {
         uint256 timestamp = _blockTimestamp();
 
         if (timestamp == pool.blockTimestamp) {
-            price = pool.lastPrice;
-            tick = pool.lastTick;
+            return (pool.lastPrice, pool.lastTick);
         }
 
         Epoch storage epoch = epochs[poolId];
@@ -799,7 +798,7 @@ contract Hyper is IHyper {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
-        _syncPool(poolId);
+        _syncPool(poolId_);
 
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = curves[uint32(poolId_)];
@@ -836,7 +835,6 @@ contract Hyper is IHyper {
         if (hiTick > pool.lastTick) {
             // note: need to check also greater than lower tick?
             pool.liquidity -= deltaLiquidity;
-            pool.blockTimestamp = _blockTimestamp();
         }
 
         // Todo: delete any slots if uninstantiated.
@@ -873,7 +871,6 @@ contract Hyper is IHyper {
         if (hiTick > pool.lastTick) {
             // note: need to check also greater than lower tick?
             pool.liquidity += deltaLiquidity;
-            pool.blockTimestamp = _blockTimestamp();
         }
 
         // Todo: update bitmap of instantiated slots.
