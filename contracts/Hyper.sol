@@ -799,6 +799,8 @@ contract Hyper is IHyper {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
+        _syncPool(poolId);
+
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = curves[uint32(poolId_)];
         HyperPool storage pool = pools[poolId_];
@@ -1031,7 +1033,7 @@ contract Hyper is IHyper {
 
         uint128 auctionFee = _calculateAuctionFee(auctionPayment, poolAuctionParams.fee);
         uint128 auctionNet = auctionPayment - auctionFee;
-        uint256 epochTimeRemaining = _blockTimestamp() - epoch.endTime;
+        uint256 epochTimeRemaining = epoch.endTime - _blockTimestamp();
 
         // save pool's priority payment per second
         pool.priorityPaymentPerSecond = FixedPointMathLib.divWadDown(auctionNet, epochTimeRemaining);
