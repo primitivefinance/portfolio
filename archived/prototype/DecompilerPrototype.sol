@@ -57,7 +57,7 @@ contract DecompilerPrototype is HyperPrototype {
     /// @custom:security Critical. Only method which credits accounts with tokens.
     function _applyCredit(address token, uint256 amount) internal {
         _balances[msg.sender][token] += amount;
-        emit Credit(token, amount);
+        emit IncreaseUserBalance(token, amount);
     }
 
     /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
@@ -71,7 +71,7 @@ contract DecompilerPrototype is HyperPrototype {
     function _applyDebit(address token, uint256 amount) internal {
         if (_balances[msg.sender][token] >= amount) _balances[msg.sender][token] -= amount;
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-        emit Debit(token, amount);
+        emit DecreaseUserBalance(token, amount);
     }
 
     /// @notice Single instruction processor that will forward instruction to appropriate function.

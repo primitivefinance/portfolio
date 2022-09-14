@@ -249,7 +249,7 @@ contract Hyper is IHyper {
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
     function _increaseGlobal(address token, uint256 amount) internal {
         globalReserves[token] += amount;
-        emit IncreaseGlobal(token, amount);
+        emit IncreaseGlobalBalance(token, amount);
     }
 
     /// @dev Equally important to `_increaseGlobal`.
@@ -257,7 +257,7 @@ contract Hyper is IHyper {
     function _decreaseGlobal(address token, uint256 amount) internal {
         require(globalReserves[token] >= amount, "Not enough reserves");
         globalReserves[token] -= amount;
-        emit DecreaseGlobal(token, amount);
+        emit DecreaseGlobalBalance(token, amount);
     }
 
     // --- Positions --- //
@@ -323,7 +323,7 @@ contract Hyper is IHyper {
         pos.totalLiquidity += deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
-        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
+        emit IncreasePosition(msg.sender, positionId, deltaLiquidity);
     }
 
     /// @dev Equally important as `_increasePosition`.
@@ -352,7 +352,7 @@ contract Hyper is IHyper {
         pos.totalLiquidity -= deltaLiquidity.toUint128();
         pos.blockTimestamp = _blockTimestamp();
 
-        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
+        emit DecreasePosition(msg.sender, positionId, deltaLiquidity);
     }
 
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
@@ -850,7 +850,7 @@ contract Hyper is IHyper {
         _decreaseGlobal(pair.tokenBase, deltaR2);
         _decreaseGlobal(pair.tokenQuote, deltaR1);
 
-        emit RemoveLiquidity(poolId_, pairId, deltaR1, deltaR2, deltaLiquidity);
+        emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
     function _increaseLiquidity(
@@ -886,7 +886,7 @@ contract Hyper is IHyper {
         _increaseGlobal(pair.tokenBase, deltaR2);
         _increaseGlobal(pair.tokenQuote, deltaR1);
 
-        emit AddLiquidity(poolId, pairId, deltaR2, deltaR1, deltaLiquidity);
+        emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
     }
 
     /**
@@ -1190,7 +1190,7 @@ contract Hyper is IHyper {
             decimalsQuote: quoteDecimals
         });
 
-        emit CreatePair(pairId, asset, quote);
+        emit CreatePair(pairId, asset, quote, assetDecimals, quoteDecimals);
     }
 
     // --- General Utils --- //
@@ -1227,7 +1227,7 @@ contract Hyper is IHyper {
     /// @custom:security Critical. Only method which credits accounts with tokens.
     function _applyCredit(address token, uint256 amount) internal {
         balances[msg.sender][token] += amount;
-        emit Credit(token, amount);
+        emit IncreaseUserBalance(token, amount);
     }
 
     /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
@@ -1241,7 +1241,7 @@ contract Hyper is IHyper {
     function _applyDebit(address token, uint256 amount) internal {
         if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-        emit Debit(token, amount);
+        emit DecreaseUserBalance(token, amount);
     }
 
     /// @notice Single instruction processor that will forward instruction to appropriate function.
