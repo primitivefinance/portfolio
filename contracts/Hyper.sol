@@ -106,13 +106,6 @@ contract Hyper is IHyper {
         WETH = weth;
     }
 
-    // --- Temp --- //
-
-    modifier preActionPoolEffects(uint48 poolId) {
-        _syncPool(poolId);
-        _;
-    }
-
     // --- External --- //
 
     /// @inheritdoc IHyperActions
