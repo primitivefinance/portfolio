@@ -144,9 +144,10 @@ interface IHyperGetters {
             uint256 blockTimestamp,
             uint256 liquidity,
             uint256 stakedLiquidity,
-            int256 epochStakedLiquidityDelta,
+            int256 pendingStakedLiquidityDelta,
             address prioritySwapper,
             uint256 priorityPaymentPerSecond,
+            uint256 priorityPaymentGrowth,
             uint256 feeGrowthGlobalAsset,
             uint256 feeGrowthGlobalQuote
         );
@@ -157,11 +158,11 @@ interface IHyperGetters {
         returns (
             int256 liquidityDelta,
             int256 stakedLiquidityDelta,
-            int256 epochStakedLiquidityDelta,
+            int256 pendingStakedLiquidityDelta,
             uint256 totalLiquidity,
             uint256 feeGrowthOutsideAsset,
             uint256 feeGrowthOutsideQuote,
-            uint256 rewardGrowthOutside,
+            uint256 priorityPaymentGrowthOutside,
             bool instantiated,
             uint256 timestamp
         );
