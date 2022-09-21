@@ -952,6 +952,30 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionStaked != 0, "Position staked is true.");
     }
 
+    function testU_PRemoveUnstakedLiquidityPasses() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
+
+        data = Instructions.encodeUnstakePosition(positionId);
+        success = forwarder.pass(data);
+
+        vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
+    }
+
     function testU_PSlotLowTickStakedLiquidityDeltaDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
