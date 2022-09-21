@@ -365,7 +365,7 @@ contract Hyper is IHyper {
 
             uint256 initialStakedLiquidity = pos.stakedLiquidity;
             uint256 transitionEpochId;
-            if (epoch.endTime - epoch.interval > pos.blockTimestamp) {
+            if (epoch.endTime - epoch.interval >= pos.blockTimestamp) {
                 if (pos.pendingStakedLiquidityDelta != 0) {
                     transitionEpochId = pos.pendingStakedEpoch;
                     pos.stakedLiquidity = signedAdd(pos.stakedLiquidity, pos.pendingStakedLiquidityDelta);
@@ -412,7 +412,7 @@ contract Hyper is IHyper {
             }
             pos.priorityGrowthInsideLast = priorityGrowthInside;
 
-            if (epoch.id > pos.unstakedEpoch && epoch.endTime - epoch.interval > pos.blockTimestamp) {
+            if (epoch.id > pos.unstakedEpoch && epoch.endTime - epoch.interval >= pos.blockTimestamp) {
                 // note: stakedLiquidity, pendingStakedLiquidityDelta, pendingStakedEpoch should already be 0
                 pos.stakedEpoch = 0;
                 pos.priorityGrowthInsideLast = 0;
@@ -1128,7 +1128,7 @@ contract Hyper is IHyper {
 
         Epoch memory epoch = epochs[poolId];
 
-        if (epoch.endTime - epoch.interval > slot.timestamp) {
+        if (epoch.endTime - epoch.interval >= slot.timestamp) {
             // note: check case where loSlot.timestamp = epoch.endTime - epoch.interval
             slot.stakedLiquidityDelta += slot.pendingStakedLiquidityDelta;
             slot.pendingStakedLiquidityDelta = 0;
