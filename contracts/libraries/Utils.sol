@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "./Gaussian.sol";
+
 function signedAdd(uint256 unsigned, int256 signed) pure returns (uint256 value) {
     if (signed > 0) {
-        value = unsigned + uint256(signed);
+        value = unsigned + abs(signed);
     } else {
-        value = unsigned - uint256(signed);
+        value = unsigned - abs(signed);
     }
 }
 
