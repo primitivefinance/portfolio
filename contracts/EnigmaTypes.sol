@@ -100,7 +100,7 @@ struct HyperPool {
     int256 pendingStakedLiquidityDelta;
     address prioritySwapper;
     uint256 priorityPaymentPerSecond;
-    uint256 priorityPaymentGrowth;
+    uint256 priorityGrowthGlobal;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
 }
@@ -129,7 +129,7 @@ struct HyperSlot {
     uint256 totalLiquidity;
     uint256 feeGrowthOutsideAsset;
     uint256 feeGrowthOutsideQuote;
-    uint256 priorityPaymentGrowthOutside;
+    uint256 priorityGrowthOutside;
     bool instantiated;
     uint256 timestamp;
 }

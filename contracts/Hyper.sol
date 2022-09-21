@@ -87,9 +87,9 @@ contract Hyper is IHyper {
     /// @dev User -> Position Id -> Liquidity Position.
     mapping(address => mapping(uint96 => HyperPosition)) public positions;
     /// @dev Pool id -> Epoch Id -> Priority Payment Growth Global
-    mapping(uint48 => mapping(uint256 => uint256)) internal priorityPaymentPoolSnapshot;
+    mapping(uint48 => mapping(uint256 => uint256)) internal priorityGrowthPoolSnapshot;
     /// @dev Pool id -> Tick -> Epoch Id -> Priority Payment Growth Outside
-    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal priorityPaymentSlotSnapshot;
+    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal priorityGrowthSlotSnapshot;
 
     // --- Reentrancy --- //
     modifier lock() {
@@ -441,10 +441,10 @@ contract Hyper is IHyper {
         int24 current,
         uint256 epoch
     ) internal view returns (uint256 priorityGrowthInside) {
-        uint256 priorityGrowthGlobal = priorityPaymentPoolSnapshot[poolId][epoch];
+        uint256 priorityGrowthGlobal = priorityGrowthPoolSnapshot[poolId][epoch];
 
-        uint256 hiPriorityGrowthOutside = priorityPaymentSlotSnapshot[poolId][hi][epoch];
-        uint256 loPriorityGrowthOutside = priorityPaymentSlotSnapshot[poolId][lo][epoch];
+        uint256 hiPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][hi][epoch];
+        uint256 loPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][lo][epoch];
 
         uint256 priorityGrowthBelow;
         if (current >= lo) {
@@ -545,9 +545,9 @@ contract Hyper is IHyper {
             uint256 epochTimestamp = timestamp < epoch.endTime ? timestamp : epoch.endTime;
             // note: could epochTimestamp ever be < pool.blockTimestamp?
             uint256 priorityPaymentChange = pool.priorityPaymentPerSecond * (epochTimestamp - pool.blockTimestamp);
-            pool.priorityPaymentGrowth += FixedPointMathLib.divWadDown(priorityPaymentChange, pool.stakedLiquidity);
+            pool.priorityGrowthGlobal += FixedPointMathLib.divWadDown(priorityPaymentChange, pool.stakedLiquidity);
             // save priority payment snapshot
-            priorityPaymentPoolSnapshot[poolId][epoch.id] = pool.priorityPaymentGrowth;
+            priorityGrowthPoolSnapshot[poolId][epoch.id] = pool.priorityGrowthGlobal;
         }
 
         // epoch transition logic
@@ -556,7 +556,7 @@ contract Hyper is IHyper {
             epoch.id += 1;
             epoch.endTime += epoch.interval;
             // initialize new epoch's priority payment snapshot
-            priorityPaymentPoolSnapshot[poolId][epoch.id] = pool.priorityPaymentGrowth;
+            priorityGrowthPoolSnapshot[poolId][epoch.id] = pool.priorityGrowthGlobal;
             // update staked liquidity kicked in / out due to epoch transition
             if (pool.pendingStakedLiquidityDelta > 0) {
                 pool.stakedLiquidity += uint256(pool.pendingStakedLiquidityDelta);
@@ -595,7 +595,7 @@ contract Hyper is IHyper {
                         syncIteration.tick,
                         pool.feeGrowthGlobalAsset,
                         pool.feeGrowthGlobalQuote,
-                        pool.priorityPaymentGrowth
+                        pool.priorityGrowthGlobal
                     );
                 // update sync iteration for change in slot
                 syncIteration.liquidity = signedAdd(syncIteration.liquidity, liquidityDelta);
@@ -751,7 +751,7 @@ contract Hyper is IHyper {
                             _swap.tick,
                             (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
                             (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal),
-                            _pool.priorityPaymentGrowth
+                            _pool.priorityGrowthGlobal
                         );
 
                     _swap.liquidity = signedAdd(_swap.liquidity, liquidityDelta);
@@ -821,7 +821,7 @@ contract Hyper is IHyper {
         int24 tick,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote,
-        uint256 priorityPaymentGrowth
+        uint256 priorityGrowthGlobal
     )
         internal
         returns (
@@ -830,12 +830,14 @@ contract Hyper is IHyper {
             int256 pendingStakedLiquidityDelta
         )
     {
-        _syncSlot(poolId, tick); // updates slot with time passing
-
         HyperSlot storage slot = slots[poolId][tick];
 
         slot.feeGrowthOutsideAsset = feeGrowthGlobalAsset - slot.feeGrowthOutsideAsset;
         slot.feeGrowthOutsideQuote = feeGrowthGlobalQuote - slot.feeGrowthOutsideQuote;
+
+        slot.priorityGrowthOutside = priorityGrowthGlobal - slot.priorityGrowthOutside;
+
+        _syncSlot(poolId, tick); // updates staking deltas, saves snapshots of priorityGrowthOutside
 
         liquidityDelta = slot.liquidityDelta;
         stakedLiquidityDelta = slot.stakedLiquidityDelta;
@@ -1137,7 +1139,7 @@ contract Hyper is IHyper {
         slot.timestamp = _blockTimestamp();
 
         // save priority payment snapshot
-        priorityPaymentSlotSnapshot[poolId][tick][epoch.id] = slot.priorityPaymentGrowthOutside;
+        priorityGrowthSlotSnapshot[poolId][tick][epoch.id] = slot.priorityGrowthOutside;
     }
 
     function _increaseSlotPendingStake(
