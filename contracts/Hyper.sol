@@ -86,10 +86,10 @@ contract Hyper is IHyper {
     mapping(address => mapping(address => uint256)) public balances;
     /// @dev User -> Position Id -> Liquidity Position.
     mapping(address => mapping(uint96 => HyperPosition)) public positions;
-    /// @dev Amount of rewards globally tracked per epoch.
-    mapping(uint48 => mapping(uint256 => uint256)) internal epochRewardGrowthGlobal;
-    /// @dev Individual rewards of a position.
-    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
+    /// @dev Pool id -> Epoch Id -> Priority Payment Growth Global
+    mapping(uint48 => mapping(uint256 => uint256)) internal priorityGrowthPoolSnapshot;
+    /// @dev Pool id -> Tick -> Epoch Id -> Priority Payment Growth Outside
+    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal priorityGrowthSlotSnapshot;
 
     // --- Reentrancy --- //
     modifier lock() {
@@ -104,13 +104,6 @@ contract Hyper is IHyper {
 
     constructor(address weth) {
         WETH = weth;
-    }
-
-    // --- Temp --- //
-
-    modifier preActionPoolEffects(uint48 poolId) {
-        _syncPool(poolId);
-        _;
     }
 
     // --- External --- //
@@ -262,29 +255,6 @@ contract Hyper is IHyper {
 
     // --- Positions --- //
 
-    function _updatePositionFees(
-        HyperPosition storage pos,
-        uint48 poolId,
-        uint256 feeGrowthInsideAsset,
-        uint256 feeGrowthInsideQuote
-    ) internal {
-        uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
-            feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
-            pos.totalLiquidity
-        );
-
-        uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(
-            feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
-            pos.totalLiquidity
-        );
-
-        pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
-        pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
-
-        pos.tokensOwedAsset += tokensOwedAsset;
-        pos.tokensOwedQuote += tokensOwedQuote;
-    }
-
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(
@@ -296,6 +266,8 @@ contract Hyper is IHyper {
         uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
 
         HyperPosition storage pos = positions[msg.sender][positionId];
+
+        _syncPosition(pos, poolId);
 
         // initialize the position's ticks if not previously set
         if (pos.loTick == 0 && pos.hiTick == 0) {
@@ -320,9 +292,24 @@ contract Hyper is IHyper {
             _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
         }
 
-        pos.totalLiquidity += deltaLiquidity.toUint128();
-        pos.blockTimestamp = _blockTimestamp();
+        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) {
+            // position is already staked, add to pending stake amount
+            pos.pendingStakedLiquidityDelta += int256(deltaLiquidity);
+            pos.pendingStakedEpoch = epochs[poolId].id;
 
+            HyperPool storage pool = pools[poolId];
+            if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
+                pool.pendingStakedLiquidityDelta += int256(deltaLiquidity);
+            }
+
+            // update slots
+            _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
+            _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+
+            // emit IncreasePendingStake
+        }
+
+        pos.totalLiquidity += deltaLiquidity.toUint128();
         emit IncreasePosition(msg.sender, positionId, deltaLiquidity);
     }
 
@@ -338,6 +325,10 @@ contract Hyper is IHyper {
 
         HyperPosition storage pos = positions[msg.sender][positionId];
 
+        _syncPosition(pos, poolId);
+
+        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) revert PositionStakedError(positionId);
+
         (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
             poolId,
             hiTick,
@@ -350,7 +341,6 @@ contract Hyper is IHyper {
         _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
 
         pos.totalLiquidity -= deltaLiquidity.toUint128();
-        pos.blockTimestamp = _blockTimestamp();
 
         emit DecreasePosition(msg.sender, positionId, deltaLiquidity);
     }
@@ -367,6 +357,133 @@ contract Hyper is IHyper {
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
         _decreasePosition(poolId, loTick, hiTick, deltaLiquidity);
+    }
+
+    function _syncPosition(HyperPosition storage pos, uint48 poolId) internal {
+        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) {
+            Epoch memory epoch = epochs[poolId];
+
+            uint256 initialStakedLiquidity = pos.stakedLiquidity;
+            uint256 transitionEpochId;
+            if (epoch.endTime - epoch.interval >= pos.blockTimestamp) {
+                if (pos.pendingStakedLiquidityDelta != 0) {
+                    transitionEpochId = pos.pendingStakedEpoch;
+                    pos.stakedLiquidity = signedAdd(pos.stakedLiquidity, pos.pendingStakedLiquidityDelta);
+                    if (initialStakedLiquidity == 0) {
+                        pos.stakedEpoch = pos.pendingStakedEpoch;
+                    }
+                }
+                pos.pendingStakedLiquidityDelta = 0;
+                pos.pendingStakedEpoch = 0;
+            }
+
+            uint256 priorityGrowthInside = _getPriorityGrowthInsideEpochs(
+                poolId,
+                pos.hiTick,
+                pos.loTick,
+                pools[poolId].lastTick,
+                pos.stakedEpoch,
+                (pos.unstakedEpoch == 0) ? epoch.id : pos.unstakedEpoch
+            );
+
+            if (pos.stakedEpoch != transitionEpochId && transitionEpochId != 0) {
+                // calculate up to transition, then the rest
+                uint256 priorityGrowthInsideTransition = _getPriorityGrowthInsideEpochs(
+                    poolId,
+                    pos.hiTick,
+                    pos.loTick,
+                    pools[poolId].lastTick,
+                    pos.stakedEpoch,
+                    transitionEpochId
+                );
+                pos.tokensOwedQuote += FixedPointMathLib.mulWadDown(
+                    priorityGrowthInsideTransition - pos.priorityGrowthInsideLast,
+                    initialStakedLiquidity
+                );
+                pos.tokensOwedQuote += FixedPointMathLib.mulWadDown(
+                    priorityGrowthInside - priorityGrowthInsideTransition - pos.priorityGrowthInsideLast,
+                    pos.stakedLiquidity
+                );
+            } else {
+                pos.tokensOwedQuote += FixedPointMathLib.mulWadDown(
+                    priorityGrowthInside - pos.priorityGrowthInsideLast,
+                    pos.stakedLiquidity
+                );
+            }
+            pos.priorityGrowthInsideLast = priorityGrowthInside;
+
+            if (epoch.id > pos.unstakedEpoch && epoch.endTime - epoch.interval >= pos.blockTimestamp) {
+                // note: stakedLiquidity, pendingStakedLiquidityDelta, pendingStakedEpoch should already be 0
+                pos.stakedEpoch = 0;
+                pos.priorityGrowthInsideLast = 0;
+            }
+        }
+        pos.blockTimestamp = _blockTimestamp();
+    }
+
+    function _getPriorityGrowthInsideEpochs(
+        uint48 poolId,
+        int24 hi,
+        int24 lo,
+        int24 current,
+        uint256 startEpoch,
+        uint256 endEpoch
+    ) internal view returns (uint256 priorityGrowthInsideEpochs) {
+        uint256 priorityGrowthInsideStart = _getPriorityGrowthInside(poolId, hi, lo, current, startEpoch);
+        uint256 priorityGrowthInsideEnd = _getPriorityGrowthInside(poolId, hi, lo, current, endEpoch);
+        priorityGrowthInsideEpochs = priorityGrowthInsideEnd - priorityGrowthInsideStart;
+    }
+
+    function _getPriorityGrowthInside(
+        uint48 poolId,
+        int24 hi,
+        int24 lo,
+        int24 current,
+        uint256 epoch
+    ) internal view returns (uint256 priorityGrowthInside) {
+        uint256 priorityGrowthGlobal = priorityGrowthPoolSnapshot[poolId][epoch];
+
+        uint256 hiPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][hi][epoch];
+        uint256 loPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][lo][epoch];
+
+        uint256 priorityGrowthBelow;
+        if (current >= lo) {
+            priorityGrowthBelow = loPriorityGrowthOutside;
+        } else {
+            priorityGrowthBelow = priorityGrowthGlobal - loPriorityGrowthOutside;
+        }
+
+        uint256 priorityGrowthAbove;
+        if (current < hi) {
+            priorityGrowthAbove = hiPriorityGrowthOutside;
+        } else {
+            priorityGrowthAbove = priorityGrowthGlobal - hiPriorityGrowthOutside;
+        }
+
+        priorityGrowthInside = priorityGrowthGlobal - priorityGrowthBelow - priorityGrowthAbove;
+    }
+
+    function _updatePositionFees(
+        HyperPosition storage pos,
+        uint48 poolId,
+        uint256 feeGrowthInsideAsset,
+        uint256 feeGrowthInsideQuote
+    ) internal {
+        uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
+            feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
+            pos.totalLiquidity
+        );
+
+        uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(
+            feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
+            pos.totalLiquidity
+        );
+
+        pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
+        pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
+
+        pos.tokensOwedAsset += tokensOwedAsset;
+        pos.tokensOwedQuote += tokensOwedQuote;
     }
 
     function _getFeeGrowthInside(
@@ -427,11 +544,10 @@ contract Hyper is IHyper {
         if (pool.stakedLiquidity > 0 && pool.priorityPaymentPerSecond > 0) {
             uint256 epochTimestamp = timestamp < epoch.endTime ? timestamp : epoch.endTime;
             // note: could epochTimestamp ever be < pool.blockTimestamp?
-            uint256 epochPriorityPayment = pool.priorityPaymentPerSecond * (epochTimestamp - pool.blockTimestamp);
-            epochRewardGrowthGlobal[poolId][epoch.id] += FixedPointMathLib.divWadDown(
-                epochPriorityPayment,
-                pool.stakedLiquidity
-            );
+            uint256 priorityPaymentChange = pool.priorityPaymentPerSecond * (epochTimestamp - pool.blockTimestamp);
+            pool.priorityGrowthGlobal += FixedPointMathLib.divWadDown(priorityPaymentChange, pool.stakedLiquidity);
+            // save priority payment snapshot
+            priorityGrowthPoolSnapshot[poolId][epoch.id] = pool.priorityGrowthGlobal;
         }
 
         // epoch transition logic
@@ -439,16 +555,16 @@ contract Hyper is IHyper {
             // transition epoch
             epoch.id += 1;
             epoch.endTime += epoch.interval;
-            // copy previous epoch's reward growth global
-            epochRewardGrowthGlobal[poolId][epoch.id] = epochRewardGrowthGlobal[poolId][epoch.id - 1];
+            // initialize new epoch's priority payment snapshot
+            priorityGrowthPoolSnapshot[poolId][epoch.id] = pool.priorityGrowthGlobal;
             // update staked liquidity kicked in / out due to epoch transition
-            if (pool.epochStakedLiquidityDelta > 0) {
-                pool.stakedLiquidity += uint256(pool.epochStakedLiquidityDelta);
+            if (pool.pendingStakedLiquidityDelta > 0) {
+                pool.stakedLiquidity += uint256(pool.pendingStakedLiquidityDelta);
             } else {
-                pool.stakedLiquidity -= abs(pool.epochStakedLiquidityDelta);
+                pool.stakedLiquidity -= abs(pool.pendingStakedLiquidityDelta);
             }
-            // reset staked epoch delta, priority swapper, priority payment rate
-            pool.epochStakedLiquidityDelta = 0;
+            // reset pending stake delta, priority swapper, priority payment rate
+            pool.pendingStakedLiquidityDelta = 0;
             pool.prioritySwapper = address(0);
             pool.priorityPaymentPerSecond = uint128(0);
         }
@@ -467,25 +583,31 @@ contract Hyper is IHyper {
                 tick: pool.lastTick + tickJump,
                 liquidity: pool.liquidity,
                 stakedLiquidity: pool.stakedLiquidity,
-                epochStakedLiquidityDelta: pool.epochStakedLiquidityDelta
+                pendingStakedLiquidityDelta: pool.pendingStakedLiquidityDelta
             });
             do {
                 (
                     int256 liquidityDelta,
                     int256 stakedLiquidityDelta,
-                    int256 slotEpochStakedLiquidityDelta
-                ) = _transitionSlot(poolId, syncIteration.tick, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+                    int256 slotPendingStakedLiquidityDelta
+                ) = _transitionSlot(
+                        poolId,
+                        syncIteration.tick,
+                        pool.feeGrowthGlobalAsset,
+                        pool.feeGrowthGlobalQuote,
+                        pool.priorityGrowthGlobal
+                    );
                 // update sync iteration for change in slot
                 syncIteration.liquidity = signedAdd(syncIteration.liquidity, liquidityDelta);
                 syncIteration.stakedLiquidity = signedAdd(syncIteration.stakedLiquidity, stakedLiquidityDelta);
-                syncIteration.epochStakedLiquidityDelta += slotEpochStakedLiquidityDelta;
+                syncIteration.pendingStakedLiquidityDelta += slotPendingStakedLiquidityDelta;
                 syncIteration.tick += tickJump;
             } while (tick != syncIteration.tick);
             // update pool fields effected by change in tick
             pool.lastTick = tick;
             pool.liquidity = syncIteration.liquidity;
             pool.stakedLiquidity = syncIteration.stakedLiquidity;
-            pool.epochStakedLiquidityDelta = syncIteration.epochStakedLiquidityDelta;
+            pool.pendingStakedLiquidityDelta = syncIteration.pendingStakedLiquidityDelta;
         }
         pool.lastPrice = price;
         pool.blockTimestamp = timestamp;
@@ -543,7 +665,7 @@ contract Hyper is IHyper {
                 remainder: remainder,
                 liquidity: pool.liquidity,
                 stakedLiquidity: pool.stakedLiquidity,
-                epochStakedLiquidityDelta: pool.epochStakedLiquidityDelta,
+                pendingStakedLiquidityDelta: pool.pendingStakedLiquidityDelta,
                 input: 0,
                 output: 0
             });
@@ -623,17 +745,18 @@ contract Hyper is IHyper {
                     (
                         int256 liquidityDelta,
                         int256 stakedLiquidityDelta,
-                        int256 epochStakedLiquidityDelta
+                        int256 pendingStakedLiquidityDelta
                     ) = _transitionSlot(
                             _args.poolId,
                             _swap.tick,
                             (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
-                            (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal)
+                            (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal),
+                            _pool.priorityGrowthGlobal
                         );
 
                     _swap.liquidity = signedAdd(_swap.liquidity, liquidityDelta);
                     _swap.stakedLiquidity = signedAdd(_swap.stakedLiquidity, stakedLiquidityDelta);
-                    _swap.epochStakedLiquidityDelta += epochStakedLiquidityDelta;
+                    _swap.pendingStakedLiquidityDelta += pendingStakedLiquidityDelta;
                 }
 
                 // Update variables for next iteration.
@@ -644,7 +767,7 @@ contract Hyper is IHyper {
                 // Save liquidity values changed by slot transition
                 swap.liquidity = _swap.liquidity;
                 swap.stakedLiquidity = _swap.stakedLiquidity;
-                swap.epochStakedLiquidityDelta = _swap.epochStakedLiquidityDelta;
+                swap.pendingStakedLiquidityDelta = _swap.pendingStakedLiquidityDelta;
             } else {
                 // Reaching this block will fill the order. Set the swap input
                 delta = swap.remainder - swap.feeAmount;
@@ -666,8 +789,8 @@ contract Hyper is IHyper {
         if (pool.lastTick != swap.tick) pool.lastTick = swap.tick;
         if (pool.liquidity != swap.liquidity) pool.liquidity = swap.liquidity;
         if (pool.stakedLiquidity != swap.stakedLiquidity) pool.stakedLiquidity = swap.stakedLiquidity;
-        if (pool.epochStakedLiquidityDelta != swap.epochStakedLiquidityDelta)
-            pool.epochStakedLiquidityDelta = swap.epochStakedLiquidityDelta;
+        if (pool.pendingStakedLiquidityDelta != swap.pendingStakedLiquidityDelta)
+            pool.pendingStakedLiquidityDelta = swap.pendingStakedLiquidityDelta;
 
         uint256 feeGrowthGlobalAsset = state.sell ? state.feeGrowthGlobal : 0;
         uint256 feeGrowthGlobalQuote = state.sell ? 0 : state.feeGrowthGlobal;
@@ -691,42 +814,34 @@ contract Hyper is IHyper {
      * @param tick Key of the slot specified to be transitioned.
      * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
      * @return stakedLiquidityDelta Difference in amount of staked liquidity available before or after this slot.
-     * @return epochStakedLiquidityDelta Difference in amount the staked liquidity should change at next epoch transition.
+     * @return pendingStakedLiquidityDelta Difference in amount the staked liquidity should change at next epoch transition.
      */
     function _transitionSlot(
         uint48 poolId,
         int24 tick,
         uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote
+        uint256 feeGrowthGlobalQuote,
+        uint256 priorityGrowthGlobal
     )
         internal
         returns (
             int256 liquidityDelta,
             int256 stakedLiquidityDelta,
-            int256 epochStakedLiquidityDelta
+            int256 pendingStakedLiquidityDelta
         )
     {
         HyperSlot storage slot = slots[poolId][tick];
-        Epoch storage epoch = epochs[poolId];
-
-        // update staked liquidity delta if epoch transition since last slot transition
-        if (epoch.endTime - epoch.interval > slot.timestamp) {
-            // note: check case where slot.timestamp = epoch.endTime - epoch.interval
-            slot.stakedLiquidityDelta += slot.epochStakedLiquidityDelta;
-            slot.epochStakedLiquidityDelta = 0;
-        }
-        slot.timestamp = _blockTimestamp();
-
-        // update rewardGrowthOutside, save in state indexed by current epoch
-        slot.rewardGrowthOutside = epochRewardGrowthGlobal[poolId][epoch.id] - slot.rewardGrowthOutside;
-        epochRewardGrowthOutside[poolId][tick][epoch.id] = slot.rewardGrowthOutside;
 
         slot.feeGrowthOutsideAsset = feeGrowthGlobalAsset - slot.feeGrowthOutsideAsset;
         slot.feeGrowthOutsideQuote = feeGrowthGlobalQuote - slot.feeGrowthOutsideQuote;
 
+        slot.priorityGrowthOutside = priorityGrowthGlobal - slot.priorityGrowthOutside;
+
+        _syncSlot(poolId, tick); // updates staking deltas, saves snapshots of priorityGrowthOutside
+
         liquidityDelta = slot.liquidityDelta;
         stakedLiquidityDelta = slot.stakedLiquidityDelta;
-        epochStakedLiquidityDelta = slot.epochStakedLiquidityDelta;
+        pendingStakedLiquidityDelta = slot.pendingStakedLiquidityDelta;
 
         // todo: update transition event
 
@@ -749,11 +864,14 @@ contract Hyper is IHyper {
         if (delLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
+        // update pool, relevant slots with time
         _syncPool(poolId);
+
+        _syncSlot(poolId, loTick);
+        _syncSlot(poolId, hiTick);
 
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = curves[uint32(poolId_)];
-        HyperSlot storage slot = slots[poolId_][loTick];
         HyperPool storage pool = pools[poolId_];
         uint256 timestamp = _blockTimestamp();
 
@@ -798,7 +916,11 @@ contract Hyper is IHyper {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
+        // update pool, relevant slots with time
         _syncPool(poolId_);
+
+        _syncSlot(poolId, loTick);
+        _syncSlot(poolId, hiTick);
 
         // Compute amounts of tokens for the real reserves.
         Curve memory curve = curves[uint32(poolId_)];
@@ -832,8 +954,7 @@ contract Hyper is IHyper {
         _decreaseSlotLiquidity(poolId_, hiTick, deltaLiquidity, true);
 
         // Update the pool state if liquidity is within the current pool's slot.
-        if (hiTick > pool.lastTick) {
-            // note: need to check also greater than lower tick?
+        if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
             pool.liquidity -= deltaLiquidity;
         }
 
@@ -866,10 +987,8 @@ contract Hyper is IHyper {
         _increaseSlotLiquidity(poolId, hiTick, deltaLiquidity, true);
 
         // Update the pool state if liquidity is within the current pool's slot.
-        // Update the pool state if liquidity is within the current pool's slot.
         HyperPool storage pool = pools[poolId];
-        if (hiTick > pool.lastTick) {
-            // note: need to check also greater than lower tick?
+        if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
             pool.liquidity += deltaLiquidity;
         }
 
@@ -910,75 +1029,6 @@ contract Hyper is IHyper {
         else slot.liquidityDelta += int256(deltaLiquidity);
     }
 
-    function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint96 positionId) = Instructions.decodeStakePosition(data);
-        poolId = poolId_;
-
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        _syncPool(poolId);
-
-        HyperPosition storage pos = positions[msg.sender][positionId];
-        if (pos.stakeEpochId != 0) revert PositionStakedError(positionId);
-        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
-
-        HyperSlot storage loSlot = slots[poolId_][pos.loTick];
-        HyperSlot storage hiSlot = slots[poolId_][pos.hiTick];
-
-        // todo: check if slots need to be updated for epoch transition
-
-        // add staked delta to lo tick, remove from hi tick for next epoch
-        loSlot.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
-        hiSlot.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
-
-        HyperPool storage pool = pools[poolId_];
-        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
-            // if position's liquidity is in range, add to next epoch's delta
-            pool.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
-        }
-
-        Epoch storage epoch = epochs[poolId_];
-        pos.stakeEpochId = epoch.id + 1;
-
-        // note: do we need to update position blockTimestamp?
-
-        // emit Stake Position
-    }
-
-    function _unstakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint96 positionId) = Instructions.decodeUnstakePosition(data);
-        poolId = poolId_;
-
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        _syncPool(poolId);
-
-        HyperPosition storage pos = positions[msg.sender][positionId];
-        if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(positionId);
-
-        HyperSlot storage loSlot = slots[poolId_][pos.loTick];
-        HyperSlot storage hiSlot = slots[poolId_][pos.hiTick];
-
-        // todo: check if slots need to be updated for epoch transition
-
-        // remove staked delta from lo tick, add to hi tick for next epoch
-        loSlot.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
-        hiSlot.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
-
-        HyperPool storage pool = pools[poolId_];
-        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
-            // if position's liquidity is in range, add to next epoch's delta
-            pool.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
-        }
-
-        Epoch storage epoch = epochs[poolId_];
-        pos.unstakeEpochId = epoch.id + 1;
-
-        // note: do we need to update position blockTimestamp?
-
-        // emit Unstake Position
-    }
-
     /**
      * @notice Updates the liquidity of a slot, and returns a bool to reflect whether its instantiation state was changed.
      */
@@ -1001,6 +1051,125 @@ contract Hyper is IHyper {
         // Update liquidity deltas depending on the changed amount.
         if (hi) slot.liquidityDelta += int256(deltaLiquidity);
         else slot.liquidityDelta -= int256(deltaLiquidity);
+    }
+
+    function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint48 poolId_, uint96 positionId) = Instructions.decodeStakePosition(data);
+        poolId = poolId_;
+
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        _syncPool(poolId);
+
+        HyperPosition storage pos = positions[msg.sender][positionId];
+
+        // update slots
+        _syncSlot(poolId, pos.loTick);
+        _syncSlot(poolId, pos.hiTick);
+
+        // update staked position
+        _syncPosition(pos, poolId);
+
+        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) revert PositionStakedError(positionId);
+        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
+
+        // update position
+        pos.pendingStakedLiquidityDelta = int256(pos.totalLiquidity);
+        pos.pendingStakedEpoch = epochs[poolId].id;
+
+        // update slots
+        _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
+        _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+
+        // update pool
+        HyperPool storage pool = pools[poolId_];
+        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
+            // if position's liquidity is in range, add to next epoch's delta
+            pool.pendingStakedLiquidityDelta += int256(pos.totalLiquidity);
+        }
+
+        // emit Stake Position
+    }
+
+    function _unstakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint48 poolId_, uint96 positionId) = Instructions.decodeUnstakePosition(data);
+        poolId = poolId_;
+
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        _syncPool(poolId);
+
+        HyperPosition storage pos = positions[msg.sender][positionId];
+
+        // update slots
+        _syncSlot(poolId, pos.loTick);
+        _syncSlot(poolId, pos.hiTick);
+
+        // update staked position
+        _syncPosition(pos, poolId);
+
+        if (pos.pendingStakedLiquidityDelta == 0 && pos.stakedLiquidity == 0) revert PositionNotStakedError(positionId);
+
+        pos.pendingStakedLiquidityDelta = -int256(pos.totalLiquidity);
+        pos.unstakedEpoch = epochs[poolId].id;
+
+        _decreaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
+        _decreaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+
+        HyperPool storage pool = pools[poolId_];
+        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
+            // if position's liquidity is in range, add to next epoch's delta
+            pool.pendingStakedLiquidityDelta -= int256(pos.totalLiquidity);
+        }
+
+        // emit Unstake Position
+    }
+
+    function _syncSlot(uint48 poolId, int24 tick) internal {
+        HyperSlot storage slot = slots[poolId][tick];
+
+        Epoch memory epoch = epochs[poolId];
+
+        if (epoch.endTime - epoch.interval >= slot.timestamp) {
+            // note: check case where loSlot.timestamp = epoch.endTime - epoch.interval
+            slot.stakedLiquidityDelta += slot.pendingStakedLiquidityDelta;
+            slot.pendingStakedLiquidityDelta = 0;
+        }
+
+        slot.timestamp = _blockTimestamp();
+
+        // save priority payment snapshot
+        priorityGrowthSlotSnapshot[poolId][tick][epoch.id] = slot.priorityGrowthOutside;
+    }
+
+    function _increaseSlotPendingStake(
+        uint48 poolId,
+        int24 tick,
+        uint256 pendingStakedLiquidity,
+        bool hi
+    ) internal {
+        HyperSlot storage slot = slots[poolId][tick];
+
+        if (hi) {
+            slot.pendingStakedLiquidityDelta -= int256(pendingStakedLiquidity);
+        } else {
+            slot.pendingStakedLiquidityDelta += int256(pendingStakedLiquidity);
+        }
+    }
+
+    function _decreaseSlotPendingStake(
+        uint48 poolId,
+        int24 tick,
+        uint256 pendingStakedLiquidity,
+        bool hi
+    ) internal {
+        HyperSlot storage slot = slots[poolId][tick];
+
+        if (hi) {
+            slot.pendingStakedLiquidityDelta += int256(pendingStakedLiquidity);
+        } else {
+            slot.pendingStakedLiquidityDelta -= int256(pendingStakedLiquidity);
+        }
     }
 
     // --- Priority Auction --- //

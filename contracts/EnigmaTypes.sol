@@ -97,9 +97,10 @@ struct HyperPool {
     uint256 blockTimestamp;
     uint256 liquidity;
     uint256 stakedLiquidity;
-    int256 epochStakedLiquidityDelta;
+    int256 pendingStakedLiquidityDelta;
     address prioritySwapper;
     uint256 priorityPaymentPerSecond;
+    uint256 priorityGrowthGlobal;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
 }
@@ -108,24 +109,27 @@ struct HyperPosition {
     int24 loTick;
     int24 hiTick;
     uint256 totalLiquidity;
-    uint256 blockTimestamp;
-    uint256 stakeEpochId;
-    uint256 unstakeEpochId;
-    uint256 lastRewardGrowth;
+    uint256 stakedLiquidity;
+    uint256 stakedEpoch;
+    uint256 unstakedEpoch;
+    int256 pendingStakedLiquidityDelta;
+    uint256 pendingStakedEpoch;
     uint256 feeGrowthInsideAssetLast;
     uint256 feeGrowthInsideQuoteLast;
+    uint256 priorityGrowthInsideLast;
     uint256 tokensOwedAsset;
     uint256 tokensOwedQuote;
+    uint256 blockTimestamp;
 }
 /// @dev Liquidity information indexed by tick (a price).
 struct HyperSlot {
     int256 liquidityDelta;
     int256 stakedLiquidityDelta;
-    int256 epochStakedLiquidityDelta;
+    int256 pendingStakedLiquidityDelta;
     uint256 totalLiquidity;
     uint256 feeGrowthOutsideAsset;
     uint256 feeGrowthOutsideQuote;
-    uint256 rewardGrowthOutside;
+    uint256 priorityGrowthOutside;
     bool instantiated;
     uint256 timestamp;
 }
@@ -164,7 +168,7 @@ struct SwapIteration {
     uint256 feeAmount;
     uint256 liquidity;
     uint256 stakedLiquidity;
-    int256 epochStakedLiquidityDelta;
+    int256 pendingStakedLiquidityDelta;
     uint256 input;
     uint256 output;
 }
@@ -179,5 +183,5 @@ struct SyncIteration {
     int24 tick;
     uint256 liquidity;
     uint256 stakedLiquidity;
-    int256 epochStakedLiquidityDelta;
+    int256 pendingStakedLiquidityDelta;
 }

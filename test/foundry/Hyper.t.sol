@@ -815,15 +815,32 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
 
-        bool prevPositionStaked = getPosition(address(forwarder), positionId).stakeEpochId != 0;
+        bool prevPositionStaked = getPosition(address(forwarder), positionId).pendingStakedLiquidityDelta != 0;
 
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        bool nextPositionStaked = getPosition(address(forwarder), positionId).stakeEpochId != 0;
+        bool nextPositionStaked = getPosition(address(forwarder), positionId).pendingStakedLiquidityDelta != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked, "Position staked is not true.");
+    }
+
+    function testFailS_PRemoveStakedLiquidityReverts() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
     }
 
     function testS_PSlotLowTickStakedLiquidityDeltaIncreases() public {
@@ -835,13 +852,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).pendingStakedLiquidityDelta;
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = getSlot(__poolId, lo).pendingStakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta > prevStakedLiquidityDelta,
@@ -858,13 +875,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = getSlot(__poolId, hi).pendingStakedLiquidityDelta;
 
         uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = getSlot(__poolId, hi).pendingStakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta < prevStakedLiquidityDelta,
@@ -924,15 +941,39 @@ contract TestHyperSingle is StandardHelpers, Test {
         data = Instructions.encodeSwap(0, __poolId, 0x09, 0x01, 0x10, 0x01, 0);
         success = forwarder.pass(data);
 
-        uint256 prevPositionStaked = getPosition(address(forwarder), positionId).unstakeEpochId;
+        uint256 prevPositionStaked = getPosition(address(forwarder), positionId).unstakedEpoch;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        uint256 nextPositionStaked = getPosition(address(forwarder), positionId).unstakeEpochId;
+        uint256 nextPositionStaked = getPosition(address(forwarder), positionId).unstakedEpoch;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked != 0, "Position staked is true.");
+    }
+
+    function testU_PRemoveUnstakedLiquidityPasses() public {
+        int24 lo = DEFAULT_TICK - 256;
+        int24 hi = DEFAULT_TICK;
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        data = Instructions.encodeStakePosition(positionId);
+        success = forwarder.pass(data);
+
+        vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
+
+        data = Instructions.encodeUnstakePosition(positionId);
+        success = forwarder.pass(data);
+
+        vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
+
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        success = forwarder.pass(data);
     }
 
     function testU_PSlotLowTickStakedLiquidityDeltaDecreases() public {
@@ -953,12 +994,12 @@ contract TestHyperSingle is StandardHelpers, Test {
         data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
         success = forwarder.pass(data);
 
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).pendingStakedLiquidityDelta;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = getSlot(__poolId, lo).pendingStakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta < prevStakedLiquidityDelta,
@@ -979,12 +1020,12 @@ contract TestHyperSingle is StandardHelpers, Test {
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
+        int256 prevStakedLiquidityDelta = getSlot(__poolId, hi).pendingStakedLiquidityDelta;
 
         data = Instructions.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
+        int256 nextStakedLiquidityDelta = getSlot(__poolId, hi).pendingStakedLiquidityDelta;
 
         assertTrue(
             nextStakedLiquidityDelta > prevStakedLiquidityDelta,
