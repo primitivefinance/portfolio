@@ -90,7 +90,7 @@ describe('HyperPrototype', function () {
       await expect(call)
         .to.emit(sdk.forwarder, 'Success')
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(1, tokens[0].address, tokens[1].address)
+        .withArgs(1, tokens[0].address, tokens[1].address, 18, 18)
     })
 
     it('Creates a curve in the createPool call', async function () {
@@ -126,7 +126,7 @@ describe('HyperPrototype', function () {
       await expect(call)
         .to.emit(sdk.forwarder, 'Success')
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(0x01, tokens[0].address, tokens[1].address)
+        .withArgs(0x01, tokens[0].address, tokens[1].address, 18, 18)
         .to.emit(sdk.instance, 'CreateCurve')
         .withArgs(0x0001, params.strike, params.sigma, params.maturity, 1e4 - params.fee, 1e4 - params.priorityFee)
         .to.emit(sdk.instance, 'CreatePool')
@@ -138,7 +138,7 @@ describe('HyperPrototype', function () {
 
       await expect(deployer.sendTransaction({ to: sdk.instance?.address, data, value: BigInt(0) }))
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(1, tokens[0].address, tokens[1].address)
+        .withArgs(1, tokens[0].address, tokens[1].address, 18, 18)
     })
 
     it('Creates a curve directly', async function () {
@@ -146,7 +146,7 @@ describe('HyperPrototype', function () {
 
       await expect(deployer.sendTransaction({ to: sdk.instance?.address, data, value: BigInt(0) }))
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(1, tokens[0].address, tokens[1].address)
+        .withArgs(1, tokens[0].address, tokens[1].address, 18, 18)
     })
   })
 
@@ -167,7 +167,7 @@ describe('HyperPrototype', function () {
 
       await call
 
-      poolId = await sdk.forwarder.getPoolId(1, 1)
+      poolId = sdk.forwarder ? await sdk.forwarder.getPoolId(1, 1) : ''
 
       // mint tokens and approve hyper
     })
@@ -207,7 +207,7 @@ describe('HyperPrototype', function () {
 
       await call
 
-      poolId = await sdk.forwarder.getPoolId(1, 1)
+      poolId = sdk.forwarder ? await sdk.forwarder.getPoolId(1, 1) : ''
 
       // mint tokens and approve hyper
     })
