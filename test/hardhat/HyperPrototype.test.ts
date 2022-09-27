@@ -74,6 +74,12 @@ describe('HyperPrototype', function () {
     ])
   })
 
+  describe('VERSION', function () {
+    it('returns the version as a string', async function () {
+      if (sdk.instance) expect(await sdk.instance.VERSION()).to.be.equal('prototype-v1.0.0')
+    })
+  })
+
   describe('Create', function () {
     it('Creates a pair in the createPool call', async function () {
       const call = sdk.createPool(
