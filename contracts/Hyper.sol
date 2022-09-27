@@ -28,7 +28,17 @@ contract Hyper is IHyper {
     using HyperSwapLib for HyperSwapLib.Expiring;
 
     // --- Constants --- //
-    string public constant VERSION = "prototype-v1.0.0";
+    // string public constant VERSION = "prototype-v1.0.0"; // 33,107 bytes
+
+    function VERSION() public view returns (string memory) {
+        // 33,089 bytes
+        assembly {
+            mstore(0x00, 0x20)
+            mstore(0x30, 0x1070726f746f747970652d76312e302e30)
+            return(0x00, 0x60)
+        }
+    }
+
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
     /// @dev Distance between the location of prices on the price grid, so distance between price.
