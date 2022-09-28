@@ -16,6 +16,7 @@ library Instructions {
     bytes1 public constant CREATE_PAIR = 0x0C;
     bytes1 public constant CREATE_CURVE = 0x0D;
     bytes1 public constant INSTRUCTION_JUMP = 0xAA;
+    bytes1 public constant COLLECT_FEES = 0xB0;
 
     // --- Errors --- //
     error DecodePairBytesLength(uint256 expected, uint256 length);
