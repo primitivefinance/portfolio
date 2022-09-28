@@ -996,6 +996,35 @@ contract Hyper is IHyper {
         emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
+    function _collectFees(
+        uint96 positionId,
+        uint128 amountAssetRequested,
+        uint128 amountQuoteRequested
+    ) internal {
+        // No need to check if the requested amounts are higher than the owed ones
+        // because this would cause the next lines to revert.
+        positions[msg.sender][positionId].tokensOwedAsset -= amountAssetRequested;
+        positions[msg.sender][positionId].tokensOwedQuote -= amountQuoteRequested;
+
+        // Right shift the positionId to keep only the pairId part (first 2 bytes).
+        uint16 pairId = uint16(positionId >> 80);
+
+        // Should save some gas
+        Pair memory pair = pairs[pairId];
+
+        if (amountAssetRequested > 0) _applyCredit(pair.tokenBase, amountAssetRequested);
+        if (amountQuoteRequested > 0) _applyCredit(pair.tokenQuote, amountQuoteRequested);
+
+        emit Collect(
+            positionId,
+            msg.sender,
+            amountAssetRequested,
+            pair.tokenBase,
+            amountQuoteRequested,
+            pair.tokenQuote
+        );
+    }
+
     function _increaseLiquidity(
         uint48 poolId,
         int24 loTick,
