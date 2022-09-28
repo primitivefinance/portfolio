@@ -30,11 +30,25 @@ contract Hyper is IHyper {
     // --- Constants --- //
     // string public constant VERSION = "prototype-v1.0.0"; // 33,107 bytes
 
+    /// @notice Current version of this contract.
+    /// @dev Optimized function returning the version of this contract
+    ///      while saving some bytes of storage (inspired by Seaport).
+    /// @return "prototype-v1.0.0" encoded as a string
     function VERSION() public view returns (string memory) {
         // 33,089 bytes
         assembly {
+            // Load 0x20 (32) in memory at slot 0x00, this corresponds to the
+            // offset location of the next data.
             mstore(0x00, 0x20)
+
+            // Then we load both the length of our string (0x10) and its actual value
+            // (0x70726f746f747970652d76312e302e30) using the offset 0x30. Using this
+            // particular offset value will right pad the length at the end of the slot
+            // and left pad the string at the beginning of the next slot, assuring the
+            // right ABI format to return a string.
             mstore(0x30, 0x1070726f746f747970652d76312e302e30)
+
+            // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
         }
     }
