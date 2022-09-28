@@ -996,11 +996,10 @@ contract Hyper is IHyper {
         emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
-    function _collectFees(
-        uint96 positionId,
-        uint128 amountAssetRequested,
-        uint128 amountQuoteRequested
-    ) internal {
+    function _collectFees(bytes calldata data) internal {
+        (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Instructions
+            .decodeCollectFees(data);
+
         // No need to check if the requested amounts are higher than the owed ones
         // because this would cause the next lines to revert.
         positions[msg.sender][positionId].tokensOwedAsset -= amountAssetRequested;
@@ -1490,6 +1489,8 @@ contract Hyper is IHyper {
             _createCurve(data);
         } else if (instruction == Instructions.CREATE_PAIR) {
             _createPair(data);
+        } else if (instruction == Instructions.COLLECT_FEES) {
+            _collectFees(data);
         } else {
             revert UnknownInstruction();
         }
