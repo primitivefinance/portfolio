@@ -289,4 +289,20 @@ library Instructions {
         priorityOwner = address(bytes20(data[7:27]));
         limitOwner = uint128(Decoder.toAmount(data[28:]));
     }
+
+    /// | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
+    function decodeCollectFees(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint96 positionId,
+            uint128 amountAssetRequested,
+            uint128 amountQuoteRequested
+        )
+    {
+        positionId = uint96(bytes12(data[1:13]));
+        uint8 pointer = uint8(data[13]);
+        amountAssetRequested = uint128(Decoder.toAmount(data[14:pointer]));
+        amountQuoteRequested = uint128(Decoder.toAmount(data[pointer:data.length - 1]));
+    }
 }
