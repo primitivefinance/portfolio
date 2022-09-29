@@ -8,6 +8,7 @@ library Instructions {
     bytes1 public constant UNKNOWN = 0x00;
     bytes1 public constant ADD_LIQUIDITY = 0x01;
     bytes1 public constant REMOVE_LIQUIDITY = 0x03;
+    bytes1 public constant COLLECT_FEES = 0x04;
     bytes1 public constant SWAP = 0x05;
     bytes1 public constant STAKE_POSITION = 0x06;
     bytes1 public constant UNSTAKE_POSITION = 0x07;
@@ -16,7 +17,6 @@ library Instructions {
     bytes1 public constant CREATE_PAIR = 0x0C;
     bytes1 public constant CREATE_CURVE = 0x0D;
     bytes1 public constant INSTRUCTION_JUMP = 0xAA;
-    bytes1 public constant COLLECT_FEES = 0xB0;
 
     // --- Errors --- //
     error DecodePairBytesLength(uint256 expected, uint256 length);
