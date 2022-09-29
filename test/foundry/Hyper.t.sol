@@ -16,29 +16,7 @@ contract HyperTester is Hyper {
     // --- Implemented --- //
 
     function process(bytes calldata data) external {
-        uint48 poolId_;
-        bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
-
-        if (instruction == Instructions.ADD_LIQUIDITY) {
-            (poolId_, ) = _addLiquidity(data);
-        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            (poolId_, , ) = _removeLiquidity(data);
-        } else if (instruction == Instructions.SWAP) {
-            (poolId_, , , ) = _swapExactForExact(data);
-        } else if (instruction == Instructions.STAKE_POSITION) {
-            (poolId_, ) = _stakePosition(data);
-        } else if (instruction == Instructions.UNSTAKE_POSITION) {
-            (poolId_, ) = _unstakePosition(data);
-        } else if (instruction == Instructions.CREATE_POOL) {
-            (poolId_) = _createPool(data);
-        } else if (instruction == Instructions.CREATE_CURVE) {
-            _createCurve(data);
-        } else if (instruction == Instructions.CREATE_PAIR) {
-            _createPair(data);
-        } else {
-            revert UnknownInstruction();
-        }
+        _process(data);
     }
 }
 
