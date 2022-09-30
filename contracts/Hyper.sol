@@ -660,7 +660,7 @@ contract Hyper is IHyper {
         // SwapState memory state;
 
         Order memory args;
-        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
+        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Decoder.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (args.input == 0) revert ZeroInput();
         if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
@@ -881,8 +881,9 @@ contract Hyper is IHyper {
      * @custom:reverts If attempting to add zero liquidity.
      */
     function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity) = Instructions
-            .decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
+        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity) = Decoder.decodeAddLiquidity(
+            data
+        ); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
 
         if (delLiquidity == 0) revert ZeroLiquidityError();
@@ -934,7 +935,7 @@ contract Hyper is IHyper {
             uint256 b
         )
     {
-        (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Instructions
+        (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Decoder
             .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
@@ -997,8 +998,9 @@ contract Hyper is IHyper {
     }
 
     function _collectFees(bytes calldata data) internal {
-        (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Instructions
-            .decodeCollectFees(data);
+        (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Decoder.decodeCollectFees(
+            data
+        );
 
         // No need to check if the requested amounts are higher than the owed ones
         // because this would cause the next lines to revert.
@@ -1106,7 +1108,7 @@ contract Hyper is IHyper {
     }
 
     function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint96 positionId) = Instructions.decodeStakePosition(data);
+        (uint48 poolId_, uint96 positionId) = Decoder.decodeStakePosition(data);
         poolId = poolId_;
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
@@ -1144,7 +1146,7 @@ contract Hyper is IHyper {
     }
 
     function _unstakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint96 positionId) = Instructions.decodeUnstakePosition(data);
+        (uint48 poolId_, uint96 positionId) = Decoder.decodeUnstakePosition(data);
         poolId = poolId_;
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
@@ -1227,7 +1229,7 @@ contract Hyper is IHyper {
     // --- Priority Auction --- //
 
     function _fillPriorityAuction(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId_, address priorityOwner, uint128 limitAmount) = Instructions.decodeFillPriorityAuction(data);
+        (uint48 poolId_, address priorityOwner, uint128 limitAmount) = Decoder.decodeFillPriorityAuction(data);
 
         if (!_doesPoolExist(poolId_)) revert();
         if (priorityOwner == address(0)) revert();
@@ -1291,7 +1293,7 @@ contract Hyper is IHyper {
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
     function _createPool(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Instructions.decodeCreatePool(data);
+        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Decoder.decodeCreatePool(data);
 
         if (price == 0) revert ZeroPrice();
 
@@ -1334,10 +1336,11 @@ contract Hyper is IHyper {
      * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
      */
     function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = Instructions
-            .decodeCreateCurve(data); // Expects Enigma encoded data.
+        (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = Decoder.decodeCreateCurve(
+            data
+        ); // Expects Enigma encoded data.
 
-        bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
+        bytes32 rawCurveId = toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
 
         curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
         if (curveId != 0) revert CurveExists(curveId);
@@ -1382,7 +1385,7 @@ contract Hyper is IHyper {
      * @custom:reverts If decimals of either token are not between 6 and 18, inclusive.
      */
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
-        (address asset, address quote) = Instructions.decodeCreatePair(data); // Expects Engima encoded data.
+        (address asset, address quote) = Decoder.decodeCreatePair(data); // Expects Engima encoded data.
         if (asset == quote) revert SameTokenError();
 
         pairId = getPairId[asset][quote];

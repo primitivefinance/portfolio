@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 import "../Hyper.sol";
 import "../interfaces/IHyper.sol";
 import {HyperPool, Pair, Curve} from "../EnigmaTypes.sol";
+import "../libraries/Encoder.sol";
 
 struct LoadedParameters {
     uint48 poolId;
@@ -100,14 +101,14 @@ contract HyperCaller is StandardHelpers {
     ) public returns (HyperPool memory, uint48) {
         uint48 poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
         HyperPool memory pool = IHyperStruct(address(hyper)).pools(poolId);
-        if (pool.blockTimestamp == 0) send(Instructions.encodeCreatePool(poolId, price));
+        if (pool.blockTimestamp == 0) send(Encoder.encodeCreatePool(poolId, price));
         return (pool, poolId);
     }
 
     function createPair(address token0, address token1) public returns (Pair memory, uint16) {
         uint16 pairId = hyper.getPairId(token0, token1);
         if (pairId == 0) {
-            send(Instructions.encodeCreatePair(token0, token1));
+            send(Encoder.encodeCreatePair(token0, token1));
             pairId = uint16(hyper.getPairNonce());
         }
         Pair memory pair = IHyperStruct(address(hyper)).pairs(pairId);
@@ -124,7 +125,7 @@ contract HyperCaller is StandardHelpers {
         bytes32 rawCurveId = bytes32(abi.encodePacked(sigma, maturity, fee, priorityFee, strike));
         uint32 curveId = hyper.getCurveId(rawCurveId);
         if (curveId == 0) {
-            send(Instructions.encodeCreateCurve(sigma, maturity, fee, priorityFee, strike));
+            send(Encoder.encodeCreateCurve(sigma, maturity, fee, priorityFee, strike));
             curveId = uint32(hyper.getCurveNonce());
         }
         Curve memory curve = IHyperStruct(address(hyper)).curves(curveId);
@@ -138,7 +139,7 @@ contract HyperCaller is StandardHelpers {
     ) external {
         uint8 useMax = 0;
         bytes memory data = abi.encodePacked(
-            Decoder.pack(bytes1(useMax), Instructions.ADD_LIQUIDITY),
+            pack(bytes1(useMax), Instructions.ADD_LIQUIDITY),
             loaded.poolId,
             loTick,
             hiTick,
@@ -155,7 +156,7 @@ contract HyperCaller is StandardHelpers {
     ) external {
         uint8 useMax = 0;
         bytes memory data = abi.encodePacked(
-            Decoder.pack(bytes1(useMax), Instructions.REMOVE_LIQUIDITY),
+            pack(bytes1(useMax), Instructions.REMOVE_LIQUIDITY),
             loaded.poolId,
             loTick,
             hiTick,
@@ -189,7 +190,7 @@ contract HyperCaller is StandardHelpers {
         // 1 bytes useMax and instruction + 6 poolId + 1 pointer + 17 input amount = 25
         uint8 pointer = 0x0a + 0x0f;
         bytes memory data = abi.encodePacked(
-            Decoder.pack(bytes1(useMax), Instructions.SWAP),
+            pack(bytes1(useMax), Instructions.SWAP),
             poolId,
             pointer,
             uint8(0),
