@@ -1,6 +1,7 @@
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
+import "forge-std/console2.sol";
 import "../../contracts/test/TestERC20.sol";
 import {WETH} from "solmate/tokens/WETH.sol";
 
@@ -1350,6 +1351,86 @@ contract TestHyperSingle is StandardHelpers, Test {
     function testM_CanCollectZeroFees() public {
         bytes memory data = Instructions.encodeCollectFees(0, 0, 0, 0, 0);
         bool success = forwarder.pass(data);
+    }
+
+    function testM_IncreaseFeeGrowthGlobalAsset() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        forwarder.pass(data);
+
+        HyperPool memory previousPool = getPool(__poolId);
+
+        // Swap some tokens
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        forwarder.pass(data);
+
+        HyperPool memory newPool = getPool(__poolId);
+
+        // FIXME: Fee growth calculation is wrong
+
+        console2.log(previousPool.feeGrowthGlobalAsset);
+        console2.log(newPool.feeGrowthGlobalAsset);
+        uint256 expectedFeeGrowth = ((0x1f * 10**0x02 * 10_000) / DEFAULT_FEE);
+        assertEq(expectedFeeGrowth, newPool.feeGrowthGlobalAsset);
+    }
+
+    function testM_CanCollectOwedAssetFees() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        forwarder.pass(data);
+
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        forwarder.pass(data);
+
+        uint96 positionId = Instructions.encodePositionId(__poolId, DEFAULT_TICK - 2560, DEFAULT_TICK + 2560);
+
+        HyperPool memory pool = getPool(__poolId);
+
+        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = HyperTester(forwarder.hyper())
+            ._getFeeGrowthInside(
+                __poolId,
+                DEFAULT_TICK + 2560,
+                DEFAULT_TICK - 2560,
+                pool.lastTick,
+                pool.feeGrowthGlobalAsset,
+                pool.feeGrowthGlobalQuote
+            );
+
+        // TODO: Fix this test
+
+        /*
+        data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            DEFAULT_TICK - 2560,
+            DEFAULT_TICK + 2560,
+            0,
+            0
+        );
+
+        HyperPosition memory position = getPosition(address(forwarder), positionId);
+
+        /*
+        console2.log(position.totalLiquidity);
+        console2.log(position.tokensOwedQuote);
+        console2.log(position.tokensOwedQuote);
+        console2.log(position.feeGrowthInsideAssetLast);
+        console2.log(position.feeGrowthInsideQuoteLast);
+        */
     }
 }
 
