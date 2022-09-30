@@ -30,11 +30,25 @@ contract Hyper is IHyper {
     // --- Constants --- //
     // string public constant VERSION = "prototype-v1.0.0"; // 33,107 bytes
 
+    /// @notice Current version of this contract.
+    /// @dev Optimized function returning the version of this contract
+    ///      while saving some bytes of storage (inspired by Seaport).
+    /// @return "prototype-v1.0.0" encoded as a string
     function VERSION() public view returns (string memory) {
         // 33,089 bytes
         assembly {
+            // Load 0x20 (32) in memory at slot 0x00, this corresponds to the
+            // offset location of the next data.
             mstore(0x00, 0x20)
+
+            // Then we load both the length of our string (0x10) and its actual value
+            // (0x70726f746f747970652d76312e302e30) using the offset 0x30. Using this
+            // particular offset value will right pad the length at the end of the slot
+            // and left pad the string at the beginning of the next slot, assuring the
+            // right ABI format to return a string.
             mstore(0x30, 0x1070726f746f747970652d76312e302e30)
+
+            // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
         }
     }
@@ -982,6 +996,34 @@ contract Hyper is IHyper {
         emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
+    function _collectFees(bytes calldata data) internal {
+        (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Instructions
+            .decodeCollectFees(data);
+
+        // No need to check if the requested amounts are higher than the owed ones
+        // because this would cause the next lines to revert.
+        positions[msg.sender][positionId].tokensOwedAsset -= amountAssetRequested;
+        positions[msg.sender][positionId].tokensOwedQuote -= amountQuoteRequested;
+
+        // Right shift the positionId to keep only the pairId part (first 2 bytes).
+        uint16 pairId = uint16(positionId >> 80);
+
+        // Should save some gas
+        Pair memory pair = pairs[pairId];
+
+        if (amountAssetRequested > 0) _applyCredit(pair.tokenBase, amountAssetRequested);
+        if (amountQuoteRequested > 0) _applyCredit(pair.tokenQuote, amountQuoteRequested);
+
+        emit Collect(
+            positionId,
+            msg.sender,
+            amountAssetRequested,
+            pair.tokenBase,
+            amountQuoteRequested,
+            pair.tokenQuote
+        );
+    }
+
     function _increaseLiquidity(
         uint48 poolId,
         int24 loTick,
@@ -1447,6 +1489,8 @@ contract Hyper is IHyper {
             _createCurve(data);
         } else if (instruction == Instructions.CREATE_PAIR) {
             _createPair(data);
+        } else if (instruction == Instructions.COLLECT_FEES) {
+            _collectFees(data);
         } else {
             revert UnknownInstruction();
         }

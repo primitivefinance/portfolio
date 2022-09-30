@@ -8,6 +8,7 @@ library Instructions {
     bytes1 public constant UNKNOWN = 0x00;
     bytes1 public constant ADD_LIQUIDITY = 0x01;
     bytes1 public constant REMOVE_LIQUIDITY = 0x03;
+    bytes1 public constant COLLECT_FEES = 0x04;
     bytes1 public constant SWAP = 0x05;
     bytes1 public constant STAKE_POSITION = 0x06;
     bytes1 public constant UNSTAKE_POSITION = 0x07;
@@ -116,6 +117,26 @@ library Instructions {
 
     function encodeUnstakePosition(uint96 positionId) internal pure returns (bytes memory data) {
         data = abi.encodePacked(UNSTAKE_POSITION, positionId);
+    }
+
+    function encodeCollectFees(
+        uint96 positionId,
+        uint8 power0,
+        uint128 amountAssetRequested,
+        uint8 power1,
+        uint128 amountQuoteRequested
+    ) internal pure returns (bytes memory data) {
+        uint8 pointer = 31;
+
+        data = abi.encodePacked(
+            bytes1(0x04),
+            positionId,
+            pointer,
+            power0,
+            amountAssetRequested,
+            power1,
+            amountQuoteRequested
+        );
     }
 
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
@@ -287,5 +308,21 @@ library Instructions {
         poolId = uint48(bytes6(data[1:7]));
         priorityOwner = address(bytes20(data[7:27]));
         limitOwner = uint128(Decoder.toAmount(data[28:]));
+    }
+
+    /// | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
+    function decodeCollectFees(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint96 positionId,
+            uint128 amountAssetRequested,
+            uint128 amountQuoteRequested
+        )
+    {
+        positionId = uint96(bytes12(data[1:13]));
+        uint8 pointer = uint8(data[13]);
+        amountAssetRequested = uint128(Decoder.toAmount(data[14:pointer]));
+        amountQuoteRequested = uint128(Decoder.toAmount(data[pointer:data.length]));
     }
 }
