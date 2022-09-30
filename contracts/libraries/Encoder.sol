@@ -4,6 +4,9 @@ pragma solidity 0.8.13;
 import "./Instructions.sol";
 import "./Utils.sol";
 
+/// @title    Hyper Decoder Library
+/// @dev      Solidity library to encode the calls to Hyper
+/// @author   Primitive
 library Encoder {
     // --- Encoding & Decoding --- //
 

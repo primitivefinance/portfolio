@@ -3,8 +3,8 @@ pragma solidity 0.8.13;
 
 import "./Utils.sol";
 
-/// @title    Decoder Library
-/// @dev      Solidity library to manipulate and covert bytes
+/// @title    Hyper Decoder Library
+/// @dev      Solidity library to decode the calldata bytes received by Hyper
 /// @author   Primitive
 library Decoder {
     // --- Errors --- //

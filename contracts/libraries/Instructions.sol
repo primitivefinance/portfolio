@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "./Decoder.sol";
-
+/// @title Hyper Instructions
+/// @dev Contains all the instructions of Hyper
+/// @author Primitive
 library Instructions {
     bytes1 public constant UNKNOWN = 0x00;
     bytes1 public constant ADD_LIQUIDITY = 0x01;

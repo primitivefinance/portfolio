@@ -3,6 +3,8 @@ pragma solidity 0.8.13;
 
 import "./Gaussian.sol";
 
+/// Contains several "free" utility functions
+
 function signedAdd(uint256 unsigned, int256 signed) pure returns (uint256 value) {
     if (signed > 0) {
         value = unsigned + abs(signed);
