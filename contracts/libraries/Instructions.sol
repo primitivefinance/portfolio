@@ -88,7 +88,7 @@ library Instructions {
         uint8 power1,
         uint8 amount1,
         uint8 direction
-    ) internal returns (bytes memory data) {
+    ) internal pure returns (bytes memory data) {
         uint8 pointer = 0x0a;
         data = abi.encodePacked(
             Decoder.pack(bytes1(useMax), SWAP),
