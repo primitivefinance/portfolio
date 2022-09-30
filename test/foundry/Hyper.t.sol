@@ -1353,6 +1353,8 @@ contract TestHyperSingle is StandardHelpers, Test {
     }
 }
 
+// Workaround contract allowing us to call the functions of the Decoder library,
+// since they require `calldata` to be passed along (instead of memory data)
 contract DecoderFoo {
     function decodeCollectFees(bytes calldata data)
         public
