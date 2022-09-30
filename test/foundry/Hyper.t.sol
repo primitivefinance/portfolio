@@ -1322,4 +1322,47 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 time = getPool(id).blockTimestamp;
         assertTrue(time != 0);
     }
+
+    function testM_decodeCollectFees() public {
+        DecoderFoo foo = new DecoderFoo();
+
+        bytes memory data = Instructions.encodeCollectFees(42, 1, 2, 2, 3);
+
+        (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = foo.decodeCollectFees(data);
+
+        assertEq(positionId, 42);
+        assertEq(amountAssetRequested, 20);
+        assertEq(amountQuoteRequested, 300);
+    }
+
+    function testFailM_CannotCollectMoreAssetFeesThanOwed() public {
+        bytes memory data = Instructions.encodeCollectFees(0, 0, 1, 0, 0);
+
+        bool success = forwarder.pass(data);
+    }
+
+    function testFailM_CannotCollectMoreQuoteFeesThanOwed() public {
+        bytes memory data = Instructions.encodeCollectFees(0, 0, 0, 0, 1);
+
+        bool success = forwarder.pass(data);
+    }
+
+    function testM_CanCollectZeroFees() public {
+        bytes memory data = Instructions.encodeCollectFees(0, 0, 0, 0, 0);
+        bool success = forwarder.pass(data);
+    }
+}
+
+contract DecoderFoo {
+    function decodeCollectFees(bytes calldata data)
+        public
+        pure
+        returns (
+            uint96 positionId,
+            uint128 amountAssetRequested,
+            uint128 amountQuoteRequested
+        )
+    {
+        return Instructions.decodeCollectFees(data);
+    }
 }
