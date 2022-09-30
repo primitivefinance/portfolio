@@ -119,6 +119,26 @@ library Instructions {
         data = abi.encodePacked(UNSTAKE_POSITION, positionId);
     }
 
+    function encodeCollectFees(
+        uint96 positionId,
+        uint8 power0,
+        uint128 amountAssetRequested,
+        uint8 power1,
+        uint128 amountQuoteRequested
+    ) internal pure returns (bytes memory data) {
+        uint8 pointer = 31;
+
+        data = abi.encodePacked(
+            bytes1(0x04),
+            positionId,
+            pointer,
+            power0,
+            amountAssetRequested,
+            power1,
+            amountQuoteRequested
+        );
+    }
+
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
     /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
@@ -303,6 +323,6 @@ library Instructions {
         positionId = uint96(bytes12(data[1:13]));
         uint8 pointer = uint8(data[13]);
         amountAssetRequested = uint128(Decoder.toAmount(data[14:pointer]));
-        amountQuoteRequested = uint128(Decoder.toAmount(data[pointer:data.length - 1]));
+        amountQuoteRequested = uint128(Decoder.toAmount(data[pointer:data.length]));
     }
 }
