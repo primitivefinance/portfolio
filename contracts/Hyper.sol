@@ -1072,6 +1072,7 @@ contract Hyper is IHyper {
         emit DecreasePosition(msg.sender, positionId, deltaLiquidity);
     }
 
+    // TODO: Is this still needed?
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
     /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
     function _decreasePositionCheckJit(
