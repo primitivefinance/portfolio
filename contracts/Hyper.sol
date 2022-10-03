@@ -456,8 +456,8 @@ contract Hyper is IHyper {
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         Pair memory pair = pairs[pairId];
-        _decreaseGlobal(pair.tokenBase, deltaR2);
-        _decreaseGlobal(pair.tokenQuote, deltaR1);
+        _adjustGlobalBalance(pair.tokenBase, -int256(deltaR2));
+        _adjustGlobalBalance(pair.tokenQuote, -int256(deltaR1));
 
         emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
@@ -684,8 +684,8 @@ contract Hyper is IHyper {
         (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
         emit Swap(args.poolId, swap.input, swap.output, pair.tokenBase, pair.tokenQuote);
 
-        _increaseGlobal(pair.tokenBase, swap.input);
-        _decreaseGlobal(pair.tokenQuote, swap.output);
+        _adjustGlobalBalance(pair.tokenBase, int256(swap.input));
+        _adjustGlobalBalance(pair.tokenQuote, -int256(swap.output));
     }
 
     //  +----------------------------------------------------------------------------------+
@@ -942,7 +942,7 @@ contract Hyper is IHyper {
         // add debit payable by auction filler
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = pairs[pairId];
-        _increaseGlobal(pair.tokenQuote, auctionPayment);
+        _adjustGlobalBalance(pair.tokenQuote, int128(auctionPayment));
     }
 
     function _calculateAuctionPayment(
@@ -964,21 +964,20 @@ contract Hyper is IHyper {
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
 
-    // --- Global --- //
-
     /// @dev Most important function because it manages the solvency of the Engima.
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
-    function _increaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] += amount;
-        emit IncreaseGlobalBalance(token, amount);
-    }
+    function _adjustGlobalBalance(address token, int256 amount) internal {
+        // require(globalReserves[token] >= amount, "Not enough reserves");
 
-    /// @dev Equally important to `_increaseGlobal`.
-    /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
-    function _decreaseGlobal(address token, uint256 amount) internal {
-        require(globalReserves[token] >= amount, "Not enough reserves");
-        globalReserves[token] -= amount;
-        emit DecreaseGlobalBalance(token, amount);
+        if (amount > 0) {
+            unchecked {
+                globalReserves[token] += uint256(amount);
+            }
+        } else {
+            globalReserves[token] -= uint256(~amount + 1); // Funky bits manipulation turning negative amount positive
+        }
+
+        emit AdjustGlobalBalance(token, amount);
     }
 
     // --- Positions --- //
@@ -1409,8 +1408,8 @@ contract Hyper is IHyper {
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = pairs[pairId];
-        _increaseGlobal(pair.tokenBase, deltaR2);
-        _increaseGlobal(pair.tokenQuote, deltaR1);
+        _adjustGlobalBalance(pair.tokenBase, int256(deltaR2));
+        _adjustGlobalBalance(pair.tokenQuote, int256(deltaR1));
 
         emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
     }
