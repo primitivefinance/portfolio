@@ -996,20 +996,6 @@ contract Hyper is IHyper {
         emit AdjustUserBalance(user, token, amount);
     }
 
-    /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
-    ///      A positive debit is a cost that must be paid for a transaction to be processed.
-    ///      If a balance exists for the token for the internal balance of `msg.sender`,
-    ///      it will be used to pay the debit.
-    ///      Else, tokens are expected to be transferred into this contract using `transferFrom`.
-    ///      Externally paid debits increase the balance of the contract, so the global
-    ///      reserves must be increased.
-    /// @custom:security Critical. Handles the payment of tokens for all pool actions.
-    function _applyDebit(address token, uint256 amount) internal {
-        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
-        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-        emit DecreaseUserBalance(token, amount);
-    }
-
     /// @dev Most important function because it manages the solvency of the Engima.
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
     function _adjustGlobalBalance(address token, int256 amount) internal {
@@ -1647,7 +1633,7 @@ contract Hyper is IHyper {
         uint256 actual = _balanceOf(token, address(this));
         if (global > actual) {
             uint256 deficit = global - actual;
-            _applyDebit(token, deficit);
+            _adjustUserBalance(msg.sender, token, -int256(deficit));
         } else {
             uint256 surplus = actual - global;
             _adjustUserBalance(msg.sender, token, int256(surplus));
