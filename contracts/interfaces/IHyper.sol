@@ -24,12 +24,18 @@ interface IHyperEvents {
         uint32 priorityGamma
     );
     // --- Balances --- //
+    // TODO: Remove the old events
+
+    event AdjustUserBalance(address indexed user, address indexed token, int256 amount);
+
     /// @dev A payment requested by this contract that must be paid by the `msg.sender` account.
     event DecreaseUserBalance(address indexed token, uint256 amount);
     /// @dev A payment that is paid out to the `msg.sender` account from this contract.
     event IncreaseUserBalance(address indexed token, uint256 amount);
 
     // --- Global Reserves --- //
+
+    // TODO: Remove the old events
     /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
     /// @custom:security High. Use these to track the total value locked of a token.
     event IncreaseGlobalBalance(address indexed token, uint256 amount);

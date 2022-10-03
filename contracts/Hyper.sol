@@ -330,7 +330,7 @@ contract Hyper is IHyper {
 
     // FIXME: Remove this external function and add an instruction instead
     function fund(address token, uint256 amount) external payable override lock {
-        _applyCredit(token, amount);
+        _adjustUserBalance(msg.sender, token, int256(amount));
         if (token == WETH) _safeWrap();
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
@@ -478,8 +478,10 @@ contract Hyper is IHyper {
         // Should save some gas
         Pair memory pair = pairs[pairId];
 
-        if (amountAssetRequested > 0) _applyCredit(pair.tokenBase, amountAssetRequested);
-        if (amountQuoteRequested > 0) _applyCredit(pair.tokenQuote, amountQuoteRequested);
+        if (amountAssetRequested > 0)
+            _adjustUserBalance(msg.sender, pair.tokenBase, int256(int128(amountAssetRequested)));
+        if (amountQuoteRequested > 0)
+            _adjustUserBalance(msg.sender, pair.tokenQuote, int256(int128(amountAssetRequested)));
 
         emit Collect(
             positionId,
@@ -964,17 +966,68 @@ contract Hyper is IHyper {
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
 
+    /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
+    ///      Positive credits are only applied to the internal balance of the account.
+    ///      Therefore, it does not require a state change for the global reserves.
+    ///
+    ///      Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
+    ///      A positive debit is a cost that must be paid for a transaction to be processed.
+    ///      If a balance exists for the token for the internal balance of `msg.sender`,
+    ///      it will be used to pay the debit.
+    ///      Else, tokens are expected to be transferred into this contract using `transferFrom`.
+    ///      Externally paid debits increase the balance of the contract, so the global
+    ///      reserves must be increased.
+    /// @custom:security Critical. Only method which credits / debits accounts with tokens.
+    function _adjustUserBalance(
+        address user,
+        address token,
+        int256 amount
+    ) internal {
+        if (amount > 0) {
+            unchecked {
+                balances[msg.sender][token] += uint256(amount);
+            }
+        } else {
+            uint256 _amount = uint256(~amount + 1); // Funky bits manipulation turning negative amounts positive
+            if (balances[msg.sender][token] >= _amount) balances[msg.sender][token] -= _amount;
+            else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), _amount);
+        }
+
+        emit AdjustUserBalance(user, token, amount);
+    }
+
+    /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
+    ///      Positive credits are only applied to the internal balance of the account.
+    ///      Therefore, it does not require a state change for the global reserves.
+    /// @custom:security Critical. Only method which credits accounts with tokens.
+    function _applyCredit(address token, uint256 amount) internal {
+        balances[msg.sender][token] += amount;
+        emit IncreaseUserBalance(token, amount);
+    }
+
+    /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
+    ///      A positive debit is a cost that must be paid for a transaction to be processed.
+    ///      If a balance exists for the token for the internal balance of `msg.sender`,
+    ///      it will be used to pay the debit.
+    ///      Else, tokens are expected to be transferred into this contract using `transferFrom`.
+    ///      Externally paid debits increase the balance of the contract, so the global
+    ///      reserves must be increased.
+    /// @custom:security Critical. Handles the payment of tokens for all pool actions.
+    function _applyDebit(address token, uint256 amount) internal {
+        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
+        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
+        emit DecreaseUserBalance(token, amount);
+    }
+
     /// @dev Most important function because it manages the solvency of the Engima.
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
     function _adjustGlobalBalance(address token, int256 amount) internal {
-        // require(globalReserves[token] >= amount, "Not enough reserves");
-
         if (amount > 0) {
             unchecked {
                 globalReserves[token] += uint256(amount);
             }
         } else {
-            globalReserves[token] -= uint256(~amount + 1); // Funky bits manipulation turning negative amount positive
+            globalReserves[token] -= uint256(~amount + 1);
         }
 
         emit AdjustGlobalBalance(token, amount);
@@ -1574,29 +1627,6 @@ contract Hyper is IHyper {
 
     // --- Internal --- //
 
-    /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
-    ///      Positive credits are only applied to the internal balance of the account.
-    ///      Therefore, it does not require a state change for the global reserves.
-    /// @custom:security Critical. Only method which credits accounts with tokens.
-    function _applyCredit(address token, uint256 amount) internal {
-        balances[msg.sender][token] += amount;
-        emit IncreaseUserBalance(token, amount);
-    }
-
-    /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
-    ///      A positive debit is a cost that must be paid for a transaction to be processed.
-    ///      If a balance exists for the token for the internal balance of `msg.sender`,
-    ///      it will be used to pay the debit.
-    ///      Else, tokens are expected to be transferred into this contract using `transferFrom`.
-    ///      Externally paid debits increase the balance of the contract, so the global
-    ///      reserves must be increased.
-    /// @custom:security Critical. Handles the payment of tokens for all pool actions.
-    function _applyDebit(address token, uint256 amount) internal {
-        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
-        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-        emit DecreaseUserBalance(token, amount);
-    }
-
     /// @dev Critical level function that is responsible for handling tokens, debits and credits.
     /// @custom:security Critical. Handles token payments with `_settleToken`.
     function _settleBalances() internal {
@@ -1629,7 +1659,7 @@ contract Hyper is IHyper {
             _applyDebit(token, deficit);
         } else {
             uint256 surplus = actual - global;
-            _applyCredit(token, surplus);
+            _adjustUserBalance(msg.sender, token, int256(surplus));
         }
 
         _cacheAddress(token, false); // note: Effectively saying "any pool with this token was paid for in full".
