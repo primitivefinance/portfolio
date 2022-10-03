@@ -1010,6 +1010,25 @@ contract Hyper is IHyper {
         emit AdjustGlobalBalance(token, amount);
     }
 
+    // --- State Functions --- //
+    function _adjustPool() internal {}
+
+    function _adjustPoolEarnings() internal {}
+
+    function _adjustPoolPriorityConfig() internal {}
+
+    function _adjustPosition() internal {}
+
+    function _adjustStakedPosition() internal {}
+
+    function _adjustPositionEarnings() internal {}
+
+    function _adjustSlot() internal {}
+
+    function _adjustSlotEarnings() internal {}
+
+    function _syncEarnings() internal {}
+
     // --- Positions --- //
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
