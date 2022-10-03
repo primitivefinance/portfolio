@@ -261,7 +261,7 @@ contract Hyper is IHyper {
         } else if (instruction == Instructions.COLLECT_FEES) {
             _collectFees(data);
         } else if (instruction == Instructions.DRAW) {
-            _draw(data);
+            // _draw(data);
         } else {
             revert UnknownInstruction();
         }
@@ -310,6 +310,10 @@ contract Hyper is IHyper {
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
 
+    //  +----------------------------------------------------------------------------------+
+    //  |                                      FUNDS                                       |
+    //  +----------------------------------------------------------------------------------+
+
     // FIXME: Remove this external function and add an instruction instead
     function draw(
         address token,
@@ -331,37 +335,634 @@ contract Hyper is IHyper {
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
 
-    // --- Internal --- //
+    //  +----------------------------------------------------------------------------------+
+    //  |                                     LIQUIDITY                                    |
+    //  +----------------------------------------------------------------------------------+
 
-    /// @dev Overridable in tests.
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
-    }
+    /**
+     * @notice Enigma method to add liquidity to a range of prices in a pool.
+     *
+     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
+     * @custom:reverts If attempting to add zero liquidity.
+     */
+    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity) = Decoder.decodeAddLiquidity(
+            data
+        ); // Packs the use max flag in the Enigma instruction code byte.
+        poolId = poolId_;
 
-    /// @dev Overridable in tests.
-    function _liquidityPolicy() internal view virtual returns (uint256) {
-        return JUST_IN_TIME_LIQUIDITY_POLICY;
-    }
+        if (delLiquidity == 0) revert ZeroLiquidityError();
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
-    /// @dev Gas optimized `balanceOf` method.
-    function _balanceOf(address token, address account) internal view returns (uint256) {
-        (bool success, bytes memory data) = token.staticcall(
-            abi.encodeWithSelector(IERC20.balanceOf.selector, account)
+        // update pool, relevant slots with time
+        _syncPool(poolId);
+
+        _syncSlot(poolId, loTick);
+        _syncSlot(poolId, hiTick);
+
+        // Compute amounts of tokens for the real reserves.
+        Curve memory curve = curves[uint32(poolId_)];
+        HyperPool storage pool = pools[poolId_];
+        uint256 timestamp = _blockTimestamp();
+
+        // Get lower price bound using the loTick index.
+        uint256 price = HyperSwapLib.computePriceWithTick(loTick);
+        // Compute the current virtual reserves given the pool's lastPrice.
+        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
+            pool.lastPrice,
+            curve.strike,
+            curve.sigma,
+            curve.maturity - timestamp
         );
-        if (!success || data.length != 32) revert BalanceError();
-        return abi.decode(data, (uint256));
+        // Compute the real reserves given the lower price bound.
+        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
+        // If the real reserves are zero, then the slot is at the bounds and so we should use virtual reserves.
+        if (deltaR2 == 0) deltaR2 = currentR2;
+        else deltaR2 = currentR2.divWadDown(deltaR2);
+        uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
+            deltaR2,
+            curve.strike,
+            curve.sigma,
+            curve.maturity - timestamp,
+            price,
+            0
+        ); // todo: fix with using the hiTick.
+        deltaR1 = deltaR1.mulWadDown(delLiquidity);
+        deltaR2 = deltaR2.mulWadDown(delLiquidity);
+        _increaseLiquidity(poolId_, loTick, hiTick, deltaR1, deltaR2, delLiquidity);
     }
 
-    function _safeWrap() internal {
-        IWETH(WETH).deposit{value: msg.value}();
+    function _removeLiquidity(bytes calldata data)
+        internal
+        returns (
+            uint48 poolId,
+            uint256 a,
+            uint256 b
+        )
+    {
+        (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Decoder
+            .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
+
+        if (deltaLiquidity == 0) revert ZeroLiquidityError();
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        // update pool, relevant slots with time
+        _syncPool(poolId_);
+
+        _syncSlot(poolId, loTick);
+        _syncSlot(poolId, hiTick);
+
+        // Compute amounts of tokens for the real reserves.
+        Curve memory curve = curves[uint32(poolId_)];
+        HyperPool storage pool = pools[poolId_];
+        uint256 timestamp = _blockTimestamp();
+        uint256 price = HyperSwapLib.computePriceWithTick(loTick);
+        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
+            pool.lastPrice,
+            curve.strike,
+            curve.sigma,
+            curve.maturity - timestamp
+        );
+
+        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
+        if (deltaR2 == 0) deltaR2 = currentR2;
+        else deltaR2 = currentR2.divWadDown(deltaR2);
+
+        uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
+            deltaR2,
+            curve.strike,
+            curve.sigma,
+            curve.maturity - timestamp,
+            price,
+            0
+        ); // todo: fix with using the hiTick.
+        deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
+        deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
+
+        // Decrease amount of liquidity in each slot.
+        _decreaseSlotLiquidity(poolId_, loTick, deltaLiquidity, false);
+        _decreaseSlotLiquidity(poolId_, hiTick, deltaLiquidity, true);
+
+        // Update the pool state if liquidity is within the current pool's slot.
+        if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
+            pool.liquidity -= deltaLiquidity;
+        }
+
+        // Todo: delete any slots if uninstantiated.
+
+        // Todo: update bitmap of instantiated/uninstantiated slots.
+
+        _decreasePosition(poolId_, loTick, hiTick, deltaLiquidity);
+
+        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
+        Pair memory pair = pairs[pairId];
+        _decreaseGlobal(pair.tokenBase, deltaR2);
+        _decreaseGlobal(pair.tokenQuote, deltaR1);
+
+        emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
-    function _dangerousUnwrap(address to, uint256 amount) internal {
-        IWETH(WETH).withdraw(amount);
+    function _collectFees(bytes calldata data) internal {
+        (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Decoder.decodeCollectFees(
+            data
+        );
 
-        // Marked as dangerous because it makes an external call to the `to` address.
-        dangerousTransferETH(to, amount);
+        // No need to check if the requested amounts are higher than the owed ones
+        // because this would cause the next lines to revert.
+        positions[msg.sender][positionId].tokensOwedAsset -= amountAssetRequested;
+        positions[msg.sender][positionId].tokensOwedQuote -= amountQuoteRequested;
+
+        // Right shift the positionId to keep only the pairId part (first 2 bytes).
+        uint16 pairId = uint16(positionId >> 80);
+
+        // Should save some gas
+        Pair memory pair = pairs[pairId];
+
+        if (amountAssetRequested > 0) _applyCredit(pair.tokenBase, amountAssetRequested);
+        if (amountQuoteRequested > 0) _applyCredit(pair.tokenQuote, amountQuoteRequested);
+
+        emit Collect(
+            positionId,
+            msg.sender,
+            amountAssetRequested,
+            pair.tokenBase,
+            amountQuoteRequested,
+            pair.tokenQuote
+        );
     }
+
+    //  +----------------------------------------------------------------------------------+
+    //  |                                     SWAPPING                                     |
+    //  +----------------------------------------------------------------------------------+
+
+    SwapState state;
+
+    /**
+     * @notice Engima method to swap tokens.
+     * @dev Swaps exact input of tokens for an output of tokens in the specified direction.
+     *
+     * @custom:reverts If order amount is zero.
+     * @custom:reverts If pool has not been created.
+     *
+     * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
+     */
+    function _swapExactForExact(bytes calldata data)
+        internal
+        returns (
+            uint48 poolId,
+            uint256 remainder,
+            uint256 input,
+            uint256 output
+        )
+    {
+        // SwapState memory state;
+
+        Order memory args;
+        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Decoder.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
+
+        if (args.input == 0) revert ZeroInput();
+        if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
+
+        state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
+
+        // Pair is used to update global reserves and check msg.sender balance.
+        Pair memory pair = pairs[uint16(args.poolId >> 32)];
+        // Pool is used to fetch information and eventually have its state updated.
+        HyperPool storage pool = pools[args.poolId];
+
+        state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
+
+        // Get the variables for first iteration of the swap.
+        SwapIteration memory swap;
+        {
+            // Writes the pool after computing its updated price with respect to time elapsed since last update.
+            (uint256 price, int24 tick) = _syncPool(args.poolId);
+            // Expect the caller to exhaust their entire balance of the input token.
+            remainder = args.useMax == 1 ? _balanceOf(pair.tokenBase, msg.sender) : args.input;
+            // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
+            swap = SwapIteration({
+                price: price,
+                tick: tick,
+                feeAmount: 0,
+                remainder: remainder,
+                liquidity: pool.liquidity,
+                stakedLiquidity: pool.stakedLiquidity,
+                pendingStakedLiquidityDelta: pool.pendingStakedLiquidityDelta,
+                input: 0,
+                output: 0
+            });
+        }
+
+        // Store the pool transiently, then delete after the swap.
+        HyperSwapLib.Expiring memory expiring;
+        {
+            // Curve stores the parameters of the trading function.
+            Curve memory curve = curves[uint32(args.poolId)];
+
+            expiring = HyperSwapLib.Expiring({
+                strike: curve.strike,
+                sigma: curve.sigma,
+                tau: curve.maturity - _blockTimestamp()
+            });
+
+            // Fetch the correct gamma to calculate the fees after pool synced.
+            state.gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
+        }
+
+        // ----- Effects ----- //
+
+        // --- Warning: loop --- //
+        //  Loops until a condition is met:
+        //  1. Order is filled.
+        //  2. Limit price is met.
+        // ---
+        //  When the price of the asset moves upwards (becomes more valuable), towards the strike,
+        //  the reserves of that asset decrease.
+        //  When the price of the asset moves downwards (becomes less valuable from having more supply), away from the strike,
+        //  the asset reserves decrease.
+        do {
+            // Input swap amount for this step.
+            uint256 delta;
+            // Next tick to move to if not filled and price limit not reached.
+            int24 nextTick = swap.tick - TICK_SIZE; // todo: fix in direction
+            // Next price derived from the next tick, or the final price of the order.
+            uint256 nextPrice;
+            // Virtual reserves.
+            uint256 liveIndependent;
+            uint256 nextIndependent;
+            uint256 liveDependent;
+            uint256 nextDependent;
+            // Compute them conditionally based on direction in arguments.
+            if (state.sell) {
+                // Independent = asset, dependent = quote.
+                liveIndependent = expiring.computeR2WithPrice(swap.price);
+                (nextPrice, , nextIndependent) = expiring.computeReservesWithTick(nextTick);
+                liveDependent = expiring.computeR1WithPrice(swap.price);
+            } else {
+                // Independent = quote, dependent = asset.
+                liveIndependent = expiring.computeR1WithPrice(swap.price);
+                (nextPrice, nextIndependent, ) = expiring.computeReservesWithTick(nextTick);
+                liveDependent = expiring.computeR2WithPrice(swap.price);
+            }
+
+            // todo: get the next tick with active liquidity.
+
+            // Get the max amount that can be filled for a max distance swap.
+            uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
+            // Calculate the amount of fees paid at this tick.
+            swap.feeAmount = ((swap.remainder >= maxInput ? maxInput : swap.remainder) * (1e4 - state.gamma)) / 10_000;
+            state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
+            // Compute amount to swap in this step.
+            // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
+            if (swap.remainder >= maxInput) {
+                delta = maxInput - swap.feeAmount;
+
+                Order memory _args = args;
+                SwapState memory _state = state;
+                SwapIteration memory _swap = swap;
+                HyperPool storage _pool = pool;
+
+                {
+                    // Entering or exiting the tick will transition the pool's active range.
+                    (
+                        int256 liquidityDelta,
+                        int256 stakedLiquidityDelta,
+                        int256 pendingStakedLiquidityDelta
+                    ) = _transitionSlot(
+                            _args.poolId,
+                            _swap.tick,
+                            (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
+                            (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal),
+                            _pool.priorityGrowthGlobal
+                        );
+
+                    _swap.liquidity = signedAdd(_swap.liquidity, liquidityDelta);
+                    _swap.stakedLiquidity = signedAdd(_swap.stakedLiquidity, stakedLiquidityDelta);
+                    _swap.pendingStakedLiquidityDelta += pendingStakedLiquidityDelta;
+                }
+
+                // Update variables for next iteration.
+                swap.tick = nextTick; // Set the next slot.
+                swap.price = nextPrice; // Set the next price according to the next slot.
+                swap.remainder -= delta + swap.feeAmount; // Reduce the remainder of the order to fill.
+
+                // Save liquidity values changed by slot transition
+                swap.liquidity = _swap.liquidity;
+                swap.stakedLiquidity = _swap.stakedLiquidity;
+                swap.pendingStakedLiquidityDelta = _swap.pendingStakedLiquidityDelta;
+            } else {
+                // Reaching this block will fill the order. Set the swap input
+                delta = swap.remainder - swap.feeAmount;
+                nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
+
+                delta = swap.remainder; // the swap input should increment the non-fee applied amount
+                swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
+            }
+
+            // Compute the output of the swap by computing the difference between the dependent reserves.
+            if (state.sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
+            else nextDependent = expiring.computeR2WithR1(nextIndependent, 0, 0);
+            swap.input += delta; // Add to the total input of the swap.
+            swap.output += liveDependent - nextDependent;
+        } while (swap.remainder != 0 && args.limit > swap.price);
+
+        // Update Pool State Effects
+        if (pool.lastPrice != swap.price) pool.lastPrice = swap.price;
+        if (pool.lastTick != swap.tick) pool.lastTick = swap.tick;
+        if (pool.liquidity != swap.liquidity) pool.liquidity = swap.liquidity;
+        if (pool.stakedLiquidity != swap.stakedLiquidity) pool.stakedLiquidity = swap.stakedLiquidity;
+        if (pool.pendingStakedLiquidityDelta != swap.pendingStakedLiquidityDelta)
+            pool.pendingStakedLiquidityDelta = swap.pendingStakedLiquidityDelta;
+
+        uint256 feeGrowthGlobalAsset = state.sell ? state.feeGrowthGlobal : 0;
+        uint256 feeGrowthGlobalQuote = state.sell ? 0 : state.feeGrowthGlobal;
+        if (feeGrowthGlobalAsset > 0) pool.feeGrowthGlobalAsset += feeGrowthGlobalAsset;
+        if (feeGrowthGlobalQuote > 0) pool.feeGrowthGlobalQuote += feeGrowthGlobalQuote;
+
+        // Update Global Balance Effects
+        // Return variables and swap event.
+        (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
+        emit Swap(args.poolId, swap.input, swap.output, pair.tokenBase, pair.tokenQuote);
+
+        _increaseGlobal(pair.tokenBase, swap.input);
+        _decreaseGlobal(pair.tokenQuote, swap.output);
+    }
+
+    //  +----------------------------------------------------------------------------------+
+    //  |                                      STAKING                                     |
+    //  +----------------------------------------------------------------------------------+
+
+    function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint48 poolId_, uint96 positionId) = Decoder.decodeStakePosition(data);
+        poolId = poolId_;
+
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        _syncPool(poolId);
+
+        HyperPosition storage pos = positions[msg.sender][positionId];
+
+        // update slots
+        _syncSlot(poolId, pos.loTick);
+        _syncSlot(poolId, pos.hiTick);
+
+        // update staked position
+        _syncPosition(pos, poolId);
+
+        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) revert PositionStakedError(positionId);
+        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
+
+        // update position
+        pos.pendingStakedLiquidityDelta = int256(pos.totalLiquidity);
+        pos.pendingStakedEpoch = epochs[poolId].id;
+
+        // update slots
+        _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
+        _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+
+        // update pool
+        HyperPool storage pool = pools[poolId_];
+        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
+            // if position's liquidity is in range, add to next epoch's delta
+            pool.pendingStakedLiquidityDelta += int256(pos.totalLiquidity);
+        }
+
+        // emit Stake Position
+    }
+
+    function _unstakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint48 poolId_, uint96 positionId) = Decoder.decodeUnstakePosition(data);
+        poolId = poolId_;
+
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        _syncPool(poolId);
+
+        HyperPosition storage pos = positions[msg.sender][positionId];
+
+        // update slots
+        _syncSlot(poolId, pos.loTick);
+        _syncSlot(poolId, pos.hiTick);
+
+        // update staked position
+        _syncPosition(pos, poolId);
+
+        if (pos.pendingStakedLiquidityDelta == 0 && pos.stakedLiquidity == 0) revert PositionNotStakedError(positionId);
+
+        pos.pendingStakedLiquidityDelta = -int256(pos.totalLiquidity);
+        pos.unstakedEpoch = epochs[poolId].id;
+
+        _decreaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
+        _decreaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+
+        HyperPool storage pool = pools[poolId_];
+        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
+            // if position's liquidity is in range, add to next epoch's delta
+            pool.pendingStakedLiquidityDelta -= int256(pos.totalLiquidity);
+        }
+
+        // emit Unstake Position
+    }
+
+    //  +----------------------------------------------------------------------------------+
+    //  |                                      CREATION                                    |
+    //  +----------------------------------------------------------------------------------+
+
+    /**
+     * @notice Uses a pair and curve to instantiate a pool at a price.
+     *
+     * @custom:reverts If price is 0.
+     * @custom:reverts If pool with pair and curve has already been created.
+     * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
+     */
+    function _createPool(bytes calldata data) internal returns (uint48 poolId) {
+        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Decoder.decodeCreatePool(data);
+
+        if (price == 0) revert ZeroPrice();
+
+        // Zero id values are magic variables, since no curve or pair can have an id of zero.
+        if (pairId == 0) pairId = uint16(getPairNonce);
+        if (curveId == 0) curveId = uint32(getCurveNonce);
+        poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
+        if (_doesPoolExist(poolId)) revert PoolExists();
+
+        Curve memory curve = curves[curveId];
+        (uint128 strike, uint48 maturity, uint24 sigma) = (curve.strike, curve.maturity, curve.sigma);
+
+        bool perpetual;
+        assembly {
+            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
+        }
+
+        uint128 timestamp = _blockTimestamp();
+        if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
+
+        // Write the epoch data
+        epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
+
+        // Write the pool to state with the desired price.
+        pools[poolId].lastPrice = price;
+        pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price); // todo: implement slot and price grid.
+        pools[poolId].blockTimestamp = timestamp;
+
+        emit CreatePool(poolId, pairId, curveId, price);
+    }
+
+    /**
+     * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
+     * @dev Curves are used to create pools.
+     * It's possible to make a perpetual pool, by only specifying the fee parameters.
+     *
+     * @custom:reverts If set parameters have already been used to create a curve.
+     * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
+     * @custom:reverts If priority fee parameter is outside the bounds of 0.01% to fee parameter, inclusive.
+     * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
+     */
+    function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
+        (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = Decoder.decodeCreateCurve(
+            data
+        ); // Expects Enigma encoded data.
+
+        bytes32 rawCurveId = toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
+
+        curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
+        if (curveId != 0) revert CurveExists(curveId);
+
+        if (!isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
+        if (!isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
+
+        bool perpetual;
+        assembly {
+            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
+        }
+
+        if (!perpetual && sigma == 0) revert MinSigma(sigma);
+        if (!perpetual && strike == 0) revert MinStrike(strike);
+
+        unchecked {
+            curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
+        }
+
+        uint32 gamma = uint32(HyperSwapLib.UNIT_PERCENT - fee); // gamma = 100% - fee %.
+        uint32 priorityGamma = uint32(HyperSwapLib.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
+
+        // Writes the curve to state with a reverse lookup.
+        curves[curveId] = Curve({
+            strike: strike,
+            sigma: sigma,
+            maturity: maturity,
+            gamma: gamma,
+            priorityGamma: priorityGamma
+        });
+        getCurveId[rawCurveId] = curveId;
+
+        emit CreateCurve(curveId, strike, sigma, maturity, gamma, priorityGamma);
+    }
+
+    /**
+     * @notice Maps a nonce to a pair of token addresses and their decimal places.
+     * @dev Pairs are used in pool creation to determine the pool's underlying tokens.
+     *
+     * @custom:reverts If decoded addresses are the same.
+     * @custom:reverts If __ordered__ pair of addresses has already been created and has a non-zero pairId.
+     * @custom:reverts If decimals of either token are not between 6 and 18, inclusive.
+     */
+    function _createPair(bytes calldata data) internal returns (uint16 pairId) {
+        (address asset, address quote) = Decoder.decodeCreatePair(data); // Expects Engima encoded data.
+        if (asset == quote) revert SameTokenError();
+
+        pairId = getPairId[asset][quote];
+        if (pairId != 0) revert PairExists(pairId);
+
+        (uint8 assetDecimals, uint8 quoteDecimals) = (IERC20(asset).decimals(), IERC20(quote).decimals());
+
+        if (!_isValidDecimals(assetDecimals)) revert DecimalsError(assetDecimals);
+        if (!_isValidDecimals(quoteDecimals)) revert DecimalsError(quoteDecimals);
+
+        unchecked {
+            pairId = uint16(++getPairNonce); // Increments the pair nonce, returning the nonce for this pair.
+        }
+
+        // Writes the pairId into a fetchable mapping using its tokens.
+        getPairId[asset][quote] = pairId; // note: No reverse lookup, because order matters!
+
+        // Writes the pair into Enigma state.
+        pairs[pairId] = Pair({
+            tokenBase: asset,
+            decimalsBase: assetDecimals,
+            tokenQuote: quote,
+            decimalsQuote: quoteDecimals
+        });
+
+        emit CreatePair(pairId, asset, quote, assetDecimals, quoteDecimals);
+    }
+
+    //  +----------------------------------------------------------------------------------+
+    //  |                                 PRIORITY AUCTION                                 |
+    //  +----------------------------------------------------------------------------------+
+
+    // FIXME: This part needs to be refactored due to the change of the auction mechanism (no more Dutch auction)
+
+    function _fillPriorityAuction(bytes calldata data) internal returns (uint48 poolId) {
+        (uint48 poolId_, address priorityOwner, uint128 limitAmount) = Decoder.decodeFillPriorityAuction(data);
+
+        if (!_doesPoolExist(poolId_)) revert();
+        if (priorityOwner == address(0)) revert();
+
+        _syncPool(poolId);
+
+        HyperPool storage pool = pools[poolId_];
+        if (pool.prioritySwapper != address(0)) revert();
+
+        Epoch memory epoch = epochs[poolId_];
+        if (epoch.endTime <= _blockTimestamp()) revert();
+
+        AuctionParams memory poolAuctionParams = auctionParams[poolId];
+        uint128 auctionPayment = _calculateAuctionPayment(
+            poolAuctionParams.startPrice,
+            poolAuctionParams.endPrice,
+            0,
+            _blockTimestamp()
+        );
+        require(auctionPayment <= limitAmount);
+
+        uint128 auctionFee = _calculateAuctionFee(auctionPayment, poolAuctionParams.fee);
+        uint128 auctionNet = auctionPayment - auctionFee;
+        uint256 epochTimeRemaining = epoch.endTime - _blockTimestamp();
+
+        // save pool's priority payment per second
+        pool.priorityPaymentPerSecond = FixedPointMathLib.divWadDown(auctionNet, epochTimeRemaining);
+
+        // set new priority swapper
+        pool.prioritySwapper = priorityOwner;
+
+        // save auction fees
+        auctionFees[poolId_] += auctionFee;
+
+        // add debit payable by auction filler
+        uint16 pairId = uint16(poolId >> 32);
+        Pair memory pair = pairs[pairId];
+        _increaseGlobal(pair.tokenQuote, auctionPayment);
+    }
+
+    function _calculateAuctionPayment(
+        uint256 startPrice,
+        uint256 endPrice,
+        uint256 startTime,
+        uint256 fillTime
+    ) internal returns (uint128 auctionPayment) {
+        return 0;
+    }
+
+    function _calculateAuctionFee(uint128 auctionPayment, uint256 fee) internal returns (uint128 auctionFee) {
+        return 0;
+    }
+
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                             STATE ALTERING FUNCTIONS                                                 |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
     // --- Global --- //
 
@@ -649,7 +1250,6 @@ contract Hyper is IHyper {
         feeGrowthInsideQuote = feeGrowthGlobalQuote - feeGrowthBelowQuote - feeGrowthAboveQuote;
     }
 
-    // --- Swap --- //
     /**
      * @notice Updates the state of the pool (and it's epoch) with respect to time.
      *
@@ -740,199 +1340,6 @@ contract Hyper is IHyper {
         pool.blockTimestamp = timestamp;
     }
 
-    SwapState state;
-
-    /**
-     * @notice Engima method to swap tokens.
-     * @dev Swaps exact input of tokens for an output of tokens in the specified direction.
-     *
-     * @custom:reverts If order amount is zero.
-     * @custom:reverts If pool has not been created.
-     *
-     * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
-     */
-    function _swapExactForExact(bytes calldata data)
-        internal
-        returns (
-            uint48 poolId,
-            uint256 remainder,
-            uint256 input,
-            uint256 output
-        )
-    {
-        // SwapState memory state;
-
-        Order memory args;
-        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Decoder.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
-
-        if (args.input == 0) revert ZeroInput();
-        if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
-
-        state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
-
-        // Pair is used to update global reserves and check msg.sender balance.
-        Pair memory pair = pairs[uint16(args.poolId >> 32)];
-        // Pool is used to fetch information and eventually have its state updated.
-        HyperPool storage pool = pools[args.poolId];
-
-        state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
-
-        // Get the variables for first iteration of the swap.
-        SwapIteration memory swap;
-        {
-            // Writes the pool after computing its updated price with respect to time elapsed since last update.
-            (uint256 price, int24 tick) = _syncPool(args.poolId);
-            // Expect the caller to exhaust their entire balance of the input token.
-            remainder = args.useMax == 1 ? _balanceOf(pair.tokenBase, msg.sender) : args.input;
-            // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
-            swap = SwapIteration({
-                price: price,
-                tick: tick,
-                feeAmount: 0,
-                remainder: remainder,
-                liquidity: pool.liquidity,
-                stakedLiquidity: pool.stakedLiquidity,
-                pendingStakedLiquidityDelta: pool.pendingStakedLiquidityDelta,
-                input: 0,
-                output: 0
-            });
-        }
-
-        // Store the pool transiently, then delete after the swap.
-        HyperSwapLib.Expiring memory expiring;
-        {
-            // Curve stores the parameters of the trading function.
-            Curve memory curve = curves[uint32(args.poolId)];
-
-            expiring = HyperSwapLib.Expiring({
-                strike: curve.strike,
-                sigma: curve.sigma,
-                tau: curve.maturity - _blockTimestamp()
-            });
-
-            // Fetch the correct gamma to calculate the fees after pool synced.
-            state.gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
-        }
-
-        // ----- Effects ----- //
-
-        // --- Warning: loop --- //
-        //  Loops until a condition is met:
-        //  1. Order is filled.
-        //  2. Limit price is met.
-        // ---
-        //  When the price of the asset moves upwards (becomes more valuable), towards the strike,
-        //  the reserves of that asset decrease.
-        //  When the price of the asset moves downwards (becomes less valuable from having more supply), away from the strike,
-        //  the asset reserves decrease.
-        do {
-            // Input swap amount for this step.
-            uint256 delta;
-            // Next tick to move to if not filled and price limit not reached.
-            int24 nextTick = swap.tick - TICK_SIZE; // todo: fix in direction
-            // Next price derived from the next tick, or the final price of the order.
-            uint256 nextPrice;
-            // Virtual reserves.
-            uint256 liveIndependent;
-            uint256 nextIndependent;
-            uint256 liveDependent;
-            uint256 nextDependent;
-            // Compute them conditionally based on direction in arguments.
-            if (state.sell) {
-                // Independent = asset, dependent = quote.
-                liveIndependent = expiring.computeR2WithPrice(swap.price);
-                (nextPrice, , nextIndependent) = expiring.computeReservesWithTick(nextTick);
-                liveDependent = expiring.computeR1WithPrice(swap.price);
-            } else {
-                // Independent = quote, dependent = asset.
-                liveIndependent = expiring.computeR1WithPrice(swap.price);
-                (nextPrice, nextIndependent, ) = expiring.computeReservesWithTick(nextTick);
-                liveDependent = expiring.computeR2WithPrice(swap.price);
-            }
-
-            // todo: get the next tick with active liquidity.
-
-            // Get the max amount that can be filled for a max distance swap.
-            uint256 maxInput = (nextIndependent - liveIndependent).mulWadDown(swap.liquidity); // Active liquidity acts as a multiplier.
-            // Calculate the amount of fees paid at this tick.
-            swap.feeAmount = ((swap.remainder >= maxInput ? maxInput : swap.remainder) * (1e4 - state.gamma)) / 10_000;
-            state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
-            // Compute amount to swap in this step.
-            // If the full tick is crossed, reduce the remainder of the trade by the max amount filled by the tick.
-            if (swap.remainder >= maxInput) {
-                delta = maxInput - swap.feeAmount;
-
-                Order memory _args = args;
-                SwapState memory _state = state;
-                SwapIteration memory _swap = swap;
-                HyperPool storage _pool = pool;
-
-                {
-                    // Entering or exiting the tick will transition the pool's active range.
-                    (
-                        int256 liquidityDelta,
-                        int256 stakedLiquidityDelta,
-                        int256 pendingStakedLiquidityDelta
-                    ) = _transitionSlot(
-                            _args.poolId,
-                            _swap.tick,
-                            (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
-                            (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal),
-                            _pool.priorityGrowthGlobal
-                        );
-
-                    _swap.liquidity = signedAdd(_swap.liquidity, liquidityDelta);
-                    _swap.stakedLiquidity = signedAdd(_swap.stakedLiquidity, stakedLiquidityDelta);
-                    _swap.pendingStakedLiquidityDelta += pendingStakedLiquidityDelta;
-                }
-
-                // Update variables for next iteration.
-                swap.tick = nextTick; // Set the next slot.
-                swap.price = nextPrice; // Set the next price according to the next slot.
-                swap.remainder -= delta + swap.feeAmount; // Reduce the remainder of the order to fill.
-
-                // Save liquidity values changed by slot transition
-                swap.liquidity = _swap.liquidity;
-                swap.stakedLiquidity = _swap.stakedLiquidity;
-                swap.pendingStakedLiquidityDelta = _swap.pendingStakedLiquidityDelta;
-            } else {
-                // Reaching this block will fill the order. Set the swap input
-                delta = swap.remainder - swap.feeAmount;
-                nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
-
-                delta = swap.remainder; // the swap input should increment the non-fee applied amount
-                swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
-            }
-
-            // Compute the output of the swap by computing the difference between the dependent reserves.
-            if (state.sell) nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0);
-            else nextDependent = expiring.computeR2WithR1(nextIndependent, 0, 0);
-            swap.input += delta; // Add to the total input of the swap.
-            swap.output += liveDependent - nextDependent;
-        } while (swap.remainder != 0 && args.limit > swap.price);
-
-        // Update Pool State Effects
-        if (pool.lastPrice != swap.price) pool.lastPrice = swap.price;
-        if (pool.lastTick != swap.tick) pool.lastTick = swap.tick;
-        if (pool.liquidity != swap.liquidity) pool.liquidity = swap.liquidity;
-        if (pool.stakedLiquidity != swap.stakedLiquidity) pool.stakedLiquidity = swap.stakedLiquidity;
-        if (pool.pendingStakedLiquidityDelta != swap.pendingStakedLiquidityDelta)
-            pool.pendingStakedLiquidityDelta = swap.pendingStakedLiquidityDelta;
-
-        uint256 feeGrowthGlobalAsset = state.sell ? state.feeGrowthGlobal : 0;
-        uint256 feeGrowthGlobalQuote = state.sell ? 0 : state.feeGrowthGlobal;
-        if (feeGrowthGlobalAsset > 0) pool.feeGrowthGlobalAsset += feeGrowthGlobalAsset;
-        if (feeGrowthGlobalQuote > 0) pool.feeGrowthGlobalQuote += feeGrowthGlobalQuote;
-
-        // Update Global Balance Effects
-        // Return variables and swap event.
-        (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
-        emit Swap(args.poolId, swap.input, swap.output, pair.tokenBase, pair.tokenQuote);
-
-        _increaseGlobal(pair.tokenBase, swap.input);
-        _decreaseGlobal(pair.tokenQuote, swap.output);
-    }
-
     /**
      * @notice Syncs a slot to a new timestamp and returns its deltas to update the pool's liquidity values.
      * @dev Effects on a slot after its been transitioned to another slot.
@@ -973,160 +1380,6 @@ contract Hyper is IHyper {
         // todo: update transition event
 
         emit SlotTransition(poolId, tick, slot.liquidityDelta);
-    }
-
-    // --- Liquidity --- //
-
-    /**
-     * @notice Enigma method to add liquidity to a range of prices in a pool.
-     *
-     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
-     * @custom:reverts If attempting to add zero liquidity.
-     */
-    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint8 useMax, uint48 poolId_, int24 loTick, int24 hiTick, uint128 delLiquidity) = Decoder.decodeAddLiquidity(
-            data
-        ); // Packs the use max flag in the Enigma instruction code byte.
-        poolId = poolId_;
-
-        if (delLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        // update pool, relevant slots with time
-        _syncPool(poolId);
-
-        _syncSlot(poolId, loTick);
-        _syncSlot(poolId, hiTick);
-
-        // Compute amounts of tokens for the real reserves.
-        Curve memory curve = curves[uint32(poolId_)];
-        HyperPool storage pool = pools[poolId_];
-        uint256 timestamp = _blockTimestamp();
-
-        // Get lower price bound using the loTick index.
-        uint256 price = HyperSwapLib.computePriceWithTick(loTick);
-        // Compute the current virtual reserves given the pool's lastPrice.
-        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
-            pool.lastPrice,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp
-        );
-        // Compute the real reserves given the lower price bound.
-        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
-        // If the real reserves are zero, then the slot is at the bounds and so we should use virtual reserves.
-        if (deltaR2 == 0) deltaR2 = currentR2;
-        else deltaR2 = currentR2.divWadDown(deltaR2);
-        uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
-            deltaR2,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp,
-            price,
-            0
-        ); // todo: fix with using the hiTick.
-        deltaR1 = deltaR1.mulWadDown(delLiquidity);
-        deltaR2 = deltaR2.mulWadDown(delLiquidity);
-        _increaseLiquidity(poolId_, loTick, hiTick, deltaR1, deltaR2, delLiquidity);
-    }
-
-    function _removeLiquidity(bytes calldata data)
-        internal
-        returns (
-            uint48 poolId,
-            uint256 a,
-            uint256 b
-        )
-    {
-        (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Decoder
-            .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
-
-        if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        // update pool, relevant slots with time
-        _syncPool(poolId_);
-
-        _syncSlot(poolId, loTick);
-        _syncSlot(poolId, hiTick);
-
-        // Compute amounts of tokens for the real reserves.
-        Curve memory curve = curves[uint32(poolId_)];
-        HyperPool storage pool = pools[poolId_];
-        uint256 timestamp = _blockTimestamp();
-        uint256 price = HyperSwapLib.computePriceWithTick(loTick);
-        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
-            pool.lastPrice,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp
-        );
-
-        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
-        if (deltaR2 == 0) deltaR2 = currentR2;
-        else deltaR2 = currentR2.divWadDown(deltaR2);
-
-        uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
-            deltaR2,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp,
-            price,
-            0
-        ); // todo: fix with using the hiTick.
-        deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
-        deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
-
-        // Decrease amount of liquidity in each slot.
-        _decreaseSlotLiquidity(poolId_, loTick, deltaLiquidity, false);
-        _decreaseSlotLiquidity(poolId_, hiTick, deltaLiquidity, true);
-
-        // Update the pool state if liquidity is within the current pool's slot.
-        if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
-            pool.liquidity -= deltaLiquidity;
-        }
-
-        // Todo: delete any slots if uninstantiated.
-
-        // Todo: update bitmap of instantiated/uninstantiated slots.
-
-        _decreasePosition(poolId_, loTick, hiTick, deltaLiquidity);
-
-        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
-        Pair memory pair = pairs[pairId];
-        _decreaseGlobal(pair.tokenBase, deltaR2);
-        _decreaseGlobal(pair.tokenQuote, deltaR1);
-
-        emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
-    }
-
-    function _collectFees(bytes calldata data) internal {
-        (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Decoder.decodeCollectFees(
-            data
-        );
-
-        // No need to check if the requested amounts are higher than the owed ones
-        // because this would cause the next lines to revert.
-        positions[msg.sender][positionId].tokensOwedAsset -= amountAssetRequested;
-        positions[msg.sender][positionId].tokensOwedQuote -= amountQuoteRequested;
-
-        // Right shift the positionId to keep only the pairId part (first 2 bytes).
-        uint16 pairId = uint16(positionId >> 80);
-
-        // Should save some gas
-        Pair memory pair = pairs[pairId];
-
-        if (amountAssetRequested > 0) _applyCredit(pair.tokenBase, amountAssetRequested);
-        if (amountQuoteRequested > 0) _applyCredit(pair.tokenQuote, amountQuoteRequested);
-
-        emit Collect(
-            positionId,
-            msg.sender,
-            amountAssetRequested,
-            pair.tokenBase,
-            amountQuoteRequested,
-            pair.tokenQuote
-        );
     }
 
     function _increaseLiquidity(
@@ -1210,78 +1463,6 @@ contract Hyper is IHyper {
         else slot.liquidityDelta -= int256(deltaLiquidity);
     }
 
-    function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint96 positionId) = Decoder.decodeStakePosition(data);
-        poolId = poolId_;
-
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        _syncPool(poolId);
-
-        HyperPosition storage pos = positions[msg.sender][positionId];
-
-        // update slots
-        _syncSlot(poolId, pos.loTick);
-        _syncSlot(poolId, pos.hiTick);
-
-        // update staked position
-        _syncPosition(pos, poolId);
-
-        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) revert PositionStakedError(positionId);
-        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
-
-        // update position
-        pos.pendingStakedLiquidityDelta = int256(pos.totalLiquidity);
-        pos.pendingStakedEpoch = epochs[poolId].id;
-
-        // update slots
-        _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
-        _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
-
-        // update pool
-        HyperPool storage pool = pools[poolId_];
-        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
-            // if position's liquidity is in range, add to next epoch's delta
-            pool.pendingStakedLiquidityDelta += int256(pos.totalLiquidity);
-        }
-
-        // emit Stake Position
-    }
-
-    function _unstakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint96 positionId) = Decoder.decodeUnstakePosition(data);
-        poolId = poolId_;
-
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        _syncPool(poolId);
-
-        HyperPosition storage pos = positions[msg.sender][positionId];
-
-        // update slots
-        _syncSlot(poolId, pos.loTick);
-        _syncSlot(poolId, pos.hiTick);
-
-        // update staked position
-        _syncPosition(pos, poolId);
-
-        if (pos.pendingStakedLiquidityDelta == 0 && pos.stakedLiquidity == 0) revert PositionNotStakedError(positionId);
-
-        pos.pendingStakedLiquidityDelta = -int256(pos.totalLiquidity);
-        pos.unstakedEpoch = epochs[poolId].id;
-
-        _decreaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
-        _decreaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
-
-        HyperPool storage pool = pools[poolId_];
-        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
-            // if position's liquidity is in range, add to next epoch's delta
-            pool.pendingStakedLiquidityDelta -= int256(pos.totalLiquidity);
-        }
-
-        // emit Unstake Position
-    }
-
     function _syncSlot(uint48 poolId, int24 tick) internal {
         HyperSlot storage slot = slots[poolId][tick];
 
@@ -1329,192 +1510,40 @@ contract Hyper is IHyper {
         }
     }
 
-    // --- Priority Auction --- //
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                               INTERNAL FUNCTIONS                                                     |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
-    function _fillPriorityAuction(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId_, address priorityOwner, uint128 limitAmount) = Decoder.decodeFillPriorityAuction(data);
+    /// @dev Overridable in tests.
+    function _blockTimestamp() internal view virtual returns (uint128) {
+        return uint128(block.timestamp);
+    }
 
-        if (!_doesPoolExist(poolId_)) revert();
-        if (priorityOwner == address(0)) revert();
+    /// @dev Overridable in tests.
+    function _liquidityPolicy() internal view virtual returns (uint256) {
+        return JUST_IN_TIME_LIQUIDITY_POLICY;
+    }
 
-        _syncPool(poolId);
-
-        HyperPool storage pool = pools[poolId_];
-        if (pool.prioritySwapper != address(0)) revert();
-
-        Epoch memory epoch = epochs[poolId_];
-        if (epoch.endTime <= _blockTimestamp()) revert();
-
-        AuctionParams memory poolAuctionParams = auctionParams[poolId];
-        uint128 auctionPayment = _calculateAuctionPayment(
-            poolAuctionParams.startPrice,
-            poolAuctionParams.endPrice,
-            0,
-            _blockTimestamp()
+    /// @dev Gas optimized `balanceOf` method.
+    function _balanceOf(address token, address account) internal view returns (uint256) {
+        (bool success, bytes memory data) = token.staticcall(
+            abi.encodeWithSelector(IERC20.balanceOf.selector, account)
         );
-        require(auctionPayment <= limitAmount);
-
-        uint128 auctionFee = _calculateAuctionFee(auctionPayment, poolAuctionParams.fee);
-        uint128 auctionNet = auctionPayment - auctionFee;
-        uint256 epochTimeRemaining = epoch.endTime - _blockTimestamp();
-
-        // save pool's priority payment per second
-        pool.priorityPaymentPerSecond = FixedPointMathLib.divWadDown(auctionNet, epochTimeRemaining);
-
-        // set new priority swapper
-        pool.prioritySwapper = priorityOwner;
-
-        // save auction fees
-        auctionFees[poolId_] += auctionFee;
-
-        // add debit payable by auction filler
-        uint16 pairId = uint16(poolId >> 32);
-        Pair memory pair = pairs[pairId];
-        _increaseGlobal(pair.tokenQuote, auctionPayment);
+        if (!success || data.length != 32) revert BalanceError();
+        return abi.decode(data, (uint256));
     }
 
-    function _calculateAuctionPayment(
-        uint256 startPrice,
-        uint256 endPrice,
-        uint256 startTime,
-        uint256 fillTime
-    ) internal returns (uint128 auctionPayment) {
-        return 0;
+    function _safeWrap() internal {
+        IWETH(WETH).deposit{value: msg.value}();
     }
 
-    function _calculateAuctionFee(uint128 auctionPayment, uint256 fee) internal returns (uint128 auctionFee) {
-        return 0;
-    }
+    function _dangerousUnwrap(address to, uint256 amount) internal {
+        IWETH(WETH).withdraw(amount);
 
-    // --- Creation --- //
-
-    /**
-     * @notice Uses a pair and curve to instantiate a pool at a price.
-     *
-     * @custom:reverts If price is 0.
-     * @custom:reverts If pool with pair and curve has already been created.
-     * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
-     */
-    function _createPool(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Decoder.decodeCreatePool(data);
-
-        if (price == 0) revert ZeroPrice();
-
-        // Zero id values are magic variables, since no curve or pair can have an id of zero.
-        if (pairId == 0) pairId = uint16(getPairNonce);
-        if (curveId == 0) curveId = uint32(getCurveNonce);
-        poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
-        if (_doesPoolExist(poolId)) revert PoolExists();
-
-        Curve memory curve = curves[curveId];
-        (uint128 strike, uint48 maturity, uint24 sigma) = (curve.strike, curve.maturity, curve.sigma);
-
-        bool perpetual;
-        assembly {
-            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
-        }
-
-        uint128 timestamp = _blockTimestamp();
-        if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
-
-        // Write the epoch data
-        epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
-
-        // Write the pool to state with the desired price.
-        pools[poolId].lastPrice = price;
-        pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price); // todo: implement slot and price grid.
-        pools[poolId].blockTimestamp = timestamp;
-
-        emit CreatePool(poolId, pairId, curveId, price);
-    }
-
-    /**
-     * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
-     * @dev Curves are used to create pools.
-     * It's possible to make a perpetual pool, by only specifying the fee parameters.
-     *
-     * @custom:reverts If set parameters have already been used to create a curve.
-     * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
-     * @custom:reverts If priority fee parameter is outside the bounds of 0.01% to fee parameter, inclusive.
-     * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
-     */
-    function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = Decoder.decodeCreateCurve(
-            data
-        ); // Expects Enigma encoded data.
-
-        bytes32 rawCurveId = toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
-
-        curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
-        if (curveId != 0) revert CurveExists(curveId);
-
-        if (!isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
-        if (!isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
-
-        bool perpetual;
-        assembly {
-            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
-        }
-
-        if (!perpetual && sigma == 0) revert MinSigma(sigma);
-        if (!perpetual && strike == 0) revert MinStrike(strike);
-
-        unchecked {
-            curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
-        }
-
-        uint32 gamma = uint32(HyperSwapLib.UNIT_PERCENT - fee); // gamma = 100% - fee %.
-        uint32 priorityGamma = uint32(HyperSwapLib.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
-
-        // Writes the curve to state with a reverse lookup.
-        curves[curveId] = Curve({
-            strike: strike,
-            sigma: sigma,
-            maturity: maturity,
-            gamma: gamma,
-            priorityGamma: priorityGamma
-        });
-        getCurveId[rawCurveId] = curveId;
-
-        emit CreateCurve(curveId, strike, sigma, maturity, gamma, priorityGamma);
-    }
-
-    /**
-     * @notice Maps a nonce to a pair of token addresses and their decimal places.
-     * @dev Pairs are used in pool creation to determine the pool's underlying tokens.
-     *
-     * @custom:reverts If decoded addresses are the same.
-     * @custom:reverts If __ordered__ pair of addresses has already been created and has a non-zero pairId.
-     * @custom:reverts If decimals of either token are not between 6 and 18, inclusive.
-     */
-    function _createPair(bytes calldata data) internal returns (uint16 pairId) {
-        (address asset, address quote) = Decoder.decodeCreatePair(data); // Expects Engima encoded data.
-        if (asset == quote) revert SameTokenError();
-
-        pairId = getPairId[asset][quote];
-        if (pairId != 0) revert PairExists(pairId);
-
-        (uint8 assetDecimals, uint8 quoteDecimals) = (IERC20(asset).decimals(), IERC20(quote).decimals());
-
-        if (!_isValidDecimals(assetDecimals)) revert DecimalsError(assetDecimals);
-        if (!_isValidDecimals(quoteDecimals)) revert DecimalsError(quoteDecimals);
-
-        unchecked {
-            pairId = uint16(++getPairNonce); // Increments the pair nonce, returning the nonce for this pair.
-        }
-
-        // Writes the pairId into a fetchable mapping using its tokens.
-        getPairId[asset][quote] = pairId; // note: No reverse lookup, because order matters!
-
-        // Writes the pair into Enigma state.
-        pairs[pairId] = Pair({
-            tokenBase: asset,
-            decimalsBase: assetDecimals,
-            tokenQuote: quote,
-            decimalsQuote: quoteDecimals
-        });
-
-        emit CreatePair(pairId, asset, quote, assetDecimals, quoteDecimals);
+        // Marked as dangerous because it makes an external call to the `to` address.
+        dangerousTransferETH(to, amount);
     }
 
     // --- General Utils --- //
