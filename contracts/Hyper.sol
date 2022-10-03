@@ -322,7 +322,7 @@ contract Hyper is IHyper {
     ) external lock {
         // note: Would pull tokens without this conditional check.
         if (balances[msg.sender][token] < amount) revert DrawBalance();
-        _applyDebit(token, amount);
+        _adjustUserBalance(msg.sender, token, int256(amount));
 
         if (token == WETH) _dangerousUnwrap(to, amount);
         else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
@@ -994,15 +994,6 @@ contract Hyper is IHyper {
         }
 
         emit AdjustUserBalance(user, token, amount);
-    }
-
-    /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
-    ///      Positive credits are only applied to the internal balance of the account.
-    ///      Therefore, it does not require a state change for the global reserves.
-    /// @custom:security Critical. Only method which credits accounts with tokens.
-    function _applyCredit(address token, uint256 amount) internal {
-        balances[msg.sender][token] += amount;
-        emit IncreaseUserBalance(token, amount);
     }
 
     /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
