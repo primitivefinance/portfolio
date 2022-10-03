@@ -28,7 +28,6 @@ contract Hyper is IHyper {
     using HyperSwapLib for HyperSwapLib.Expiring;
 
     // --- Constants --- //
-    // string public constant VERSION = "prototype-v1.0.0"; // 33,107 bytes
 
     /// @notice Current version of this contract.
     /// @dev Optimized function returning the version of this contract
@@ -55,67 +54,99 @@ contract Hyper is IHyper {
 
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
+
     /// @dev Distance between the location of prices on the price grid, so distance between price.
     int24 public constant TICK_SIZE = 256;
+
     /// @dev Used as the first pointer for the jump process.
     uint8 public constant JUMP_PROCESS_START_POINTER = 2;
+
     /// @dev Minimum amount of decimals supported for ERC20 tokens.
     uint8 public constant MIN_DECIMALS = 6;
+
     /// @dev Maximum amount of decimals supported for ERC20 tokens.
     uint8 public constant MAX_DECIMALS = 18;
+
     /// @dev Amount of seconds of available time to swap past maturity of a pool.
     uint256 public constant BUFFER = 300;
+
     /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
     uint256 public constant PRECISION = 1e18;
+
     /// @dev Constant amount of basis points. All percentage values are integers in basis points.
     uint256 public constant PERCENTAGE = 1e4;
+
     /// @dev Minimum pool fee. 0.01%.
     uint256 public constant MIN_POOL_FEE = 1;
+
     /// @dev Maximum pool fee. 10.00%.
     uint256 public constant MAX_POOL_FEE = 1e3;
+
     /// @dev Amount of seconds that an epoch lasts.
     uint256 public constant EPOCH_INTERVAL = 300;
+
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
+
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
     uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
+
     // --- State --- //
+
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
+
     /// @dev A value incremented by one on pair creation. Reduces calldata.
     uint256 public getPairNonce;
+
     /// @dev A value incremented by one on curve creation. Reduces calldata.
     uint256 public getCurveNonce;
+
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;
+
     /// @dev Pool id -> Epoch Data Structure.
     mapping(uint48 => Epoch) public epochs;
+
     /// @dev Pool id -> Auction Param Data Structure.
     mapping(uint48 => AuctionParams) auctionParams;
+
     /// @dev Pool id -> Auction Fees
     mapping(uint48 => uint128) auctionFees;
+
     /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) public curves;
+
     /// @dev Pool id -> HyperPool Data Structure.
     mapping(uint48 => HyperPool) public pools;
+
     /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
     mapping(bytes32 => uint32) public getCurveId;
+
     /// @dev Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
+
     /// @dev Pool id -> Tick -> Slot has liquidity at a price.
     mapping(uint48 => mapping(int24 => HyperSlot)) public slots;
+
     /// @dev Base Token -> Quote Token -> Pair id
     mapping(address => mapping(address => uint16)) public getPairId;
+
     /// @dev User -> Token -> Internal Balance.
     mapping(address => mapping(address => uint256)) public balances;
+
     /// @dev User -> Position Id -> Liquidity Position.
     mapping(address => mapping(uint96 => HyperPosition)) public positions;
+
     /// @dev Pool id -> Epoch Id -> Priority Payment Growth Global
     mapping(uint48 => mapping(uint256 => uint256)) internal priorityGrowthPoolSnapshot;
+
     /// @dev Pool id -> Tick -> Epoch Id -> Priority Payment Growth Outside
     mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal priorityGrowthSlotSnapshot;
 
-    // --- Reentrancy --- //
+    // --- Modifiers --- //
+
+    /// @dev Protection against reentracy
     modifier lock() {
         if (locked != 1) revert LockedError();
 
@@ -126,11 +157,12 @@ contract Hyper is IHyper {
 
     // --- Constructor --- //
 
-    constructor(address weth) {
-        WETH = weth;
+    /// @param weth_ Address of the WETH9 contract
+    constructor(address weth_) {
+        WETH = weth_;
     }
 
-    // --- External --- //
+    // --- External functions directly callable (no instructions)  --- //
 
     /// @inheritdoc IHyperActions
     function draw(
