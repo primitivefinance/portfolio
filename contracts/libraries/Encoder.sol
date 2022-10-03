@@ -139,4 +139,8 @@ library Encoder {
             amountQuoteRequested
         );
     }
+
+    function encodeDraw(address token, bytes memory amount) external pure returns (bytes memory) {
+        return abi.encodePacked(bytes1(0x04), token, amount);
+    }
 }

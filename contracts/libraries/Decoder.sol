@@ -196,4 +196,18 @@ library Decoder {
         amountAssetRequested = uint128(toAmount(data[14:pointer]));
         amountQuoteRequested = uint128(toAmount(data[pointer:data.length]));
     }
+
+    function decodeDraw(bytes calldata data)
+        external
+        pure
+        returns (
+            address token,
+            bytes memory slice,
+            uint256 amount
+        )
+    {
+        token = address(bytes20(data[1:21]));
+        slice = data[21:data.length];
+        amount = toAmount(data[21:data.length]);
+    }
 }
