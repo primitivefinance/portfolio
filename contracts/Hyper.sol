@@ -27,7 +27,11 @@ contract Hyper is IHyper {
     using FixedPointMathLib for uint256;
     using HyperSwapLib for HyperSwapLib.Expiring;
 
-    // --- Constants --- //
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                                      CONSTANTS                                                       |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
     /// @notice Current version of this contract.
     /// @dev Optimized function returning the version of this contract
@@ -91,7 +95,11 @@ contract Hyper is IHyper {
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
     uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
 
-    // --- State --- //
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                                      STORAGE                                                         |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
@@ -144,7 +152,11 @@ contract Hyper is IHyper {
     /// @dev Pool id -> Tick -> Epoch Id -> Priority Payment Growth Outside
     mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal priorityGrowthSlotSnapshot;
 
-    // --- Modifiers --- //
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                                     MODIFIERS                                                        |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
     /// @dev Protection against reentracy
     modifier lock() {
@@ -155,11 +167,20 @@ contract Hyper is IHyper {
         locked = 1;
     }
 
-    // --- Constructor --- //
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                                  SPECIAL FUNCTIONS                                                   |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
     /// @param weth_ Address of the WETH9 contract
     constructor(address weth_) {
         WETH = weth_;
+    }
+
+    // Note: Not sure if we should always revert when receiving ETH
+    receive() external payable {
+        revert();
     }
 
     // --- External functions directly callable (no instructions)  --- //
@@ -194,12 +215,11 @@ contract Hyper is IHyper {
         }
     }
 
-    // Note: Not sure if we should always revert when receiving ETH
-    receive() external payable {
-        revert();
-    }
-
-    // --- Main entry point of Hyper --- ///
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                                     ENTRY POINT                                                      |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
     /// @notice Main touchpoint for receiving calls.
     /// @dev Critical: data must be encoded properly to be processed.
@@ -284,8 +304,13 @@ contract Hyper is IHyper {
         }
     }
 
-    // --- Instruction implementations --- //
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                                    INSTRUCTIONS                                                      |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
 
+    // FIXME: Remove this external function and add an instruction instead
     function draw(
         address token,
         uint256 amount,
@@ -299,6 +324,7 @@ contract Hyper is IHyper {
         else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
     }
 
+    // FIXME: Remove this external function and add an instruction instead
     function fund(address token, uint256 amount) external payable override lock {
         _applyCredit(token, amount);
         if (token == WETH) _safeWrap();
