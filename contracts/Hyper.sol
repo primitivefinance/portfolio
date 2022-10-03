@@ -164,27 +164,7 @@ contract Hyper is IHyper {
 
     // --- External functions directly callable (no instructions)  --- //
 
-    /// @inheritdoc IHyperActions
-    function draw(
-        address token,
-        uint256 amount,
-        address to
-    ) external lock {
-        // note: Would pull tokens without this conditional check.
-        if (balances[msg.sender][token] < amount) revert DrawBalance();
-        _applyDebit(token, amount);
-
-        if (token == WETH) _dangerousUnwrap(to, amount);
-        else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
-    }
-
-    /// @inheritdoc IHyperActions
-    function fund(address token, uint256 amount) external payable override lock {
-        _applyCredit(token, amount);
-        if (token == WETH) _safeWrap();
-        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-    }
-
+    // FIXME: Remove this as part of the auction reimplementation
     function setAuctionParams(
         uint48 poolId,
         uint256 startPrice,
@@ -202,6 +182,7 @@ contract Hyper is IHyper {
         emit SetAuctionParams(poolId, params.startPrice, params.endPrice, params.fee, params.length);
     }
 
+    // FIXME: Remove this as part of the auction reimplementation
     function collectAuctionFees(uint48 poolId) external {
         // todo: access control
         uint128 fees = auctionFees[poolId];
@@ -218,7 +199,7 @@ contract Hyper is IHyper {
         revert();
     }
 
-    // --- Fallback --- //
+    // --- Main entry point of Hyper --- ///
 
     /// @notice Main touchpoint for receiving calls.
     /// @dev Critical: data must be encoded properly to be processed.
@@ -228,6 +209,100 @@ contract Hyper is IHyper {
         if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
         else _jumpProcess(msg.data);
         _settleBalances();
+    }
+
+    /// @notice Single instruction processor that will forward instruction to appropriate function.
+    /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
+    /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
+    /// @custom:security Critical. Directly sends instructions to be executed.
+    function _process(bytes calldata data) internal {
+        uint48 poolId;
+        bytes1 instruction = bytes1(data[0] & 0x0f);
+        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
+
+        if (instruction == Instructions.ADD_LIQUIDITY) {
+            (poolId, ) = _addLiquidity(data);
+        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
+            (poolId, , ) = _removeLiquidity(data);
+        } else if (instruction == Instructions.SWAP) {
+            (poolId, , , ) = _swapExactForExact(data);
+        } else if (instruction == Instructions.STAKE_POSITION) {
+            (poolId, ) = _stakePosition(data);
+        } else if (instruction == Instructions.UNSTAKE_POSITION) {
+            (poolId, ) = _unstakePosition(data);
+        } else if (instruction == Instructions.FILL_PRIORITY_AUCTION) {
+            (poolId) = _fillPriorityAuction(data);
+        } else if (instruction == Instructions.CREATE_POOL) {
+            (poolId) = _createPool(data);
+        } else if (instruction == Instructions.CREATE_CURVE) {
+            _createCurve(data);
+        } else if (instruction == Instructions.CREATE_PAIR) {
+            _createPair(data);
+        } else if (instruction == Instructions.COLLECT_FEES) {
+            _collectFees(data);
+        } else if (instruction == Instructions.DRAW) {
+            _draw(data);
+        } else {
+            revert UnknownInstruction();
+        }
+
+        // note: Only pool interactions have a non-zero poolId.
+        if (poolId != 0) {
+            uint16 pairId = uint16(poolId >> 32);
+            // Add the pair to the array to track all the pairs that have been interacted with.
+            _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
+            // Caching the addresses to settle the pools interacted with in the fallback function.
+            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
+            if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
+            if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
+        }
+    }
+
+    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
+    /// @dev Expects a special encoding method for multiple instructions.
+    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
+    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
+    function _jumpProcess(bytes calldata data) internal {
+        uint8 length = uint8(data[1]);
+        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
+        uint256 start;
+
+        // For each instruction set...
+        for (uint256 i; i != length; ++i) {
+            // Start at the index of the first byte of the next instruction.
+            start = pointer;
+
+            // Set the new pointer to the next instruction, located at the pointer.
+            pointer = uint8(data[pointer]);
+
+            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
+            if (pointer > data.length) revert JumpError(pointer);
+            bytes calldata instruction = data[start:pointer];
+
+            // Process the instruction.
+            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
+        }
+    }
+
+    // --- Instruction implementations --- //
+
+    function draw(
+        address token,
+        uint256 amount,
+        address to
+    ) external lock {
+        // note: Would pull tokens without this conditional check.
+        if (balances[msg.sender][token] < amount) revert DrawBalance();
+        _applyDebit(token, amount);
+
+        if (token == WETH) _dangerousUnwrap(to, amount);
+        else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
+    }
+
+    function fund(address token, uint256 amount) external payable override lock {
+        _applyCredit(token, amount);
+        if (token == WETH) _safeWrap();
+        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
 
     // --- Internal --- //
@@ -260,36 +335,6 @@ contract Hyper is IHyper {
 
         // Marked as dangerous because it makes an external call to the `to` address.
         dangerousTransferETH(to, amount);
-    }
-
-    /// @dev Must be implemented by the highest level contract.
-    /// @notice Processing logic for instructions.
-    /* function _process(bytes calldata data) internal virtual; */
-
-    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
-    /// @dev Expects a special encoding method for multiple instructions.
-    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
-    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
-    function _jumpProcess(bytes calldata data) internal {
-        uint8 length = uint8(data[1]);
-        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
-        uint256 start;
-
-        // For each instruction set...
-        for (uint256 i; i != length; ++i) {
-            // Start at the index of the first byte of the next instruction.
-            start = pointer;
-
-            // Set the new pointer to the next instruction, located at the pointer.
-            pointer = uint8(data[pointer]);
-
-            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
-            if (pointer > data.length) revert JumpError(pointer);
-            bytes calldata instruction = data[start:pointer];
-
-            // Process the instruction.
-            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
-        }
     }
 
     // --- Global --- //
@@ -1495,51 +1540,6 @@ contract Hyper is IHyper {
         if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         emit DecreaseUserBalance(token, amount);
-    }
-
-    /// @notice Single instruction processor that will forward instruction to appropriate function.
-    /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
-    /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
-    /// @custom:security Critical. Directly sends instructions to be executed.
-    function _process(bytes calldata data) internal {
-        uint48 poolId;
-        bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
-
-        if (instruction == Instructions.ADD_LIQUIDITY) {
-            (poolId, ) = _addLiquidity(data);
-        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            (poolId, , ) = _removeLiquidity(data);
-        } else if (instruction == Instructions.SWAP) {
-            (poolId, , , ) = _swapExactForExact(data);
-        } else if (instruction == Instructions.STAKE_POSITION) {
-            (poolId, ) = _stakePosition(data);
-        } else if (instruction == Instructions.UNSTAKE_POSITION) {
-            (poolId, ) = _unstakePosition(data);
-        } else if (instruction == Instructions.FILL_PRIORITY_AUCTION) {
-            (poolId) = _fillPriorityAuction(data);
-        } else if (instruction == Instructions.CREATE_POOL) {
-            (poolId) = _createPool(data);
-        } else if (instruction == Instructions.CREATE_CURVE) {
-            _createCurve(data);
-        } else if (instruction == Instructions.CREATE_PAIR) {
-            _createPair(data);
-        } else if (instruction == Instructions.COLLECT_FEES) {
-            _collectFees(data);
-        } else {
-            revert UnknownInstruction();
-        }
-
-        // note: Only pool interactions have a non-zero poolId.
-        if (poolId != 0) {
-            uint16 pairId = uint16(poolId >> 32);
-            // Add the pair to the array to track all the pairs that have been interacted with.
-            _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
-            // Caching the addresses to settle the pools interacted with in the fallback function.
-            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
-            if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
-            if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
-        }
     }
 
     /// @dev Critical level function that is responsible for handling tokens, debits and credits.
