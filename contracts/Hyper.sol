@@ -288,6 +288,7 @@ contract Hyper is IHyper {
         uint256 start;
 
         // For each instruction set...
+        // TODO: Gas optimize this loop
         for (uint256 i; i != length; ++i) {
             // Start at the index of the first byte of the next instruction.
             start = pointer;
@@ -311,7 +312,7 @@ contract Hyper is IHyper {
     //  +----------------------------------------------------------------------------------------------------------------------+
 
     //  +----------------------------------------------------------------------------------+
-    //  |                                      FUNDS                                       |
+    //  |                                   USER BALANCE                                   |
     //  +----------------------------------------------------------------------------------+
 
     // FIXME: Remove this external function and add an instruction instead
