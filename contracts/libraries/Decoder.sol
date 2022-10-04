@@ -210,4 +210,9 @@ library Decoder {
         token = address(bytes20(data[21:41]));
         amount = unpackAmount(data[41:data.length]);
     }
+
+    function decodeFund(bytes calldata data) external pure returns (address token, uint256 amount) {
+        token = address(bytes20(data[1:21]));
+        amount = unpackAmount(data[21:data.length]);
+    }
 }
