@@ -60,8 +60,8 @@ library InstructionsPoC {
         useMax = uint8(maxFlag);
         poolId = uint48(bytes6(data[1:7]));
         uint8 pointer = uint8(data[7]);
-        deltaBase = Decoder.toAmount(data[8:pointer]);
-        deltaQuote = Decoder.toAmount(data[pointer:]);
+        deltaBase = Decoder.unpackAmount(data[8:pointer]);
+        deltaQuote = Decoder.unpackAmount(data[pointer:]);
     }
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
@@ -148,7 +148,7 @@ library InstructionsPoC {
         useMax = uint8(data[0] >> 4);
         poolId = uint48(bytes6(data[1:7]));
         pairId = uint16(bytes2(data[1:3]));
-        deltaLiquidity = uint128(Decoder.toAmount(data[7:]));
+        deltaLiquidity = uint128(Decoder.unpackAmount(data[7:]));
     }
 
     /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
@@ -169,8 +169,8 @@ library InstructionsPoC {
         useMax = uint8(data[0] >> 4);
         poolId = uint48(bytes6(data[1:7]));
         uint8 pointer = uint8(data[7]);
-        deltaIn = uint128(Decoder.toAmount(data[8:pointer]));
-        deltaOut = uint128(Decoder.toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
+        deltaIn = uint128(Decoder.unpackAmount(data[8:pointer]));
+        deltaOut = uint128(Decoder.unpackAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
         direction = uint8(data[data.length - 1]);
     }
 }

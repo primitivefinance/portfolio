@@ -85,7 +85,7 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
 ///                  - Rest of the array: A hexadecimal number.
 /// @param raw       Array of bytes to convert.
 /// @return amount   Converted amount.
-function toAmount(bytes calldata raw) pure returns (uint128 amount) {
+function unpackAmount(bytes calldata raw) pure returns (uint128 amount) {
     uint8 power = uint8(raw[0]);
     amount = uint128(toBytes16(raw[1:raw.length]));
     amount = amount * uint128(10**power);

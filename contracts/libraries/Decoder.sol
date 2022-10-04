@@ -29,10 +29,10 @@ library Decoder {
         poolId = uint48(bytes6(data[1:7]));
         loTick = int24(uint24(bytes3(data[7:10])));
         hiTick = int24(uint24(bytes3(data[10:13])));
-        deltaLiquidity = toAmount(data[13:]);
+        deltaLiquidity = unpackAmount(data[13:]);
         //uint8 pointer = uint8(data[13]);
-        //deltaBase = toAmount(data[14:pointer]);
-        //deltaQuote = toAmount(data[pointer:]);
+        //deltaBase = unpackAmount(data[14:pointer]);
+        //deltaQuote = unpackAmount(data[pointer:]);
     }
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
@@ -123,7 +123,7 @@ library Decoder {
         poolId = uint48(bytes6(data[1:7]));
         loTick = int24(uint24(bytes3(data[7:10])));
         hiTick = int24(uint24(bytes3(data[10:13])));
-        deltaLiquidity = uint128(toAmount(data[13:]));
+        deltaLiquidity = uint128(unpackAmount(data[13:]));
     }
 
     /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
@@ -144,8 +144,8 @@ library Decoder {
         useMax = uint8(data[0] >> 4);
         poolId = uint48(bytes6(data[1:7]));
         uint8 pointer = uint8(data[7]);
-        input = uint128(toAmount(data[8:pointer]));
-        limit = uint128(toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
+        input = uint128(unpackAmount(data[8:pointer]));
+        limit = uint128(unpackAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
         direction = uint8(data[data.length - 1]);
     }
 
@@ -178,7 +178,7 @@ library Decoder {
     {
         poolId = uint48(bytes6(data[1:7]));
         priorityOwner = address(bytes20(data[7:27]));
-        limitOwner = uint128(toAmount(data[28:]));
+        limitOwner = uint128(unpackAmount(data[28:]));
     }
 
     /// | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
@@ -193,8 +193,8 @@ library Decoder {
     {
         positionId = uint96(bytes12(data[1:13]));
         uint8 pointer = uint8(data[13]);
-        amountAssetRequested = uint128(toAmount(data[14:pointer]));
-        amountQuoteRequested = uint128(toAmount(data[pointer:data.length]));
+        amountAssetRequested = uint128(unpackAmount(data[14:pointer]));
+        amountQuoteRequested = uint128(unpackAmount(data[pointer:data.length]));
     }
 
     function decodeDraw(bytes calldata data)
@@ -208,6 +208,6 @@ library Decoder {
     {
         to = address(bytes20(data[1:21]));
         token = address(bytes20(data[21:41]));
-        amount = toAmount(data[41:data.length]);
+        amount = unpackAmount(data[41:data.length]);
     }
 }
