@@ -261,7 +261,7 @@ contract Hyper is IHyper {
         } else if (instruction == Instructions.COLLECT_FEES) {
             _collectFees(data);
         } else if (instruction == Instructions.DRAW) {
-            // _draw(data);
+            _draw(data);
         } else {
             revert UnknownInstruction();
         }
@@ -315,12 +315,13 @@ contract Hyper is IHyper {
     //  |                                   USER BALANCE                                   |
     //  +----------------------------------------------------------------------------------+
 
-    // FIXME: Remove this external function and add an instruction instead
-    function draw(
-        address token,
-        uint256 amount,
-        address to
-    ) external lock {
+    /// @notice Transfers `amount` of `token` to the `to` account.
+    /// @dev Decreases the `msg.sender` account's internal balance of `token`.
+    /// @custom:security High. Calls the `token` external contract.
+
+    function _draw(bytes calldata data) internal {
+        (address to, address token, uint256 amount) = Decoder.decodeDraw(data);
+
         // note: Would pull tokens without this conditional check.
         if (balances[msg.sender][token] < amount) revert DrawBalance();
         _adjustUserBalance(msg.sender, token, int256(amount));
