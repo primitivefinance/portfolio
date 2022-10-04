@@ -201,13 +201,13 @@ library Decoder {
         external
         pure
         returns (
+            address to,
             address token,
-            bytes memory slice,
             uint256 amount
         )
     {
-        token = address(bytes20(data[1:21]));
-        slice = data[21:data.length];
-        amount = toAmount(data[21:data.length]);
+        to = address(bytes20(data[1:21]));
+        token = address(bytes20(data[21:41]));
+        amount = toAmount(data[41:data.length]);
     }
 }
