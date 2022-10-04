@@ -144,7 +144,7 @@ library Encoder {
         address to,
         address token,
         bytes memory amount
-    ) external pure returns (bytes memory) {
+    ) internal pure returns (bytes memory) {
         return abi.encodePacked(bytes1(0x04), to, token, amount);
     }
 }
