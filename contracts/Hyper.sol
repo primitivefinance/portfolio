@@ -320,7 +320,6 @@ contract Hyper is IHyper {
     /// @notice Transfers `amount` of `token` to the `to` account.
     /// @dev Decreases the `msg.sender` account's internal balance of `token`.
     /// @custom:security High. Calls the `token` external contract.
-
     function _draw(bytes calldata data) internal {
         (address to, address token, uint256 amount) = Decoder.decodeDraw(data);
 
@@ -332,7 +331,7 @@ contract Hyper is IHyper {
         else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
     }
 
-    // FIXME: Remove this external function and add an instruction instead
+    // TODO: Add NatSpec
     function _fund(bytes calldata data) internal {
         (address token, uint256 amount) = Decoder.decodeFund(data);
         _adjustUserBalance(msg.sender, token, int256(amount));
