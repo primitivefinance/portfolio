@@ -262,6 +262,8 @@ contract Hyper is IHyper {
             _collectFees(data);
         } else if (instruction == Instructions.DRAW) {
             _draw(data);
+        } else if (instruction == Instructions.FUND) {
+            _fund(data);
         } else {
             revert UnknownInstruction();
         }
@@ -331,7 +333,8 @@ contract Hyper is IHyper {
     }
 
     // FIXME: Remove this external function and add an instruction instead
-    function fund(address token, uint256 amount) external payable override lock {
+    function _fund(bytes calldata data) internal {
+        (address token, uint256 amount) = Decoder.decodeFund(data);
         _adjustUserBalance(msg.sender, token, int256(amount));
         if (token == WETH) _safeWrap();
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
