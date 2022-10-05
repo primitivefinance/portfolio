@@ -31,19 +31,19 @@ library HyperSwapLib {
 
     // --- Class Methods --- //
 
-    function computeR1WithPrice(Expiring memory args, uint256 price) internal view returns (uint256 R1) {
+    function computeR1WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R1) {
         R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
     }
 
-    function computeR2WithPrice(Expiring memory args, uint256 price) internal view returns (uint256 R2) {
+    function computeR2WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
     }
 
-    function computePriceWithR1(Expiring memory args, uint256 R1) internal view returns (uint256 price) {
+    function computePriceWithR1(Expiring memory args, uint256 R1) internal pure returns (uint256 price) {
         price = computePriceWithR1(R1, args.strike, args.sigma, args.tau);
     }
 
-    function computePriceWithR2(Expiring memory args, uint256 R2) internal view returns (uint256 price) {
+    function computePriceWithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 price) {
         price = computePriceWithR2(R2, args.strike, args.sigma, args.tau);
     }
 
@@ -52,7 +52,7 @@ library HyperSwapLib {
         uint256 R2,
         uint256 price,
         int256 invariant
-    ) internal view returns (uint256 R1) {
+    ) internal pure returns (uint256 R1) {
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, price, invariant);
     }
 
@@ -61,7 +61,7 @@ library HyperSwapLib {
         uint256 R1,
         uint256 price,
         int256 invariant
-    ) internal view returns (uint256 R2) {
+    ) internal pure returns (uint256 R2) {
         R2 = computeR2WithR1(R1, args.strike, args.sigma, args.tau, price, invariant);
     }
 
@@ -69,12 +69,13 @@ library HyperSwapLib {
         Expiring memory args,
         uint256 prc,
         uint256 epsilon
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
     }
 
     function computeReservesWithTick(Expiring memory args, int24 tick)
         internal
+        pure
         returns (
             uint256 price,
             uint256 R1,
@@ -97,7 +98,7 @@ library HyperSwapLib {
         uint256 prc,
         uint256 tau,
         uint256 epsilon
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         if (epsilon == 0) return prc;
 
         Expiring memory params = Expiring(stk, vol, tau);
@@ -150,7 +151,7 @@ library HyperSwapLib {
         uint256 tau,
         uint256 price,
         int256 invariant
-    ) internal view returns (uint256 R1) {
+    ) internal pure returns (uint256 R1) {
         R1 = Invariant.getY(R2, strike, sigma, tau, invariant); // todo: use price for concentrated curve
     }
 
@@ -166,7 +167,7 @@ library HyperSwapLib {
         uint256 tau,
         uint256 price,
         int256 invariant
-    ) internal view returns (uint256 R2) {
+    ) internal pure returns (uint256 R2) {
         R2 = Invariant.getX(R1, strike, sigma, tau, invariant); // todo: use price for concentrated curve
     }
 
@@ -178,7 +179,7 @@ library HyperSwapLib {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) internal view returns (uint256 R1) {
+    ) internal pure returns (uint256 R1) {
         // todo: handle price when above strike.
         if (prc != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
@@ -204,7 +205,7 @@ library HyperSwapLib {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) internal view returns (uint256 R2) {
+    ) internal pure returns (uint256 R2) {
         // todo: handle price when above strike.
         if (prc != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
@@ -240,7 +241,7 @@ library HyperSwapLib {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) internal view returns (uint256 prc) {
+    ) internal pure returns (uint256 prc) {
         uint256 tauYears = convertSecondsToWadYears(tau);
         uint256 volWad = convertPercentageToWad(vol);
 

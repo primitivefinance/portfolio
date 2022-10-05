@@ -87,8 +87,8 @@ contract TestHyperSingle is StandardHelpers, Test {
         (asset, quote) = handlePrerequesites();
     }
 
-    function testHyper() public {
-        HyperPool memory p = IHyperStruct(address(__contractBeingTested)).pools(1);
+    function testHyper() public view {
+        IHyperStruct(address(__contractBeingTested)).pools(1);
     }
 
     function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1) {
@@ -1069,21 +1069,21 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailC_PrPairExistsReverts() public {
         bytes memory data = Encoder.encodeCreatePair(address(asset), address(quote));
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_PrLowerDecimalBoundsReverts() public {
         address token0 = address(new TestERC20("t", "t", 5));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Encoder.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_PrUpperDecimalBoundsReverts() public {
         address token0 = address(new TestERC20("t", "t", 24));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Encoder.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testC_PrPairNonceIncrementedReturnsOneAdded() public {
@@ -1091,27 +1091,27 @@ contract TestHyperSingle is StandardHelpers, Test {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Encoder.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
         uint256 nonce = __contractBeingTested.getPairNonce();
         assertEq(nonce, prevNonce + 1);
     }
 
     function testC_PrFetchesPairIdReturnsNonZero() public {
-        uint256 prevNonce = __contractBeingTested.getPairNonce();
+        __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Encoder.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
         uint256 pairId = __contractBeingTested.getPairId(token0, token1);
         assertTrue(pairId != 0);
     }
 
     function testC_PrFetchesPairDataReturnsAddresses() public {
-        uint256 prevNonce = __contractBeingTested.getPairNonce();
+        __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Encoder.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
         uint16 pairId = __contractBeingTested.getPairId(token0, token1);
         Pair memory pair = getPair(pairId);
         assertEq(pair.tokenBase, token0);
@@ -1131,7 +1131,7 @@ contract TestHyperSingle is StandardHelpers, Test {
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_CuFeeParameterOutsideBoundsReverts() public {
@@ -1143,7 +1143,7 @@ contract TestHyperSingle is StandardHelpers, Test {
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_CuPriorityFeeParameterOutsideBoundsReverts() public {
@@ -1155,7 +1155,7 @@ contract TestHyperSingle is StandardHelpers, Test {
             5e4,
             curve.strike
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_CuExpiringPoolZeroSigmaReverts() public {
@@ -1167,7 +1167,7 @@ contract TestHyperSingle is StandardHelpers, Test {
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_CuExpiringPoolZeroStrikeReverts() public {
@@ -1179,7 +1179,7 @@ contract TestHyperSingle is StandardHelpers, Test {
             uint16(1e4 - curve.priorityGamma),
             0
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testC_CuCurveNonceIncrementReturnsOne() public {
@@ -1192,7 +1192,7 @@ contract TestHyperSingle is StandardHelpers, Test {
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
         uint256 nextNonce = __contractBeingTested.getCurveNonce();
         assertEq(prevNonce, nextNonce - 1);
     }
@@ -1215,7 +1215,7 @@ contract TestHyperSingle is StandardHelpers, Test {
                 curve.strike
             )
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
         uint32 curveId = __contractBeingTested.getCurveId(rawCurveId);
         assertTrue(curveId != 0);
     }
@@ -1238,7 +1238,7 @@ contract TestHyperSingle is StandardHelpers, Test {
                 curve.strike
             )
         );
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
         uint32 curveId = __contractBeingTested.getCurveId(rawCurveId);
         Curve memory newCurve = getCurve(curveId);
         assertEq(newCurve.sigma, curve.sigma + 1);
@@ -1252,17 +1252,17 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailC_PoZeroPriceParameterReverts() public {
         bytes memory data = Encoder.encodeCreatePool(1, 0);
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_PoExistentPoolReverts() public {
         bytes memory data = Encoder.encodeCreatePool(__poolId, 1);
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_PoZeroPairIdReverts() public {
         bytes memory data = Encoder.encodeCreatePool(0x000001, 1);
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testFailC_PoExpiringPoolExpiredReverts() public {
@@ -1352,7 +1352,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testM_CanCollectZeroFees() public {
         bytes memory data = Encoder.encodeCollectFees(0, 0, 0, 0, 0);
-        bool success = forwarder.pass(data);
+        forwarder.pass(data);
     }
 
     function testM_IncreaseFeeGrowthGlobalAsset() public {
@@ -1379,7 +1379,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         console2.log(previousPool.feeGrowthGlobalAsset);
         console2.log(newPool.feeGrowthGlobalAsset);
-        uint256 expectedFeeGrowth = ((0x1f * 10**0x02 * 10_000) / DEFAULT_FEE);
+        // uint256 expectedFeeGrowth = ((0x1f * 10**0x02 * 10_000) / DEFAULT_FEE);
         // assertEq(expectedFeeGrowth, newPool.feeGrowthGlobalAsset);
     }
 
@@ -1398,9 +1398,9 @@ contract TestHyperSingle is StandardHelpers, Test {
         data = Encoder.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         forwarder.pass(data);
 
-        uint96 positionId = Encoder.encodePositionId(__poolId, DEFAULT_TICK - 2560, DEFAULT_TICK + 2560);
+        // uint96 positionId = Encoder.encodePositionId(__poolId, DEFAULT_TICK - 2560, DEFAULT_TICK + 2560);
 
-        HyperPool memory pool = getPool(__poolId);
+        // HyperPool memory pool = getPool(__poolId);
 
         /*
         (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = HyperTester(forwarder.hyper())

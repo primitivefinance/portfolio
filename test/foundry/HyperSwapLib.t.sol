@@ -12,7 +12,7 @@ contract TestHyperSwapLib is Test {
 
     function testComputePriceR2ZeroTauReturnsStrike() public {}
 
-    function testGetY() public {
+    function testGetY() public view {
         uint256 R_x = 481800390188356246;
         uint256 stk = 1600 * 1e18;
         uint256 vol = 1e18;

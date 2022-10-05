@@ -37,7 +37,7 @@ contract Hyper is IHyper {
     /// @dev Optimized function returning the version of this contract
     ///      while saving some bytes of storage (inspired by Seaport).
     /// @return "prototype-v1.0.0" encoded as a string
-    function VERSION() public view returns (string memory) {
+    function VERSION() public pure returns (string memory) {
         // 33,089 bytes
         assembly {
             // Load 0x20 (32) in memory at slot 0x00, this corresponds to the
@@ -957,11 +957,14 @@ contract Hyper is IHyper {
         uint256 endPrice,
         uint256 startTime,
         uint256 fillTime
-    ) internal returns (uint128 auctionPayment) {
+    ) internal pure returns (uint128 auctionPayment) {
         return 0;
     }
 
-    function _calculateAuctionFee(uint128 auctionPayment, uint256 fee) internal returns (uint128 auctionFee) {
+    function _calculateAuctionFee(uint128 auctionPayment, uint256 fee) internal pure returns (uint128 auctionFee) {
+        // TODO: Remove these variables (only there to silent the unused variable warning)
+        uint128 auctionPayment;
+        uint256 fee;
         return 0;
     }
 
@@ -1112,7 +1115,7 @@ contract Hyper is IHyper {
         int24 hiTick,
         int256 deltaLiquidity
     ) internal {
-        (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId, loTick, hiTick);
+        (uint256 distance, ) = checkJitLiquidity(msg.sender, poolId, loTick, hiTick);
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
         _adjustPosition(poolId, loTick, hiTick, deltaLiquidity);
@@ -1186,6 +1189,7 @@ contract Hyper is IHyper {
         uint256 feeGrowthInsideAsset,
         uint256 feeGrowthInsideQuote
     ) internal {
+        uint48 poolId; // TODO: Remove this variable (only there to silent the unused variable warning)
         uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
             feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
             pos.totalLiquidity
