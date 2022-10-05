@@ -444,8 +444,9 @@ contract Hyper is IHyper {
         deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
 
         // Decrease amount of liquidity in each slot.
-        _decreaseSlotLiquidity(poolId_, loTick, deltaLiquidity, false);
-        _decreaseSlotLiquidity(poolId_, hiTick, deltaLiquidity, true);
+
+        _adjustSlotLiquidity(poolId_, hiTick, -int256(uint256(deltaLiquidity)), true);
+        _adjustSlotLiquidity(poolId_, loTick, -int256(uint256(deltaLiquidity)), false);
 
         // Update the pool state if liquidity is within the current pool's slot.
         if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
@@ -456,7 +457,6 @@ contract Hyper is IHyper {
 
         // Todo: update bitmap of instantiated/uninstantiated slots.
 
-        // _decreasePosition(poolId_, loTick, hiTick, deltaLiquidity);
         _adjustPosition(poolId_, loTick, hiTick, -int256(uint256(deltaLiquidity)));
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
@@ -1346,8 +1346,8 @@ contract Hyper is IHyper {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
 
         // Update the slots.
-        _increaseSlotLiquidity(poolId, loTick, deltaLiquidity, false);
-        _increaseSlotLiquidity(poolId, hiTick, deltaLiquidity, true);
+        _adjustSlotLiquidity(poolId, loTick, int256(uint256(deltaLiquidity)), false);
+        _adjustSlotLiquidity(poolId, hiTick, int256(uint256(deltaLiquidity)), true);
 
         // Update the pool state if liquidity is within the current pool's slot.
         HyperPool storage pool = pools[poolId];
@@ -1369,7 +1369,7 @@ contract Hyper is IHyper {
         emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
     }
 
-    function _syncSlotLiquidity(
+    function _adjustSlotLiquidity(
         uint48 poolId,
         int24 tick,
         int256 deltaLiquidity,
@@ -1380,9 +1380,9 @@ contract Hyper is IHyper {
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = deltaLiquidity > 0
             ? slot.totalLiquidity + uint256(deltaLiquidity)
-            : slot.totalLiquidity + uint256(~deltaLiquidity + 1);
+            : slot.totalLiquidity - uint256(~deltaLiquidity + 1);
 
-        alterState = (prevLiquidity == 0 && nextLiquidity != 0); // If the liquidity started at zero but was altered.
+        alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0); // If there was liquidity previously and all of it was removed.
 
         slot.totalLiquidity = nextLiquidity;
         if (alterState) slot.instantiated = !slot.instantiated;
