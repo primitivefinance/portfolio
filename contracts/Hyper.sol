@@ -724,8 +724,8 @@ contract Hyper is IHyper {
         pos.pendingStakedEpoch = epochs[poolId].id;
 
         // update slots
-        _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
-        _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+        _syncSlotPendingStake(poolId, pos.loTick, int256(pos.totalLiquidity), false);
+        _syncSlotPendingStake(poolId, pos.hiTick, int256(pos.totalLiquidity), true);
 
         // update pool
         HyperPool storage pool = pools[poolId_];
@@ -759,8 +759,8 @@ contract Hyper is IHyper {
         pos.pendingStakedLiquidityDelta = -int256(pos.totalLiquidity);
         pos.unstakedEpoch = epochs[poolId].id;
 
-        _decreaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
-        _decreaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+        _syncSlotPendingStake(poolId, pos.loTick, -int256(pos.totalLiquidity), false);
+        _syncSlotPendingStake(poolId, pos.hiTick, -int256(pos.totalLiquidity), true);
 
         HyperPool storage pool = pools[poolId_];
         if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
@@ -1088,8 +1088,8 @@ contract Hyper is IHyper {
                 }
 
                 // update slots
-                _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
-                _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+                _syncSlotPendingStake(poolId, pos.loTick, int256(pos.totalLiquidity), false);
+                _syncSlotPendingStake(poolId, pos.hiTick, int256(pos.totalLiquidity), true);
 
                 // emit IncreasePendingStake
             }
@@ -1180,48 +1180,6 @@ contract Hyper is IHyper {
         pos.blockTimestamp = _blockTimestamp();
     }
 
-    function _getPriorityGrowthInsideEpochs(
-        uint48 poolId,
-        int24 hi,
-        int24 lo,
-        int24 current,
-        uint256 startEpoch,
-        uint256 endEpoch
-    ) internal view returns (uint256 priorityGrowthInsideEpochs) {
-        uint256 priorityGrowthInsideStart = _getPriorityGrowthInside(poolId, hi, lo, current, startEpoch);
-        uint256 priorityGrowthInsideEnd = _getPriorityGrowthInside(poolId, hi, lo, current, endEpoch);
-        priorityGrowthInsideEpochs = priorityGrowthInsideEnd - priorityGrowthInsideStart;
-    }
-
-    function _getPriorityGrowthInside(
-        uint48 poolId,
-        int24 hi,
-        int24 lo,
-        int24 current,
-        uint256 epoch
-    ) internal view returns (uint256 priorityGrowthInside) {
-        uint256 priorityGrowthGlobal = priorityGrowthPoolSnapshot[poolId][epoch];
-
-        uint256 hiPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][hi][epoch];
-        uint256 loPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][lo][epoch];
-
-        uint256 priorityGrowthBelow;
-        if (current >= lo) {
-            priorityGrowthBelow = loPriorityGrowthOutside;
-        } else {
-            priorityGrowthBelow = priorityGrowthGlobal - loPriorityGrowthOutside;
-        }
-
-        uint256 priorityGrowthAbove;
-        if (current < hi) {
-            priorityGrowthAbove = hiPriorityGrowthOutside;
-        } else {
-            priorityGrowthAbove = priorityGrowthGlobal - hiPriorityGrowthOutside;
-        }
-
-        priorityGrowthInside = priorityGrowthGlobal - priorityGrowthBelow - priorityGrowthAbove;
-    }
-
     function _updatePositionFees(
         HyperPosition storage pos,
         uint48 poolId,
@@ -1243,42 +1201,6 @@ contract Hyper is IHyper {
 
         pos.tokensOwedAsset += tokensOwedAsset;
         pos.tokensOwedQuote += tokensOwedQuote;
-    }
-
-    function _getFeeGrowthInside(
-        uint48 poolId,
-        int24 hi,
-        int24 lo,
-        int24 current,
-        uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote
-    ) internal view returns (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) {
-        HyperSlot storage hiTick = slots[poolId][hi];
-        HyperSlot storage loTick = slots[poolId][lo];
-
-        uint256 feeGrowthBelowAsset;
-        uint256 feeGrowthBelowQuote;
-
-        if (current >= lo) {
-            feeGrowthBelowAsset = loTick.feeGrowthOutsideAsset;
-            feeGrowthBelowQuote = loTick.feeGrowthOutsideQuote;
-        } else {
-            feeGrowthBelowAsset = feeGrowthGlobalAsset - loTick.feeGrowthOutsideAsset;
-            feeGrowthBelowQuote = feeGrowthGlobalQuote - loTick.feeGrowthOutsideQuote;
-        }
-
-        uint256 feeGrowthAboveAsset;
-        uint256 feeGrowthAboveQuote;
-        if (current < hi) {
-            feeGrowthAboveAsset = hiTick.feeGrowthOutsideAsset;
-            feeGrowthAboveQuote = hiTick.feeGrowthOutsideQuote;
-        } else {
-            feeGrowthAboveAsset = feeGrowthGlobalAsset - hiTick.feeGrowthOutsideAsset;
-            feeGrowthAboveQuote = feeGrowthGlobalQuote - hiTick.feeGrowthOutsideQuote;
-        }
-
-        feeGrowthInsideAsset = feeGrowthGlobalAsset - feeGrowthBelowAsset - feeGrowthAboveAsset;
-        feeGrowthInsideQuote = feeGrowthGlobalQuote - feeGrowthBelowQuote - feeGrowthAboveQuote;
     }
 
     /**
@@ -1512,6 +1434,21 @@ contract Hyper is IHyper {
         priorityGrowthSlotSnapshot[poolId][tick][epoch.id] = slot.priorityGrowthOutside;
     }
 
+    function _syncSlotPendingStake(
+        uint48 poolId,
+        int24 tick,
+        int256 pendingStakedLiquidity,
+        bool hi
+    ) internal {
+        HyperSlot storage slot = slots[poolId][tick];
+
+        if (hi) {
+            slot.pendingStakedLiquidityDelta -= pendingStakedLiquidity;
+        } else {
+            slot.pendingStakedLiquidityDelta += pendingStakedLiquidity;
+        }
+    }
+
     function _increaseSlotPendingStake(
         uint48 poolId,
         int24 tick,
@@ -1540,6 +1477,90 @@ contract Hyper is IHyper {
         } else {
             slot.pendingStakedLiquidityDelta -= int256(pendingStakedLiquidity);
         }
+    }
+
+    //  +----------------------------------------------------------------------------------------------------------------------+
+    //  |                                                                                                                      |
+    //  |                                             STATE READING FUNCTIONS                                                  |
+    //  |                                                                                                                      |
+    //  +----------------------------------------------------------------------------------------------------------------------+
+
+    function _getPriorityGrowthInsideEpochs(
+        uint48 poolId,
+        int24 hi,
+        int24 lo,
+        int24 current,
+        uint256 startEpoch,
+        uint256 endEpoch
+    ) internal view returns (uint256 priorityGrowthInsideEpochs) {
+        uint256 priorityGrowthInsideStart = _getPriorityGrowthInside(poolId, hi, lo, current, startEpoch);
+        uint256 priorityGrowthInsideEnd = _getPriorityGrowthInside(poolId, hi, lo, current, endEpoch);
+        priorityGrowthInsideEpochs = priorityGrowthInsideEnd - priorityGrowthInsideStart;
+    }
+
+    function _getPriorityGrowthInside(
+        uint48 poolId,
+        int24 hi,
+        int24 lo,
+        int24 current,
+        uint256 epoch
+    ) internal view returns (uint256 priorityGrowthInside) {
+        uint256 priorityGrowthGlobal = priorityGrowthPoolSnapshot[poolId][epoch];
+
+        uint256 hiPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][hi][epoch];
+        uint256 loPriorityGrowthOutside = priorityGrowthSlotSnapshot[poolId][lo][epoch];
+
+        uint256 priorityGrowthBelow;
+        if (current >= lo) {
+            priorityGrowthBelow = loPriorityGrowthOutside;
+        } else {
+            priorityGrowthBelow = priorityGrowthGlobal - loPriorityGrowthOutside;
+        }
+
+        uint256 priorityGrowthAbove;
+        if (current < hi) {
+            priorityGrowthAbove = hiPriorityGrowthOutside;
+        } else {
+            priorityGrowthAbove = priorityGrowthGlobal - hiPriorityGrowthOutside;
+        }
+
+        priorityGrowthInside = priorityGrowthGlobal - priorityGrowthBelow - priorityGrowthAbove;
+    }
+
+    function _getFeeGrowthInside(
+        uint48 poolId,
+        int24 hi,
+        int24 lo,
+        int24 current,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote
+    ) internal view returns (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) {
+        HyperSlot storage hiTick = slots[poolId][hi];
+        HyperSlot storage loTick = slots[poolId][lo];
+
+        uint256 feeGrowthBelowAsset;
+        uint256 feeGrowthBelowQuote;
+
+        if (current >= lo) {
+            feeGrowthBelowAsset = loTick.feeGrowthOutsideAsset;
+            feeGrowthBelowQuote = loTick.feeGrowthOutsideQuote;
+        } else {
+            feeGrowthBelowAsset = feeGrowthGlobalAsset - loTick.feeGrowthOutsideAsset;
+            feeGrowthBelowQuote = feeGrowthGlobalQuote - loTick.feeGrowthOutsideQuote;
+        }
+
+        uint256 feeGrowthAboveAsset;
+        uint256 feeGrowthAboveQuote;
+        if (current < hi) {
+            feeGrowthAboveAsset = hiTick.feeGrowthOutsideAsset;
+            feeGrowthAboveQuote = hiTick.feeGrowthOutsideQuote;
+        } else {
+            feeGrowthAboveAsset = feeGrowthGlobalAsset - hiTick.feeGrowthOutsideAsset;
+            feeGrowthAboveQuote = feeGrowthGlobalQuote - hiTick.feeGrowthOutsideQuote;
+        }
+
+        feeGrowthInsideAsset = feeGrowthGlobalAsset - feeGrowthBelowAsset - feeGrowthAboveAsset;
+        feeGrowthInsideQuote = feeGrowthGlobalQuote - feeGrowthBelowQuote - feeGrowthAboveQuote;
     }
 
     //  +----------------------------------------------------------------------------------------------------------------------+
