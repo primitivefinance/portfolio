@@ -1449,36 +1449,6 @@ contract Hyper is IHyper {
         }
     }
 
-    function _increaseSlotPendingStake(
-        uint48 poolId,
-        int24 tick,
-        uint256 pendingStakedLiquidity,
-        bool hi
-    ) internal {
-        HyperSlot storage slot = slots[poolId][tick];
-
-        if (hi) {
-            slot.pendingStakedLiquidityDelta -= int256(pendingStakedLiquidity);
-        } else {
-            slot.pendingStakedLiquidityDelta += int256(pendingStakedLiquidity);
-        }
-    }
-
-    function _decreaseSlotPendingStake(
-        uint48 poolId,
-        int24 tick,
-        uint256 pendingStakedLiquidity,
-        bool hi
-    ) internal {
-        HyperSlot storage slot = slots[poolId][tick];
-
-        if (hi) {
-            slot.pendingStakedLiquidityDelta += int256(pendingStakedLiquidity);
-        } else {
-            slot.pendingStakedLiquidityDelta -= int256(pendingStakedLiquidity);
-        }
-    }
-
     //  +----------------------------------------------------------------------------------------------------------------------+
     //  |                                                                                                                      |
     //  |                                             STATE READING FUNCTIONS                                                  |
