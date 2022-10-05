@@ -456,7 +456,8 @@ contract Hyper is IHyper {
 
         // Todo: update bitmap of instantiated/uninstantiated slots.
 
-        _decreasePosition(poolId_, loTick, hiTick, deltaLiquidity);
+        // _decreasePosition(poolId_, loTick, hiTick, deltaLiquidity);
+        _adjustPosition(poolId_, loTick, hiTick, -int256(uint256(deltaLiquidity)));
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         Pair memory pair = pairs[pairId];
@@ -1021,8 +1022,6 @@ contract Hyper is IHyper {
 
     function _adjustPoolPriorityConfig() internal {}
 
-    function _adjustPosition() internal {}
-
     function _adjustStakedPosition() internal {}
 
     function _adjustPositionEarnings() internal {}
@@ -1034,26 +1033,16 @@ contract Hyper is IHyper {
     function _syncEarnings() internal {}
 
     // --- Positions --- //
-
-    /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
-    /// @custom:security High. Only method of increasing the liquidity held by accounts.
-    function _increasePosition(
+    function _adjustPosition(
         uint48 poolId,
         int24 loTick,
         int24 hiTick,
-        uint256 deltaLiquidity
+        int256 deltaLiquidity
     ) internal {
         uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
-
         HyperPosition storage pos = positions[msg.sender][positionId];
 
-        _syncPosition(pos, poolId);
-
-        // initialize the position's ticks if not previously set
-        if (pos.loTick == 0 && pos.hiTick == 0) {
-            pos.loTick = loTick;
-            pos.hiTick = hiTick;
-        }
+        _syncPosition(pos, poolId); // TODO: Change this name to something more obvious
 
         (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
             poolId,
@@ -1064,7 +1053,8 @@ contract Hyper is IHyper {
             pools[poolId].feeGrowthGlobalQuote
         );
 
-        if (pos.totalLiquidity == 0) {
+        // TODO: Not sure if this triple check is required but we have to be sure that the position wasn't initialized before
+        if (pos.loTick == 0 && pos.hiTick == 0 && pos.totalLiquidity == 0) {
             // initialize fee growth inside
             pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
             pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
@@ -1072,57 +1062,45 @@ contract Hyper is IHyper {
             _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
         }
 
-        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) {
-            // position is already staked, add to pending stake amount
-            pos.pendingStakedLiquidityDelta += int256(deltaLiquidity);
-            pos.pendingStakedEpoch = epochs[poolId].id;
-
-            HyperPool storage pool = pools[poolId];
-            if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
-                pool.pendingStakedLiquidityDelta += int256(deltaLiquidity);
+        // Add liquidity
+        if (deltaLiquidity > 0) {
+            if (pos.loTick == 0 && pos.hiTick == 0) {
+                pos.loTick = loTick;
+                pos.hiTick = hiTick;
             }
 
-            // update slots
-            _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
-            _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+            if (pos.totalLiquidity == 0) {
+                // initialize fee growth inside
+                pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
+                pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
+            } else {
+                _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
+            }
 
-            // emit IncreasePendingStake
+            if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) {
+                // position is already staked, add to pending stake amount
+                pos.pendingStakedLiquidityDelta += int256(deltaLiquidity);
+                pos.pendingStakedEpoch = epochs[poolId].id;
+
+                HyperPool storage pool = pools[poolId];
+                if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
+                    pool.pendingStakedLiquidityDelta += int256(deltaLiquidity);
+                }
+
+                // update slots
+                _increaseSlotPendingStake(poolId, pos.loTick, pos.totalLiquidity, false);
+                _increaseSlotPendingStake(poolId, pos.hiTick, pos.totalLiquidity, true);
+
+                // emit IncreasePendingStake
+            }
+
+            pos.totalLiquidity += uint128(int128(deltaLiquidity));
+        } else {
+            // Remove liquidity
+            if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0)
+                revert PositionStakedError(positionId);
+            pos.totalLiquidity -= uint128(int128(~deltaLiquidity + 1));
         }
-
-        pos.totalLiquidity += deltaLiquidity.toUint128();
-        emit IncreasePosition(msg.sender, positionId, deltaLiquidity);
-    }
-
-    /// @dev Equally important as `_increasePosition`.
-    /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
-    function _decreasePosition(
-        uint48 poolId,
-        int24 loTick,
-        int24 hiTick,
-        uint256 deltaLiquidity
-    ) internal {
-        uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
-
-        HyperPosition storage pos = positions[msg.sender][positionId];
-
-        _syncPosition(pos, poolId);
-
-        if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) revert PositionStakedError(positionId);
-
-        (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
-            poolId,
-            hiTick,
-            loTick,
-            pools[poolId].lastTick,
-            pools[poolId].feeGrowthGlobalAsset,
-            pools[poolId].feeGrowthGlobalQuote
-        );
-
-        _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
-
-        pos.totalLiquidity -= deltaLiquidity.toUint128();
-
-        emit DecreasePosition(msg.sender, positionId, deltaLiquidity);
     }
 
     // TODO: Is this still needed?
@@ -1132,12 +1110,12 @@ contract Hyper is IHyper {
         uint48 poolId,
         int24 loTick,
         int24 hiTick,
-        uint256 deltaLiquidity
+        int256 deltaLiquidity
     ) internal {
         (uint256 distance, uint256 timestamp) = checkJitLiquidity(msg.sender, poolId, loTick, hiTick);
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
-        _decreasePosition(poolId, loTick, hiTick, deltaLiquidity);
+        _adjustPosition(poolId, loTick, hiTick, deltaLiquidity);
     }
 
     function _syncPosition(HyperPosition storage pos, uint48 poolId) internal {
@@ -1457,7 +1435,8 @@ contract Hyper is IHyper {
 
         // Todo: update bitmap of instantiated slots.
 
-        _increasePosition(poolId, loTick, hiTick, deltaLiquidity);
+        // _increasePosition(poolId, loTick, hiTick, deltaLiquidity);
+        _adjustPosition(poolId, loTick, hiTick, int256(deltaLiquidity));
 
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         uint16 pairId = uint16(poolId >> 32);
