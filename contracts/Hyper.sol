@@ -1396,30 +1396,6 @@ contract Hyper is IHyper {
         else slot.liquidityDelta += deltaLiquidity;
     }
 
-    /**
-     * @notice Updates the liquidity of a slot, and returns a bool to reflect whether its instantiation state was changed.
-     */
-    function _decreaseSlotLiquidity(
-        uint48 poolId,
-        int24 tick,
-        uint256 deltaLiquidity,
-        bool hi
-    ) internal returns (bool alterState) {
-        HyperSlot storage slot = slots[poolId][tick];
-
-        uint256 prevLiquidity = slot.totalLiquidity;
-        uint256 nextLiquidity = slot.totalLiquidity - deltaLiquidity;
-
-        alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0); // If there was liquidity previously and all of it was removed.
-
-        slot.totalLiquidity = nextLiquidity;
-        if (alterState) slot.instantiated = !slot.instantiated;
-
-        // Update liquidity deltas depending on the changed amount.
-        if (hi) slot.liquidityDelta += int256(deltaLiquidity);
-        else slot.liquidityDelta -= int256(deltaLiquidity);
-    }
-
     function _syncSlot(uint48 poolId, int24 tick) internal {
         HyperSlot storage slot = slots[poolId][tick];
 
