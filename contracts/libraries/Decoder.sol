@@ -10,6 +10,8 @@ library Decoder {
     // --- Errors --- //
     error DecodePairBytesLength(uint256 expected, uint256 length);
 
+    // TODO: decodeAddLiquidity and decodeRemoveLiquidity should be merged together
+
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
     /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
@@ -33,6 +35,29 @@ library Decoder {
         //uint8 pointer = uint8(data[13]);
         //deltaBase = unpackAmount(data[14:pointer]);
         //deltaQuote = unpackAmount(data[pointer:]);
+    }
+
+    /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
+    /// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
+    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
+    function decodeRemoveLiquidity(bytes calldata data)
+        internal
+        pure
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint16 pairId,
+            int24 loTick,
+            int24 hiTick,
+            uint128 deltaLiquidity
+        )
+    {
+        useMax = uint8(data[0] >> 4);
+        pairId = uint16(bytes2(data[1:3]));
+        poolId = uint48(bytes6(data[1:7]));
+        loTick = int24(uint24(bytes3(data[7:10])));
+        hiTick = int24(uint24(bytes3(data[10:13])));
+        deltaLiquidity = uint128(unpackAmount(data[13:]));
     }
 
     /// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
@@ -103,29 +128,6 @@ library Decoder {
         curveId = uint32(bytes4(data[2:]));
     }
 
-    /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
-    /// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
-    /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
-    function decodeRemoveLiquidity(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint8 useMax,
-            uint48 poolId,
-            uint16 pairId,
-            int24 loTick,
-            int24 hiTick,
-            uint128 deltaLiquidity
-        )
-    {
-        useMax = uint8(data[0] >> 4);
-        pairId = uint16(bytes2(data[1:3]));
-        poolId = uint48(bytes6(data[1:7]));
-        loTick = int24(uint24(bytes3(data[7:10])));
-        hiTick = int24(uint24(bytes3(data[10:13])));
-        deltaLiquidity = uint128(unpackAmount(data[13:]));
-    }
-
     /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
     /// @dev Expects standard instructions with the end byte specifying swap direction.
     /// @param data Maximum 1 + 6 + 16 + 1 = 24 bytes.
@@ -148,6 +150,8 @@ library Decoder {
         limit = uint128(unpackAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
         direction = uint8(data[data.length - 1]);
     }
+
+    // TODO: decodeStakePosition and decodeUnstakePosition should be merged together
 
     /// @dev Expects an enigma code and positionId.
     /// @param data Maximum 1 + 12 = 13 bytes.
@@ -196,6 +200,8 @@ library Decoder {
         amountAssetRequested = uint128(unpackAmount(data[14:pointer]));
         amountQuoteRequested = uint128(unpackAmount(data[pointer:data.length]));
     }
+
+    // TODO: Should we merge decodeDraw and decodeFund together?
 
     function decodeDraw(bytes calldata data)
         external
