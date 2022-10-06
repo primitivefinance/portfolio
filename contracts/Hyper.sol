@@ -231,6 +231,9 @@ contract Hyper is IHyper {
         _settleBalances();
     }
 
+    // FIXME: This sucks and should be fixed.
+    bool private _inputFlag;
+
     /// @notice Single instruction processor that will forward instruction to appropriate function.
     /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
     /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
@@ -241,16 +244,18 @@ contract Hyper is IHyper {
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
         if (instruction == Instructions.ADD_LIQUIDITY) {
-            _addLiquidityFlag = true;
+            _inputFlag = true;
             (poolId) = _addOrRemoveLiquidity(data);
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            _addLiquidityFlag = false;
+            _inputFlag = false;
             (poolId) = _addOrRemoveLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
             (poolId, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.STAKE_POSITION) {
+            _inputFlag = true;
             (poolId, ) = _stakePosition(data);
         } else if (instruction == Instructions.UNSTAKE_POSITION) {
+            _inputFlag = false;
             (poolId, ) = _unstakePosition(data);
         } else if (instruction == Instructions.FILL_PRIORITY_AUCTION) {
             (poolId) = _fillPriorityAuction(data);
@@ -345,9 +350,6 @@ contract Hyper is IHyper {
     //  |                                     LIQUIDITY                                    |
     //  +----------------------------------------------------------------------------------+
 
-    // FIXME: This sucks and should be fixed.
-    bool private _addLiquidityFlag;
-
     function _addOrRemoveLiquidity(bytes calldata data) internal returns (uint48 poolId) {
         // TODO: Replace decodeAddLiquidity by a generic function
         (, uint48 poolId, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Decoder
@@ -402,19 +404,19 @@ contract Hyper is IHyper {
             _adjustSlotLiquidity(
                 poolId,
                 hiTick,
-                _addLiquidityFlag ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity)),
+                _inputFlag ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity)),
                 true
             );
             _adjustSlotLiquidity(
                 poolId,
                 loTick,
-                _addLiquidityFlag ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity)),
+                _inputFlag ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity)),
                 false
             );
 
             // Update the pool state if liquidity is within the current pool's slot.
             if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
-                pool.liquidity = _addLiquidityFlag ? pool.liquidity + deltaLiquidity : pool.liquidity - deltaLiquidity;
+                pool.liquidity = _inputFlag ? pool.liquidity + deltaLiquidity : pool.liquidity - deltaLiquidity;
             }
 
             // Todo: update bitmap of instantiated slots.
@@ -423,15 +425,15 @@ contract Hyper is IHyper {
                 poolId,
                 loTick,
                 hiTick,
-                _addLiquidityFlag ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity))
+                _inputFlag ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity))
             );
 
             // note: Global reserves are used at the end of instruction processing to settle transactions.
             Pair memory pair = pairs[pairId];
-            _adjustGlobalBalance(pair.tokenBase, _addLiquidityFlag ? int256(deltaR2) : -int256(deltaR2));
-            _adjustGlobalBalance(pair.tokenQuote, _addLiquidityFlag ? int256(deltaR1) : -int256(deltaR1));
+            _adjustGlobalBalance(pair.tokenBase, _inputFlag ? int256(deltaR2) : -int256(deltaR2));
+            _adjustGlobalBalance(pair.tokenQuote, _inputFlag ? int256(deltaR1) : -int256(deltaR1));
 
-            if (_addLiquidityFlag)
+            if (_inputFlag)
                 emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
             else emit RemoveLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
         }
@@ -669,6 +671,65 @@ contract Hyper is IHyper {
     //  |                                      STAKING                                     |
     //  +----------------------------------------------------------------------------------+
 
+    // FIXME: One test fails using this function
+    function _stakeOrUnstakePosition(bytes calldata data) internal returns (uint48 poolId) {
+        (uint48 poolId, uint96 positionId) = Decoder.decodeStakePosition(data);
+
+        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
+
+        _adjustPool(poolId);
+
+        HyperPosition storage pos = positions[msg.sender][positionId];
+        // update pool
+        HyperPool storage pool = pools[poolId];
+
+        // update slots
+        _adjustSlot(poolId, pos.loTick);
+        _adjustSlot(poolId, pos.hiTick);
+
+        // update staked position
+        _adjustStakedPosition(pos, poolId);
+
+        // FIXME: These lines are terrible
+        if (_inputFlag) {
+            if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0)
+                revert PositionStakedError(positionId);
+            if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
+        } else {
+            if (pos.pendingStakedLiquidityDelta == 0 && pos.stakedLiquidity == 0)
+                revert PositionNotStakedError(positionId);
+        }
+
+        // update position
+        pos.pendingStakedLiquidityDelta = _inputFlag ? int256(pos.totalLiquidity) : -int256(pos.totalLiquidity);
+        pos.pendingStakedEpoch = epochs[poolId].id;
+
+        // update slots
+        _syncSlotPendingStake(
+            poolId,
+            pos.loTick,
+            _inputFlag ? int256(pos.totalLiquidity) : -int256(pos.totalLiquidity),
+            false
+        );
+        _syncSlotPendingStake(
+            poolId,
+            pos.hiTick,
+            _inputFlag ? int256(pos.totalLiquidity) : -int256(pos.totalLiquidity),
+            true
+        );
+
+        if (pos.loTick <= pool.lastTick && pos.hiTick > pool.lastTick) {
+            // if position's liquidity is in range, add to next epoch's delta
+            pool.pendingStakedLiquidityDelta = _inputFlag
+                ? pool.pendingStakedLiquidityDelta + int256(pos.totalLiquidity)
+                : pool.pendingStakedLiquidityDelta - int256(pos.totalLiquidity);
+        }
+
+        // emit Stake Position
+        // or
+        // emit Unstake Position
+    }
+
     function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
         (uint48 poolId_, uint96 positionId) = Decoder.decodeStakePosition(data);
         poolId = poolId_;
@@ -684,7 +745,7 @@ contract Hyper is IHyper {
         _adjustSlot(poolId, pos.hiTick);
 
         // update staked position
-        _syncPosition(pos, poolId);
+        _adjustStakedPosition(pos, poolId);
 
         if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) revert PositionStakedError(positionId);
         if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
@@ -722,7 +783,7 @@ contract Hyper is IHyper {
         _adjustSlot(poolId, pos.hiTick);
 
         // update staked position
-        _syncPosition(pos, poolId);
+        _adjustStakedPosition(pos, poolId);
 
         if (pos.pendingStakedLiquidityDelta == 0 && pos.stakedLiquidity == 0) revert PositionNotStakedError(positionId);
 
@@ -1103,7 +1164,7 @@ contract Hyper is IHyper {
         uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
         HyperPosition storage pos = positions[msg.sender][positionId];
 
-        _syncPosition(pos, poolId); // TODO: Change this name to something more obvious
+        _adjustStakedPosition(pos, poolId); // TODO: Change this name to something more obvious
 
         (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
             poolId,
@@ -1179,7 +1240,7 @@ contract Hyper is IHyper {
         _adjustPosition(poolId, loTick, hiTick, deltaLiquidity);
     }
 
-    function _syncPosition(HyperPosition storage pos, uint48 poolId) internal {
+    function _adjustStakedPosition(HyperPosition storage pos, uint48 poolId) internal {
         if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) {
             Epoch memory epoch = epochs[poolId];
 
