@@ -423,21 +423,21 @@ contract Hyper is IHyper {
             uint256 b
         )
     {
-        (uint8 useMax, uint48 poolId_, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Decoder
+        (uint8 useMax, uint48 poolId, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Decoder
             .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
         // update pool, relevant slots with time
-        _adjustPool(poolId_);
+        _adjustPool(poolId);
 
         _adjustSlot(poolId, loTick);
         _adjustSlot(poolId, hiTick);
 
         // Compute amounts of tokens for the real reserves.
-        Curve memory curve = curves[uint32(poolId_)];
-        HyperPool storage pool = pools[poolId_];
+        Curve memory curve = curves[uint32(poolId)];
+        HyperPool storage pool = pools[poolId];
         uint256 timestamp = _blockTimestamp();
         uint256 price = HyperSwapLib.computePriceWithTick(loTick);
         uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
@@ -464,8 +464,8 @@ contract Hyper is IHyper {
 
         // Decrease amount of liquidity in each slot.
 
-        _adjustSlotLiquidity(poolId_, hiTick, -int256(uint256(deltaLiquidity)), true);
-        _adjustSlotLiquidity(poolId_, loTick, -int256(uint256(deltaLiquidity)), false);
+        _adjustSlotLiquidity(poolId, hiTick, -int256(uint256(deltaLiquidity)), true);
+        _adjustSlotLiquidity(poolId, loTick, -int256(uint256(deltaLiquidity)), false);
 
         // Update the pool state if liquidity is within the current pool's slot.
         if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
@@ -476,14 +476,14 @@ contract Hyper is IHyper {
 
         // Todo: update bitmap of instantiated/uninstantiated slots.
 
-        _adjustPosition(poolId_, loTick, hiTick, -int256(uint256(deltaLiquidity)));
+        _adjustPosition(poolId, loTick, hiTick, -int256(uint256(deltaLiquidity)));
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         Pair memory pair = pairs[pairId];
         _adjustGlobalBalance(pair.tokenBase, -int256(deltaR2));
         _adjustGlobalBalance(pair.tokenQuote, -int256(deltaR1));
 
-        emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
+        emit RemoveLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
     function _collectFees(bytes calldata data) internal {
