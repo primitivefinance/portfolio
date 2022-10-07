@@ -353,7 +353,7 @@ contract Hyper is IHyper {
     function _addOrRemoveLiquidity(bytes calldata data) internal returns (uint48 poolId) {
         // TODO: Replace decodeAddLiquidity by a generic function
         (, uint48 poolId, uint16 pairId, int24 loTick, int24 hiTick, uint128 deltaLiquidity) = Decoder
-            .decodeRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
+            .decodeAddOrRemoveLiquidity(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
