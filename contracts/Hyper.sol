@@ -672,7 +672,7 @@ contract Hyper is IHyper {
     //  +----------------------------------------------------------------------------------+
 
     function _stakeOrUnstakePosition(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId, uint96 positionId) = Decoder.decodeStakePosition(data);
+        (uint48 poolId, uint96 positionId) = Decoder.decodeStakingPosition(data);
 
         if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 

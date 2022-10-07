@@ -155,15 +155,7 @@ library Decoder {
     /// @dev Expects an enigma code and positionId.
     /// @param data Maximum 1 + 12 = 13 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-    function decodeStakePosition(bytes calldata data) internal pure returns (uint48 poolId, uint96 positionId) {
-        poolId = uint48(bytes6(data[1:7]));
-        positionId = uint96(bytes12(data[1:13]));
-    }
-
-    /// @dev Expects an enigma code and positionId.
-    /// @param data Maximum 1 + 12 = 13 bytes.
-    /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-    function decodeUnstakePosition(bytes calldata data) internal pure returns (uint48 poolId, uint96 positionId) {
+    function decodeStakingPosition(bytes calldata data) internal pure returns (uint48 poolId, uint96 positionId) {
         poolId = uint48(bytes6(data[1:7]));
         positionId = uint96(bytes12(data[1:13]));
     }
