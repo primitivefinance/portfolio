@@ -1010,10 +1010,6 @@ contract Hyper is IHyper {
 
     function _adjustPoolPriorityConfig() internal {}
 
-    function _adjustPositionEarnings() internal {}
-
-    function _adjustSlot() internal {}
-
     function _adjustSlotEarnings() internal {}
 
     function _syncEarnings() internal {}
