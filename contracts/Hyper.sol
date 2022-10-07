@@ -1178,7 +1178,7 @@ contract Hyper is IHyper {
             pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
             pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
         } else {
-            _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
+            _adjustPositionEarnings(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
         }
 
         // Add liquidity
@@ -1193,7 +1193,7 @@ contract Hyper is IHyper {
                 pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
                 pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
             } else {
-                _updatePositionFees(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
+                _adjustPositionEarnings(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
             }
 
             if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) {
@@ -1299,7 +1299,7 @@ contract Hyper is IHyper {
         pos.blockTimestamp = _blockTimestamp();
     }
 
-    function _updatePositionFees(
+    function _adjustPositionEarnings(
         HyperPosition storage pos,
         uint48 poolId,
         uint256 feeGrowthInsideAsset,
