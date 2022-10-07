@@ -1010,8 +1010,6 @@ contract Hyper is IHyper {
 
     function _adjustPoolPriorityConfig() internal {}
 
-    function _adjustStakedPosition() internal {}
-
     function _adjustPositionEarnings() internal {}
 
     function _adjustSlot() internal {}
@@ -1132,9 +1130,8 @@ contract Hyper is IHyper {
                 balances[msg.sender][token] += uint256(amount);
             }
         } else {
-            uint256 _amount = uint256(~amount + 1); // Funky bits manipulation turning negative amounts positive
-            if (balances[msg.sender][token] >= _amount) balances[msg.sender][token] -= _amount;
-            else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), _amount);
+            if (balances[msg.sender][token] >= abs(amount)) balances[msg.sender][token] -= abs(amount);
+            else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), abs(amount));
         }
 
         emit AdjustUserBalance(user, token, amount);
@@ -1148,7 +1145,7 @@ contract Hyper is IHyper {
                 globalReserves[token] += uint256(amount);
             }
         } else {
-            globalReserves[token] -= uint256(~amount + 1);
+            globalReserves[token] -= abs(amount);
         }
 
         emit AdjustGlobalBalance(token, amount);
@@ -1221,7 +1218,7 @@ contract Hyper is IHyper {
             // Remove liquidity
             if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0)
                 revert PositionStakedError(positionId);
-            pos.totalLiquidity -= uint128(int128(~deltaLiquidity + 1));
+            pos.totalLiquidity -= abs(deltaLiquidity);
         }
     }
 
@@ -1379,7 +1376,7 @@ contract Hyper is IHyper {
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = deltaLiquidity > 0
             ? slot.totalLiquidity + uint256(deltaLiquidity)
-            : slot.totalLiquidity - uint256(~deltaLiquidity + 1);
+            : slot.totalLiquidity - abs(deltaLiquidity);
 
         alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0); // If there was liquidity previously and all of it was removed.
 
