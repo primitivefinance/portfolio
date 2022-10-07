@@ -45,6 +45,19 @@ function abs(int256 input) pure returns (uint256 output) {
     }
 }
 
+function abs(int128 input) pure returns (uint256 output) {
+    if (input == type(int128).min) revert Min();
+    if (input < 0) {
+        assembly {
+            output := add(not(input), 1)
+        }
+    } else {
+        assembly {
+            output := input
+        }
+    }
+}
+
 /**
  * @title Gaussian Math Library.
  * @author @alexangelj
