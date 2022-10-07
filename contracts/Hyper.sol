@@ -936,7 +936,7 @@ contract Hyper is IHyper {
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
 
-    // --- State Functions --- //
+    // TODO: Not sure if we are going to use these?
     function _adjustPoolEarnings() internal {}
 
     function _adjustPoolPriorityConfig() internal {}
