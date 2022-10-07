@@ -253,10 +253,10 @@ contract Hyper is IHyper {
             (poolId, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.STAKE_POSITION) {
             _inputFlag = true;
-            (poolId, ) = _stakePosition(data);
+            (poolId) = _stakeOrUnstakePosition(data);
         } else if (instruction == Instructions.UNSTAKE_POSITION) {
             _inputFlag = false;
-            (poolId, ) = _unstakePosition(data);
+            (poolId) = _stakeOrUnstakePosition(data);
         } else if (instruction == Instructions.FILL_PRIORITY_AUCTION) {
             (poolId) = _fillPriorityAuction(data);
         } else if (instruction == Instructions.CREATE_POOL) {
@@ -671,7 +671,6 @@ contract Hyper is IHyper {
     //  |                                      STAKING                                     |
     //  +----------------------------------------------------------------------------------+
 
-    // FIXME: One test fails using this function
     function _stakeOrUnstakePosition(bytes calldata data) internal returns (uint48 poolId) {
         (uint48 poolId, uint96 positionId) = Decoder.decodeStakePosition(data);
 
@@ -701,8 +700,13 @@ contract Hyper is IHyper {
         }
 
         // update position
-        pos.pendingStakedLiquidityDelta = _inputFlag ? int256(pos.totalLiquidity) : -int256(pos.totalLiquidity);
-        pos.pendingStakedEpoch = epochs[poolId].id;
+        if (_inputFlag) {
+            pos.pendingStakedLiquidityDelta = int256(pos.totalLiquidity);
+            pos.pendingStakedEpoch = epochs[poolId].id;
+        } else {
+            pos.pendingStakedLiquidityDelta = -int256(pos.totalLiquidity);
+            pos.unstakedEpoch = epochs[poolId].id;
+        }
 
         // update slots
         _syncSlotPendingStake(
