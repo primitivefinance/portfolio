@@ -10,8 +10,7 @@ library Decoder {
     // --- Errors --- //
     error DecodePairBytesLength(uint256 expected, uint256 length);
 
-    // TODO: decodeAddLiquidity and decodeRemoveLiquidity should be merged together
-
+    // TODO: remove decodeAddLiquidity
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
     /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
@@ -40,7 +39,7 @@ library Decoder {
     /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
     /// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
-    function decodeRemoveLiquidity(bytes calldata data)
+    function decodeAddOrRemoveLiquidity(bytes calldata data)
         internal
         pure
         returns (
