@@ -775,33 +775,33 @@ contract Hyper is IHyper {
      * @custom:reverts If decimals of either token are not between 6 and 18, inclusive.
      */
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
-        (address asset, address quote) = Decoder.decodeCreatePair(data); // Expects Engima encoded data.
-        if (asset == quote) revert SameTokenError();
+        (address token0, address token1) = Decoder.decodeCreatePair(data); // Expects Engima encoded data.
+        if (token0 == token1) revert SameTokenError();
 
-        pairId = getPairId[asset][quote];
+        pairId = getPairId[token0][token1];
         if (pairId != 0) revert PairExists(pairId);
 
-        (uint8 assetDecimals, uint8 quoteDecimals) = (IERC20(asset).decimals(), IERC20(quote).decimals());
+        (uint8 token0Decimals, uint8 token1Decimals) = (IERC20(token0).decimals(), IERC20(token1).decimals());
 
-        if (!_isValidDecimals(assetDecimals)) revert DecimalsError(assetDecimals);
-        if (!_isValidDecimals(quoteDecimals)) revert DecimalsError(quoteDecimals);
+        if (!_isValidDecimals(token0Decimals)) revert DecimalsError(token0Decimals);
+        if (!_isValidDecimals(token1Decimals)) revert DecimalsError(token1Decimals);
 
         unchecked {
             pairId = uint16(++getPairNonce); // Increments the pair nonce, returning the nonce for this pair.
         }
 
         // Writes the pairId into a fetchable mapping using its tokens.
-        getPairId[asset][quote] = pairId; // note: No reverse lookup, because order matters!
+        getPairId[token0][token1] = pairId; // note: No reverse lookup, because order matters!
 
         // Writes the pair into Enigma state.
         pairs[pairId] = Pair({
-            tokenBase: asset,
-            decimalsBase: assetDecimals,
-            tokenQuote: quote,
-            decimalsQuote: quoteDecimals
+            tokenBase: token0,
+            decimalsBase: token0Decimals,
+            tokentoken1: token1,
+            decimalstoken1: token1Decimals
         });
 
-        emit CreatePair(pairId, asset, quote, assetDecimals, quoteDecimals);
+        emit CreatePair(pairId, token0, token1, token0Decimals, token1Decimals);
     }
 
     //  +----------------------------------------------------------------------------------+
@@ -929,13 +929,12 @@ contract Hyper is IHyper {
             pool.priorityPaymentPerSecond = uint128(0);
         }
 
-        // fetch pool's curve, calculate updated price and tick
-        Curve memory curve = curves[uint32(poolId)];
         uint256 tau = curve.maturity - pool.blockTimestamp;
         HyperSwapLib.Expiring memory expiring = HyperSwapLib.Expiring(curve.strike, curve.sigma, tau);
         // apply time change to price, tick
         price = expiring.computePriceWithChangeInTau(pool.lastPrice, timestamp - pool.blockTimestamp);
         tick = HyperSwapLib.computeTickWithPrice(price); // todo: check computeTickWithPrice returns tick % TICK_SIZE == 0
+
         // if updated tick, then apply slot transitions
         if (tick != pool.lastTick) {
             int24 tickJump = price > pool.lastPrice ? TICK_SIZE : -TICK_SIZE;
