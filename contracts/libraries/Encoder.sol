@@ -24,17 +24,6 @@ library Encoder {
         positionId = uint96(bytes12(data));
     }
 
-    /// @dev Encodes the arugments for the CREATE_CURVE instruction.
-    function encodeCreateCurve(
-        uint24 sigma,
-        uint32 maturity,
-        uint16 fee,
-        uint16 priorityFee,
-        uint128 strike
-    ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(Instructions.CREATE_CURVE, sigma, maturity, fee, priorityFee, strike);
-    }
-
     /// @dev Encodes the arguments for the CREATE_PAIR instruction.
     function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
         data = abi.encodePacked(Instructions.CREATE_PAIR, token0, token1);
