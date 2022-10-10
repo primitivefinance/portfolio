@@ -119,9 +119,6 @@ contract Hyper is IHyper {
     /// @dev Pool id -> Auction Fees
     mapping(uint48 => uint128) auctionFees;
 
-    /// @dev Pool id -> Curve Data Structure stores parameters.
-    mapping(uint32 => Curve) public curves;
-
     /// @dev Pool id -> HyperPool Data Structure.
     mapping(uint48 => HyperPool) public pools;
 
