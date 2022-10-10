@@ -104,11 +104,24 @@ contract Hyper is IHyper {
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
 
-    /// @dev A value incremented by one on pair creation. Reduces calldata.
-    uint256 public getPairNonce;
+    mapping(address => mapping(address => uint16)) public getPairId;
 
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;
+
+    /// @dev A value incremented by one on pair creation. Reduces calldata.
+    uint256 public getPairNonce;
+
+    /// @dev Pair id -> Pool id -> HyperPool Data Structure.
+    // mapping(uint16 => mapping(uint16 => HyperPool)) public pools;
+
+    // Triiiiipllleeeee maaaapppiiiiiiing???
+    // Pair id => gamma => priorityGamma => Pool = poolId
+    mapping(uint16 => mapping(uint32 => mapping(uint32 => uint24))) public getPoolId;
+
+    mapping(uint24 => HyperPool) public pools;
+
+    uint256 public getPoolNonce;
 
     /// @dev Pool id -> Epoch Data Structure.
     mapping(uint48 => Epoch) public epochs;
@@ -119,9 +132,6 @@ contract Hyper is IHyper {
     /// @dev Pool id -> Auction Fees
     mapping(uint48 => uint128) auctionFees;
 
-    /// @dev Pool id -> HyperPool Data Structure.
-    mapping(uint48 => HyperPool) public pools;
-
     /// @dev Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
 
@@ -129,7 +139,6 @@ contract Hyper is IHyper {
     mapping(uint48 => mapping(int24 => HyperSlot)) public slots;
 
     /// @dev Base Token -> Quote Token -> Pair id
-    mapping(address => mapping(address => uint16)) public getPairId;
 
     /// @dev User -> Token -> Internal Balance.
     mapping(address => mapping(address => uint256)) public balances;
@@ -734,26 +743,23 @@ contract Hyper is IHyper {
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
     function _createPool(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Decoder.decodeCreatePool(data);
+        (uint16 pairId, uint32 gamma, uint32 priorityGamma, uint128 price) = Decoder.decodeCreatePool(data);
 
         if (price == 0) revert ZeroPrice();
 
         // Zero id values are magic variables, since no curve or pair can have an id of zero.
         if (pairId == 0) pairId = uint16(getPairNonce);
-        if (curveId == 0) curveId = uint32(getCurveNonce);
-        poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
+
+        uint16 poolId = getPoolId[pairId][gamma][priorityGamma];
+
+        if (poolId != 0) revert(); // TODO: Add a proper custom revert error "Pool already exists"
+
+        getPoolId[pairId][gamma][priorityGamma] = uint24(++getPoolNonce);
+
+        // TODO: Do we still want to use this function?
         if (_doesPoolExist(poolId)) revert PoolExists();
 
-        Curve memory curve = curves[curveId];
-        (uint128 strike, uint48 maturity, uint24 sigma) = (curve.strike, curve.maturity, curve.sigma);
-
-        bool perpetual;
-        assembly {
-            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
-        }
-
         uint128 timestamp = _blockTimestamp();
-        if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
 
         // Write the epoch data
         epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
