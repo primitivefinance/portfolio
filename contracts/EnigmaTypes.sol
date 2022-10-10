@@ -95,6 +95,8 @@ struct HyperPool {
     uint256 priorityGrowthGlobal;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
+    uint32 gamma;
+    uint32 priorityGamma;
 }
 /// @dev Individual position state.
 struct HyperPosition {
