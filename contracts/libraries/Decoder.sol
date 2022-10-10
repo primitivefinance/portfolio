@@ -70,22 +70,24 @@ library Decoder {
     }
 
     /// @dev Expects a poolId and one left zero padded amount for `price`.
+    /// TODO: Update these comments, new encoding is:
+    /// | 0x | 1 byte for instruction | 2 bytes for pair Id | 16 bytes for the price |
     /// @param data Maximum 1 + 6 + 16 = 23 bytes.
     /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes |
     function decodeCreatePool(bytes calldata data)
         internal
         pure
         returns (
-            uint48 poolId,
             uint16 pairId,
-            uint32 curveId,
+            uint32 gamma,
+            uint32 priorityGamma,
             uint128 price
         )
     {
-        poolId = uint48(bytes6(data[1:7])); // note: First byte is the create pool ecode.
         pairId = uint16(bytes2(data[1:3]));
-        curveId = uint32(bytes4(data[3:7]));
-        price = uint128(bytes16(data[7:23]));
+        gamma = uint32(bytes4(data[3:7]));
+        priorityGamma = uint32(bytes4(data[7:11]));
+        price = uint128(bytes16(data[11:27]));
     }
 
     /// @dev Expects a 6 byte left-pad `poolId`.
