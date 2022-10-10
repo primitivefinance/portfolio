@@ -107,9 +107,6 @@ contract Hyper is IHyper {
     /// @dev A value incremented by one on pair creation. Reduces calldata.
     uint256 public getPairNonce;
 
-    /// @dev A value incremented by one on curve creation. Reduces calldata.
-    uint256 public getCurveNonce;
-
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint16 => Pair) public pairs;
 
