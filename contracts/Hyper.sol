@@ -795,10 +795,10 @@ contract Hyper is IHyper {
 
         // Writes the pair into Enigma state.
         pairs[pairId] = Pair({
-            tokenBase: token0,
-            decimalsBase: token0Decimals,
-            tokentoken1: token1,
-            decimalstoken1: token1Decimals
+            token0: token0,
+            token0Decimals: token0Decimals,
+            token1: token1,
+            token1Decimals: token1Decimals
         });
 
         emit CreatePair(pairId, token0, token1, token0Decimals, token1Decimals);
