@@ -62,14 +62,6 @@ error PositionStakedError(uint96 positionId);
 error PositionZeroLiquidityError(uint96 positionId);
 /// @dev Thrown if position is not staked and trying to unstake.
 error PositionNotStakedError(uint96 positionId);
-/// @dev Parameters of the Primitive RMM trading function.
-struct Curve {
-    uint128 strike;
-    uint24 sigma;
-    uint32 maturity;
-    uint32 gamma;
-    uint32 priorityGamma;
-}
 /// @dev Token information of each two token pool.
 struct Pair {
     address tokenBase;
