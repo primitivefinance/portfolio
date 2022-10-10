@@ -62,10 +62,11 @@ library Decoder {
     /// @dev Expects a 41-byte length array with two addresses packed into it.
     /// @param data Maximum 1 + 20 + 20 = 41 bytes.
     /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
-    function decodeCreatePair(bytes calldata data) internal pure returns (address tokenBase, address tokenQuote) {
+    function decodeCreatePair(bytes calldata data) internal pure returns (address token0, address token1) {
         if (data.length != 41) revert DecodePairBytesLength(41, data.length);
-        tokenBase = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
-        tokenQuote = address(bytes20(data[21:]));
+        token0 = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
+        token1 = address(bytes20(data[21:]));
+        (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
     }
 
     /// @dev Expects a poolId and one left zero padded amount for `price`.
