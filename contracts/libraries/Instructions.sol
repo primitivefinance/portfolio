@@ -18,6 +18,5 @@ library Instructions {
     bytes1 public constant FILL_PRIORITY_AUCTION = 0x08;
     bytes1 public constant CREATE_POOL = 0x0B;
     bytes1 public constant CREATE_PAIR = 0x0C;
-    bytes1 public constant CREATE_CURVE = 0x0D;
     bytes1 public constant INSTRUCTION_JUMP = 0xAA;
 }
