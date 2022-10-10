@@ -64,10 +64,10 @@ error PositionZeroLiquidityError(uint96 positionId);
 error PositionNotStakedError(uint96 positionId);
 /// @dev Token information of each two token pool.
 struct Pair {
-    address tokenBase;
-    uint8 decimalsBase;
-    address tokenQuote;
-    uint8 decimalsQuote;
+    address token0;
+    uint8 token0Decimals;
+    address token1;
+    uint8 token1Decimals;
 }
 /// @dev Time interval information for liquidity staking.
 struct Epoch {
