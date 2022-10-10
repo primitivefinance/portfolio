@@ -122,9 +122,6 @@ contract Hyper is IHyper {
     /// @dev Pool id -> HyperPool Data Structure.
     mapping(uint48 => HyperPool) public pools;
 
-    /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
-    mapping(bytes32 => uint32) public getCurveId;
-
     /// @dev Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
 
