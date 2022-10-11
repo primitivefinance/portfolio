@@ -71,6 +71,8 @@ contract Hyper is IHyper {
     /// @dev Maximum amount of decimals supported for ERC20 tokens.
     uint8 public constant MAX_DECIMALS = 18;
 
+    // TODO: Some constants are never used, we should either use them at some point or delete them
+
     /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
     uint256 public constant PRECISION = 1e18;
 
