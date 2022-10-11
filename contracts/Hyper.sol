@@ -114,7 +114,8 @@ contract Hyper is IHyper {
     /// @dev Pair id -> Pool id -> HyperPool Data Structure.
     // mapping(uint16 => mapping(uint16 => HyperPool)) public pools;
 
-    // Triiiiipllleeeee maaaapppiiiiiiing???
+    // FIXME: Triiiiipllleeeee maaaapppiiiiiiing???
+    // Probably not a good idea because we might end up having more pool parameters
     // Pair id => gamma => priorityGamma => Pool = poolId
     mapping(uint16 => mapping(uint32 => mapping(uint32 => uint24))) public getPoolId;
 
