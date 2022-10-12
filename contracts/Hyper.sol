@@ -369,6 +369,7 @@ contract Hyper is IHyper {
             instruction == 0x01 ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity)),
             true
         );
+
         _adjustSlot(
             poolId,
             loTick,
@@ -396,12 +397,11 @@ contract Hyper is IHyper {
 
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         Pair memory pair = pairs[pairId];
-        _adjustGlobalBalance(pair.tokenBase, instruction == 0x01 ? int256(deltaR2) : -int256(deltaR2));
-        _adjustGlobalBalance(pair.tokenQuote, instruction == 0x01 ? int256(deltaR1) : -int256(deltaR1));
+        _adjustGlobalBalance(pair.token0, instruction == 0x01 ? int256(amount0) : -int256(amount0));
+        _adjustGlobalBalance(pair.token1, instruction == 0x01 ? int256(amount1) : -int256(amount1));
 
-        if (instruction == 0x01)
-            emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
-        else emit RemoveLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
+        if (instruction == 0x01) emit AddLiquidity(poolId, pair.token0, pair.token1, amount0, amount1, deltaLiquidity);
+        else emit RemoveLiquidity(poolId, pair.token0, pair.token1, amount0, amount1, deltaLiquidity);
     }
 
     function _collectFees(bytes calldata data) internal {
@@ -497,21 +497,7 @@ contract Hyper is IHyper {
             });
         }
 
-        // Store the pool transiently, then delete after the swap.
-        HyperSwapLib.Expiring memory expiring;
-        {
-            // Curve stores the parameters of the trading function.
-            Curve memory curve = curves[uint32(args.poolId)];
-
-            expiring = HyperSwapLib.Expiring({
-                strike: curve.strike,
-                sigma: curve.sigma,
-                tau: curve.maturity - _blockTimestamp()
-            });
-
-            // Fetch the correct gamma to calculate the fees after pool synced.
-            state.gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
-        }
+        state.gamma = msg.sender == pool.prioritySwapper ? pool.priorityGamma : pool.gamma;
 
         // ----- Effects ----- //
 
@@ -848,14 +834,41 @@ contract Hyper is IHyper {
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
 
-    // TODO: Not sure if we are going to use these?
-    function _adjustPoolEarnings() internal {}
+    function _adjustSlot(
+        uint48 poolId,
+        int24 tick,
+        int256 deltaLiquidity,
+        bool hi
+    ) internal returns (bool alterState) {
+        HyperSlot storage slot = slots[poolId][tick];
+        slot.timestamp = _blockTimestamp();
 
-    function _adjustPoolPriorityConfig() internal {}
+        // TODO: Check if the next lines are right, I copied / pasted them from _adjustSlot
+        Epoch memory epoch = epochs[poolId];
 
-    function _adjustSlotEarnings() internal {}
+        if (epoch.endTime - epoch.interval >= slot.timestamp) {
+            // note: check case where loSlot.timestamp = epoch.endTime - epoch.interval
+            slot.stakedLiquidityDelta += slot.pendingStakedLiquidityDelta;
+            slot.pendingStakedLiquidityDelta = 0;
+        }
 
-    function _syncEarnings() internal {}
+        // save priority payment snapshot
+        priorityGrowthSlotSnapshot[poolId][tick][epoch.id] = slot.priorityGrowthOutside;
+
+        uint256 prevLiquidity = slot.totalLiquidity;
+        uint256 nextLiquidity = deltaLiquidity > 0
+            ? slot.totalLiquidity + uint256(deltaLiquidity)
+            : slot.totalLiquidity - abs(deltaLiquidity);
+
+        alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0); // If there was liquidity previously and all of it was removed.
+
+        slot.totalLiquidity = nextLiquidity;
+        if (alterState) slot.instantiated = !slot.instantiated;
+
+        // If a slot is exited and is on the upper bound of the range, there is a "loss" of liquidity to the next slot.
+        if (hi) slot.liquidityDelta -= deltaLiquidity;
+        else slot.liquidityDelta += deltaLiquidity;
+    }
 
     /**
      * @notice Updates the state of the pool (and it's epoch) with respect to time.
@@ -1202,42 +1215,6 @@ contract Hyper is IHyper {
         // todo: update transition event
 
         emit SlotTransition(poolId, tick, slot.liquidityDelta);
-    }
-
-    function _adjustSlot(
-        uint48 poolId,
-        int24 tick,
-        int256 deltaLiquidity,
-        bool hi
-    ) internal returns (bool alterState) {
-        HyperSlot storage slot = slots[poolId][tick];
-        slot.timestamp = _blockTimestamp();
-
-        // TODO: Check if the next lines are right, I copied / pasted them from _adjustSlot
-        Epoch memory epoch = epochs[poolId];
-
-        if (epoch.endTime - epoch.interval >= slot.timestamp) {
-            // note: check case where loSlot.timestamp = epoch.endTime - epoch.interval
-            slot.stakedLiquidityDelta += slot.pendingStakedLiquidityDelta;
-            slot.pendingStakedLiquidityDelta = 0;
-        }
-
-        // save priority payment snapshot
-        priorityGrowthSlotSnapshot[poolId][tick][epoch.id] = slot.priorityGrowthOutside;
-
-        uint256 prevLiquidity = slot.totalLiquidity;
-        uint256 nextLiquidity = deltaLiquidity > 0
-            ? slot.totalLiquidity + uint256(deltaLiquidity)
-            : slot.totalLiquidity - abs(deltaLiquidity);
-
-        alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0); // If there was liquidity previously and all of it was removed.
-
-        slot.totalLiquidity = nextLiquidity;
-        if (alterState) slot.instantiated = !slot.instantiated;
-
-        // If a slot is exited and is on the upper bound of the range, there is a "loss" of liquidity to the next slot.
-        if (hi) slot.liquidityDelta -= deltaLiquidity;
-        else slot.liquidityDelta += deltaLiquidity;
     }
 
     function _syncSlotPendingStake(
