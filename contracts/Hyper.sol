@@ -357,6 +357,8 @@ contract Hyper is IHyper {
             uint128 deltaLiquidity
         ) = Decoder.decodeAddOrRemoveLiquidity(data);
 
+        // TODO: Should we add a check for the min / max ticks?
+
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
