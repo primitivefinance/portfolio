@@ -356,7 +356,7 @@ contract Hyper is IHyper {
         if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
         // update pool, relevant slots with time
-        _adjustPool(poolId);
+        _adjustPoolStaking(poolId);
         _adjustSlot(poolId, loTick);
         _adjustSlot(poolId, hiTick);
 
@@ -512,7 +512,7 @@ contract Hyper is IHyper {
         SwapIteration memory swap;
         {
             // Writes the pool after computing its updated price with respect to time elapsed since last update.
-            (uint256 price, int24 tick) = _adjustPool(args.poolId);
+            (uint256 price, int24 tick) = _adjustPoolStaking(args.poolId);
             // Expect the caller to exhaust their entire balance of the input token.
             remainder = args.useMax == 1 ? _balanceOf(pair.tokenBase, msg.sender) : args.input;
             // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
@@ -673,7 +673,7 @@ contract Hyper is IHyper {
 
         if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
-        _adjustPool(poolId);
+        _adjustPoolStaking(poolId);
 
         HyperPosition storage pos = positions[msg.sender][positionId];
         // update pool
@@ -822,7 +822,7 @@ contract Hyper is IHyper {
         if (!_doesPoolExist(poolId_)) revert();
         if (priorityOwner == address(0)) revert();
 
-        _adjustPool(poolId);
+        _adjustPoolStaking(poolId);
 
         HyperPool storage pool = pools[poolId_];
         if (pool.prioritySwapper != address(0)) revert();
@@ -895,7 +895,7 @@ contract Hyper is IHyper {
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _adjustPool(uint48 poolId) internal returns (uint256 price, int24 tick) {
+    function _adjustPoolStaking(uint48 poolId) internal returns (uint256 price, int24 tick) {
         HyperPool storage pool = pools[poolId];
 
         uint256 timestamp = _blockTimestamp();
