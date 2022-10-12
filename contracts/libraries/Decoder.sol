@@ -17,6 +17,7 @@ library Decoder {
         internal
         pure
         returns (
+            bytes1 instruction,
             uint8 useMax,
             uint48 poolId,
             uint16 pairId,
@@ -25,6 +26,7 @@ library Decoder {
             uint128 deltaLiquidity
         )
     {
+        instruction = bytes1(data[0] & 0x0F);
         useMax = uint8(data[0] >> 4);
         pairId = uint16(bytes2(data[1:3]));
         poolId = uint48(bytes6(data[1:7]));
