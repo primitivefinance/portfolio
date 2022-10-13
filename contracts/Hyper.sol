@@ -85,9 +85,6 @@ contract Hyper is IHyper {
     /// @dev Maximum pool fee. 10.00%.
     uint256 public constant MAX_POOL_FEE = 1e3;
 
-    /// @dev Amount of seconds that an epoch lasts.
-    uint256 public constant EPOCH_INTERVAL = 300;
-
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
 
@@ -128,8 +125,6 @@ contract Hyper is IHyper {
 
     /// @dev Pool id -> Tick -> Slot has liquidity at a price.
     mapping(uint48 => mapping(int24 => HyperSlot)) public slots;
-
-    /// @dev Base Token -> Quote Token -> Pair id
 
     /// @dev User -> Token -> Internal Balance.
     mapping(address => mapping(address => uint256)) public balances;
@@ -503,8 +498,7 @@ contract Hyper is IHyper {
                         _args.poolId,
                         _swap.tick,
                         (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
-                        (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal),
-                        _pool.priorityGrowthGlobal
+                        (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal)
                     );
 
                     _swap.liquidity = signedAdd(_swap.liquidity, liquidityDelta);
@@ -579,11 +573,6 @@ contract Hyper is IHyper {
 
         // TODO: Do we still want to use this function?
         if (_doesPoolExist(poolId)) revert PoolExists();
-
-        uint128 timestamp = _blockTimestamp();
-
-        // Write the epoch data
-        epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
 
         // Write the pool to state with the desired price.
         pools[poolId].lastPrice = price;
@@ -770,7 +759,6 @@ contract Hyper is IHyper {
     /**
      * @notice Syncs a slot to a new timestamp and returns its deltas to update the pool's liquidity values.
      * @dev Effects on a slot after its been transitioned to another slot.
-     * @dev Assumes epoch transition applied before calling.
      * @param poolId Identifier of the pool.
      * @param tick Key of the slot specified to be transitioned.
      * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
@@ -785,8 +773,6 @@ contract Hyper is IHyper {
 
         slot.feeGrowthOutsideAsset = feeGrowthGlobalAsset - slot.feeGrowthOutsideAsset;
         slot.feeGrowthOutsideQuote = feeGrowthGlobalQuote - slot.feeGrowthOutsideQuote;
-
-        slot.priorityGrowthOutside = priorityGrowthGlobal - slot.priorityGrowthOutside;
 
         _adjustSlot(poolId, tick);
 
