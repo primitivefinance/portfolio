@@ -380,6 +380,8 @@ contract Hyper is IHyper {
             false
         );
 
+        // TODO: Call _adjustSlotStaking for the lo and hi ticks
+
         // TODO: Calculate these two bad boys using fancy Math
         uint256 amount0;
         uint256 amount1;
@@ -838,12 +840,7 @@ contract Hyper is IHyper {
 
     // FIXME: Made this function quickly to remove staking stuff from _adjustSlot,
     // we should check if everything is correct
-    function _adjustSlotStaking(
-        uint48 poolId,
-        int24 tick,
-        int256 deltaLiquidity,
-        bool hi
-    ) internal {
+    function _adjustSlotStaking(uint48 poolId, int24 tick) internal {
         slot.timestamp = _blockTimestamp();
 
         // TODO: Check if the next lines are right, I copied / pasted them from _adjustSlot
