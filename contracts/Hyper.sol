@@ -836,13 +836,14 @@ contract Hyper is IHyper {
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
 
-    function _adjustSlot(
+    // FIXME: Made this function quickly to remove staking stuff from _adjustSlot,
+    // we should check if everything is correct
+    function _adjustSlotStaking(
         uint48 poolId,
         int24 tick,
         int256 deltaLiquidity,
         bool hi
-    ) internal returns (bool alterState) {
-        HyperSlot storage slot = slots[poolId][tick];
+    ) internal {
         slot.timestamp = _blockTimestamp();
 
         // TODO: Check if the next lines are right, I copied / pasted them from _adjustSlot
@@ -856,13 +857,26 @@ contract Hyper is IHyper {
 
         // save priority payment snapshot
         priorityGrowthSlotSnapshot[poolId][tick][epoch.id] = slot.priorityGrowthOutside;
+    }
+
+    /**
+     * @dev Updates the liquidity of a slot
+     */
+    function _adjustSlot(
+        uint48 poolId,
+        int24 tick,
+        int256 deltaLiquidity,
+        bool hi
+    ) internal returns (bool alterState) {
+        HyperSlot storage slot = slots[poolId][tick];
 
         uint256 prevLiquidity = slot.totalLiquidity;
         uint256 nextLiquidity = deltaLiquidity > 0
             ? slot.totalLiquidity + uint256(deltaLiquidity)
             : slot.totalLiquidity - abs(deltaLiquidity);
 
-        alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0); // If there was liquidity previously and all of it was removed.
+        // If there was liquidity previously and all of it was removed OR vice-versa
+        alterState = (prevLiquidity == 0 && nextLiquidity != 0) || (prevLiquidity != 0 && nextLiquidity == 0);
 
         slot.totalLiquidity = nextLiquidity;
         if (alterState) slot.instantiated = !slot.instantiated;
@@ -923,6 +937,8 @@ contract Hyper is IHyper {
         // apply time change to price, tick
         price = expiring.computePriceWithChangeInTau(pool.lastPrice, timestamp - pool.blockTimestamp);
         tick = HyperSwapLib.computeTickWithPrice(price); // todo: check computeTickWithPrice returns tick % TICK_SIZE == 0
+
+        // TODO: Pretty sure we can get rid of the next lines
 
         // if updated tick, then apply slot transitions
         if (tick != pool.lastTick) {
