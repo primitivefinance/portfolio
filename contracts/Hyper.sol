@@ -949,8 +949,6 @@ contract Hyper is IHyper {
         uint256 deltaQuote
     ) external view returns (uint256 deltaLiquidity) {}
 
-    function getInvariant(uint48 poolId) external view returns (int128 invariant) {}
-
     function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
         external
         view
