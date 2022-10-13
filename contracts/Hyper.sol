@@ -858,10 +858,6 @@ contract Hyper is IHyper {
 
     // --- General Utils --- //
 
-    function _doesPoolExist(uint48 poolId) internal view returns (bool exists) {
-        exists = pools[poolId].blockTimestamp != 0;
-    }
-
     function _isValidDecimals(uint8 decimals) internal pure returns (bool valid) {
         valid = isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
     }
