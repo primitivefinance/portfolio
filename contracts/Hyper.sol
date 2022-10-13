@@ -153,9 +153,6 @@ contract Hyper is IHyper {
         _settleBalances();
     }
 
-    // FIXME: This sucks and should be fixed.
-    bool private _inputFlag;
-
     /// @notice Single instruction processor that will forward instruction to appropriate function.
     /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
     /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
