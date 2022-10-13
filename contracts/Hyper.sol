@@ -346,6 +346,7 @@ contract Hyper is IHyper {
     //  |                                     LIQUIDITY                                    |
     //  +----------------------------------------------------------------------------------+
 
+    // TODO: This function is almost done, we just need to calculate amount0 and amount1
     function _addOrRemoveLiquidity(bytes calldata data) internal returns (uint48 poolId) {
         (
             bytes1 instruction,
