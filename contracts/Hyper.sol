@@ -85,9 +85,6 @@ contract Hyper is IHyper {
     /// @dev Maximum pool fee. 10.00%.
     uint256 public constant MAX_POOL_FEE = 1e3;
 
-    /// @dev Used to compute the amount of liquidity to burn on creating a pool.
-    uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
-
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
     uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
 
