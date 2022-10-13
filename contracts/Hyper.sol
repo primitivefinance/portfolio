@@ -437,8 +437,6 @@ contract Hyper is IHyper {
                 feeAmount: 0,
                 remainder: remainder,
                 liquidity: pool.liquidity,
-                stakedLiquidity: pool.stakedLiquidity,
-                pendingStakedLiquidityDelta: pool.pendingStakedLiquidityDelta,
                 input: 0,
                 output: 0
             });
@@ -501,21 +499,15 @@ contract Hyper is IHyper {
 
                 {
                     // Entering or exiting the tick will transition the pool's active range.
-                    (
-                        int256 liquidityDelta,
-                        int256 stakedLiquidityDelta,
-                        int256 pendingStakedLiquidityDelta
-                    ) = _transitionSlot(
-                            _args.poolId,
-                            _swap.tick,
-                            (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
-                            (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal),
-                            _pool.priorityGrowthGlobal
-                        );
+                    int256 liquidityDelta = _transitionSlot(
+                        _args.poolId,
+                        _swap.tick,
+                        (_state.sell ? _state.feeGrowthGlobal : _pool.feeGrowthGlobalAsset),
+                        (_state.sell ? _pool.feeGrowthGlobalQuote : _state.feeGrowthGlobal),
+                        _pool.priorityGrowthGlobal
+                    );
 
                     _swap.liquidity = signedAdd(_swap.liquidity, liquidityDelta);
-                    _swap.stakedLiquidity = signedAdd(_swap.stakedLiquidity, stakedLiquidityDelta);
-                    _swap.pendingStakedLiquidityDelta += pendingStakedLiquidityDelta;
                 }
 
                 // Update variables for next iteration.
@@ -525,8 +517,6 @@ contract Hyper is IHyper {
 
                 // Save liquidity values changed by slot transition
                 swap.liquidity = _swap.liquidity;
-                swap.stakedLiquidity = _swap.stakedLiquidity;
-                swap.pendingStakedLiquidityDelta = _swap.pendingStakedLiquidityDelta;
             } else {
                 // Reaching this block will fill the order. Set the swap input
                 delta = swap.remainder - swap.feeAmount;
@@ -547,9 +537,6 @@ contract Hyper is IHyper {
         if (pool.lastPrice != swap.price) pool.lastPrice = swap.price;
         if (pool.lastTick != swap.tick) pool.lastTick = swap.tick;
         if (pool.liquidity != swap.liquidity) pool.liquidity = swap.liquidity;
-        if (pool.stakedLiquidity != swap.stakedLiquidity) pool.stakedLiquidity = swap.stakedLiquidity;
-        if (pool.pendingStakedLiquidityDelta != swap.pendingStakedLiquidityDelta)
-            pool.pendingStakedLiquidityDelta = swap.pendingStakedLiquidityDelta;
 
         uint256 feeGrowthGlobalAsset = state.sell ? state.feeGrowthGlobal : 0;
         uint256 feeGrowthGlobalQuote = state.sell ? 0 : state.feeGrowthGlobal;
@@ -787,23 +774,13 @@ contract Hyper is IHyper {
      * @param poolId Identifier of the pool.
      * @param tick Key of the slot specified to be transitioned.
      * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
-     * @return stakedLiquidityDelta Difference in amount of staked liquidity available before or after this slot.
-     * @return pendingStakedLiquidityDelta Difference in amount the staked liquidity should change at next epoch transition.
      */
     function _transitionSlot(
         uint48 poolId,
         int24 tick,
         uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote,
-        uint256 priorityGrowthGlobal
-    )
-        internal
-        returns (
-            int256 liquidityDelta,
-            int256 stakedLiquidityDelta,
-            int256 pendingStakedLiquidityDelta
-        )
-    {
+        uint256 feeGrowthGlobalQuote
+    ) internal returns (int256 liquidityDelta) {
         HyperSlot storage slot = slots[poolId][tick];
 
         slot.feeGrowthOutsideAsset = feeGrowthGlobalAsset - slot.feeGrowthOutsideAsset;
@@ -811,11 +788,9 @@ contract Hyper is IHyper {
 
         slot.priorityGrowthOutside = priorityGrowthGlobal - slot.priorityGrowthOutside;
 
-        _adjustSlot(poolId, tick); // updates staking deltas, saves snapshots of priorityGrowthOutside
+        _adjustSlot(poolId, tick);
 
         liquidityDelta = slot.liquidityDelta;
-        stakedLiquidityDelta = slot.stakedLiquidityDelta;
-        pendingStakedLiquidityDelta = slot.pendingStakedLiquidityDelta;
 
         // todo: update transition event
 
