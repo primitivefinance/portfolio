@@ -71,20 +71,6 @@ contract Hyper is IHyper {
     /// @dev Maximum amount of decimals supported for ERC20 tokens.
     uint8 public constant MAX_DECIMALS = 18;
 
-    // TODO: Some constants are never used, we should either use them at some point or delete them
-
-    /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
-    uint256 public constant PRECISION = 1e18;
-
-    /// @dev Constant amount of basis points. All percentage values are integers in basis points.
-    uint256 public constant PERCENTAGE = 1e4;
-
-    /// @dev Minimum pool fee. 0.01%.
-    uint256 public constant MIN_POOL_FEE = 1;
-
-    /// @dev Maximum pool fee. 10.00%.
-    uint256 public constant MAX_POOL_FEE = 1e3;
-
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
     uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
 
