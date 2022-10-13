@@ -83,17 +83,6 @@ error InvariantError(int128 prev, int128 post);
 /// @dev Thrown if zero swap amount in arguments.
 error ZeroInput();
 
-// --- Staking --- //
-
-/// @dev Thrown if position is already staked and trying to stake again.
-error PositionStakedError(uint96 positionId);
-
-/// @dev Thrown if position has zero liquidity and trying to stake.
-error PositionZeroLiquidityError(uint96 positionId);
-
-/// @dev Thrown if position is not staked and trying to unstake.
-error PositionNotStakedError(uint96 positionId);
-
 /// @dev Token information of each two token pool.
 struct Pair {
     address token0;
@@ -102,36 +91,15 @@ struct Pair {
     uint8 token1Decimals;
 }
 
-/// @dev Time interval information for liquidity staking.
-struct Epoch {
-    uint256 id;
-    uint256 endTime;
-    uint256 interval;
-}
-
-/// @dev Auction parameter information for a pool.
-struct AuctionParams {
-    uint256 startPrice;
-    uint256 endPrice;
-    uint256 fee;
-    uint256 length;
-}
-
 /// @dev Individual live pool state.
 struct HyperPool {
     uint256 lastPrice;
     int24 lastTick;
     uint256 blockTimestamp;
     uint256 liquidity;
-    uint256 stakedLiquidity;
-    int256 pendingStakedLiquidityDelta;
-    address prioritySwapper;
-    uint256 priorityPaymentPerSecond;
-    uint256 priorityGrowthGlobal;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
     uint32 gamma;
-    uint32 priorityGamma;
 }
 
 /// @dev Individual position state.
@@ -139,14 +107,8 @@ struct HyperPosition {
     int24 loTick;
     int24 hiTick;
     uint256 totalLiquidity;
-    uint256 stakedLiquidity;
-    uint256 stakedEpoch;
-    uint256 unstakedEpoch;
-    int256 pendingStakedLiquidityDelta;
-    uint256 pendingStakedEpoch;
     uint256 feeGrowthInsideAssetLast;
     uint256 feeGrowthInsideQuoteLast;
-    uint256 priorityGrowthInsideLast;
     uint256 tokensOwedAsset;
     uint256 tokensOwedQuote;
     uint256 blockTimestamp;
@@ -155,12 +117,9 @@ struct HyperPosition {
 /// @dev Liquidity information indexed by tick (a price).
 struct HyperSlot {
     int256 liquidityDelta;
-    int256 stakedLiquidityDelta;
-    int256 pendingStakedLiquidityDelta;
     uint256 totalLiquidity;
     uint256 feeGrowthOutsideAsset;
     uint256 feeGrowthOutsideQuote;
-    uint256 priorityGrowthOutside;
     bool instantiated;
     uint256 timestamp;
 }
@@ -198,8 +157,6 @@ struct SwapIteration {
     uint256 remainder;
     uint256 feeAmount;
     uint256 liquidity;
-    uint256 stakedLiquidity;
-    int256 pendingStakedLiquidityDelta;
     uint256 input;
     uint256 output;
 }
@@ -213,6 +170,4 @@ struct SwapState {
 struct SyncIteration {
     int24 tick;
     uint256 liquidity;
-    uint256 stakedLiquidity;
-    int256 pendingStakedLiquidityDelta;
 }
