@@ -399,6 +399,8 @@ contract Hyper is IHyper {
             instruction == 0x01 ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity))
         );
 
+        // TODO: Call _adjustPositionStaking
+
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         Pair memory pair = pairs[pairId];
         _adjustGlobalBalance(pair.token0, instruction == 0x01 ? int256(amount0) : -int256(amount0));
@@ -1027,9 +1029,6 @@ contract Hyper is IHyper {
         uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
         HyperPosition storage pos = positions[msg.sender][positionId];
 
-        // FIXME: Not a huge fan of these nested function calls
-        _adjustStakedPosition(pos, poolId); // TODO: Change this name to something more obvious
-
         (uint256 feeGrowthInsideAsset, uint256 feeGrowthInsideQuote) = _getFeeGrowthInside(
             poolId,
             hiTick,
@@ -1039,30 +1038,41 @@ contract Hyper is IHyper {
             pools[poolId].feeGrowthGlobalQuote
         );
 
-        // TODO: Not sure if this triple check is required but we have to be sure that the position wasn't initialized before
-        if (pos.loTick == 0 && pos.hiTick == 0 && pos.totalLiquidity == 0) {
-            // initialize fee growth inside
-            pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
-            pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
-        } else {
-            _adjustPositionEarnings(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
+        uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
+            feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
+            pos.totalLiquidity
+        );
+
+        uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(
+            feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
+            pos.totalLiquidity
+        );
+
+        pos.tokensOwedAsset += tokensOwedAsset;
+        pos.tokensOwedQuote += tokensOwedQuote;
+
+        pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
+        pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
+
+        // TODO: Do we really need this? We already get it from the position id
+        if (pos.loTick == 0 && pos.hiTick == 0) {
+            pos.loTick = loTick;
+            pos.hiTick = hiTick;
         }
 
-        // Add liquidity
+        if (deltaLiquidity > 0) pos.totalLiquidity += uint128(int128(deltaLiquidity));
+        else pos.totalLiquidity -= abs(deltaLiquidity);
+    }
+
+    // FIXME: The code was taken out from _adjustPosition, it's just a copy / pasta
+    // so it should not work out of the box
+    function _adjustPositionStaking(
+        uint48 poolId,
+        int24 loTick,
+        int24 hiTick,
+        int256 deltaLiquidity
+    ) internal {
         if (deltaLiquidity > 0) {
-            if (pos.loTick == 0 && pos.hiTick == 0) {
-                pos.loTick = loTick;
-                pos.hiTick = hiTick;
-            }
-
-            if (pos.totalLiquidity == 0) {
-                // initialize fee growth inside
-                pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
-                pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
-            } else {
-                _adjustPositionEarnings(pos, poolId, feeGrowthInsideAsset, feeGrowthInsideQuote);
-            }
-
             if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0) {
                 // position is already staked, add to pending stake amount
                 pos.pendingStakedLiquidityDelta += int256(deltaLiquidity);
@@ -1079,13 +1089,10 @@ contract Hyper is IHyper {
 
                 // emit IncreasePendingStake
             }
-
-            pos.totalLiquidity += uint128(int128(deltaLiquidity));
         } else {
             // Remove liquidity
             if (pos.pendingStakedLiquidityDelta != 0 || pos.stakedLiquidity != 0)
                 revert PositionStakedError(positionId);
-            pos.totalLiquidity -= abs(deltaLiquidity);
         }
     }
 
