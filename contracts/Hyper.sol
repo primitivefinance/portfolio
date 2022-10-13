@@ -832,11 +832,6 @@ contract Hyper is IHyper {
     //  +----------------------------------------------------------------------------------------------------------------------+
 
     /// @dev Overridable in tests.
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
-    }
-
-    /// @dev Overridable in tests.
     function _liquidityPolicy() internal view virtual returns (uint256) {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
@@ -954,6 +949,4 @@ contract Hyper is IHyper {
         view
         returns (uint256 deltaBase, uint256 deltaQuote)
     {}
-
-    function updateLastTimestamp(uint48) external override returns (uint128 blockTimestamp) {}
 }
