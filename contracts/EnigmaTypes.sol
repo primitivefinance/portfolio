@@ -89,6 +89,11 @@ struct Pair {
     uint8 token0Decimals;
     address token1;
     uint8 token1Decimals;
+    uint256 lastPrice;
+    int24 lastTick;
+    uint256 liquidity;
+    uint256 feeGrowthGlobalAsset;
+    uint256 feeGrowthGlobalQuote;
 }
 
 /// @dev Individual live pool state.
