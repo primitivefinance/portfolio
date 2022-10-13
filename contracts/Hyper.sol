@@ -411,6 +411,7 @@ contract Hyper is IHyper {
         else emit RemoveLiquidity(poolId, pair.token0, pair.token1, amount0, amount1, deltaLiquidity);
     }
 
+    // TODO: This function DOES NOT update the owed tokens, bug or feature?
     function _collectFees(bytes calldata data) internal {
         (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Decoder.decodeCollectFees(
             data
