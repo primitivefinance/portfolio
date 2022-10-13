@@ -1173,30 +1173,6 @@ contract Hyper is IHyper {
         pos.blockTimestamp = _blockTimestamp();
     }
 
-    function _adjustPositionEarnings(
-        HyperPosition storage pos,
-        uint48 poolId,
-        uint256 feeGrowthInsideAsset,
-        uint256 feeGrowthInsideQuote
-    ) internal {
-        uint48 poolId; // TODO: Remove this variable (only there to silent the unused variable warning)
-        uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
-            feeGrowthInsideAsset - pos.feeGrowthInsideAssetLast,
-            pos.totalLiquidity
-        );
-
-        uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(
-            feeGrowthInsideQuote - pos.feeGrowthInsideQuoteLast,
-            pos.totalLiquidity
-        );
-
-        pos.feeGrowthInsideAssetLast = feeGrowthInsideAsset;
-        pos.feeGrowthInsideQuoteLast = feeGrowthInsideQuote;
-
-        pos.tokensOwedAsset += tokensOwedAsset;
-        pos.tokensOwedQuote += tokensOwedQuote;
-    }
-
     /**
      * @notice Syncs a slot to a new timestamp and returns its deltas to update the pool's liquidity values.
      * @dev Effects on a slot after its been transitioned to another slot.
