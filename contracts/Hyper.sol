@@ -880,6 +880,7 @@ contract Hyper is IHyper {
 
     // todo: check for hash collisions with instruction calldata and fix.
 
+    // TODO: I think JIT should be checked in terms of block
     function checkJitLiquidity(
         address account,
         uint48 poolId,
@@ -888,7 +889,7 @@ contract Hyper is IHyper {
     ) public view returns (uint256 distance, uint256 timestamp) {
         uint96 positionId = uint96(bytes12(abi.encodePacked(poolId, loTick, hiTick)));
         uint256 previous = positions[account][positionId].blockTimestamp;
-        timestamp = _blockTimestamp();
+        // timestamp = _blockTimestamp();
         distance = timestamp - previous;
     }
 
