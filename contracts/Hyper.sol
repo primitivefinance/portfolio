@@ -255,6 +255,49 @@ contract Hyper is IHyper {
     }
 
     //  +----------------------------------------------------------------------------------+
+    //  |                                      CREATION                                    |
+    //  +----------------------------------------------------------------------------------+
+
+    /**
+     * @notice Uses a pair to instantiate a pool at a price.
+     *
+     * @custom:reverts If price is 0.
+     * @custom:reverts If pool with pair and curve has already been created.
+     * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
+     */
+    function _createPool(bytes calldata data) internal returns (uint24 poolId) {
+        (address token0, address token1, uint256 amount0, uint256 amount1) = Decoder.decodeCreatePool(data);
+
+        poolId = getPoolId[token0][token1];
+
+        if (poolId != 0) revert PoolExists();
+        if (token0 == token1) revert SameTokenError();
+
+        poolId = uint24(++getPoolNonce);
+        getPoolId[token0][token1] = poolId;
+
+        (uint8 token0Decimals, uint8 token1Decimals) = (IERC20(token0).decimals(), IERC20(token1).decimals());
+
+        if (!_isValidDecimals(token0Decimals)) revert DecimalsError(token0Decimals);
+        if (!_isValidDecimals(token1Decimals)) revert DecimalsError(token1Decimals);
+
+        // TODO: Do we need to add liquidity right away or can we just put a price?
+        pools[poolId] = Pool({
+            token0: token0,
+            token0Decimals: token0Decimals,
+            token1: token1,
+            token1Decimals: token1Decimals,
+            lastPrice: 0,
+            lastTick: 0,
+            liquidity: 0,
+            feeGrowthGlobalAsset: 0,
+            feeGrowthGlobalQuote: 0
+        });
+
+        emit CreatePool(poolId, token0, token1);
+    }
+
+    //  +----------------------------------------------------------------------------------+
     //  |                                     LIQUIDITY                                    |
     //  +----------------------------------------------------------------------------------+
 
@@ -554,49 +597,6 @@ contract Hyper is IHyper {
         _adjustGlobalBalance(pair.tokenQuote, -int256(swap.output));
     }
 */
-
-    //  +----------------------------------------------------------------------------------+
-    //  |                                      CREATION                                    |
-    //  +----------------------------------------------------------------------------------+
-
-    /**
-     * @notice Uses a pair to instantiate a pool at a price.
-     *
-     * @custom:reverts If price is 0.
-     * @custom:reverts If pool with pair and curve has already been created.
-     * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
-     */
-    function _createPool(bytes calldata data) internal returns (uint24 poolId) {
-        (address token0, address token1, uint256 amount0, uint256 amount1) = Decoder.decodeCreatePool(data);
-
-        poolId = getPoolId[token0][token1];
-
-        if (poolId != 0) revert PoolExists();
-        if (token0 == token1) revert SameTokenError();
-
-        poolId = uint24(++getPoolNonce);
-        getPoolId[token0][token1] = poolId;
-
-        (uint8 token0Decimals, uint8 token1Decimals) = (IERC20(token0).decimals(), IERC20(token1).decimals());
-
-        if (!_isValidDecimals(token0Decimals)) revert DecimalsError(token0Decimals);
-        if (!_isValidDecimals(token1Decimals)) revert DecimalsError(token1Decimals);
-
-        // TODO: Do we need to add liquidity right away or can we just put a price?
-        pools[poolId] = Pool({
-            token0: token0,
-            token0Decimals: token0Decimals,
-            token1: token1,
-            token1Decimals: token1Decimals,
-            lastPrice: 0,
-            lastTick: 0,
-            liquidity: 0,
-            feeGrowthGlobalAsset: 0,
-            feeGrowthGlobalQuote: 0
-        });
-
-        emit CreatePool(poolId, token0, token1);
-    }
 
     //  +----------------------------------------------------------------------------------------------------------------------+
     //  |                                                                                                                      |
