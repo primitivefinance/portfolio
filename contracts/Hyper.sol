@@ -258,15 +258,29 @@ contract Hyper is IHyper {
     //  |                                     LIQUIDITY                                    |
     //  +----------------------------------------------------------------------------------+
 
-    function _calculateDeltaAmounts(
+    function _calculateAmount0Delta(
         uint24 poolId,
         int24 loTick,
         int24 hiTick,
         uint128 deltaLiquidity
-    ) internal returns (uint256 amount0, uint256 amount1) {}
+    ) internal returns (uint256 amount0) {}
+
+    function _calculateAmount1Delta(
+        uint24 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint128 deltaLiquidity
+    ) internal returns (uint256 amount0) {}
 
     // TODO: This function is almost done, we just need to calculate amount0 and amount1
-    function _addOrRemoveLiquidity(bytes calldata data) internal returns (uint48 poolId) {
+    function _addOrRemoveLiquidity(bytes calldata data)
+        internal
+        returns (
+            uint48 poolId,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
         (
             bytes1 instruction,
             uint8 useMax,
@@ -298,14 +312,19 @@ contract Hyper is IHyper {
             false
         );
 
-        // TODO: Calculate these two bad boys using fancy Math
-        (uint256 amount0, uint256 amount1) = _calculateDeltaAmounts(poolId, loTick, hiTick, deltaLiquidity);
+        Pool storage pool = pools[poolId];
 
-        if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
-            pool.liquidity = instruction == 0x01 ? pool.liquidity + deltaLiquidity : pool.liquidity - deltaLiquidity;
+        if (pool.lastTick < loTick) {
+            amount0 = _calculateAmount0Delta(poolId, loTick, hiTick, deltaLiquidity);
+        } else if (pool.lastTick < hiTick) {
+            amount0 = _calculateAmount0Delta(poolId, loTick, hiTick, deltaLiquidity);
+            amount1 = _calculateAmount1Delta(poolId, loTick, hiTick, deltaLiquidity);
+
+            // FIXME: I think this is wrong?
+            pool.liquidity = instruction == 0x01 ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity));
+        } else {
+            amount1 = _calculateAmount1Delta(poolId, loTick, hiTick, deltaLiquidity);
         }
-
-        // Todo: update bitmap of instantiated slots.
 
         _adjustPosition(
             poolId,
@@ -585,6 +604,17 @@ contract Hyper is IHyper {
     //  |                                             STATE ALTERING FUNCTIONS                                                 |
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
+
+    function _adjustPoolLiquidity(
+        uint24 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint128 deltaLiquidity
+    ) internal {
+        if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
+            pool.liquidity = instruction == 0x01 ? pool.liquidity + deltaLiquidity : pool.liquidity - deltaLiquidity;
+        }
+    }
 
     /**
      * @dev Updates the liquidity of a slot
