@@ -321,7 +321,7 @@ contract Hyper is IHyper {
             amount1 = _calculateAmount1Delta(poolId, loTick, hiTick, deltaLiquidity);
 
             // FIXME: I think this is wrong?
-            pool.liquidity = instruction == 0x01 ? int256(uint256(deltaLiquidity)) : -int256(uint256(deltaLiquidity));
+            pool.liquidity = instruction == 0x01 ? pool.liquidity + deltaLiquidity : pool.liquidity - deltaLiquidity;
         } else {
             amount1 = _calculateAmount1Delta(poolId, loTick, hiTick, deltaLiquidity);
         }
