@@ -316,6 +316,8 @@ contract Hyper is IHyper {
 
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         Pair memory pair = pairs[pairId];
+
+        // TODO: I think this is wrong because we are adding / subtracting in the _adjustGlobalBalance function
         _adjustGlobalBalance(pair.token0, instruction == 0x01 ? int256(amount0) : -int256(amount0));
         _adjustGlobalBalance(pair.token1, instruction == 0x01 ? int256(amount1) : -int256(amount1));
 
