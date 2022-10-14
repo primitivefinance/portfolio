@@ -325,6 +325,7 @@ contract Hyper is IHyper {
         else emit RemoveLiquidity(poolId, pair.token0, pair.token1, amount0, amount1, deltaLiquidity);
     }
 
+    /*
     // TODO: This function DOES NOT update the owed tokens, bug or feature?
     function _collectFees(bytes calldata data) internal {
         (uint96 positionId, uint128 amountAssetRequested, uint128 amountQuoteRequested) = Decoder.decodeCollectFees(
@@ -337,10 +338,10 @@ contract Hyper is IHyper {
         positions[msg.sender][positionId].tokensOwedQuote -= amountQuoteRequested;
 
         // Right shift the positionId to keep only the pairId part (first 2 bytes).
-        uint16 pairId = uint16(positionId >> 80);
+        uint16 poolId = uint16(positionId >> 80);
 
         // Should save some gas
-        Pair memory pair = pairs[pairId];
+        Pool memory poo = pairs[pairId];
 
         if (amountAssetRequested > 0)
             _adjustUserBalance(msg.sender, pair.tokenBase, int256(int128(amountAssetRequested)));
@@ -356,6 +357,7 @@ contract Hyper is IHyper {
             pair.tokenQuote
         );
     }
+*/
 
     //  +----------------------------------------------------------------------------------+
     //  |                                     SWAPPING                                     |
