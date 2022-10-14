@@ -258,6 +258,13 @@ contract Hyper is IHyper {
     //  |                                     LIQUIDITY                                    |
     //  +----------------------------------------------------------------------------------+
 
+    function _calculateDeltaAmounts(
+        uint24 poolId,
+        int24 loTick,
+        int24 hiTick,
+        uint128 deltaLiquidity
+    ) internal returns (uint256 amount0, uint256 amount1) {}
+
     // TODO: This function is almost done, we just need to calculate amount0 and amount1
     function _addOrRemoveLiquidity(bytes calldata data) internal returns (uint48 poolId) {
         (
@@ -292,8 +299,7 @@ contract Hyper is IHyper {
         );
 
         // TODO: Calculate these two bad boys using fancy Math
-        uint256 amount0;
-        uint256 amount1;
+        (uint256 amount0, uint256 amount1) = _calculateDeltaAmounts(poolId, loTick, hiTick, deltaLiquidity);
 
         if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
             pool.liquidity = instruction == 0x01 ? pool.liquidity + deltaLiquidity : pool.liquidity - deltaLiquidity;
