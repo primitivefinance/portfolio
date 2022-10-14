@@ -168,7 +168,7 @@ contract Hyper is IHyper {
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
             (poolId) = _addOrRemoveLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
-            (poolId, , , ) = _swapExactForExact(data);
+            // (poolId, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId) = _createPool(data);
         } else if (instruction == Instructions.CREATE_PAIR) {
@@ -367,6 +367,7 @@ contract Hyper is IHyper {
         bool direction
     ) internal returns (uint256 output) {}
 
+    /*
     SwapState state;
 
     /**
@@ -378,6 +379,7 @@ contract Hyper is IHyper {
      *
      * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
      */
+    /*
     function _swapExactForExact(bytes calldata data)
         internal
         returns (
@@ -531,6 +533,7 @@ contract Hyper is IHyper {
         _adjustGlobalBalance(pair.tokenBase, int256(swap.input));
         _adjustGlobalBalance(pair.tokenQuote, -int256(swap.output));
     }
+*/
 
     //  +----------------------------------------------------------------------------------+
     //  |                                      CREATION                                    |
