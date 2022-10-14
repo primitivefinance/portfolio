@@ -171,10 +171,8 @@ contract Hyper is IHyper {
             // (poolId, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId) = _createPool(data);
-        } else if (instruction == Instructions.CREATE_PAIR) {
-            _createPair(data);
         } else if (instruction == Instructions.COLLECT_FEES) {
-            _collectFees(data);
+            // _collectFees(data);
         } else if (instruction == Instructions.DRAW) {
             _draw(data);
         } else if (instruction == Instructions.FUND) {
