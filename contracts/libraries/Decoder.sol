@@ -10,6 +10,7 @@ library Decoder {
     // --- Errors --- //
     error DecodePairBytesLength(uint256 expected, uint256 length);
 
+    // TODO: Update this function
     /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
     /// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
@@ -19,7 +20,7 @@ library Decoder {
         returns (
             bytes1 instruction,
             uint8 useMax,
-            uint48 poolId,
+            uint24 poolId,
             uint16 pairId,
             int24 loTick,
             int24 hiTick,
@@ -29,7 +30,7 @@ library Decoder {
         instruction = bytes1(data[0] & 0x0F);
         useMax = uint8(data[0] >> 4);
         pairId = uint16(bytes2(data[1:3]));
-        poolId = uint48(bytes6(data[1:7]));
+        poolId = uint24(bytes4(data[1:7]));
         loTick = int24(uint24(bytes3(data[7:10])));
         hiTick = int24(uint24(bytes3(data[10:13])));
         deltaLiquidity = uint128(unpackAmount(data[13:]));
