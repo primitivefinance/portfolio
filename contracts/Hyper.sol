@@ -609,7 +609,7 @@ contract Hyper is IHyper {
      * @dev Updates the liquidity of a slot
      */
     function _adjustSlot(
-        uint48 poolId,
+        uint24 poolId,
         int24 tick,
         int256 deltaLiquidity,
         bool hi
