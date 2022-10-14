@@ -61,4 +61,27 @@ contract TestHyper is Test {
         data = Encoder.encodeCreatePool(address(token1), address(token0), hex"0101");
         hyper.process(data);
     }
+
+    function test_updatesPoolStruct() public {
+        bytes memory data = Encoder.encodeCreatePool(address(token0), address(token1), hex"0101");
+        hyper.process(data);
+
+        (
+            address token0Address,
+            uint8 token0Decimals,
+            address token1Address,
+            uint8 token1Decimals,
+            uint256 lastPrice,
+            int24 lastTick,
+            uint256 liquidity,
+            uint256 feeGrowthGlobalAsset,
+            uint256 feeGrowthGlobalQuote
+        ) = hyper.pools(1);
+
+        assertEq(token0Address, address(token0));
+        assertEq(token1Address, address(token1));
+        assertEq(token0Decimals, token0.decimals());
+        assertEq(token1Decimals, token1.decimals());
+        assertEq(lastPrice, 10);
+    }
 }
