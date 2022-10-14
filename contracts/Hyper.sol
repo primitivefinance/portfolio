@@ -83,22 +83,22 @@ contract Hyper is IHyper {
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
 
-    /// @dev Maps the pair of tokens with their pair id
-    /// token0 -> token1 -> pairId
+    /// @dev Maps the pair of tokens with their pool id
+    /// token0 -> token1 -> poolId
     /// Note than token0 < token1, duplicate pairs are not possible
-    mapping(address => mapping(address => uint24)) public getPairId;
+    mapping(address => mapping(address => uint24)) public getPoolId;
 
     /// @dev Pool id -> Pair of a Pool.
-    mapping(uint24 => Pair) public pairs;
+    mapping(uint24 => Pool) public pools;
 
-    /// @dev A value incremented by one on pair creation. Reduces calldata.
+    /// @dev A value incremented by one on pool creation. Reduces calldata.
     /// Actually a uint24 but we don't cast it down because the storage slot is 32 bytes anyway
-    uint256 public getPairNonce;
+    uint256 public getPoolNonce;
 
     /// @dev Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
 
-    /// @dev Pair id -> Tick -> Slot has liquidity at a price.
+    /// @dev Pool id -> Tick -> Slot has liquidity at a price.
     mapping(uint24 => mapping(int24 => HyperSlot)) public slots;
 
     /// @dev User -> Token -> Internal Balance.
