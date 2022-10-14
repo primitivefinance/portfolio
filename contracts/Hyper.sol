@@ -266,7 +266,7 @@ contract Hyper is IHyper {
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
     function _createPool(bytes calldata data) internal returns (uint24 poolId) {
-        (address token0, address token1, uint256 amount0, uint256 amount1) = Decoder.decodeCreatePool(data);
+        (address token0, address token1, uint256 price) = Decoder.decodeCreatePool(data);
 
         poolId = getPoolId[token0][token1];
 
