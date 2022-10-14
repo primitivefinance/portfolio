@@ -30,7 +30,7 @@ library Decoder {
         instruction = bytes1(data[0] & 0x0F);
         useMax = uint8(data[0] >> 4);
         pairId = uint16(bytes2(data[1:3]));
-        poolId = uint24(bytes4(data[1:7]));
+        poolId = uint24(bytes3(data[1:7]));
         loTick = int24(uint24(bytes3(data[7:10])));
         hiTick = int24(uint24(bytes3(data[10:13])));
         deltaLiquidity = uint128(unpackAmount(data[13:]));
