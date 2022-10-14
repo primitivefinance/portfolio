@@ -11,7 +11,7 @@ contract TestHyperTime is Hyper {
 
     constructor(address weth) Hyper(weth) {}
 
-    function _blockTimestamp() internal view override returns (uint128) {
+    function _blockTimestamp() internal view returns (uint128) {
         return uint128(timestamp);
     }
 }
