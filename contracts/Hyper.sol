@@ -741,6 +741,7 @@ contract Hyper is IHyper {
      * @param tick Key of the slot specified to be transitioned.
      * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
      */
+    /*
     function _transitionSlot(
         uint48 poolId,
         int24 tick,
@@ -760,6 +761,7 @@ contract Hyper is IHyper {
 
         emit SlotTransition(poolId, tick, slot.liquidityDelta);
     }
+    */
 
     //  +----------------------------------------------------------------------------------------------------------------------+
     //  |                                                                                                                      |
