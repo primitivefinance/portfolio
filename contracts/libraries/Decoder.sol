@@ -10,6 +10,25 @@ library Decoder {
     // --- Errors --- //
     error DecodePairBytesLength(uint256 expected, uint256 length);
 
+    // TODO: Update the NatSpec
+    /// @dev Expects a 41-byte length array with two addresses packed into it.
+    /// @param data Maximum 1 + 20 + 20 = 41 bytes.
+    /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
+    function decodeCreatePool(bytes calldata data)
+        internal
+        pure
+        returns (
+            address token0,
+            address token1,
+            uint256 price
+        )
+    {
+        token0 = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
+        token1 = address(bytes20(data[21:41]));
+        (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
+        price = unpackAmount(data[41:data.length]);
+    }
+
     // TODO: Update this function
     /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
     /// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
@@ -34,25 +53,6 @@ library Decoder {
         loTick = int24(uint24(bytes3(data[7:10])));
         hiTick = int24(uint24(bytes3(data[10:13])));
         deltaLiquidity = uint128(unpackAmount(data[13:]));
-    }
-
-    // TODO: Update the NatSpec
-    /// @dev Expects a 41-byte length array with two addresses packed into it.
-    /// @param data Maximum 1 + 20 + 20 = 41 bytes.
-    /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
-    function decodeCreatePool(bytes calldata data)
-        internal
-        pure
-        returns (
-            address token0,
-            address token1,
-            uint256 price
-        )
-    {
-        token0 = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
-        token1 = address(bytes20(data[21:41]));
-        (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
-        price = unpackAmount(data[41:data.length]);
     }
 
     /*
