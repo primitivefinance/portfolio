@@ -46,8 +46,8 @@ interface IHyperEvents {
     event AdjustGlobalBalance(address indexed token, int256 amount);
 
     // --- Pools --- //
-    /// @dev Emitted on creating a pool for a pair and curve.
-    event CreatePool(uint48 indexed poolId, uint16 indexed pairId, uint32 indexed curveId, uint256 price);
+    /// @dev Emitted on creating a pool for a pair.
+    event CreatePool(uint24 indexed poolId, address indexed token0, address indexed token1);
 
     event PoolUpdate(
         uint48 indexed poolId,
