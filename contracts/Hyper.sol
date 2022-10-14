@@ -569,7 +569,7 @@ contract Hyper is IHyper {
     function _createPool(bytes calldata data) internal returns (uint48 poolId) {
         (address token0, address token1, uint256 amount0, uint256 amount1) = Decoder.decodeCreatePool(data);
 
-        poolId = pools[token0][token1];
+        poolId = getPoolId[token0][token1];
 
         if (poolId != 0) revert PoolExists();
         if (token0 == token1) revert SameTokenError();
