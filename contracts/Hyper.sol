@@ -151,7 +151,7 @@ contract Hyper is IHyper {
     fallback() external payable lock {
         if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
         else _jumpProcess(msg.data);
-        _settleBalances();
+        // _settleBalances();
     }
 
     /// @notice Single instruction processor that will forward instruction to appropriate function.
@@ -838,21 +838,23 @@ contract Hyper is IHyper {
 
     // --- Internal --- //
 
+    /*
     /// @dev Critical level function that is responsible for handling tokens, debits and credits.
     /// @custom:security Critical. Handles token payments with `_settleToken`.
     function _settleBalances() internal {
-        uint256 len = _tempPairIds.length;
-        uint16[] memory ids = _tempPairIds;
+        uint256 len = _tempPoolIds.length;
+        uint16[] memory ids = _tempPoolIds;
         if (len == 0) return; // note: Dangerous! If pools were interacted with, this return being trigerred would be a failure.
         for (uint256 i; i != len; ++i) {
-            uint16 pairId = ids[i];
-            Pair memory pair = pairs[pairId];
-            _settleToken(pair.tokenBase);
-            _settleToken(pair.tokenQuote);
+            uint16 poolId = ids[i];
+            Pool memory pool = pools[poolId];
+            _settleToken(pool.token0);
+            _settleToken(pool.token1);
         }
 
         delete _tempPairIds;
     }
+    */
 
     /// @dev Increases the `msg.sender` internal balance of a token, or requests payment from them.
     /// @param token Target token to pay or credit.
