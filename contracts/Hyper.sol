@@ -575,7 +575,7 @@ contract Hyper is IHyper {
         if (token0 == token1) revert SameTokenError();
 
         poolId = uint24(++getPoolNonce);
-        pools[token0][token1] = poolId;
+        getPoolId[token0][token1] = poolId;
 
         (uint8 token0Decimals, uint8 token1Decimals) = (IERC20(token0).decimals(), IERC20(token1).decimals());
 
