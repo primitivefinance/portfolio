@@ -46,18 +46,13 @@ library Decoder {
         returns (
             address token0,
             address token1,
-            uint256 amount0,
-            uint256 amount1
+            uint256 price
         )
     {
-        // if (data.length != 41) revert DecodePairBytesLength(41, data.length);
         token0 = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
-        token1 = address(bytes20(data[21:]));
+        token1 = address(bytes20(data[21:41]));
         (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
-        uint8 pointer = uint8(data[13]);
-        amount0 = uint128(unpackAmount(data[13:pointer]));
-        pointer = uint8(data[pointer + 1]);
-        amount1 = uint128(unpackAmount(data[pointer:data.length]));
+        price = unpackAmount(data[41:data.length]);
     }
 
     /*
