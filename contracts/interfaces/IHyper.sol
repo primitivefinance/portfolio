@@ -113,49 +113,18 @@ interface IHyperEvents {
 /// @dev Public view functions exposed by the Enigma's higher level contracts.
 interface IHyperGetters {
     // --- Enigma --- //
-    function pairs(uint16 pairId)
-        external
-        view
-        returns (
-            address tokenasset,
-            uint8 decimalsasset,
-            address tokenQuote,
-            uint8 decimalsQuote
-        );
-
-    function curves(uint32 curveId)
-        external
-        view
-        returns (
-            uint128 strike,
-            uint24 sigma,
-            uint32 maturity,
-            uint32 gamma,
-            uint32 priorityGamma
-        );
-
-    function epochs(uint24 poolId)
-        external
-        view
-        returns (
-            uint256 id,
-            uint256 endTime,
-            uint256 interval
-        );
 
     function pools(uint24 poolId)
         external
         view
         returns (
+            address token0,
+            uint8 token0Decimals,
+            address token1,
+            uint8 token1Decimals,
             uint256 lastPrice,
             int24 lastTick,
-            uint256 blockTimestamp,
             uint256 liquidity,
-            uint256 stakedLiquidity,
-            int256 pendingStakedLiquidityDelta,
-            address prioritySwapper,
-            uint256 priorityPaymentPerSecond,
-            uint256 priorityPaymentGrowth,
             uint256 feeGrowthGlobalAsset,
             uint256 feeGrowthGlobalQuote
         );
@@ -165,23 +134,14 @@ interface IHyperGetters {
         view
         returns (
             int256 liquidityDelta,
-            int256 stakedLiquidityDelta,
-            int256 pendingStakedLiquidityDelta,
             uint256 totalLiquidity,
             uint256 feeGrowthOutsideAsset,
             uint256 feeGrowthOutsideQuote,
-            uint256 priorityPaymentGrowthOutside,
             bool instantiated,
             uint256 timestamp
         );
 
     function globalReserves(address asset) external view returns (uint256);
-
-    function getCurveId(bytes32) external view returns (uint32);
-
-    function getCurveNonce() external view returns (uint256);
-
-    function getPairNonce() external view returns (uint256);
 
     // --- Liquidity --- //
 
@@ -208,12 +168,6 @@ interface IHyperGetters {
     ) external view returns (uint256 deltaLiquidity);
 
     // --- Swap --- //
-
-    /// @notice Uses the ReplicationMath.sol trading function to check if a swap is valid.
-    /// @dev Warning! Can revert if poolId references an unsynced pool. Returns a fixed point 64.64 formatted value.
-    /// @custom:security Critical. The invariant check is the most important check for the Enigma.
-    /// @return invariant FixedPoint64.64 invariant value denominated in `quoteToken` units.
-    function getInvariant(uint24 poolId) external view returns (int128 invariant);
 
     /// @notice Computes amount of asset and quote tokens entitled to `liquidity` amount.
     /// @dev Can be used to fetch the expected amount of tokens withdrawn from removing `liquidity`.
