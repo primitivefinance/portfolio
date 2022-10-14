@@ -25,20 +25,27 @@ contract TestHyper is Test {
     HyperWrapper public hyper;
 
     function setUp() public {
-        token0 = new TestERC20("TestERC20", "TEST", 18);
-        token1 = new TestERC20("TestERC20", "TEST", 18);
+        TestERC20 tokenA = new TestERC20("TestERC20", "TEST", 18);
+        TestERC20 tokenB = new TestERC20("TestERC20", "TEST", 6);
+
+        (token0, token1) = address(tokenA) < address(tokenB) ? (tokenA, tokenB) : (tokenB, tokenA);
 
         weth = new WETH();
         hyper = new HyperWrapper(address(weth));
     }
 
-    function testWeth() public {
+    function test_WETH() public {
         assertEq(hyper.WETH(), address(weth));
     }
 
-    function testCreatePool() public {
+    function test_createPool() public {
         bytes memory data = Encoder.encodeCreatePool(address(token0), address(token1), hex"0101");
-
         hyper.process(data);
+    }
+
+    function test_getPoolId() public {
+        bytes memory data = Encoder.encodeCreatePool(address(token0), address(token1), hex"0101");
+        hyper.process(data);
+        assertEq(hyper.getPoolId(address(token0), address(token1)), 1);
     }
 }
