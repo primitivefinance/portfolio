@@ -35,16 +35,31 @@ library Decoder {
         deltaLiquidity = uint128(unpackAmount(data[13:]));
     }
 
+    // TODO: Update the NatSpec
     /// @dev Expects a 41-byte length array with two addresses packed into it.
     /// @param data Maximum 1 + 20 + 20 = 41 bytes.
     /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
-    function decodeCreatePair(bytes calldata data) internal pure returns (address token0, address token1) {
-        if (data.length != 41) revert DecodePairBytesLength(41, data.length);
+    function decodeCreatePool(bytes calldata data)
+        internal
+        pure
+        returns (
+            address token0,
+            address token1,
+            uint256 amount0,
+            uint256 amount1
+        )
+    {
+        // if (data.length != 41) revert DecodePairBytesLength(41, data.length);
         token0 = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
         token1 = address(bytes20(data[21:]));
         (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
+        uint8 pointer = data[13];
+        amount0 = uint128(unpackAmount(data[13:pointer]));
+        pointer = data[pointer + 1];
+        amount1 = uint128(unpackAmount(data[pointer:data.length]));
     }
 
+    /*
     /// @dev Expects a poolId and one left zero padded amount for `price`.
     /// TODO: Update these comments, new encoding is:
     /// | 0x | 1 byte for instruction | 2 bytes for pair Id | 16 bytes for the price |
@@ -65,6 +80,7 @@ library Decoder {
         priorityGamma = uint32(bytes4(data[7:11]));
         price = uint128(bytes16(data[11:27]));
     }
+    */
 
     /// @dev Expects a 6 byte left-pad `poolId`.
     /// @param data Maximum 6 bytes. | 0x | left-pad 6 bytes poolId |
