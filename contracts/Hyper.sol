@@ -294,7 +294,7 @@ contract Hyper is IHyper {
         // TODO: Should we add a check for the min / max ticks?
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
+        if (_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
         _adjustSlot(
             poolId,
@@ -766,6 +766,10 @@ contract Hyper is IHyper {
     //  |                                             STATE READING FUNCTIONS                                                  |
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
+
+    function _doesPoolExist(uint24 poolId) internal view returns (bool) {
+        return pools[poolId].price != 0;
+    }
 
     function _getFeeGrowthInside(
         uint48 poolId,
