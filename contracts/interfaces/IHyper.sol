@@ -50,7 +50,7 @@ interface IHyperEvents {
     event CreatePool(uint24 indexed poolId, address indexed token0, address indexed token1);
 
     event PoolUpdate(
-        uint48 indexed poolId,
+        uint24 indexed poolId,
         uint256 price,
         int24 indexed tick,
         uint256 liquidity,
@@ -78,7 +78,7 @@ interface IHyperEvents {
 
     // -- Auction Params -- //
     /// @dev Emitted when auction parameters for a pool are updated.
-    event SetAuctionParams(uint48 indexed poolId, uint256 startPrice, uint256 endPrice, uint256 fee, uint256 length);
+    event SetAuctionParams(uint24 indexed poolId, uint256 startPrice, uint256 endPrice, uint256 fee, uint256 length);
 
     // -- Positions -- //
     /// @dev Emitted on increasing liquidity or creating a pool.
@@ -102,11 +102,11 @@ interface IHyperEvents {
 
     // - Sync pool - //
     /// @dev Emitted on external calls to `updateLastTimestamp` or `swap`. Syncs a pool's timestamp to block.timestamp.
-    event UpdateLastTimestamp(uint48 indexed poolId);
+    event UpdateLastTimestamp(uint24 indexed poolId);
 
     // - Slots - //
     /// @dev Emitted when entering or exiting a slot when swapping.
-    event SlotTransition(uint48 indexed poolId, int24 indexed tick, int256 liquidityDelta);
+    event SlotTransition(uint24 indexed poolId, int24 indexed tick, int256 liquidityDelta);
 }
 
 /// @title IHyperGetters
@@ -134,7 +134,7 @@ interface IHyperGetters {
             uint32 priorityGamma
         );
 
-    function epochs(uint48 poolId)
+    function epochs(uint24 poolId)
         external
         view
         returns (
@@ -213,12 +213,12 @@ interface IHyperGetters {
     /// @dev Warning! Can revert if poolId references an unsynced pool. Returns a fixed point 64.64 formatted value.
     /// @custom:security Critical. The invariant check is the most important check for the Enigma.
     /// @return invariant FixedPoint64.64 invariant value denominated in `quoteToken` units.
-    function getInvariant(uint48 poolId) external view returns (int128 invariant);
+    function getInvariant(uint24 poolId) external view returns (int128 invariant);
 
     /// @notice Computes amount of asset and quote tokens entitled to `liquidity` amount.
     /// @dev Can be used to fetch the expected amount of tokens withdrawn from removing `liquidity`.
     /// @custom:security Medium. Designed to round in a direction disadvantageous to the liquidity owner.
-    function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
+    function getPhysicalReserves(uint24 poolId, uint256 deltaLiquidity)
         external
         view
         returns (uint256 deltaAsset, uint256 deltaQuote);
@@ -228,7 +228,7 @@ interface IHyperActions {
     /// @notice Syncs a pool with `poolId` to the current `block.timestamp`.
     /// @dev Use this method after the pool is expired or else the invariant method will revert.
     /// @custom:security Medium. Alternative method (instead of swapping) of syncing pools to the current timestamp.
-    function updateLastTimestamp(uint48 poolId) external returns (uint128 blockTimestamp);
+    function updateLastTimestamp(uint24 poolId) external returns (uint128 blockTimestamp);
 
     // TODO: add collect function to collect swap fees
 }
