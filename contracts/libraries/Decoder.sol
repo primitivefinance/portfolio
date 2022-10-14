@@ -54,9 +54,9 @@ library Decoder {
         token0 = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
         token1 = address(bytes20(data[21:]));
         (token0, token1) = token0 < token1 ? (token0, token1) : (token1, token0);
-        uint8 pointer = data[13];
+        uint8 pointer = uint8(data[13]);
         amount0 = uint128(unpackAmount(data[13:pointer]));
-        pointer = data[pointer + 1];
+        pointer = uint8(data[pointer + 1]);
         amount1 = uint128(unpackAmount(data[pointer:data.length]));
     }
 
