@@ -164,9 +164,9 @@ contract Hyper is IHyper {
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
         if (instruction == Instructions.ADD_LIQUIDITY) {
-            (poolId) = _addOrRemoveLiquidity(data);
+            (poolId, , ) = _addOrRemoveLiquidity(data);
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            (poolId) = _addOrRemoveLiquidity(data);
+            (poolId, , ) = _addOrRemoveLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
             // (poolId, , , ) = _swapExactForExact(data);
         } else if (instruction == Instructions.CREATE_POOL) {
