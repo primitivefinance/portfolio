@@ -676,7 +676,7 @@ contract Hyper is IHyper {
 
     // --- Positions --- //
     function _adjustPosition(
-        uint48 poolId,
+        uint24 poolId,
         int24 loTick,
         int24 hiTick,
         int256 deltaLiquidity
