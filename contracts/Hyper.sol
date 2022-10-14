@@ -734,6 +734,7 @@ contract Hyper is IHyper {
         _adjustPosition(poolId, loTick, hiTick, deltaLiquidity);
     }
 
+    /*
     /**
      * @notice Syncs a slot to a new timestamp and returns its deltas to update the pool's liquidity values.
      * @dev Effects on a slot after its been transitioned to another slot.
