@@ -183,6 +183,7 @@ contract Hyper is IHyper {
             revert UnknownInstruction();
         }
 
+        /*
         // note: Only pool interactions have a non-zero poolId.
         if (poolId != 0) {
             uint16 pairId = uint16(poolId >> 32);
@@ -193,6 +194,7 @@ contract Hyper is IHyper {
             if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
             if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
         }
+        */
     }
 
     /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
