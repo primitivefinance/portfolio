@@ -605,17 +605,6 @@ contract Hyper is IHyper {
     //  |                                                                                                                      |
     //  +----------------------------------------------------------------------------------------------------------------------+
 
-    function _adjustPoolLiquidity(
-        uint24 poolId,
-        int24 loTick,
-        int24 hiTick,
-        uint128 deltaLiquidity
-    ) internal {
-        if (loTick <= pool.lastTick && hiTick > pool.lastTick) {
-            pool.liquidity = instruction == 0x01 ? pool.liquidity + deltaLiquidity : pool.liquidity - deltaLiquidity;
-        }
-    }
-
     /**
      * @dev Updates the liquidity of a slot
      */
