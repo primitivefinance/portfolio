@@ -361,6 +361,8 @@ contract Hyper is IHyper {
     //  |                                     SWAPPING                                     |
     //  +----------------------------------------------------------------------------------+
 
+    function _getAmountOut(uint24 poolId, uint256 input) internal returns (uint256 output) {}
+
     SwapState state;
 
     /**
