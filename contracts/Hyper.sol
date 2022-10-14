@@ -287,14 +287,14 @@ contract Hyper is IHyper {
             token0Decimals: token0Decimals,
             token1: token1,
             token1Decimals: token1Decimals,
-            lastPrice: 0,
+            lastPrice: price,
             lastTick: 0,
             liquidity: 0,
             feeGrowthGlobalAsset: 0,
             feeGrowthGlobalQuote: 0
         });
 
-        emit CreatePool(poolId, token0, token1);
+        emit CreatePool(poolId, token0, token1, price);
     }
 
     //  +----------------------------------------------------------------------------------+
