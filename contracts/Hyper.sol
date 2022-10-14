@@ -566,7 +566,7 @@ contract Hyper is IHyper {
      * @custom:reverts If pool with pair and curve has already been created.
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
-    function _createPool(bytes calldata data) internal returns (uint48 poolId) {
+    function _createPool(bytes calldata data) internal returns (uint24 poolId) {
         (address token0, address token1, uint256 amount0, uint256 amount1) = Decoder.decodeCreatePool(data);
 
         poolId = getPoolId[token0][token1];
@@ -723,7 +723,7 @@ contract Hyper is IHyper {
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
     /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
     function _decreasePositionCheckJit(
-        uint48 poolId,
+        uint24 poolId,
         int24 loTick,
         int24 hiTick,
         int256 deltaLiquidity

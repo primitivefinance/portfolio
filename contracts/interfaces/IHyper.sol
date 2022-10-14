@@ -59,7 +59,7 @@ interface IHyperEvents {
     );
     /// @dev Emitted on increasing the internal reserves of a pool.
     event AddLiquidity(
-        uint48 indexed poolId,
+        uint24 indexed poolId,
         address indexed asset,
         address indexed quote,
         uint256 deltaAsset,
@@ -68,7 +68,7 @@ interface IHyperEvents {
     );
     /// @dev Emitted on decreasing the internal reserves of a pool.
     event RemoveLiquidity(
-        uint48 indexed poolId,
+        uint24 indexed poolId,
         address indexed asset,
         address indexed quote,
         uint256 deltaAsset,
@@ -98,7 +98,7 @@ interface IHyperEvents {
 
     // -- Swaps -- //
     /// @dev Emitted on a token swap in a single virtual pool.
-    event Swap(uint48 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
+    event Swap(uint24 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
 
     // - Sync pool - //
     /// @dev Emitted on external calls to `updateLastTimestamp` or `swap`. Syncs a pool's timestamp to block.timestamp.
@@ -143,7 +143,7 @@ interface IHyperGetters {
             uint256 interval
         );
 
-    function pools(uint48 poolId)
+    function pools(uint24 poolId)
         external
         view
         returns (
@@ -160,7 +160,7 @@ interface IHyperGetters {
             uint256 feeGrowthGlobalQuote
         );
 
-    function slots(uint48 poolId, int24 slot)
+    function slots(uint24 poolId, int24 slot)
         external
         view
         returns (
@@ -193,7 +193,7 @@ interface IHyperGetters {
     /// negative (or positive) effects to accounts interacting with the Enigma.
     function checkJitLiquidity(
         address account,
-        uint48 poolId,
+        uint24 poolId,
         int24 loTick,
         int24 hiTick
     ) external view returns (uint256 distance, uint256 timestamp);
@@ -202,7 +202,7 @@ interface IHyperGetters {
     /// @dev Designed to round in a direction disadvantageous to the account minting liquidity.
     /// @custom:security High. Liquidity amounts minted have a direct impact on liquidity pools.
     function getLiquidityMinted(
-        uint48 poolId,
+        uint24 poolId,
         uint256 deltaAsset,
         uint256 deltaQuote
     ) external view returns (uint256 deltaLiquidity);
