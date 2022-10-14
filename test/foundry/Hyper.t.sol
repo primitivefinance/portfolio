@@ -48,4 +48,17 @@ contract TestHyper is Test {
         hyper.process(data);
         assertEq(hyper.getPoolId(address(token0), address(token1)), 1);
     }
+
+    function testFail_cannotUseSamePairTwice() public {
+        bytes memory data = Encoder.encodeCreatePool(address(token0), address(token1), hex"0101");
+        hyper.process(data);
+        hyper.process(data);
+    }
+
+    function testFail_cannotUseSamePairEvenInverted() public {
+        bytes memory data = Encoder.encodeCreatePool(address(token0), address(token1), hex"0101");
+        hyper.process(data);
+        data = Encoder.encodeCreatePool(address(token1), address(token0), hex"0101");
+        hyper.process(data);
+    }
 }
