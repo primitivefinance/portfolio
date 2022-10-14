@@ -774,7 +774,7 @@ contract Hyper is IHyper {
     }
 
     function _getFeeGrowthInside(
-        uint48 poolId,
+        uint24 poolId,
         int24 hi,
         int24 lo,
         int24 current,
