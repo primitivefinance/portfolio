@@ -47,7 +47,7 @@ interface IHyperEvents {
 
     // --- Pools --- //
     /// @dev Emitted on creating a pool for a pair.
-    event CreatePool(uint24 indexed poolId, address indexed token0, address indexed token1);
+    event CreatePool(uint24 indexed poolId, address indexed token0, address indexed token1, uint256 price);
 
     event PoolUpdate(
         uint24 indexed poolId,
