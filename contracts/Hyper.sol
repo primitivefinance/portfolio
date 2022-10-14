@@ -537,73 +537,42 @@ contract Hyper is IHyper {
     //  +----------------------------------------------------------------------------------+
 
     /**
-     * @notice Uses a pair and curve to instantiate a pool at a price.
+     * @notice Uses a pair to instantiate a pool at a price.
      *
      * @custom:reverts If price is 0.
      * @custom:reverts If pool with pair and curve has already been created.
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
     function _createPool(bytes calldata data) internal returns (uint48 poolId) {
-        (uint16 pairId, uint32 gamma, uint32 priorityGamma, uint128 price) = Decoder.decodeCreatePool(data);
+        (address token0, address token1, uint256 amount0, uint256 amount1) = Decoder.decodeCreatePool(data);
 
-        if (price == 0) revert ZeroPrice();
+        poolId = pools[token0][token1];
 
-        // Zero id values are magic variables, since no curve or pair can have an id of zero.
-        if (pairId == 0) pairId = uint16(getPairNonce);
-
-        uint16 poolId = getPoolId[pairId][gamma][priorityGamma];
-
-        if (poolId != 0) revert(); // TODO: Add a proper custom revert error "Pool already exists"
-
-        getPoolId[pairId][gamma][priorityGamma] = uint24(++getPoolNonce);
-
-        // TODO: Do we still want to use this function?
-        if (_doesPoolExist(poolId)) revert PoolExists();
-
-        // Write the pool to state with the desired price.
-        pools[poolId].lastPrice = price;
-        pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price); // todo: implement slot and price grid.
-        pools[poolId].blockTimestamp = timestamp;
-
-        emit CreatePool(poolId, pairId, curveId, price);
-    }
-
-    /**
-     * @notice Maps a nonce to a pair of token addresses and their decimal places.
-     * @dev Pairs are used in pool creation to determine the pool's underlying tokens.
-     *
-     * @custom:reverts If decoded addresses are the same.
-     * @custom:reverts If __ordered__ pair of addresses has already been created and has a non-zero pairId.
-     * @custom:reverts If decimals of either token are not between 6 and 18, inclusive.
-     */
-    function _createPair(bytes calldata data) internal returns (uint16 pairId) {
-        (address token0, address token1) = Decoder.decodeCreatePair(data); // Expects Engima encoded data.
+        if (poolId != 0) revert PoolExists();
         if (token0 == token1) revert SameTokenError();
 
-        pairId = getPairId[token0][token1];
-        if (pairId != 0) revert PairExists(pairId);
+        poolId = uint24(++getPoolNonce);
+        pools[token0][token1] = poolId;
 
         (uint8 token0Decimals, uint8 token1Decimals) = (IERC20(token0).decimals(), IERC20(token1).decimals());
 
         if (!_isValidDecimals(token0Decimals)) revert DecimalsError(token0Decimals);
         if (!_isValidDecimals(token1Decimals)) revert DecimalsError(token1Decimals);
 
-        unchecked {
-            pairId = uint16(++getPairNonce); // Increments the pair nonce, returning the nonce for this pair.
-        }
-
-        // Writes the pairId into a fetchable mapping using its tokens.
-        getPairId[token0][token1] = pairId; // note: No reverse lookup, because order matters!
-
-        // Writes the pair into Enigma state.
-        pairs[pairId] = Pair({
+        // TODO: Do we need to add liquidity right away or can we just put a price?
+        pools[poolId] = Pool({
             token0: token0,
             token0Decimals: token0Decimals,
             token1: token1,
-            token1Decimals: token1Decimals
+            token1Decimals: token1Decimals,
+            lastPrice: 0,
+            lastTick: 0,
+            liquidity: 0,
+            feeGrowthGlobalAsset: 0,
+            feeGrowthGlobalQuote: 0
         });
 
-        emit CreatePair(pairId, token0, token1, token0Decimals, token1Decimals);
+        emit CreatePool(poolId, token0, token1);
     }
 
     //  +----------------------------------------------------------------------------------------------------------------------+
