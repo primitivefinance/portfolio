@@ -10,6 +10,15 @@ import "./Utils.sol";
 library Encoder {
     // --- Encoding & Decoding --- //
 
+    /// @dev Encodes the arguments for the CREATE_POOL instruction.
+    function encodeCreatePool(
+        address token0,
+        address token1,
+        bytes memory price
+    ) internal pure returns (bytes memory data) {
+        data = abi.encodePacked(Instructions.CREATE_POOL, token0, token1, price);
+    }
+
     function encodePoolId(uint16 pairId, uint32 curveId) internal pure returns (uint48 poolId) {
         bytes memory data = abi.encodePacked(pairId, curveId);
         poolId = uint48(bytes6(data));
@@ -27,11 +36,6 @@ library Encoder {
     /// @dev Encodes the arguments for the CREATE_PAIR instruction.
     function encodeCreatePair(address token0, address token1) internal pure returns (bytes memory data) {
         data = abi.encodePacked(Instructions.CREATE_PAIR, token0, token1);
-    }
-
-    /// @dev Encodes the arguments for the CREATE_POOL instruction.
-    function encodeCreatePool(uint48 poolId, uint128 price) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(Instructions.CREATE_POOL, poolId, price);
     }
 
     function encodeAddLiquidity(
