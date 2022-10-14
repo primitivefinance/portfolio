@@ -20,8 +20,6 @@ error BalanceError();
 error LockedError();
 
 // --- Creation --- //
-/// @dev Thrown when a pool is being created which has already been created with the same args.
-error CurveExists(uint32 curveId);
 
 /// @dev Thrown when interacting with a pool that has not been created.
 error NonExistentPool(uint48 poolId);
@@ -85,6 +83,13 @@ error ZeroInput();
 
 /// @dev Token information of each two token pool.
 struct Pair {
+    address token0;
+    uint8 token0Decimals;
+    address token1;
+    uint8 token1Decimals;
+}
+
+struct Pool {
     address token0;
     uint8 token0Decimals;
     address token1;
