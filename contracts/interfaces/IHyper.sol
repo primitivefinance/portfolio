@@ -224,14 +224,7 @@ interface IHyperGetters {
         returns (uint256 deltaAsset, uint256 deltaQuote);
 }
 
-interface IHyperActions {
-    /// @notice Syncs a pool with `poolId` to the current `block.timestamp`.
-    /// @dev Use this method after the pool is expired or else the invariant method will revert.
-    /// @custom:security Medium. Alternative method (instead of swapping) of syncing pools to the current timestamp.
-    function updateLastTimestamp(uint24 poolId) external returns (uint128 blockTimestamp);
-
-    // TODO: add collect function to collect swap fees
-}
+interface IHyperActions {}
 
 /// @title IHyper
 /// @dev All the interfaces of the Enigma, so it can be imported with ease.
