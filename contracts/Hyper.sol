@@ -159,7 +159,7 @@ contract Hyper is IHyper {
     /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
     /// @custom:security Critical. Directly sends instructions to be executed.
     function _process(bytes calldata data) internal {
-        uint48 poolId;
+        uint24 poolId;
         bytes1 instruction = bytes1(data[0] & 0x0f);
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
@@ -276,7 +276,7 @@ contract Hyper is IHyper {
     function _addOrRemoveLiquidity(bytes calldata data)
         internal
         returns (
-            uint48 poolId,
+            uint24 poolId,
             uint256 amount0,
             uint256 amount1
         )
@@ -284,7 +284,7 @@ contract Hyper is IHyper {
         (
             bytes1 instruction,
             uint8 useMax,
-            uint48 poolId,
+            uint24 poolId,
             uint16 pairId,
             int24 loTick,
             int24 hiTick,
@@ -403,7 +403,7 @@ contract Hyper is IHyper {
     function _swapExactForExact(bytes calldata data)
         internal
         returns (
-            uint48 poolId,
+            uint24 poolId,
             uint256 remainder,
             uint256 input,
             uint256 output
@@ -743,7 +743,7 @@ contract Hyper is IHyper {
      */
     /*
     function _transitionSlot(
-        uint48 poolId,
+        uint24 poolId,
         int24 tick,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
@@ -911,7 +911,7 @@ contract Hyper is IHyper {
     // TODO: I think JIT should be checked in terms of block
     function checkJitLiquidity(
         address account,
-        uint48 poolId,
+        uint24 poolId,
         int24 loTick,
         int24 hiTick
     ) public view returns (uint256 distance, uint256 timestamp) {
@@ -922,12 +922,12 @@ contract Hyper is IHyper {
     }
 
     function getLiquidityMinted(
-        uint48 poolId,
+        uint24 poolId,
         uint256 deltaBase,
         uint256 deltaQuote
     ) external view returns (uint256 deltaLiquidity) {}
 
-    function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
+    function getPhysicalReserves(uint24 poolId, uint256 deltaLiquidity)
         external
         view
         returns (uint256 deltaBase, uint256 deltaQuote)
