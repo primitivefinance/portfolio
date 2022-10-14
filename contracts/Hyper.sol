@@ -768,7 +768,7 @@ contract Hyper is IHyper {
     //  +----------------------------------------------------------------------------------------------------------------------+
 
     function _doesPoolExist(uint24 poolId) internal view returns (bool) {
-        return pools[poolId].price != 0;
+        return pools[poolId].lastPrice != 0;
     }
 
     function _getFeeGrowthInside(
