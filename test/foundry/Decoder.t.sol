@@ -18,6 +18,19 @@ contract DecoderWrapper {
     {
         (token0, token1, price) = Decoder.decodeCreatePool(data);
     }
+
+    function decodeSwap(bytes calldata data)
+        public
+        returns (
+            uint8 useMax,
+            uint48 poolId,
+            uint128 input,
+            uint128 limit,
+            uint8 direction
+        )
+    {
+        (useMax, poolId, input, limit, direction) = Decoder.decodeSwap(data);
+    }
 }
 
 contract TestDecoder is Test {
@@ -35,5 +48,17 @@ contract TestDecoder is Test {
         assertEq(token0, 0x32c18e72DD64531B1C43Eec684B1E3Ee9d7EB616);
         assertEq(token1, 0x9bc0dC30f3522bA29A37Cf9098EabCDEa86dD935);
         assertEq(price, 10);
+    }
+
+    function testDecoderSwap() public {
+        bytes memory data = hex"05000002071201060100";
+
+        (uint8 useMax, uint48 poolId, uint128 input, uint128 limit, uint8 direction) = decoder.decodeSwap(data);
+
+        assertEq(useMax, 0);
+        assertEq(poolId, 2);
+        assertEq(input, 1 ether);
+        assertEq(limit, 1 * 10**6);
+        assertEq(direction, 0);
     }
 }
