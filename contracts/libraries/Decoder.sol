@@ -111,9 +111,11 @@ library Decoder {
         )
     {
         useMax = uint8(data[0] >> 4);
-        poolId = uint48(bytes6(data[1:7]));
-        uint8 pointer = uint8(data[7]);
-        input = uint128(unpackAmount(data[8:pointer]));
+        // FIXME: The next line is very ugly, but I had to do it because
+        // Solidity was poorly converting my bytes6 to uint48
+        poolId = uint48(uint256(toBytes32(data[1:4])));
+        uint8 pointer = uint8(data[4]);
+        input = uint128(unpackAmount(data[5:pointer]));
         limit = uint128(unpackAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
         direction = uint8(data[data.length - 1]);
     }
