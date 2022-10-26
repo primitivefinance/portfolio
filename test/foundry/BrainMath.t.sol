@@ -14,4 +14,13 @@ contract TestBrainMath is Test {
         uint256 slot = BrainMath.getSlotFromPrice(price, a);
         assertEq(slot / 1 ether, 71705);
     }
+
+    function test_getSlotProportionFromPrice() public {
+        int256 price = 1300 ether;
+        int256 a = 10001 ether / 10000;
+        uint256 activeSlot = 71705 ether;
+
+        uint256 p = BrainMath.getSlotProportionFromPrice(price, a, activeSlot);
+        assertEq(p, 280434520237481183);
+    }
 }
