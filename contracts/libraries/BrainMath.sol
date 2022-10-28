@@ -3,27 +3,51 @@ pragma solidity 0.8.13;
 
 import "solmate/utils/FixedPointMathLib.sol";
 
-library BrainMath {
-    /**
-     * @dev Returns the slot index associated with a price
-     * @param price Price associated with the slot (with 10^18 precision)
-     * @param a Tick spacing (with 10^18 precision)
-     * @return Associated slot index (with 10^18 precision)
-     */
-    function getSlotFromPrice(int256 price, int256 a) internal pure returns (uint256) {
-        return
-            FixedPointMathLib.divWadDown(uint256(FixedPointMathLib.lnWad(price)), uint256(FixedPointMathLib.lnWad(a))) +
-            500000000000000000;
-    }
+function _abs(int256 x) pure returns (uint256) {
+    return uint256(~x + 1);
+}
 
-    function getSlotProportionFromPrice(
-        int256 price,
-        int256 a,
-        uint256 activeSlot
-    ) internal pure returns (uint256) {
-        return
-            FixedPointMathLib.divWadDown(uint256(FixedPointMathLib.lnWad(price)), uint256(FixedPointMathLib.lnWad(a))) +
-            500000000000000000 -
-            activeSlot;
-    }
+function getSlotFromPrice(uint256 priceF, uint256 aF) pure returns (int128) {
+    return
+        int128(
+            int256(
+                (FixedPointMathLib.divWadDown(
+                    uint256(FixedPointMathLib.lnWad(int256(priceF))),
+                    uint256(FixedPointMathLib.lnWad(int256(aF)))
+                ) + 500000000000000000)
+            )
+        ) / int128(int256(FixedPointMathLib.WAD));
+}
+
+function getSlotProportionFromPrice(
+    uint256 priceF,
+    uint256 aF,
+    int128 activeSlot
+) pure returns (uint256) {
+    return
+        uint256(
+            int256(
+                FixedPointMathLib.divWadDown(
+                    uint256(FixedPointMathLib.lnWad(int256(priceF))),
+                    uint256(FixedPointMathLib.lnWad(int256(aF)))
+                )
+            ) -
+                activeSlot *
+                int128(int256(FixedPointMathLib.WAD)) +
+                500000000000000000
+        );
+}
+
+function getPriceFromSlot(
+    uint256 aF,
+    int128 slotIndex,
+    uint256 slotProportionF
+) returns (uint256) {
+    return
+        uint256(
+            FixedPointMathLib.powWad(
+                int256(aF),
+                slotIndex * int128(int256(FixedPointMathLib.WAD)) + int256(slotProportionF) - 500000000000000000
+            )
+        );
 }
