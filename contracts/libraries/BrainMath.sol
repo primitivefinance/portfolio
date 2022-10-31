@@ -7,6 +7,7 @@ function _abs(int256 x) pure returns (uint256) {
     return uint256(~x + 1);
 }
 
+/// @dev slot index = ln(price) / ln(a) + 0.5
 function getSlotFromPrice(uint256 priceF, uint256 aF) pure returns (int128) {
     return
         int128(
@@ -19,6 +20,7 @@ function getSlotFromPrice(uint256 priceF, uint256 aF) pure returns (int128) {
         ) / int128(int256(FixedPointMathLib.WAD));
 }
 
+/// @dev proportion = ln(price) / ln(a) - activeSlot + 0.5
 function getSlotProportionFromPrice(
     uint256 priceF,
     uint256 aF,
@@ -38,6 +40,7 @@ function getSlotProportionFromPrice(
         );
 }
 
+/// @dev price = a^(slotIndex + slotProportion - 0.5)
 function getPriceFromSlot(
     uint256 aF,
     int128 slotIndex,
