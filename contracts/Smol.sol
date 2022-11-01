@@ -16,7 +16,7 @@ struct Pool {
 }
 
 struct Slot {
-    uint256 liquidityDelta;
+    int256 liquidityDelta;
     uint256 feeGrowthOutsideA;
     uint256 feeGrowthOutsideB;
 }
@@ -77,7 +77,7 @@ contract Smol {
         {
             bytes32 lowerSlotId = _getSlotId(poolId, lowerSlotIndex);
             Slot storage slot = slots[lowerSlotId];
-            slot.liquidityDelta += amount;
+            slot.liquidityDelta += int256(amount);
 
             if (pool.activeSlotIndex >= lowerSlotIndex) {
                 slot.feeGrowthOutsideA = pool.feeGrowthGlobalA;
@@ -88,7 +88,7 @@ contract Smol {
         {
             bytes32 upperSlotId = _getSlotId(poolId, upperSlotIndex);
             Slot storage slot = slots[upperSlotId];
-            slot.liquidityDelta -= amount;
+            slot.liquidityDelta -= int256(amount);
 
             if (pool.activeSlotIndex >= lowerSlotIndex) {
                 slot.feeGrowthOutsideA = pool.feeGrowthGlobalA;
