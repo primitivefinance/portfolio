@@ -182,6 +182,38 @@ contract Smol {
         if (direction) {}
     }
 
+    function calculateFeeGrowthInside(
+        bytes32 poolId,
+        int128 lowerSlotIndex,
+        int128 upperSlotIndex
+    ) internal view returns (uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) {
+        bytes32 lowerSlotId = _getSlotId(poolId, lowerSlotIndex);
+        uint256 lowerSlotFeeGrowthOutsideA = slots[lowerSlotId].feeGrowthOutsideA;
+        uint256 lowerSlotFeeGrowthOutsideB = slots[lowerSlotId].feeGrowthOutsideB;
+
+        bytes32 upperSlotId = _getSlotId(poolId, upperSlotIndex);
+        uint256 upperSlotFeeGrowthOutsideA = slots[upperSlotId].feeGrowthOutsideA;
+        uint256 upperSlotFeeGrowthOutsideB = slots[upperSlotId].feeGrowthOutsideB;
+
+        Pool memory pool = pools[poolId];
+
+        uint256 feeGrowthAboveA = pool.activeSlotIndex >= upperSlotIndex
+            ? pool.feeGrowthGlobalA - upperSlotFeeGrowthOutsideA
+            : upperSlotFeeGrowthOutsideA;
+        uint256 feeGrowthAboveB = pool.activeSlotIndex >= upperSlotIndex
+            ? pool.feeGrowthGlobalB - upperSlotFeeGrowthOutsideB
+            : upperSlotFeeGrowthOutsideB;
+        uint256 feeGrowthBelowA = pool.activeSlotIndex >= upperSlotIndex
+            ? lowerSlotFeeGrowthOutsideA
+            : pool.feeGrowthGlobalA - lowerSlotFeeGrowthOutsideA;
+        uint256 feeGrowthBelowB = pool.activeSlotIndex >= upperSlotIndex
+            ? lowerSlotFeeGrowthOutsideB
+            : pool.feeGrowthGlobalB - lowerSlotFeeGrowthOutsideB;
+
+        feeGrowthInsideA = pool.feeGrowthGlobalA - feeGrowthBelowA - feeGrowthAboveA;
+        feeGrowthInsideB = pool.feeGrowthGlobalB - feeGrowthBelowB - feeGrowthAboveB;
+    }
+
     function _getPoolId(address tokenA, address tokenB) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(tokenA, tokenB));
     }
