@@ -122,13 +122,14 @@ contract Smol {
         } else {
             uint256 slotProportionF = getSlotProportionFromPrice(pool.activePriceF, aF, pool.activeSlotIndex);
 
-            int256 numSlots = (pool.activeSlotIndex - lowerSlotIndex) *
-                int256(FixedPointMathLib.WAD) +
-                int256(slotProportionF);
+            uint256 numSlots = FixedPointMathLib.divWadDown(
+                uint256(int256(pool.activeSlotIndex - lowerSlotIndex)) * FixedPointMathLib.WAD + slotProportionF,
+                FixedPointMathLib.WAD
+            );
 
             // (a^numSlots - 1) / ln(a)
             uint256 firstTerm = FixedPointMathLib.divWadDown(
-                uint256(FixedPointMathLib.powWad(int256(aF), numSlots) - 1000000000000000000),
+                uint256(FixedPointMathLib.powWad(int256(aF), int256(numSlots)) - 1000000000000000000),
                 uint256(FixedPointMathLib.lnWad(int256(aF)))
             );
 
