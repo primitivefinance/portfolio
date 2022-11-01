@@ -27,6 +27,7 @@ struct Position {
     uint256 liquidityOwned;
     uint256 freeGrowthInsideLastA;
     uint256 freeGrowthInsideLastB;
+    // TODO: Should we track these fees with precision or nah?
     uint256 feesOwedA;
     uint256 feesOwedB;
 }
@@ -158,6 +159,23 @@ contract Smol {
         bytes32 positionId = _getPositionId(poolId, lowerSlotIndex, upperSlotIndex);
         Position storage position = positions[positionId];
         position.liquidityOwned += amount;
+
+        {
+            (uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) = _calculateFeeGrowthInside(
+                poolId,
+                lowerSlotIndex,
+                upperSlotIndex
+            );
+
+            uint256 changeInFeeGrowthA = feeGrowthInsideA - position.freeGrowthInsideLastA;
+            uint256 changeInFeeGrowthB = feeGrowthInsideB - position.freeGrowthInsideLastB;
+
+            position.feesOwedA += FixedPointMathLib.divWadDown(changeInFeeGrowthA, position.liquidityOwned);
+            position.feesOwedB += FixedPointMathLib.divWadDown(changeInFeeGrowthB, position.liquidityOwned);
+
+            position.freeGrowthInsideLastA = feeGrowthInsideA;
+            position.freeGrowthInsideLastB = feeGrowthInsideB;
+        }
     }
 
     struct SwapCache {
@@ -184,7 +202,7 @@ contract Smol {
         if (direction) {}
     }
 
-    function calculateFeeGrowthInside(
+    function _calculateFeeGrowthInside(
         bytes32 poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex
