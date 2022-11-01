@@ -98,30 +98,38 @@ contract Smol {
         uint256 amountB;
 
         if (pool.activeSlotIndex > upperSlotIndex) {
-            amountB = _abs((upperSlotIndex - lowerSlotIndex) * int256(amount));
+            amountB = uint256(int256(upperSlotIndex - lowerSlotIndex)) * amount;
         } else if (pool.activeSlotIndex < lowerSlotIndex) {
             int256 numSlots = upperSlotIndex - lowerSlotIndex;
+
+            // a^(numSlots - 1) / ln(a)
             uint256 firstTerm = FixedPointMathLib.divWadDown(
-                uint256(FixedPointMathLib.powWad(int256(aF), int256(numSlots))),
+                uint256(FixedPointMathLib.powWad(int256(aF), numSlots)) - 1000000000000000000,
                 uint256(FixedPointMathLib.lnWad(int256(aF)))
             );
+
+            // a^(0.5 - upperSlotIndex)
             uint256 secondTerm = uint256(
                 FixedPointMathLib.powWad(
                     int256(aF),
                     int256(500000000000000000 - upperSlotIndex * int128(uint128(FixedPointMathLib.WAD)))
                 )
             );
-            amountA += FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(firstTerm, secondTerm), amount);
+            amountA = FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(firstTerm, secondTerm), amount);
         } else {
             uint256 slotProportionF = getSlotProportionFromPrice(pool.activePriceF, aF, pool.activeSlotIndex);
 
             int256 numSlots = (pool.activeSlotIndex - lowerSlotIndex) *
                 int256(FixedPointMathLib.WAD) +
                 int256(slotProportionF);
+
+            // (a^numSlots - 1) / ln(a)
             uint256 firstTerm = FixedPointMathLib.divWadDown(
-                uint256(FixedPointMathLib.powWad(int256(aF), numSlots) - int256(1 ether)),
+                uint256(FixedPointMathLib.powWad(int256(aF), numSlots) - 1000000000000000000),
                 uint256(FixedPointMathLib.lnWad(int256(aF)))
             );
+
+            // a^(0.5 - upperSlotIndex - slotProportionF)
             uint256 secondTerm = uint256(
                 FixedPointMathLib.powWad(
                     int256(aF),
@@ -132,10 +140,13 @@ contract Smol {
                 )
             );
 
-            amountA += FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(firstTerm, secondTerm), amount);
-
+            amountA = FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(firstTerm, secondTerm), amount);
             amountB = FixedPointMathLib.mulWadDown(
-                uint256(pool.activeSlotIndex - lowerSlotIndex + int256(slotProportionF)),
+                uint256(
+                    (pool.activeSlotIndex - lowerSlotIndex) *
+                        int128(uint128(FixedPointMathLib.WAD)) +
+                        int256(slotProportionF)
+                ),
                 amount
             );
 
