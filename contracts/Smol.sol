@@ -27,6 +27,8 @@ struct Position {
     uint256 liquidityOwned;
     uint256 freeGrowthInsideLastA;
     uint256 freeGrowthInsideLastB;
+    uint256 feesOwedA;
+    uint256 feesOwedB;
 }
 
 contract Smol {
