@@ -26,6 +26,7 @@ function getSlotProportionFromPrice(
     uint256 aF,
     int128 activeSlot
 ) pure returns (uint256) {
+    // TODO: Fix this calculation, it seems to be off
     return
         uint256(
             int256(
