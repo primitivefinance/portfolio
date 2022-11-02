@@ -7,11 +7,13 @@ struct Pool {
     bool initialized;
     address tokenA;
     address tokenB;
+    uint256 lvrFactor;
     uint256 activeLiquidity;
     uint256 activePriceF;
     int128 activeSlotIndex;
     uint256 feeGrowthGlobalA;
     uint256 feeGrowthGlobalB;
+    uint256 slotProportionF;
 }
 
 struct Slot {
@@ -250,6 +252,18 @@ contract Smol {
                 (1000000000000000000 - pool.slotProportionF) + uint128(slotIndexOfNextDelta - pool.activeSlotIndex),
                 pool.activeLiquidity
             );
+    }
+
+    function _getDeltaX(Pool memory pool, uint256 y) internal view returns (uint256) {
+        uint256 firstTerm = FixedPointMathLib.divWadDown(
+            (1000000000000000000 -
+                uint256(
+                    FixedPointMathLib.powWad(int256(aF), int256(FixedPointMathLib.divWadDown(y, pool.activeLiquidity)))
+                )),
+            FixedPointMathLib.mulWadDown(pool.activePriceF, uint256(FixedPointMathLib.lnWad(int256(aF))))
+        );
+
+        return FixedPointMathLib.mulWadDown(firstTerm, pool.activeLiquidity);
     }
 
     function _calculateFeeGrowthInside(
