@@ -13,6 +13,7 @@ struct Pool {
     int128 activeSlotIndex;
     uint256 feeGrowthGlobalA;
     uint256 feeGrowthGlobalB;
+    uint256 slotProportionF;
 }
 
 struct Slot {
@@ -200,7 +201,57 @@ contract Smol {
         uint256 cumulativeFees;
         SwapCache memory swapCache;
 
-        if (direction) {}
+        if (!direction) {
+            while (tenderedRemaining > 0) {
+                uint256 xMax;
+            }
+        } else {}
+    }
+
+    function _getXMaxToLiquidityDelta(Pool memory pool, int128 slotIndexOfNextDelta) internal returns (uint256) {
+        uint256 numSlotsF = uint256(int256(pool.activeSlotIndex - slotIndexOfNextDelta)) *
+            FixedPointMathLib.WAD +
+            pool.slotProportionF;
+
+        // (1 / (activePrice * ln(a))) * activeLiquidity
+        uint256 xFirstTerm = FixedPointMathLib.mulWadDown(
+            FixedPointMathLib.divWadDown(
+                1000000000000000000,
+                pool.activePriceF * uint256(FixedPointMathLib.lnWad(int256(aF)))
+            ),
+            pool.activeLiquidity
+        );
+
+        // a^(numSlots + slotProportion) - 1
+        uint256 xSecondTerm = uint256(FixedPointMathLib.powWad(int256(aF), int256(numSlotsF + pool.slotProportionF))) -
+            1000000000000000000;
+
+        return FixedPointMathLib.mulWadDown(xFirstTerm, xSecondTerm);
+    }
+
+    function _getDeltaY(Pool memory pool, uint256 x) internal view returns (uint256) {
+        // (-1 / ln(a)) * activeLiquidity
+        uint256 receivedFirstTerm = FixedPointMathLib.mulWadDown(
+            FixedPointMathLib.divWadDown(1000000000000000000, uint256(FixedPointMathLib.lnWad(int256(aF)))),
+            pool.activeLiquidity
+        );
+
+        uint256 liquidityFraction = x / pool.activeLiquidity;
+        uint256 receivedInsideLogTerm = 1000000000000000000 +
+            FixedPointMathLib.divWadDown(
+                FixedPointMathLib.mulWadDown(uint256(FixedPointMathLib.lnWad(int256(aF))), liquidityFraction),
+                pool.activePriceF
+            );
+
+        return FixedPointMathLib.mulWadDown(receivedInsideLogTerm, receivedFirstTerm);
+    }
+
+    function _getYMaxToLiquidityDelta(Pool memory pool, int128 slotIndexOfNextDelta) internal view returns (uint256) {
+        return
+            FixedPointMathLib.mulWadDown(
+                (1000000000000000000 - pool.slotProportionF) + uint128(slotIndexOfNextDelta - pool.activeSlotIndex),
+                pool.activeLiquidity
+            );
     }
 
     function _calculateFeeGrowthInside(
