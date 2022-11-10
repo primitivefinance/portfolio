@@ -7,13 +7,11 @@ struct Pool {
     bool initialized;
     address tokenA;
     address tokenB;
-    uint256 lvrFactor;
     uint256 activeLiquidity;
     uint256 activePriceF;
     int128 activeSlotIndex;
     uint256 feeGrowthGlobalA;
     uint256 feeGrowthGlobalB;
-    uint256 slotProportionF;
 }
 
 struct Slot {
