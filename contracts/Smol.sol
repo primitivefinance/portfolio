@@ -41,9 +41,7 @@ contract Smol {
     function initiatePool(
         address tokenA,
         address tokenB,
-        // TODO: Should we use active price or active slot?
-        uint256 activePriceF,
-        int128 activeSlotIndex
+        uint256 activePriceF
     ) public {
         if (tokenA == tokenB) revert();
         (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -52,10 +50,7 @@ contract Smol {
 
         if (pool.initialized) revert();
         pool.initialized = true;
-
-        // TODO: I think we should only use one of them and deduct the other one
         pool.activePriceF = activePriceF;
-        pool.activeSlotIndex = activeSlotIndex;
     }
 
     function addLiquidity(
@@ -99,60 +94,7 @@ contract Smol {
         uint256 amountA;
         uint256 amountB;
 
-        if (pool.activeSlotIndex > upperSlotIndex) {
-            amountB = uint256(int256(upperSlotIndex - lowerSlotIndex)) * amount;
-        } else if (pool.activeSlotIndex < lowerSlotIndex) {
-            int256 numSlots = upperSlotIndex - lowerSlotIndex;
-
-            // a^(numSlots - 1) / ln(a)
-            uint256 firstTerm = FixedPointMathLib.divWadDown(
-                uint256(FixedPointMathLib.powWad(int256(aF), numSlots)) - 1000000000000000000,
-                uint256(FixedPointMathLib.lnWad(int256(aF)))
-            );
-
-            // a^(0.5 - upperSlotIndex)
-            uint256 secondTerm = uint256(
-                FixedPointMathLib.powWad(
-                    int256(aF),
-                    int256(500000000000000000 - upperSlotIndex * int128(uint128(FixedPointMathLib.WAD)))
-                )
-            );
-            amountA = FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(firstTerm, secondTerm), amount);
-        } else {
-            uint256 slotProportionF = getSlotProportionFromPrice(pool.activePriceF, aF, pool.activeSlotIndex);
-
-            uint256 numSlots = FixedPointMathLib.divWadDown(
-                uint256(int256(pool.activeSlotIndex - lowerSlotIndex)) * FixedPointMathLib.WAD + slotProportionF,
-                FixedPointMathLib.WAD
-            );
-
-            // (a^numSlots - 1) / ln(a)
-            uint256 firstTerm = FixedPointMathLib.divWadDown(
-                uint256(FixedPointMathLib.powWad(int256(aF), int256(numSlots)) - 1000000000000000000),
-                uint256(FixedPointMathLib.lnWad(int256(aF)))
-            );
-
-            // a^(0.5 - upperSlotIndex - slotProportionF)
-            uint256 secondTerm = uint256(
-                FixedPointMathLib.powWad(
-                    int256(aF),
-                    int256(500000000000000000) -
-                        upperSlotIndex *
-                        int256(FixedPointMathLib.WAD) -
-                        int256(slotProportionF)
-                )
-            );
-
-            amountA = FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(firstTerm, secondTerm), amount);
-            amountB = FixedPointMathLib.mulWadDown(
-                uint256(
-                    (pool.activeSlotIndex - lowerSlotIndex) *
-                        int128(uint128(FixedPointMathLib.WAD)) +
-                        int256(slotProportionF)
-                ),
-                amount
-            );
-
+        if (pool.activeSlotIndex > upperSlotIndex) {} else if (pool.activeSlotIndex < lowerSlotIndex) {} else {
             pool.activeLiquidity += amount;
         }
 
@@ -199,69 +141,7 @@ contract Smol {
         uint256 cumulativeFees;
         SwapCache memory swapCache;
 
-        if (!direction) {
-            while (tenderedRemaining > 0) {
-                uint256 xMax;
-            }
-        } else {}
-    }
-
-    function _getXMaxToLiquidityDelta(Pool memory pool, int128 slotIndexOfNextDelta) internal returns (uint256) {
-        uint256 numSlotsF = uint256(int256(pool.activeSlotIndex - slotIndexOfNextDelta)) *
-            FixedPointMathLib.WAD +
-            pool.slotProportionF;
-
-        // (1 / (activePrice * ln(a))) * activeLiquidity
-        uint256 xFirstTerm = FixedPointMathLib.mulWadDown(
-            FixedPointMathLib.divWadDown(
-                1000000000000000000,
-                pool.activePriceF * uint256(FixedPointMathLib.lnWad(int256(aF)))
-            ),
-            pool.activeLiquidity
-        );
-
-        // a^(numSlots + slotProportion) - 1
-        uint256 xSecondTerm = uint256(FixedPointMathLib.powWad(int256(aF), int256(numSlotsF + pool.slotProportionF))) -
-            1000000000000000000;
-
-        return FixedPointMathLib.mulWadDown(xFirstTerm, xSecondTerm);
-    }
-
-    function _getDeltaY(Pool memory pool, uint256 x) internal view returns (uint256) {
-        // (-1 / ln(a)) * activeLiquidity
-        uint256 receivedFirstTerm = FixedPointMathLib.mulWadDown(
-            FixedPointMathLib.divWadDown(1000000000000000000, uint256(FixedPointMathLib.lnWad(int256(aF)))),
-            pool.activeLiquidity
-        );
-
-        uint256 liquidityFraction = x / pool.activeLiquidity;
-        uint256 receivedInsideLogTerm = 1000000000000000000 +
-            FixedPointMathLib.divWadDown(
-                FixedPointMathLib.mulWadDown(uint256(FixedPointMathLib.lnWad(int256(aF))), liquidityFraction),
-                pool.activePriceF
-            );
-
-        return FixedPointMathLib.mulWadDown(receivedInsideLogTerm, receivedFirstTerm);
-    }
-
-    function _getYMaxToLiquidityDelta(Pool memory pool, int128 slotIndexOfNextDelta) internal view returns (uint256) {
-        return
-            FixedPointMathLib.mulWadDown(
-                (1000000000000000000 - pool.slotProportionF) + uint128(slotIndexOfNextDelta - pool.activeSlotIndex),
-                pool.activeLiquidity
-            );
-    }
-
-    function _getDeltaX(Pool memory pool, uint256 y) internal view returns (uint256) {
-        uint256 firstTerm = FixedPointMathLib.divWadDown(
-            (1000000000000000000 -
-                uint256(
-                    FixedPointMathLib.powWad(int256(aF), int256(FixedPointMathLib.divWadDown(y, pool.activeLiquidity)))
-                )),
-            FixedPointMathLib.mulWadDown(pool.activePriceF, uint256(FixedPointMathLib.lnWad(int256(aF))))
-        );
-
-        return FixedPointMathLib.mulWadDown(firstTerm, pool.activeLiquidity);
+        if (!direction) {} else {}
     }
 
     function _calculateFeeGrowthInside(
