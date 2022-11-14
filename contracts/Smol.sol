@@ -112,8 +112,12 @@ contract Smol {
             uint256 changeInFeeGrowthA = feeGrowthInsideA - position.freeGrowthInsideLastA;
             uint256 changeInFeeGrowthB = feeGrowthInsideB - position.freeGrowthInsideLastB;
 
-            position.feesOwedA += FixedPointMathLib.divWadDown(changeInFeeGrowthA, position.liquidityOwned);
-            position.feesOwedB += FixedPointMathLib.divWadDown(changeInFeeGrowthB, position.liquidityOwned);
+            position.feesOwedA += uint256(
+                PRBMathSD59x18.div(int256(changeInFeeGrowthA), int256(position.liquidityOwned))
+            );
+            position.feesOwedB += uint256(
+                PRBMathSD59x18.div(int256(changeInFeeGrowthB), int256(position.liquidityOwned))
+            );
 
             position.freeGrowthInsideLastA = feeGrowthInsideA;
             position.freeGrowthInsideLastB = feeGrowthInsideB;
