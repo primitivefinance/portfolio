@@ -94,8 +94,32 @@ contract Smol {
         uint256 amountA;
         uint256 amountB;
 
-        if (pool.activeSlotIndex > upperSlotIndex) {} else if (pool.activeSlotIndex < lowerSlotIndex) {} else {
+        if (pool.activeSlotIndex > upperSlotIndex) {
+            amountA = _calculateDeltaX(
+                amount,
+                _getPriceSqrtAtSlot(int256(aF), lowerSlotIndex),
+                _getPriceSqrtAtSlot(int256(aF), upperSlotIndex)
+            );
+        } else if (pool.activeSlotIndex < lowerSlotIndex) {
+            amountA = _calculateDeltaX(
+                amount,
+                _getPriceSqrtAtSlot(int256(aF), pool.activeSlotIndex),
+                _getPriceSqrtAtSlot(int256(aF), upperSlotIndex)
+            );
+
+            amountB = _calculateDeltaY(
+                amount,
+                _getPriceSqrtAtSlot(int256(aF), lowerSlotIndex),
+                _getPriceSqrtAtSlot(int256(aF), pool.activeSlotIndex)
+            );
+
             pool.activeLiquidity += amount;
+        } else {
+            amountB = _calculateDeltaY(
+                amount,
+                _getPriceSqrtAtSlot(int256(aF), lowerSlotIndex),
+                _getPriceSqrtAtSlot(int256(aF), upperSlotIndex)
+            );
         }
 
         bytes32 positionId = _getPositionId(poolId, lowerSlotIndex, upperSlotIndex);
