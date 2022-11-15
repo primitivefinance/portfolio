@@ -2,13 +2,41 @@
 pragma solidity 0.8.13;
 
 import "./libraries/BrainMath.sol";
+import "./libraries/GlobalDefaults.sol";
+
+struct Epoch {
+    uint256 id;
+    uint256 endTime;
+}
+
+struct PoolSnapshot {
+    uint256 activeSqrtPriceFixedPoint;
+    int128 activeSlotIndex;
+    uint256 proceedsGrowthGlobalFixedPoint;
+    uint256 feeGrowthGlobalAFixedPoint;
+    uint256 feeGrowthGlobalBFixedPoint;
+}
+
+struct SlotSnapshot {
+    uint256 proceedsGrowthOutsideFixedPoint;
+    uint256 feeGrowthOutsideAFixedPoint;
+    uint256 feeGrowthOutsideBFixedPoint;
+}
+
+struct AuctionBid {
+    address bidder;
+    uint256 amount;
+}
 
 struct Pool {
     address tokenA;
     address tokenB;
     uint256 activeLiquidity;
-    uint256 activePriceFixedPoint;
+    uint256 activeLiquidityMatured;
+    int256 activeLiquidityPending;
+    uint256 activeSqrtPriceFixedPoint;
     int128 activeSlotIndex;
+    uint256 proceedsGrowthGlobalFixedPoint;
     uint256 feeGrowthGlobalAFixedPoint;
     uint256 feeGrowthGlobalBFixedPoint;
     address arbRightOwner;
@@ -17,8 +45,12 @@ struct Pool {
 
 struct Slot {
     int256 liquidityDelta;
+    int256 liquidityMaturedDelta;
+    int256 liquidityPendingDelta;
+    uint256 proceedsGrowthOutsideFixedPoint;
     uint256 feeGrowthOutsideAFixedPoint;
     uint256 feeGrowthOutsideBFixedPoint;
+    uint256 lastUpdatedTimestamp;
 }
 
 struct Position {
@@ -48,7 +80,6 @@ struct Position {
 // - slots bitmap
 
 contract Smol {
-    uint256 public priceGridFixedPoint = 1000100000000000000; // 1.0001
     uint256 public epochLength;
     uint256 public auctionLength;
     address public auctionSettlementToken;
@@ -58,6 +89,9 @@ contract Smol {
     mapping(bytes32 => Pool) public pools;
     mapping(bytes32 => Position) public positions;
     mapping(bytes32 => Slot) public slots;
+
+    mapping(bytes32 => mapping(uint256 => PoolSnapshots)) public poolSnapshots;
+    mapping(bytes32 => mapping(uint256 => SlotSnapshots)) public slotSnapshots;
 
     function initiatePool(
         address tokenA,
@@ -70,8 +104,13 @@ contract Smol {
         Pool storage pool = pools[_getPoolId(tokenA, tokenB)];
 
         if (pool.lastUpdatedTimestamp != 0) revert();
+        pool.tokenA = tokenA;
+        pool.tokenB = tokenB;
         pool.activePriceFixedPoint = activePriceFixedPoint;
+        // TODO: set active slot index?
         pool.lastUpdatedTimestamp = block.timestamp;
+
+        uint256 x = PRICE_GRID_FIXED_POINT;
 
         // TODO: emit InitiatePool event
     }
