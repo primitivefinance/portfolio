@@ -60,6 +60,7 @@
     "*.ts": "prettier --write"
   },
   "dependencies": {
+    "@prb/math": "^2.5.0",
     "@primitivefi/rmm-core": "^1.0.0",
     "@rari-capital/solmate": "7.0.0-alpha.3",
     "@typechain/ethers-v5": "^10.0.0",
