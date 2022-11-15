@@ -99,9 +99,6 @@ contract Smol {
         address tokenB,
         uint256 activeSqrtPriceFixedPoint
     ) public {
-        if (tokenA == tokenB) revert();
-        (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-
         Pool storage pool = pools[_getPoolId(tokenA, tokenB)];
 
         if (pool.lastUpdatedTimestamp != 0) revert();
@@ -123,8 +120,6 @@ contract Smol {
     ) public {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
-
-        (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
 
         bytes32 poolId = _getPoolId(tokenA, tokenB);
         Pool storage pool = pools[poolId];
@@ -254,6 +249,8 @@ contract Smol {
     }
 
     function _getPoolId(address tokenA, address tokenB) internal pure returns (bytes32) {
+        if (tokenA == tokenB) revert();
+        (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
         return keccak256(abi.encodePacked(tokenA, tokenB));
     }
 
