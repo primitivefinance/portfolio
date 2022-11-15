@@ -13,6 +13,7 @@ struct Pool {
     uint256 feeGrowthGlobalAFixedPoint;
     uint256 feeGrowthGlobalBFixedPoint;
     address arbRightOwner;
+    uint256 lastUpdatedTimestamp;
 }
 
 struct Slot {
@@ -53,6 +54,7 @@ contract Smol {
     uint256 public auctionLength;
     address public auctionSettlementToken;
     uint256 public auctionFee;
+    uint256 public publicSwapFee;
 
     mapping(bytes32 => Pool) public pools;
     mapping(bytes32 => Position) public positions;
@@ -61,7 +63,7 @@ contract Smol {
     function initiatePool(
         address tokenA,
         address tokenB,
-        uint256 activePriceF
+        uint256 activePriceFixedPoint
     ) public {
         if (tokenA == tokenB) revert();
         (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -70,7 +72,10 @@ contract Smol {
 
         if (pool.initialized) revert();
         pool.initialized = true;
-        pool.activePriceF = activePriceF;
+        pool.activePriceFixedPoint = activePriceFixedPoint;
+        pool.lastUpdatedTimestamp = block.timestamp;
+
+        // TODO: emit InitiatePool event
     }
 
     function addLiquidity(
