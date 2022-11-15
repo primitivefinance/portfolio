@@ -8,31 +8,51 @@ struct Pool {
     address tokenA;
     address tokenB;
     uint256 activeLiquidity;
-    uint256 activePriceF;
+    uint256 activePriceFixedPoint;
     int128 activeSlotIndex;
-    uint256 feeGrowthGlobalA;
-    uint256 feeGrowthGlobalB;
+    uint256 feeGrowthGlobalAFixedPoint;
+    uint256 feeGrowthGlobalBFixedPoint;
+    address arbRightOwner;
 }
 
 struct Slot {
     int256 liquidityDelta;
-    uint256 feeGrowthOutsideA;
-    uint256 feeGrowthOutsideB;
+    uint256 feeGrowthOutsideAFixedPoint;
+    uint256 feeGrowthOutsideBFixedPoint;
 }
 
 struct Position {
     int128 lowerSlotIndex;
     int128 upperSlotIndex;
     uint256 liquidityOwned;
-    uint256 freeGrowthInsideLastA;
-    uint256 freeGrowthInsideLastB;
+    uint256 feeGrowthInsideLastAFixedPoint;
+    uint256 feeGrowthInsideLastBFixedPoint;
     // TODO: Should we track these fees with precision or nah?
-    uint256 feesOwedA;
-    uint256 feesOwedB;
+    uint256 feesOwedAFixedPoint;
+    uint256 feesOwedBFixedPoint;
 }
 
+// TODO:
+// - Add WETH wrapping / unwrapping
+// - Add the internal balances, fund and withdraw
+// - Add Multicall?
+// - Fixed point library
+// - Slippage checks
+// - Extra function parameters
+// - Epochs / staking feature
+// - Auction
+// - Events
+// - Custom errors
+// - Interface
+// - Change `addLiquidity` to `updateLiquidity`
+// - slots bitmap
+
 contract Smol {
-    uint256 public aF = 1000100000000000000; // 1.0001
+    uint256 public priceGridFixedPoint = 1000100000000000000; // 1.0001
+    uint256 public epochLength;
+    uint256 public auctionLength;
+    address public auctionSettlementToken;
+    uint256 public auctionFee;
 
     mapping(bytes32 => Pool) public pools;
     mapping(bytes32 => Position) public positions;
@@ -122,7 +142,7 @@ contract Smol {
             );
         }
 
-        bytes32 positionId = _getPositionId(poolId, lowerSlotIndex, upperSlotIndex);
+        bytes32 positionId = _getPositionId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
         Position storage position = positions[positionId];
         position.liquidityOwned += amount;
 
@@ -213,10 +233,11 @@ contract Smol {
     }
 
     function _getPositionId(
+        address owner,
         bytes32 poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex
     ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(poolId, lowerSlotIndex, upperSlotIndex));
+        return keccak256(abi.encodePacked(owner, poolId, lowerSlotIndex, upperSlotIndex));
     }
 }
