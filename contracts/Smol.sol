@@ -4,7 +4,6 @@ pragma solidity 0.8.13;
 import "./libraries/BrainMath.sol";
 
 struct Pool {
-    bool initialized;
     address tokenA;
     address tokenB;
     uint256 activeLiquidity;
@@ -70,8 +69,7 @@ contract Smol {
 
         Pool storage pool = pools[_getPoolId(tokenA, tokenB)];
 
-        if (pool.initialized) revert();
-        pool.initialized = true;
+        if (pool.lastUpdatedTimestamp != 0) revert();
         pool.activePriceFixedPoint = activePriceFixedPoint;
         pool.lastUpdatedTimestamp = block.timestamp;
 
@@ -92,16 +90,17 @@ contract Smol {
 
         bytes32 poolId = _getPoolId(tokenA, tokenB);
         Pool storage pool = pools[poolId];
-        if (!pool.initialized) revert();
+        if (pool.lastUpdatedTimestamp == 0) revert();
 
+        // TODO: Optimize this code to avoid duplicated lines (maybe add a function)
         {
             bytes32 lowerSlotId = _getSlotId(poolId, lowerSlotIndex);
             Slot storage slot = slots[lowerSlotId];
             slot.liquidityDelta += int256(amount);
 
             if (pool.activeSlotIndex >= lowerSlotIndex) {
-                slot.feeGrowthOutsideA = pool.feeGrowthGlobalA;
-                slot.feeGrowthOutsideB = pool.feeGrowthGlobalB;
+                slot.feeGrowthOutsideAFixedPoint = pool.feeGrowthGlobalAFixedPoint;
+                slot.feeGrowthOutsideBFixedPoint = pool.feeGrowthGlobalBFixedPoint;
             }
         }
 
@@ -110,46 +109,25 @@ contract Smol {
             Slot storage slot = slots[upperSlotId];
             slot.liquidityDelta -= int256(amount);
 
-            if (pool.activeSlotIndex >= lowerSlotIndex) {
-                slot.feeGrowthOutsideA = pool.feeGrowthGlobalA;
-                slot.feeGrowthOutsideB = pool.feeGrowthGlobalB;
+            if (pool.activeSlotIndex >= upperSlotIndex) {
+                slot.feeGrowthOutsideAFixedPoint = pool.feeGrowthGlobalAFixedPoint;
+                slot.feeGrowthOutsideBFixedPoint = pool.feeGrowthGlobalBFixedPoint;
             }
         }
 
-        uint256 amountA;
-        uint256 amountB;
+        (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
+            priceGridFixedPoint,
+            amount,
+            pool.activePriceFixedPoint,
+            pool.activeSlotIndex,
+            lowerSlotIndex,
+            upperSlotIndex
+        );
 
-        if (pool.activeSlotIndex > upperSlotIndex) {
-            amountA = _calculateDeltaX(
-                amount,
-                _getPriceSqrtAtSlot(int256(aF), lowerSlotIndex),
-                _getPriceSqrtAtSlot(int256(aF), upperSlotIndex)
-            );
-        } else if (pool.activeSlotIndex < lowerSlotIndex) {
-            amountA = _calculateDeltaX(
-                amount,
-                _getPriceSqrtAtSlot(int256(aF), pool.activeSlotIndex),
-                _getPriceSqrtAtSlot(int256(aF), upperSlotIndex)
-            );
-
-            amountB = _calculateDeltaY(
-                amount,
-                _getPriceSqrtAtSlot(int256(aF), lowerSlotIndex),
-                _getPriceSqrtAtSlot(int256(aF), pool.activeSlotIndex)
-            );
-
-            pool.activeLiquidity += amount;
-        } else {
-            amountB = _calculateDeltaY(
-                amount,
-                _getPriceSqrtAtSlot(int256(aF), lowerSlotIndex),
-                _getPriceSqrtAtSlot(int256(aF), upperSlotIndex)
-            );
-        }
+        if (amountA != 0 && amountB != 0) pool.activeLiquidity += amount;
 
         bytes32 positionId = _getPositionId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
         Position storage position = positions[positionId];
-        position.liquidityOwned += amount;
 
         {
             (uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) = _calculateFeeGrowthInside(
@@ -158,19 +136,22 @@ contract Smol {
                 upperSlotIndex
             );
 
-            uint256 changeInFeeGrowthA = feeGrowthInsideA - position.freeGrowthInsideLastA;
-            uint256 changeInFeeGrowthB = feeGrowthInsideB - position.freeGrowthInsideLastB;
+            uint256 changeInFeeGrowthA = feeGrowthInsideA - position.feeGrowthInsideLastAFixedPoint;
+            uint256 changeInFeeGrowthB = feeGrowthInsideB - position.feeGrowthInsideLastBFixedPoint;
 
-            position.feesOwedA += uint256(
-                PRBMathSD59x18.div(int256(changeInFeeGrowthA), int256(position.liquidityOwned))
-            );
-            position.feesOwedB += uint256(
-                PRBMathSD59x18.div(int256(changeInFeeGrowthB), int256(position.liquidityOwned))
-            );
+            position.feesOwedAFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthA);
+            position.feesOwedBFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthB);
 
-            position.freeGrowthInsideLastA = feeGrowthInsideA;
-            position.freeGrowthInsideLastB = feeGrowthInsideB;
+            position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideA;
+            position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideB;
         }
+
+        position.liquidityOwned += amount;
+
+        // TODO: Flip the ticks depending on the liquidity delta
+        // TODO: Update the fee growth of the tick when the tick is flipped
+
+        // TODO: emit AddLiquidity event
     }
 
     struct SwapCache {
@@ -197,36 +178,41 @@ contract Smol {
         if (!direction) {} else {}
     }
 
+    // TODO: Turn this into a global function (avoid duplicated lines)
+    // TODO: Maybe we should pass directly the pool as a struct or at least the variables
+    // that we need instead of passing the poolId (because it's going to reload the pool
+    // one more time into the memory)
     function _calculateFeeGrowthInside(
         bytes32 poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex
     ) internal view returns (uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) {
         bytes32 lowerSlotId = _getSlotId(poolId, lowerSlotIndex);
-        uint256 lowerSlotFeeGrowthOutsideA = slots[lowerSlotId].feeGrowthOutsideA;
-        uint256 lowerSlotFeeGrowthOutsideB = slots[lowerSlotId].feeGrowthOutsideB;
+        uint256 lowerSlotFeeGrowthOutsideAFixedPoint = slots[lowerSlotId].feeGrowthOutsideAFixedPoint;
+        uint256 lowerSlotFeeGrowthOutsideBFixedPoint = slots[lowerSlotId].feeGrowthOutsideBFixedPoint;
 
         bytes32 upperSlotId = _getSlotId(poolId, upperSlotIndex);
-        uint256 upperSlotFeeGrowthOutsideA = slots[upperSlotId].feeGrowthOutsideA;
-        uint256 upperSlotFeeGrowthOutsideB = slots[upperSlotId].feeGrowthOutsideB;
+        uint256 upperSlotFeeGrowthOutsideAFixedPoint = slots[upperSlotId].feeGrowthOutsideAFixedPoint;
+        uint256 upperSlotFeeGrowthOutsideBFixedPoint = slots[upperSlotId].feeGrowthOutsideBFixedPoint;
 
         Pool memory pool = pools[poolId];
 
         uint256 feeGrowthAboveA = pool.activeSlotIndex >= upperSlotIndex
-            ? pool.feeGrowthGlobalA - upperSlotFeeGrowthOutsideA
-            : upperSlotFeeGrowthOutsideA;
+            ? pool.feeGrowthGlobalAFixedPoint - upperSlotFeeGrowthOutsideAFixedPoint
+            : upperSlotFeeGrowthOutsideAFixedPoint;
         uint256 feeGrowthAboveB = pool.activeSlotIndex >= upperSlotIndex
-            ? pool.feeGrowthGlobalB - upperSlotFeeGrowthOutsideB
-            : upperSlotFeeGrowthOutsideB;
-        uint256 feeGrowthBelowA = pool.activeSlotIndex >= upperSlotIndex
-            ? lowerSlotFeeGrowthOutsideA
-            : pool.feeGrowthGlobalA - lowerSlotFeeGrowthOutsideA;
-        uint256 feeGrowthBelowB = pool.activeSlotIndex >= upperSlotIndex
-            ? lowerSlotFeeGrowthOutsideB
-            : pool.feeGrowthGlobalB - lowerSlotFeeGrowthOutsideB;
+            ? pool.feeGrowthGlobalBFixedPoint - upperSlotFeeGrowthOutsideBFixedPoint
+            : upperSlotFeeGrowthOutsideBFixedPoint;
 
-        feeGrowthInsideA = pool.feeGrowthGlobalA - feeGrowthBelowA - feeGrowthAboveA;
-        feeGrowthInsideB = pool.feeGrowthGlobalB - feeGrowthBelowB - feeGrowthAboveB;
+        uint256 feeGrowthBelowA = pool.activeSlotIndex >= upperSlotIndex
+            ? lowerSlotFeeGrowthOutsideAFixedPoint
+            : pool.feeGrowthGlobalAFixedPoint - lowerSlotFeeGrowthOutsideAFixedPoint;
+        uint256 feeGrowthBelowB = pool.activeSlotIndex >= upperSlotIndex
+            ? lowerSlotFeeGrowthOutsideBFixedPoint
+            : pool.feeGrowthGlobalBFixedPoint - lowerSlotFeeGrowthOutsideBFixedPoint;
+
+        feeGrowthInsideA = pool.feeGrowthGlobalAFixedPoint - feeGrowthBelowA - feeGrowthAboveA;
+        feeGrowthInsideB = pool.feeGrowthGlobalBFixedPoint - feeGrowthBelowB - feeGrowthAboveB;
     }
 
     function _getPoolId(address tokenA, address tokenB) internal pure returns (bytes32) {
