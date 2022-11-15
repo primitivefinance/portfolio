@@ -23,11 +23,6 @@ struct SlotSnapshot {
     uint256 feeGrowthOutsideBFixedPoint;
 }
 
-struct AuctionBid {
-    address bidder;
-    uint256 amount;
-}
-
 struct Pool {
     address tokenA;
     address tokenB;
@@ -57,11 +52,16 @@ struct Position {
     int128 lowerSlotIndex;
     int128 upperSlotIndex;
     uint256 liquidityOwned;
+    uint256 liquidityMatured;
+    int256 liquidityPending;
+    uint256 proceedsGrowthInsideLastFixedPoint;
     uint256 feeGrowthInsideLastAFixedPoint;
     uint256 feeGrowthInsideLastBFixedPoint;
     // TODO: Should we track these fees with precision or nah?
-    uint256 feesOwedAFixedPoint;
-    uint256 feesOwedBFixedPoint;
+    uint256 tokensOwedAFixedPoint;
+    uint256 tokensOwedBFixedPoint;
+    uint256 tokensOwedCFixedPoint; // auction settlement token
+    uint256 lastUpdatedTimestamp;
 }
 
 // TODO:
@@ -80,23 +80,24 @@ struct Position {
 // - slots bitmap
 
 contract Smol {
-    uint256 public epochLength;
-    uint256 public auctionLength;
-    address public auctionSettlementToken;
-    uint256 public auctionFee;
-    uint256 public publicSwapFee;
+    Epoch public epoch;
 
     mapping(bytes32 => Pool) public pools;
     mapping(bytes32 => Position) public positions;
     mapping(bytes32 => Slot) public slots;
 
-    mapping(bytes32 => mapping(uint256 => PoolSnapshots)) public poolSnapshots;
-    mapping(bytes32 => mapping(uint256 => SlotSnapshots)) public slotSnapshots;
+    mapping(bytes32 => mapping(uint256 => PoolSnapshot)) public poolSnapshots;
+    mapping(bytes32 => mapping(uint256 => SlotSnapshot)) public slotSnapshots;
+
+    constructor(uint256 epochTransitionTime) {
+        require(epochTransitionTime > block.timestamp);
+        epoch = Epoch({id: 0, endTime: epochTransitionTime});
+    }
 
     function initiatePool(
         address tokenA,
         address tokenB,
-        uint256 activePriceFixedPoint
+        uint256 activeSqrtPriceFixedPoint
     ) public {
         if (tokenA == tokenB) revert();
         (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
@@ -106,11 +107,9 @@ contract Smol {
         if (pool.lastUpdatedTimestamp != 0) revert();
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
-        pool.activePriceFixedPoint = activePriceFixedPoint;
+        pool.activeSqrtPriceFixedPoint = activeSqrtPriceFixedPoint;
         // TODO: set active slot index?
         pool.lastUpdatedTimestamp = block.timestamp;
-
-        uint256 x = PRICE_GRID_FIXED_POINT;
 
         // TODO: emit InitiatePool event
     }
@@ -155,9 +154,9 @@ contract Smol {
         }
 
         (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-            priceGridFixedPoint,
+            PRICE_GRID_FIXED_POINT,
             amount,
-            pool.activePriceFixedPoint,
+            pool.activeSqrtPriceFixedPoint,
             pool.activeSlotIndex,
             lowerSlotIndex,
             upperSlotIndex
@@ -178,8 +177,8 @@ contract Smol {
             uint256 changeInFeeGrowthA = feeGrowthInsideA - position.feeGrowthInsideLastAFixedPoint;
             uint256 changeInFeeGrowthB = feeGrowthInsideB - position.feeGrowthInsideLastBFixedPoint;
 
-            position.feesOwedAFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthA);
-            position.feesOwedBFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthB);
+            position.tokensOwedAFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthA);
+            position.tokensOwedBFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthB);
 
             position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideA;
             position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideB;

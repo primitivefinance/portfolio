@@ -8,3 +8,4 @@ hardhat/=node_modules/hardhat/
 lib/=lib/
 solmate/=lib/solmate/src/
 solstat/=lib/solstat/contracts/
+@prb/math/=lib/prb-math/
