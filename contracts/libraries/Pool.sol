@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "./BrainMath.sol";
 import "./Epoch.sol";
 import "./GlobalDefaults.sol";
 
@@ -36,15 +37,31 @@ library Pool {
 
     /// @notice                Updates the pool data w.r.t. time passing
     function sync(Data storage pool, Epoch.Data memory epoch) internal {
-        // 1. update proceeds growth global based on time passing
-        // only up until the epoch end time.
+        // 1. update proceeds growth global based on time passing, only up until the current epoch end time.
         if (pool.proceedsPerSecondFixedPoint > 0) {
-            uint256 proceedsTimePassed = (block.timestamp < epoch.endTime ? block.timestamp : epoch.endTime) -
+            uint256 timePassed = (block.timestamp < epoch.endTime ? block.timestamp : epoch.endTime) -
                 pool.lastUpdatedTimestamp;
-            if (proceedsTimePassed > 0) {}
+            if (timePassed > 0) {
+                pool.proceedsGrowthGlobalFixedPoint += PRBMathUD60x18.div(
+                    PRBMathUD60x18.mul(pool.proceedsPerSecondFixedPoint, timePassed),
+                    pool.activeLiquidityMatured
+                );
+            }
         }
 
         // 2. check for epoch transition
+        if (epoch.hasTransitionedSince(pool.lastUpdatedTimestamp)) {
+            // // transition liquidity
+            // if (pool.activeLiquidityPending < 0) {
+            //     pool.activeLiquidity +=
+            // }
+            // if self.pending_delta < Decimal::ZERO {
+            //     // kicked liquidity out, update overall liquidity delta
+            //     self.liquidity_delta += self.pending_delta;
+            // }
+            // self.matured_delta += self.pending_delta;
+            // self.pending_delta = Decimal::ZERO;
+        }
 
         // if (epoch.hasTransitionedSince(pool.lastUpdatedTimestamp)) {
         //     // update
