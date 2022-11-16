@@ -8,3 +8,6 @@
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
 	branch = v7
+[submodule "lib/prb-math"]
+	path = lib/prb-math
+	url = https://github.com/paulrberg/prb-math

@@ -2,35 +2,13 @@
 pragma solidity 0.8.13;
 
 import "./libraries/BrainMath.sol";
-
-struct Pool {
-    address tokenA;
-    address tokenB;
-    uint256 activeLiquidity;
-    uint256 activePriceFixedPoint;
-    int128 activeSlotIndex;
-    uint256 feeGrowthGlobalAFixedPoint;
-    uint256 feeGrowthGlobalBFixedPoint;
-    address arbRightOwner;
-    uint256 lastUpdatedTimestamp;
-}
-
-struct Slot {
-    int256 liquidityDelta;
-    uint256 feeGrowthOutsideAFixedPoint;
-    uint256 feeGrowthOutsideBFixedPoint;
-}
-
-struct Position {
-    int128 lowerSlotIndex;
-    int128 upperSlotIndex;
-    uint256 liquidityOwned;
-    uint256 feeGrowthInsideLastAFixedPoint;
-    uint256 feeGrowthInsideLastBFixedPoint;
-    // TODO: Should we track these fees with precision or nah?
-    uint256 feesOwedAFixedPoint;
-    uint256 feesOwedBFixedPoint;
-}
+import "./libraries/Epoch.sol";
+import "./libraries/GlobalDefaults.sol";
+import "./libraries/Pool.sol";
+import "./libraries/PoolSnapshot.sol";
+import "./libraries/Position.sol";
+import "./libraries/Slot.sol";
+import "./libraries/SlotSnapshot.sol";
 
 // TODO:
 // - Add WETH wrapping / unwrapping
@@ -48,37 +26,37 @@ struct Position {
 // - slots bitmap
 
 contract Smol {
-    uint256 public priceGridFixedPoint = 1000100000000000000; // 1.0001
-    uint256 public epochLength;
-    uint256 public auctionLength;
-    address public auctionSettlementToken;
-    uint256 public auctionFee;
-    uint256 public publicSwapFee;
+    using Epoch for Epoch.Data;
+    using Pool for mapping(bytes32 => Pool.Data);
+    using Pool for Pool.Data;
 
-    mapping(bytes32 => Pool) public pools;
-    mapping(bytes32 => Position) public positions;
+    Epoch.Data public epoch;
+
+    mapping(bytes32 => Pool.Data) public pools;
+    mapping(bytes32 => Position.Data) public positions;
     mapping(bytes32 => Slot) public slots;
 
-    function initiatePool(
+    mapping(bytes32 => mapping(uint256 => PoolSnapshot)) public poolSnapshots;
+    mapping(bytes32 => mapping(uint256 => SlotSnapshot)) public slotSnapshots;
+
+    constructor(uint256 transitionTime) {
+        require(transitionTime > block.timestamp);
+        epoch = Epoch.Data({id: 0, endTime: transitionTime});
+    }
+
+    function activatePool(
         address tokenA,
         address tokenB,
-        uint256 activePriceFixedPoint
+        uint256 activeSqrtPriceFixedPoint
     ) public {
-        if (tokenA == tokenB) revert();
-        (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
+        epoch.sync();
+        pools.activate(tokenA, tokenB, activeSqrtPriceFixedPoint);
 
-        Pool storage pool = pools[_getPoolId(tokenA, tokenB)];
-
-        if (pool.lastUpdatedTimestamp != 0) revert();
-        pool.activePriceFixedPoint = activePriceFixedPoint;
-        pool.lastUpdatedTimestamp = block.timestamp;
-
-        // TODO: emit InitiatePool event
+        // TODO: emit ActivatePool event
     }
 
     function addLiquidity(
-        address tokenA,
-        address tokenB,
+        bytes32 poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         uint256 amount
@@ -86,11 +64,10 @@ contract Smol {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
 
-        (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-
-        bytes32 poolId = _getPoolId(tokenA, tokenB);
-        Pool storage pool = pools[poolId];
+        Pool.Data storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert();
+
+        epoch.sync();
 
         // TODO: Optimize this code to avoid duplicated lines (maybe add a function)
         {
@@ -116,9 +93,9 @@ contract Smol {
         }
 
         (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-            priceGridFixedPoint,
+            PRICE_GRID_FIXED_POINT,
             amount,
-            pool.activePriceFixedPoint,
+            pool.activeSqrtPriceFixedPoint,
             pool.activeSlotIndex,
             lowerSlotIndex,
             upperSlotIndex
@@ -126,8 +103,8 @@ contract Smol {
 
         if (amountA != 0 && amountB != 0) pool.activeLiquidity += amount;
 
-        bytes32 positionId = _getPositionId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
-        Position storage position = positions[positionId];
+        bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
+        Position.Data storage position = positions[positionId];
 
         {
             (uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) = _calculateFeeGrowthInside(
@@ -139,8 +116,8 @@ contract Smol {
             uint256 changeInFeeGrowthA = feeGrowthInsideA - position.feeGrowthInsideLastAFixedPoint;
             uint256 changeInFeeGrowthB = feeGrowthInsideB - position.feeGrowthInsideLastBFixedPoint;
 
-            position.feesOwedAFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthA);
-            position.feesOwedBFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthB);
+            position.tokensOwedAFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthA);
+            position.tokensOwedBFixedPoint += PRBMathUD60x18.mul(position.liquidityOwned, changeInFeeGrowthB);
 
             position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideA;
             position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideB;
@@ -195,7 +172,7 @@ contract Smol {
         uint256 upperSlotFeeGrowthOutsideAFixedPoint = slots[upperSlotId].feeGrowthOutsideAFixedPoint;
         uint256 upperSlotFeeGrowthOutsideBFixedPoint = slots[upperSlotId].feeGrowthOutsideBFixedPoint;
 
-        Pool memory pool = pools[poolId];
+        Pool.Data memory pool = pools[poolId];
 
         uint256 feeGrowthAboveA = pool.activeSlotIndex >= upperSlotIndex
             ? pool.feeGrowthGlobalAFixedPoint - upperSlotFeeGrowthOutsideAFixedPoint
@@ -213,22 +190,5 @@ contract Smol {
 
         feeGrowthInsideA = pool.feeGrowthGlobalAFixedPoint - feeGrowthBelowA - feeGrowthAboveA;
         feeGrowthInsideB = pool.feeGrowthGlobalBFixedPoint - feeGrowthBelowB - feeGrowthAboveB;
-    }
-
-    function _getPoolId(address tokenA, address tokenB) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(tokenA, tokenB));
-    }
-
-    function _getSlotId(bytes32 poolId, int128 slotIndex) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(poolId, slotIndex));
-    }
-
-    function _getPositionId(
-        address owner,
-        bytes32 poolId,
-        int128 lowerSlotIndex,
-        int128 upperSlotIndex
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(owner, poolId, lowerSlotIndex, upperSlotIndex));
     }
 }
