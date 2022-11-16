@@ -23,4 +23,8 @@ library Epoch {
             // TODO: If multiple EPOCH_LENGTHs have passed, what then?
         }
     }
+
+    function hasTransitionedSince(Data memory epoch, uint256 timestamp) public pure returns (bool) {
+        return epoch.endTime - EPOCH_LENGTH > timestamp;
+    }
 }

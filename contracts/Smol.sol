@@ -33,7 +33,7 @@ contract Smol {
     Epoch.Data public epoch;
 
     mapping(bytes32 => Pool.Data) public pools;
-    mapping(bytes32 => Position) public positions;
+    mapping(bytes32 => Position.Data) public positions;
     mapping(bytes32 => Slot) public slots;
 
     mapping(bytes32 => mapping(uint256 => PoolSnapshot)) public poolSnapshots;
@@ -52,7 +52,7 @@ contract Smol {
         epoch.sync();
         pools.activate(tokenA, tokenB, activeSqrtPriceFixedPoint);
 
-        // TODO: emit InitiatePool event
+        // TODO: emit ActivatePool event
     }
 
     function addLiquidity(
@@ -103,8 +103,8 @@ contract Smol {
 
         if (amountA != 0 && amountB != 0) pool.activeLiquidity += amount;
 
-        bytes32 positionId = _getPositionId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
-        Position storage position = positions[positionId];
+        bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
+        Position.Data storage position = positions[positionId];
 
         {
             (uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) = _calculateFeeGrowthInside(
@@ -172,7 +172,7 @@ contract Smol {
         uint256 upperSlotFeeGrowthOutsideAFixedPoint = slots[upperSlotId].feeGrowthOutsideAFixedPoint;
         uint256 upperSlotFeeGrowthOutsideBFixedPoint = slots[upperSlotId].feeGrowthOutsideBFixedPoint;
 
-        Pool memory pool = pools[poolId];
+        Pool.Data memory pool = pools[poolId];
 
         uint256 feeGrowthAboveA = pool.activeSlotIndex >= upperSlotIndex
             ? pool.feeGrowthGlobalAFixedPoint - upperSlotFeeGrowthOutsideAFixedPoint
