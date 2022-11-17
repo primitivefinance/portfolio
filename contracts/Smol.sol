@@ -68,6 +68,7 @@ contract Smol {
         if (pool.lastUpdatedTimestamp == 0) revert();
 
         epoch.sync();
+        pool.sync(epoch, poolSnapshots[poolId]);
 
         // TODO: Optimize this code to avoid duplicated lines (maybe add a function)
         {

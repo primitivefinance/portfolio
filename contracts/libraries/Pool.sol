@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import "./BrainMath.sol";
 import "./Epoch.sol";
 import "./GlobalDefaults.sol";
+import "./PoolSnapshot.sol";
 
 /// @title   Pool Library
 /// @author  Primitive
@@ -56,7 +57,11 @@ library Pool {
 
     /// @notice                Updates the pool data w.r.t. time passing
     /// @dev                   Assumes epoch sync is always called before.
-    function sync(Data storage pool, Epoch.Data memory epoch) internal {
+    function sync(
+        Data storage pool,
+        Epoch.Data memory epoch,
+        mapping(uint256 => PoolSnapshot) storage snapshots
+    ) internal {
         // apply any updates for previous epochs
         uint256 epochsPassed = (epoch.endTime - pool.lastUpdatedTimestamp) / EPOCH_LENGTH;
         if (epochsPassed > 0) {
@@ -83,7 +88,14 @@ library Pool {
             // update arb right owner for next epoch
             pool.arbRightOwner = pool.pendingArbRightOwner;
             pool.pendingArbRightOwner = address(0);
-            // TODO: save pool state snapshots
+            // save pool state snapshot
+            snapshots[epoch.id - epochsPassed] = PoolSnapshot({
+                activeSqrtPriceFixedPoint: pool.activeSqrtPriceFixedPoint,
+                activeSlotIndex: pool.activeSlotIndex,
+                proceedsGrowthGlobalFixedPoint: pool.proceedsGrowthGlobalFixedPoint,
+                feeGrowthGlobalAFixedPoint: pool.feeGrowthGlobalAFixedPoint,
+                feeGrowthGlobalBFixedPoint: pool.feeGrowthGlobalBFixedPoint
+            });
             // check if multiple epochs have passed
             if (epochsPassed > 1) {
                 // add proceeds for the epoch after the transition applied above
@@ -96,9 +108,9 @@ library Pool {
                 // since its been multiple epochs since the pool was touched, there were no bids for the current epoch
                 pool.proceedsPerSecondFixedPoint = uint256(0);
                 pool.arbRightOwner = address(0);
+                // don't save snapshot since no position was touched during epoch
             }
         }
-
         // add proceeds for time passed in the current epoch
         uint256 timePassedInCurrentEpoch = block.timestamp - (epoch.endTime - EPOCH_LENGTH);
         if (pool.proceedsPerSecondFixedPoint > 0 && pool.activeLiquidityMatured > 0 && timePassedInCurrentEpoch > 0) {
@@ -107,7 +119,7 @@ library Pool {
                 pool.activeLiquidityMatured
             );
         }
-
+        // finally update last saved timestamp
         pool.lastUpdatedTimestamp = block.timestamp;
     }
 }
