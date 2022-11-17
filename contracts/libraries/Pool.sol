@@ -37,6 +37,23 @@ library Pool {
         return keccak256(abi.encodePacked(tokenA, tokenB));
     }
 
+    /// @notice                Activates a pool with two different tokens, A and B.
+    function activate(
+        mapping(bytes32 => Data) storage pools,
+        address tokenA,
+        address tokenB,
+        uint256 activeSqrtPriceFixedPoint
+    ) internal {
+        Data storage pool = pools[getId(tokenA, tokenB)];
+
+        if (pool.lastUpdatedTimestamp != 0) revert();
+        pool.tokenA = tokenA;
+        pool.tokenB = tokenB;
+        pool.activeSqrtPriceFixedPoint = activeSqrtPriceFixedPoint;
+        // TODO: set active slot index?
+        pool.lastUpdatedTimestamp = block.timestamp;
+    }
+
     /// @notice                Updates the pool data w.r.t. time passing
     /// @dev                   Assumes epoch sync is always called before.
     function sync(Data storage pool, Epoch.Data memory epoch) internal {
@@ -91,23 +108,6 @@ library Pool {
             );
         }
 
-        pool.lastUpdatedTimestamp = block.timestamp;
-    }
-
-    /// @notice                Activates a pool with two different tokens, A and B.
-    function activate(
-        mapping(bytes32 => Data) storage pools,
-        address tokenA,
-        address tokenB,
-        uint256 activeSqrtPriceFixedPoint
-    ) internal {
-        Data storage pool = pools[getId(tokenA, tokenB)];
-
-        if (pool.lastUpdatedTimestamp != 0) revert();
-        pool.tokenA = tokenA;
-        pool.tokenB = tokenB;
-        pool.activeSqrtPriceFixedPoint = activeSqrtPriceFixedPoint;
-        // TODO: set active slot index?
         pool.lastUpdatedTimestamp = block.timestamp;
     }
 }
