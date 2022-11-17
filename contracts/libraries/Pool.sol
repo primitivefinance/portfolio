@@ -60,7 +60,8 @@ library Pool {
     function sync(
         Data storage pool,
         Epoch.Data memory epoch,
-        mapping(uint256 => PoolSnapshot) storage snapshots
+        bytes32 poolId,
+        mapping(bytes32 => PoolSnapshot.Data) storage snapshots
     ) internal {
         // apply any updates for previous epochs
         uint256 epochsPassed = (epoch.endTime - pool.lastUpdatedTimestamp) / EPOCH_LENGTH;
@@ -89,7 +90,8 @@ library Pool {
             pool.arbRightOwner = pool.pendingArbRightOwner;
             pool.pendingArbRightOwner = address(0);
             // save pool state snapshot
-            snapshots[epoch.id - epochsPassed] = PoolSnapshot({
+            bytes32 poolSnapshotId = PoolSnapshot.getId(poolId, epoch.id - epochsPassed);
+            snapshots[poolSnapshotId] = PoolSnapshot.Data({
                 activeSqrtPriceFixedPoint: pool.activeSqrtPriceFixedPoint,
                 activeSlotIndex: pool.activeSlotIndex,
                 proceedsGrowthGlobalFixedPoint: pool.proceedsGrowthGlobalFixedPoint,
