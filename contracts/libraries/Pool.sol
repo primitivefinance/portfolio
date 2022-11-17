@@ -90,6 +90,8 @@ library Pool {
                 pool.activeLiquidityMatured
             );
         }
+
+        pool.lastUpdatedTimestamp = block.timestamp;
     }
 
     /// @notice                Activates a pool with two different tokens, A and B.
