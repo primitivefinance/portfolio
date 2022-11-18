@@ -21,7 +21,6 @@ import "./libraries/SlotSnapshot.sol";
 // - Events
 // - Custom errors
 // - Interface
-// - Change `addLiquidity` to `updateLiquidity`
 // - slots bitmap
 
 contract Smol {
@@ -62,11 +61,11 @@ contract Smol {
         // TODO: emit ActivatePool event
     }
 
-    function addLiquidity(
+    function updateLiquidity(
         bytes32 poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
-        uint256 amount
+        int256 amount
     ) public {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
@@ -77,20 +76,22 @@ contract Smol {
         epoch.sync();
         pool.sync(epoch, poolId, poolSnapshots);
 
-        bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
-        Position.Data storage position = positions[positionId];
-
-        bytes32 lowerSlotId = Slot.getId(poolId, position.lowerSlotIndex);
+        bytes32 lowerSlotId = Slot.getId(poolId, lowerSlotIndex);
         Slot.Data storage lowerSlot = slots[lowerSlotId];
         lowerSlot.sync(epoch);
 
-        bytes32 upperSlotId = Slot.getId(poolId, position.upperSlotIndex);
+        bytes32 upperSlotId = Slot.getId(poolId, upperSlotIndex);
         Slot.Data storage upperSlot = slots[upperSlotId];
         upperSlot.sync(epoch);
 
+        bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
+        Position.Data storage position = positions[positionId];
+
         if (position.lastUpdatedTimestamp == 0) {
+            if (amount < 0) revert();
             position.lowerSlotIndex = lowerSlotIndex;
             position.upperSlotIndex = upperSlotIndex;
+            position.lastUpdatedTimestamp = block.timestamp;
         } else {
             position.sync(
                 pool,
@@ -105,91 +106,65 @@ contract Smol {
             );
         }
 
+        if (amount > 0) {
+            _addLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
+        } else {
+            _removeLiquidity(pool, lowerSlotId, upperSlotId, lowerSlot, upperSlot, position, uint256(amount));
+        }
+    }
+
+    function _addLiquidity(
+        Pool.Data storage pool,
+        Slot.Data storage lowerSlot,
+        Slot.Data storage upperSlot,
+        Position.Data storage position,
+        uint256 amount
+    ) internal {
         position.liquidity += amount;
         position.liquidityPending += int256(amount);
 
-        {
-            lowerSlot.liquidityDelta += int256(amount);
-            lowerSlot.liquidityPendingDelta += int256(amount);
-
-            if (lowerSlot.liquidityGross == uint256(0)) {
-                // TODO: add to / initialize slot in bitmap
-                // TODO: initialize growth outside values
-                lowerSlot.liquidityGross += uint256(amount);
-            }
+        lowerSlot.liquidityDelta += int256(amount);
+        lowerSlot.liquidityPendingDelta += int256(amount);
+        if (lowerSlot.liquidityGross == uint256(0)) {
+            // TODO: add to / initialize slot in bitmap
+            // TODO: initialize growth outside values
+            lowerSlot.liquidityGross += uint256(amount);
         }
 
-        {
-            upperSlot.liquidityDelta -= int256(amount);
-            upperSlot.liquidityPendingDelta -= int256(amount);
-
-            if (upperSlot.liquidityGross == uint256(0)) {
-                // TODO: add to / initialize slot in bitmap
-                // TODO: initialize growth outside values
-                upperSlot.liquidityGross += uint256(amount);
-            }
+        upperSlot.liquidityDelta -= int256(amount);
+        upperSlot.liquidityPendingDelta -= int256(amount);
+        if (upperSlot.liquidityGross == uint256(0)) {
+            // TODO: add to / initialize slot in bitmap
+            // TODO: initialize growth outside values
+            upperSlot.liquidityGross += uint256(amount);
         }
 
-        {
-            (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-                PRICE_GRID_FIXED_POINT,
-                amount,
-                pool.activeSqrtPriceFixedPoint,
-                pool.activeSlotIndex,
-                lowerSlotIndex,
-                upperSlotIndex
-            );
-            if (amountA != 0 && amountB != 0) {
-                pool.activeLiquidity += amount;
-                pool.activeLiquidityPending += int256(amount);
-            }
+        (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
+            PRICE_GRID_FIXED_POINT,
+            amount,
+            pool.activeSqrtPriceFixedPoint,
+            pool.activeSlotIndex,
+            position.lowerSlotIndex,
+            position.upperSlotIndex
+        );
+        if (amountA != 0 && amountB != 0) {
+            pool.activeLiquidity += amount;
+            pool.activeLiquidityPending += int256(amount);
         }
+        // TODO: Request amountA & amountB from msg.sender
 
-        // TODO: Request tokens from msg.sender
-
-        // TODO: emit AddLiquidity event
+        // TODO: Emit add liquidity event
     }
 
-    function removeLiquidity(
-        bytes32 poolId,
-        int128 lowerSlotIndex,
-        int128 upperSlotIndex,
+    function _removeLiquidity(
+        Pool.Data storage pool,
+        bytes32 lowerSlotId,
+        bytes32 upperSlotId,
+        Slot.Data storage lowerSlot,
+        Slot.Data storage upperSlot,
+        Position.Data storage position,
         uint256 amount
-    ) public {
-        if (lowerSlotIndex > upperSlotIndex) revert();
-        if (amount == 0) revert();
-
-        Pool.Data storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert();
-
-        epoch.sync();
-        pool.sync(epoch, poolId, poolSnapshots);
-
-        bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
-        Position.Data storage position = positions[positionId];
-
-        if (position.lastUpdatedTimestamp == 0) revert();
-
-        bytes32 lowerSlotId = Slot.getId(poolId, position.lowerSlotIndex);
-        Slot.Data storage lowerSlot = slots[lowerSlotId];
-        lowerSlot.sync(epoch);
-
-        bytes32 upperSlotId = Slot.getId(poolId, position.upperSlotIndex);
-        Slot.Data storage upperSlot = slots[upperSlotId];
-        upperSlot.sync(epoch);
-
-        position.sync(
-            pool,
-            epoch,
-            lowerSlot,
-            upperSlot,
-            poolId,
-            lowerSlotId,
-            upperSlotId,
-            poolSnapshots,
-            slotSnapshots
-        );
-
+    ) internal {
         uint256 removeAmountLeft = amount;
 
         // remove positive pending liquidity balance immediately
@@ -218,8 +193,8 @@ contract Smol {
                 removeLiquidityPending,
                 pool.activeSqrtPriceFixedPoint,
                 pool.activeSlotIndex,
-                lowerSlotIndex,
-                upperSlotIndex
+                position.lowerSlotIndex,
+                position.upperSlotIndex
             );
 
             position.tokensOwedA += amountA;
