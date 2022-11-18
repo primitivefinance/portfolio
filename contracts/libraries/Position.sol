@@ -54,17 +54,14 @@ library Position {
         Data storage position,
         Pool.Data memory pool,
         Epoch.Data memory epoch,
+        Slot.Data memory lowerSlot,
+        Slot.Data memory upperSlot,
         bytes32 poolId,
-        mapping(bytes32 => Slot.Data) storage slots,
+        bytes32 lowerSlotId,
+        bytes32 upperSlotId,
         mapping(bytes32 => PoolSnapshot.Data) storage poolSnapshots,
         mapping(bytes32 => SlotSnapshot.Data) storage slotSnapshots
     ) internal {
-        bytes32 lowerSlotId = Slot.getId(poolId, position.lowerSlotIndex);
-        Slot.Data storage lowerSlot = slots[lowerSlotId];
-
-        bytes32 upperSlotId = Slot.getId(poolId, position.upperSlotIndex);
-        Slot.Data storage upperSlot = slots[upperSlotId];
-
         uint256 epochsPassed = (epoch.endTime - position.lastUpdatedTimestamp) / EPOCH_LENGTH;
         if (epochsPassed > 0) {
             if (position.liquidityPending != 0) {
