@@ -17,7 +17,6 @@ import "./libraries/SlotSnapshot.sol";
 // - Fixed point library
 // - Slippage checks
 // - Extra function parameters
-// - Auction
 // - Events
 // - Custom errors
 // - Interface
