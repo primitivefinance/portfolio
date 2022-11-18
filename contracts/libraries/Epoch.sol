@@ -18,13 +18,10 @@ library Epoch {
     /// @notice                Updates the epoch data w.r.t. time passing
     function sync(Data storage epoch) internal {
         if (block.timestamp >= epoch.endTime) {
-            epoch.id += 1;
-            epoch.endTime += EPOCH_LENGTH;
-            // TODO: If multiple EPOCH_LENGTHs have passed, what then?
+            // TODO: definitely double check this
+            uint256 epochsPassed = (block.timestamp - epoch.endTime) / EPOCH_LENGTH;
+            epoch.id += (1 + epochsPassed);
+            epoch.endTime += (EPOCH_LENGTH + (epochsPassed * EPOCH_LENGTH));
         }
-    }
-
-    function hasTransitionedSince(Data memory epoch, uint256 timestamp) public pure returns (bool) {
-        return epoch.endTime - EPOCH_LENGTH > timestamp;
     }
 }
