@@ -17,7 +17,6 @@ import "./libraries/SlotSnapshot.sol";
 // - Fixed point library
 // - Slippage checks
 // - Extra function parameters
-// - Epochs / staking feature
 // - Auction
 // - Events
 // - Custom errors
@@ -89,7 +88,10 @@ contract Smol {
         Slot.Data storage upperSlot = slots[upperSlotId];
         upperSlot.sync(epoch);
 
-        if (position.lastUpdatedTimestamp != 0) {
+        if (position.lastUpdatedTimestamp == 0) {
+            position.lowerSlotIndex = lowerSlotIndex;
+            position.upperSlotIndex = upperSlotIndex;
+        } else {
             position.sync(
                 pool,
                 epoch,
@@ -166,6 +168,8 @@ contract Smol {
         bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
         Position.Data storage position = positions[positionId];
 
+        if (position.lastUpdatedTimestamp == 0) revert();
+
         bytes32 lowerSlotId = Slot.getId(poolId, position.lowerSlotIndex);
         Slot.Data storage lowerSlot = slots[lowerSlotId];
         lowerSlot.sync(epoch);
@@ -174,64 +178,89 @@ contract Smol {
         Slot.Data storage upperSlot = slots[upperSlotId];
         upperSlot.sync(epoch);
 
-        if (position.lastUpdatedTimestamp != 0) {
-            position.sync(
-                pool,
-                epoch,
-                lowerSlot,
-                upperSlot,
-                poolId,
-                lowerSlotId,
-                upperSlotId,
-                poolSnapshots,
-                slotSnapshots
-            );
-        }
+        position.sync(
+            pool,
+            epoch,
+            lowerSlot,
+            upperSlot,
+            poolId,
+            lowerSlotId,
+            upperSlotId,
+            poolSnapshots,
+            slotSnapshots
+        );
 
-        // a few cases
-        // 1. positive liquidity pending is enough to cover withdrawal, in which case tokens are sent now
-        // 2. something else
-        // 3. something else
+        uint256 removeAmountLeft = amount;
 
-        uint256 remainingLiquidity = position.liquidityPending > int256(0)
-            ? position.liquidity
-            : position.liquidity - uint256(position.liquidityPending);
-        require(remainingLiquidity >= amount);
+        // remove positive pending liquidity balance immediately
+        if (position.liquidityPending > int256(0)) {
+            // pending + matured = position.liquidity when liquidity pending is positive
+            if (position.liquidity < amount) revert();
 
-        {
-            lowerSlot.liquidityPendingDelta -= int256(amount);
-            lowerSlot.pendingLiquidityGross -= int256(amount);
-        }
+            uint256 removeLiquidityPending = uint256(position.liquidityPending) >= amount
+                ? amount
+                : uint256(position.liquidityPending);
 
-        {
-            upperSlot.liquidityDelta -= int256(amount);
-            upperSlot.liquidityPendingDelta -= int256(amount);
+            lowerSlot.liquidityDelta -= int256(removeLiquidityPending);
+            lowerSlot.liquidityPendingDelta -= int256(removeLiquidityPending);
+            lowerSlot.liquidityGross -= removeLiquidityPending;
 
-            if (upperSlot.liquidityGross == uint256(0)) {
-                // TODO: add to / initialize slot in bitmap
-                // TODO: initialize growth outside values
-                upperSlot.liquidityGross += uint256(amount);
-            }
-        }
+            upperSlot.liquidityDelta += int256(removeLiquidityPending);
+            upperSlot.liquidityPendingDelta += int256(removeLiquidityPending);
+            upperSlot.liquidityGross -= removeLiquidityPending;
 
-        {
+            position.liquidity -= removeLiquidityPending;
+            position.liquidityPending -= int256(removeLiquidityPending);
+
+            // credit tokens owed to the position immediately
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
                 PRICE_GRID_FIXED_POINT,
-                amount,
+                removeLiquidityPending,
                 pool.activeSqrtPriceFixedPoint,
                 pool.activeSlotIndex,
                 lowerSlotIndex,
                 upperSlotIndex
             );
+
+            position.tokensOwedA += amountA;
+            position.tokensOwedB += amountB;
+
             if (amountA != 0 && amountB != 0) {
-                pool.activeLiquidity += amount;
-                pool.activeLiquidityPending += int256(amount);
+                pool.activeLiquidity -= removeLiquidityPending;
+                pool.activeLiquidityPending -= int256(removeLiquidityPending);
+            }
+
+            removeAmountLeft -= removeLiquidityPending;
+        } else {
+            // pending + position.liquidity = remaining liquidity when liquidity pending is negative (or zero)
+            if (position.liquidity - uint256(position.liquidityPending) < amount) revert();
+        }
+
+        // schedule removeAmountLeft to be removed from remaining liquidity
+        if (removeAmountLeft > 0) {
+            lowerSlot.liquidityPendingDelta -= int256(removeAmountLeft);
+            upperSlot.liquidityPendingDelta += int256(removeAmountLeft);
+
+            position.liquidityPending -= int256(removeAmountLeft);
+
+            if (position.lowerSlotIndex <= pool.activeSlotIndex && pool.activeSlotIndex < position.upperSlotIndex) {
+                pool.activeLiquidityPending -= int256(removeAmountLeft);
             }
         }
 
-        // TODO: Request tokens from msg.sender
+        // save slot snapshots
+        slotSnapshots[SlotSnapshot.getId(lowerSlotId, epoch.id)] = SlotSnapshot.Data({
+            proceedsGrowthOutsideFixedPoint: lowerSlot.proceedsGrowthOutsideFixedPoint,
+            feeGrowthOutsideAFixedPoint: lowerSlot.feeGrowthOutsideAFixedPoint,
+            feeGrowthOutsideBFixedPoint: lowerSlot.feeGrowthOutsideBFixedPoint
+        });
+        slotSnapshots[SlotSnapshot.getId(upperSlotId, epoch.id)] = SlotSnapshot.Data({
+            proceedsGrowthOutsideFixedPoint: upperSlot.proceedsGrowthOutsideFixedPoint,
+            feeGrowthOutsideAFixedPoint: upperSlot.feeGrowthOutsideAFixedPoint,
+            feeGrowthOutsideBFixedPoint: upperSlot.feeGrowthOutsideBFixedPoint
+        });
 
-        // TODO: emit AddLiquidity event
+        // TODO: emit RemoveLiquidity event
     }
 
     struct SwapCache {
