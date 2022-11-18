@@ -12,6 +12,7 @@ library Slot {
     /// @notice                Stores the state of a slot
     struct Data {
         uint256 liquidityGross;
+        int256 pendingLiquidityGross;
         int256 liquidityDelta;
         int256 liquidityMaturedDelta;
         int256 liquidityPendingDelta;
@@ -35,6 +36,13 @@ library Slot {
             } else if (slot.liquidityPendingDelta > 0) {
                 slot.liquidityMaturedDelta += slot.liquidityPendingDelta;
             }
+            slot.liquidityPendingDelta = int256(0);
+
+            if (slot.pendingLiquidityGross < 0) {
+                slot.liquidityGross -= uint256(slot.pendingLiquidityGross);
+                // TODO: If liquidity gross is now zero, remove from bitmap
+            }
+            slot.pendingLiquidityGross = int256(0);
         }
         slot.lastUpdatedTimestamp = block.timestamp;
     }

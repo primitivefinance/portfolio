@@ -148,6 +148,92 @@ contract Smol {
         // TODO: emit AddLiquidity event
     }
 
+    function removeLiquidity(
+        bytes32 poolId,
+        int128 lowerSlotIndex,
+        int128 upperSlotIndex,
+        uint256 amount
+    ) public {
+        if (lowerSlotIndex > upperSlotIndex) revert();
+        if (amount == 0) revert();
+
+        Pool.Data storage pool = pools[poolId];
+        if (pool.lastUpdatedTimestamp == 0) revert();
+
+        epoch.sync();
+        pool.sync(epoch, poolId, poolSnapshots);
+
+        bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
+        Position.Data storage position = positions[positionId];
+
+        bytes32 lowerSlotId = Slot.getId(poolId, position.lowerSlotIndex);
+        Slot.Data storage lowerSlot = slots[lowerSlotId];
+        lowerSlot.sync(epoch);
+
+        bytes32 upperSlotId = Slot.getId(poolId, position.upperSlotIndex);
+        Slot.Data storage upperSlot = slots[upperSlotId];
+        upperSlot.sync(epoch);
+
+        if (position.lastUpdatedTimestamp != 0) {
+            position.sync(
+                pool,
+                epoch,
+                lowerSlot,
+                upperSlot,
+                poolId,
+                lowerSlotId,
+                upperSlotId,
+                poolSnapshots,
+                slotSnapshots
+            );
+        }
+
+        // a few cases
+        // 1. positive liquidity pending is enough to cover withdrawal, in which case tokens are sent now
+        // 2. something else
+        // 3. something else
+
+        uint256 remainingLiquidity = position.liquidityPending > int256(0)
+            ? position.liquidity
+            : position.liquidity - uint256(position.liquidityPending);
+        require(remainingLiquidity >= amount);
+
+        {
+            lowerSlot.liquidityPendingDelta -= int256(amount);
+            lowerSlot.pendingLiquidityGross -= int256(amount);
+        }
+
+        {
+            upperSlot.liquidityDelta -= int256(amount);
+            upperSlot.liquidityPendingDelta -= int256(amount);
+
+            if (upperSlot.liquidityGross == uint256(0)) {
+                // TODO: add to / initialize slot in bitmap
+                // TODO: initialize growth outside values
+                upperSlot.liquidityGross += uint256(amount);
+            }
+        }
+
+        {
+            (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
+                PRICE_GRID_FIXED_POINT,
+                amount,
+                pool.activeSqrtPriceFixedPoint,
+                pool.activeSlotIndex,
+                lowerSlotIndex,
+                upperSlotIndex
+            );
+            if (amountA != 0 && amountB != 0) {
+                pool.activeLiquidity += amount;
+                pool.activeLiquidityPending += int256(amount);
+            }
+        }
+
+        // TODO: Request tokens from msg.sender
+
+        // TODO: emit AddLiquidity event
+    }
+
     struct SwapCache {
         int128 activeSlotIndex;
         uint256 slotProportionF;
