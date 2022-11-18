@@ -286,4 +286,32 @@ contract Smol {
 
         if (!direction) {} else {}
     }
+
+    function bid(
+        bytes32 poolId,
+        uint256 epochId,
+        uint256 amount,
+        address arbRightOwner
+    ) public {
+        if (amount == 0) revert();
+
+        Pool.Data storage pool = pools[poolId];
+        if (pool.lastUpdatedTimestamp == 0) revert();
+
+        epoch.sync();
+        if (epochId != epoch.id + 1) revert();
+        if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert();
+
+        pool.sync(epoch, poolId, poolSnapshots); // @dev: pool needs to sync here, assumes no bids otherwise
+
+        // TODO: take fee from bid
+
+        uint256 bidProceedsPerSecondFixedPoint = PRBMathUD60x18.div(amount, EPOCH_LENGTH);
+        if (bidProceedsPerSecondFixedPoint > pool.pendingProceedsPerSecondFixedPoint) {
+            // TODO: Request auction settlement tokens from bidder
+            // TODO: Refund previous bid
+            pool.pendingProceedsPerSecondFixedPoint = bidProceedsPerSecondFixedPoint;
+            pool.pendingArbRightOwner = arbRightOwner;
+        }
+    }
 }
