@@ -18,16 +18,16 @@ contract TestSmol is Test {
 
     function test_add_liquidity_above_current_slot() public {
         smol.activatePool(address(0xbeef), address(0xbabe), 10 ether);
-        smol.addLiquidity(Pool.getId(address(0xbeef), address(0xbabe)), 11, 12, 1);
+        smol.updateLiquidity(Pool.getId(address(0xbeef), address(0xbabe)), 11, 12, int256(1));
     }
 
     function test_add_liquidity_including_current_slot() public {
         smol.activatePool(address(0xbeef), address(0xbabe), 10 ether);
-        smol.addLiquidity(Pool.getId(address(0xbeef), address(0xbabe)), 9, 11, 1000000000000000000);
+        smol.updateLiquidity(Pool.getId(address(0xbeef), address(0xbabe)), 9, 11, int256(1000000000000000000));
     }
 
     function test_add_liquidity_below_current_slot() public {
         smol.activatePool(address(0xbeef), address(0xbabe), 10 ether);
-        smol.addLiquidity(Pool.getId(address(0xbeef), address(0xbabe)), 8, 9, 1);
+        smol.updateLiquidity(Pool.getId(address(0xbeef), address(0xbabe)), 8, 9, int256(1));
     }
 }

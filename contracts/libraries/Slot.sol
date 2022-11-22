@@ -9,7 +9,6 @@ import "./Epoch.sol";
 library Slot {
     using Epoch for Epoch.Data;
 
-    /// @notice                Stores the state of a slot
     struct Data {
         uint256 liquidityGross;
         int256 pendingLiquidityGross;
@@ -19,14 +18,20 @@ library Slot {
         uint256 proceedsGrowthOutsideFixedPoint;
         uint256 feeGrowthOutsideAFixedPoint;
         uint256 feeGrowthOutsideBFixedPoint;
+        mapping(uint256 => Snapshot) snapshots;
         uint256 lastUpdatedTimestamp;
+    }
+
+    struct Snapshot {
+        uint256 proceedsGrowthOutsideFixedPoint;
+        uint256 feeGrowthOutsideAFixedPoint;
+        uint256 feeGrowthOutsideBFixedPoint;
     }
 
     function getId(bytes32 poolId, int128 slotIndex) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(poolId, slotIndex));
     }
 
-    /// @notice                Updates the slot data w.r.t. time passing
     function sync(Data storage slot, Epoch.Data memory epoch) internal {
         uint256 epochsPassed = (epoch.endTime - slot.lastUpdatedTimestamp) / EPOCH_LENGTH;
         if (epochsPassed > 0) {

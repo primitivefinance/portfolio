@@ -5,10 +5,8 @@ import "./libraries/BrainMath.sol";
 import "./libraries/Epoch.sol";
 import "./libraries/GlobalDefaults.sol";
 import "./libraries/Pool.sol";
-import "./libraries/PoolSnapshot.sol";
 import "./libraries/Position.sol";
 import "./libraries/Slot.sol";
-import "./libraries/SlotSnapshot.sol";
 
 // TODO:
 // - Add WETH wrapping / unwrapping
@@ -17,7 +15,6 @@ import "./libraries/SlotSnapshot.sol";
 // - Fixed point library
 // - Slippage checks
 // - Extra function parameters
-// - Auction
 // - Events
 // - Custom errors
 // - Interface
@@ -27,23 +24,16 @@ contract Smol {
     using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
-    using PoolSnapshot for PoolSnapshot.Data;
-    using PoolSnapshot for mapping(bytes32 => PoolSnapshot.Data);
     using Position for Position.Data;
     using Position for mapping(bytes32 => Position.Data);
     using Slot for Slot.Data;
     using Slot for mapping(bytes32 => Slot.Data);
-    using SlotSnapshot for SlotSnapshot.Data;
-    using SlotSnapshot for mapping(bytes32 => SlotSnapshot.Data);
 
     Epoch.Data public epoch;
 
     mapping(bytes32 => Pool.Data) public pools;
     mapping(bytes32 => Position.Data) public positions;
     mapping(bytes32 => Slot.Data) public slots;
-
-    mapping(bytes32 => PoolSnapshot.Data) private poolSnapshots;
-    mapping(bytes32 => SlotSnapshot.Data) private slotSnapshots;
 
     constructor(uint256 transitionTime) {
         require(transitionTime > block.timestamp);
@@ -74,7 +64,7 @@ contract Smol {
         if (pool.lastUpdatedTimestamp == 0) revert();
 
         epoch.sync();
-        pool.sync(epoch, poolId, poolSnapshots);
+        pool.sync(epoch);
 
         bytes32 lowerSlotId = Slot.getId(poolId, lowerSlotIndex);
         Slot.Data storage lowerSlot = slots[lowerSlotId];
@@ -93,23 +83,13 @@ contract Smol {
             position.upperSlotIndex = upperSlotIndex;
             position.lastUpdatedTimestamp = block.timestamp;
         } else {
-            position.sync(
-                pool,
-                epoch,
-                lowerSlot,
-                upperSlot,
-                poolId,
-                lowerSlotId,
-                upperSlotId,
-                poolSnapshots,
-                slotSnapshots
-            );
+            position.sync(pool, lowerSlot, upperSlot, epoch);
         }
 
         if (amount > 0) {
             _addLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
         } else {
-            _removeLiquidity(pool, lowerSlotId, upperSlotId, lowerSlot, upperSlot, position, uint256(amount));
+            _removeLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
         }
     }
 
@@ -158,8 +138,6 @@ contract Smol {
 
     function _removeLiquidity(
         Pool.Data storage pool,
-        bytes32 lowerSlotId,
-        bytes32 upperSlotId,
         Slot.Data storage lowerSlot,
         Slot.Data storage upperSlot,
         Position.Data storage position,
@@ -197,8 +175,7 @@ contract Smol {
                 position.upperSlotIndex
             );
 
-            position.tokensOwedA += amountA;
-            position.tokensOwedB += amountB;
+            // TODO: add amountA & b to internal balance
 
             if (amountA != 0 && amountB != 0) {
                 pool.activeLiquidity -= removeLiquidityPending;
@@ -224,12 +201,12 @@ contract Smol {
         }
 
         // save slot snapshots
-        slotSnapshots[SlotSnapshot.getId(lowerSlotId, epoch.id)] = SlotSnapshot.Data({
+        lowerSlot.snapshots[epoch.id] = Slot.Snapshot({
             proceedsGrowthOutsideFixedPoint: lowerSlot.proceedsGrowthOutsideFixedPoint,
             feeGrowthOutsideAFixedPoint: lowerSlot.feeGrowthOutsideAFixedPoint,
             feeGrowthOutsideBFixedPoint: lowerSlot.feeGrowthOutsideBFixedPoint
         });
-        slotSnapshots[SlotSnapshot.getId(upperSlotId, epoch.id)] = SlotSnapshot.Data({
+        upperSlot.snapshots[epoch.id] = Slot.Snapshot({
             proceedsGrowthOutsideFixedPoint: upperSlot.proceedsGrowthOutsideFixedPoint,
             feeGrowthOutsideAFixedPoint: upperSlot.feeGrowthOutsideAFixedPoint,
             feeGrowthOutsideBFixedPoint: upperSlot.feeGrowthOutsideBFixedPoint
@@ -277,16 +254,10 @@ contract Smol {
         if (epochId != epoch.id + 1) revert();
         if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert();
 
-        pool.sync(epoch, poolId, poolSnapshots); // @dev: pool needs to sync here, assumes no bids otherwise
+        pool.sync(epoch); // @dev: pool needs to sync here, assumes no bids otherwise
 
         // TODO: take fee from bid
 
-        uint256 bidProceedsPerSecondFixedPoint = PRBMathUD60x18.div(amount, EPOCH_LENGTH);
-        if (bidProceedsPerSecondFixedPoint > pool.pendingProceedsPerSecondFixedPoint) {
-            // TODO: Request auction settlement tokens from bidder
-            // TODO: Refund previous bid
-            pool.pendingProceedsPerSecondFixedPoint = bidProceedsPerSecondFixedPoint;
-            pool.pendingArbRightOwner = arbRightOwner;
-        }
+        // TODO: check and update bid
     }
 }
