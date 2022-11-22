@@ -35,9 +35,12 @@ contract Smol {
     mapping(bytes32 => Position.Data) public positions;
     mapping(bytes32 => Slot.Data) public slots;
 
-    constructor(uint256 transitionTime) {
+    address public auctionFeeCollector;
+
+    constructor(uint256 transitionTime, address _auctionFeeCollector) {
         require(transitionTime > block.timestamp);
         epoch = Epoch.Data({id: 0, endTime: transitionTime});
+        auctionFeeCollector = _auctionFeeCollector;
     }
 
     function activatePool(
@@ -242,8 +245,9 @@ contract Smol {
     function bid(
         bytes32 poolId,
         uint256 epochId,
-        uint256 amount,
-        address arbRightOwner
+        address refunder,
+        address swapper,
+        uint256 amount
     ) public {
         if (amount == 0) revert();
 
@@ -256,8 +260,19 @@ contract Smol {
 
         pool.sync(epoch); // @dev: pool needs to sync here, assumes no bids otherwise
 
-        // TODO: take fee from bid
+        uint256 fee = (amount * AUCTION_FEE) / 10000;
+        amount -= fee;
 
-        // TODO: check and update bid
+        if (amount > pool.bids[epoch.id + 1].amount) {
+            // TO-DO: balance changes for msg.sender, auctionFeeCollector, previous bid refunder
+            pool.bids[epoch.id + 1] = Pool.Bid({
+                refunder: refunder,
+                swapper: swapper,
+                amount: amount,
+                proceedsPerSecondFixedPoint: PRBMathUD60x18.div(amount, EPOCH_LENGTH)
+            });
+        }
+
+        // TODO: emit event
     }
 }
