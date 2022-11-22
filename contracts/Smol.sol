@@ -8,6 +8,8 @@ import "./libraries/Pool.sol";
 import "./libraries/Position.sol";
 import "./libraries/Slot.sol";
 
+import "forge-std/Test.sol";
+
 // TODO:
 // - Add WETH wrapping / unwrapping
 // - Add the internal balances, fund and withdraw
@@ -20,7 +22,7 @@ import "./libraries/Slot.sol";
 // - Interface
 // - slots bitmap
 
-contract Smol {
+contract Smol is Test {
     using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
@@ -37,17 +39,28 @@ contract Smol {
 
     address public auctionFeeCollector;
 
-    constructor(uint256 transitionTime, address _auctionFeeCollector) {
-        require(transitionTime > block.timestamp);
-        epoch = Epoch.Data({id: 0, endTime: transitionTime});
+    constructor(uint256 startTime, address _auctionFeeCollector) {
+        require(startTime > block.timestamp);
+        epoch = Epoch.Data({id: 0, endTime: startTime});
         auctionFeeCollector = _auctionFeeCollector;
+    }
+
+    modifier warmedUp() {
+        require(epoch.id > 0, "Hyper not warmed up yet.");
+        _;
+    }
+
+    function warmUp() public {
+        epoch.sync();
+        require(epoch.id > 0, "Hyper not warmed up yet.");
+        // TODO: emit ActivateHyper
     }
 
     function activatePool(
         address tokenA,
         address tokenB,
         uint256 activeSqrtPriceFixedPoint
-    ) public {
+    ) public warmedUp {
         epoch.sync();
         pools.activate(tokenA, tokenB, activeSqrtPriceFixedPoint);
 
@@ -59,7 +72,7 @@ contract Smol {
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
-    ) public {
+    ) public warmedUp {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
 
@@ -232,7 +245,7 @@ contract Smol {
         address tokenB,
         uint256 tendered,
         bool direction
-    ) public {
+    ) public warmedUp {
         uint256 tenderedRemaining = tendered;
         uint256 received;
 
@@ -248,7 +261,7 @@ contract Smol {
         address refunder,
         address swapper,
         uint256 amount
-    ) public {
+    ) public warmedUp {
         if (amount == 0) revert();
 
         Pool.Data storage pool = pools[poolId];

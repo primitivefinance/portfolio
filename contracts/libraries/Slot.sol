@@ -33,7 +33,8 @@ library Slot {
     }
 
     function sync(Data storage slot, Epoch.Data memory epoch) internal {
-        uint256 epochsPassed = (epoch.endTime - slot.lastUpdatedTimestamp) / EPOCH_LENGTH;
+        uint256 epochsPassed = (epoch.endTime - (slot.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
+        // TODO: double check boundary condition
         if (epochsPassed > 0) {
             if (slot.liquidityPendingDelta < 0) {
                 slot.liquidityDelta += slot.liquidityPendingDelta;
