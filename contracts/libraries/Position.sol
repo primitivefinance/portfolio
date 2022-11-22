@@ -6,8 +6,6 @@ import "./Epoch.sol";
 import "./GlobalDefaults.sol";
 import "./Pool.sol";
 import "./Slot.sol";
-import "./PoolSnapshot.sol";
-import "./SlotSnapshot.sol";
 
 /// @title   Pool Library
 /// @author  Primitive
@@ -16,12 +14,9 @@ library Position {
     using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
-    using PoolSnapshot for PoolSnapshot.Data;
-    using PoolSnapshot for mapping(bytes32 => PoolSnapshot.Data);
+    using Position for Position.Data;
     using Slot for Slot.Data;
     using Slot for mapping(bytes32 => Slot.Data);
-    using SlotSnapshot for SlotSnapshot.Data;
-    using SlotSnapshot for mapping(bytes32 => SlotSnapshot.Data);
 
     /// @notice                Stores the state of a position
     struct Data {
@@ -33,10 +28,13 @@ library Position {
         uint256 proceedsGrowthInsideLastFixedPoint;
         uint256 feeGrowthInsideLastAFixedPoint;
         uint256 feeGrowthInsideLastBFixedPoint;
-        uint256 tokensOwedA;
-        uint256 tokensOwedB;
-        uint256 tokensOwedC; // auction settlement token
         uint256 lastUpdatedTimestamp;
+    }
+
+    struct PositiveBalanceChange {
+        uint256 tokenA;
+        uint256 tokenB;
+        uint256 tokenC;
     }
 
     function getId(
@@ -52,75 +50,62 @@ library Position {
     /// @dev                   Assumes the position has been initialized.
     function sync(
         Data storage position,
-        Pool.Data memory pool,
-        Epoch.Data memory epoch,
-        Slot.Data memory lowerSlot,
-        Slot.Data memory upperSlot,
-        bytes32 poolId,
-        bytes32 lowerSlotId,
-        bytes32 upperSlotId,
-        mapping(bytes32 => PoolSnapshot.Data) storage poolSnapshots,
-        mapping(bytes32 => SlotSnapshot.Data) storage slotSnapshots
-    ) internal {
+        Pool.Data storage pool,
+        Slot.Data storage lowerSlot,
+        Slot.Data storage upperSlot,
+        Epoch.Data memory epoch
+    ) internal returns (PositiveBalanceChange memory balanceChange) {
         uint256 epochsPassed = (epoch.endTime - position.lastUpdatedTimestamp) / EPOCH_LENGTH;
         if (epochsPassed > 0) {
             if (position.liquidityPending != 0) {
-                // get proceed & fee growth inside through the end of the pending epoch
                 uint256 lastUpdateEpoch = epoch.id - epochsPassed;
-                PoolSnapshot.Data memory poolSnapshot = poolSnapshots[PoolSnapshot.getId(poolId, lastUpdateEpoch)];
-                (
-                    uint256 proceedsGrowthInsideThroughLastUpdate,
-                    uint256 feeGrowthInsideAThroughLastUpdate,
-                    uint256 feeGrowthInsideBThroughLastUpdate
-                ) = getGrowthInsideThroughEpoch(
-                        poolSnapshot,
-                        slotSnapshots[SlotSnapshot.getId(lowerSlotId, lastUpdateEpoch)],
-                        slotSnapshots[SlotSnapshot.getId(upperSlotId, lastUpdateEpoch)],
-                        position.lowerSlotIndex,
-                        position.upperSlotIndex
-                    );
-                // update tokens owed before pending state applied
-                position.tokensOwedA += PRBMathUD60x18.mul(
-                    position.liquidity,
-                    feeGrowthInsideAThroughLastUpdate - position.feeGrowthInsideLastAFixedPoint
+                // update growth values through end of pending epoch
+                balanceChange = position.updateGrowthThroughEpoch(
+                    pool.snapshots[lastUpdateEpoch],
+                    lowerSlot.snapshots[lastUpdateEpoch],
+                    upperSlot.snapshots[lastUpdateEpoch]
                 );
-                position.tokensOwedB += PRBMathUD60x18.mul(
-                    position.liquidity,
-                    feeGrowthInsideBThroughLastUpdate - position.feeGrowthInsideLastBFixedPoint
-                );
-                if (position.liquidityMatured > 0) {
-                    position.tokensOwedC += PRBMathUD60x18.mul(
-                        position.liquidityMatured,
-                        proceedsGrowthInsideThroughLastUpdate - position.proceedsGrowthInsideLastFixedPoint
-                    );
-                }
-                position.proceedsGrowthInsideLastFixedPoint = proceedsGrowthInsideThroughLastUpdate;
-                position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideAThroughLastUpdate;
-                position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideBThroughLastUpdate;
-                // if liquidity was kicked out, add the underlying tokens to tokens owed
+
                 if (position.liquidityPending < 0) {
-                    (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
+                    // if liquidity was kicked out, add the underlying tokens
+                    (uint256 underlyingA, uint256 underlyingB) = _calculateLiquidityDeltas(
                         PRICE_GRID_FIXED_POINT,
                         uint256(position.liquidityPending),
-                        poolSnapshot.activeSqrtPriceFixedPoint,
-                        poolSnapshot.activeSlotIndex,
+                        pool.snapshots[lastUpdateEpoch].activeSqrtPriceFixedPoint,
+                        pool.snapshots[lastUpdateEpoch].activeSlotIndex,
                         position.lowerSlotIndex,
                         position.upperSlotIndex
                     );
-                    position.tokensOwedA += amountA;
-                    position.tokensOwedB += amountB;
+                    balanceChange.tokenA += underlyingA;
+                    balanceChange.tokenB += underlyingB;
+
                     position.liquidity -= uint256(position.liquidityPending);
                     position.liquidityMatured -= uint256(position.liquidityPending);
                 } else {
-                    // liquidity matured
                     position.liquidityMatured += uint256(position.liquidityPending);
                 }
-                // zero out pending liquidity
                 position.liquidityPending = int256(0);
             }
         }
 
-        // calculate tokens owed due to growth since last update
+        // calculate earned tokens due to growth since last update
+        {
+            PositiveBalanceChange memory _balanceChange = position.updateGrowth(pool, lowerSlot, upperSlot);
+            balanceChange.tokenA += _balanceChange.tokenA;
+            balanceChange.tokenB += _balanceChange.tokenB;
+            balanceChange.tokenC += _balanceChange.tokenC;
+        }
+
+        // finally update position timestamp
+        position.lastUpdatedTimestamp = block.timestamp;
+    }
+
+    function updateGrowth(
+        Data storage position,
+        Pool.Data storage pool,
+        Slot.Data storage lowerSlot,
+        Slot.Data storage upperSlot
+    ) internal returns (PositiveBalanceChange memory balanceChange) {
         (uint256 proceedsGrowthInside, uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) = getGrowthInside(
             pool,
             lowerSlot,
@@ -128,16 +113,16 @@ library Position {
             position.lowerSlotIndex,
             position.upperSlotIndex
         );
-        position.tokensOwedA += PRBMathUD60x18.mul(
+        balanceChange.tokenA = PRBMathUD60x18.mul(
             position.liquidity,
             feeGrowthInsideA - position.feeGrowthInsideLastAFixedPoint
         );
-        position.tokensOwedB += PRBMathUD60x18.mul(
+        balanceChange.tokenB = PRBMathUD60x18.mul(
             position.liquidity,
             feeGrowthInsideB - position.feeGrowthInsideLastBFixedPoint
         );
         if (position.liquidityMatured > 0) {
-            position.tokensOwedC += PRBMathUD60x18.mul(
+            balanceChange.tokenC = PRBMathUD60x18.mul(
                 position.liquidityMatured,
                 proceedsGrowthInside - position.proceedsGrowthInsideLastFixedPoint
             );
@@ -145,19 +130,53 @@ library Position {
         position.proceedsGrowthInsideLastFixedPoint = proceedsGrowthInside;
         position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideA;
         position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideB;
+    }
 
-        position.lastUpdatedTimestamp = block.timestamp;
+    function updateGrowthThroughEpoch(
+        Data storage position,
+        Pool.Snapshot storage poolSnapshot,
+        Slot.Snapshot storage lowerSlotSnapshot,
+        Slot.Snapshot storage upperSlotSnapshot
+    ) internal returns (PositiveBalanceChange memory balanceChange) {
+        (
+            uint256 proceedsGrowthInsideThroughLastUpdate,
+            uint256 feeGrowthInsideAThroughLastUpdate,
+            uint256 feeGrowthInsideBThroughLastUpdate
+        ) = getGrowthInsideThroughEpoch(
+                poolSnapshot,
+                lowerSlotSnapshot,
+                upperSlotSnapshot,
+                position.lowerSlotIndex,
+                position.upperSlotIndex
+            );
+        balanceChange.tokenA = PRBMathUD60x18.mul(
+            position.liquidity,
+            feeGrowthInsideAThroughLastUpdate - position.feeGrowthInsideLastAFixedPoint
+        );
+        balanceChange.tokenB = PRBMathUD60x18.mul(
+            position.liquidity,
+            feeGrowthInsideBThroughLastUpdate - position.feeGrowthInsideLastBFixedPoint
+        );
+        if (position.liquidityMatured > 0) {
+            balanceChange.tokenC = PRBMathUD60x18.mul(
+                position.liquidityMatured,
+                proceedsGrowthInsideThroughLastUpdate - position.proceedsGrowthInsideLastFixedPoint
+            );
+        }
+        position.proceedsGrowthInsideLastFixedPoint = proceedsGrowthInsideThroughLastUpdate;
+        position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideAThroughLastUpdate;
+        position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideBThroughLastUpdate;
     }
 
     function getGrowthInside(
-        Pool.Data memory pool,
-        Slot.Data memory lowerSlot,
-        Slot.Data memory upperSlot,
+        Pool.Data storage pool,
+        Slot.Data storage lowerSlot,
+        Slot.Data storage upperSlot,
         int128 lowerSlotIndex,
         int128 upperSlotIndex
     )
         internal
-        pure
+        view
         returns (
             uint256 proceedsGrowthInside,
             uint256 feeGrowthInsideA,
@@ -190,14 +209,14 @@ library Position {
     }
 
     function getGrowthInsideThroughEpoch(
-        PoolSnapshot.Data memory poolSnapshot,
-        SlotSnapshot.Data memory lowerSlotSnapshot,
-        SlotSnapshot.Data memory upperSlotSnapshot,
+        Pool.Snapshot storage poolSnapshot,
+        Slot.Snapshot storage lowerSlotSnapshot,
+        Slot.Snapshot storage upperSlotSnapshot,
         int128 lowerSlotIndex,
         int128 upperSlotIndex
     )
         internal
-        pure
+        view
         returns (
             uint256 proceedsGrowthInside,
             uint256 feeGrowthInsideA,
