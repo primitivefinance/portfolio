@@ -8,8 +8,6 @@ import "./libraries/Pool.sol";
 import "./libraries/Position.sol";
 import "./libraries/Slot.sol";
 
-import "forge-std/Test.sol";
-
 // TODO:
 // - Add WETH wrapping / unwrapping
 // - Add the internal balances, fund and withdraw
@@ -22,7 +20,7 @@ import "forge-std/Test.sol";
 // - Interface
 // - slots bitmap
 
-contract Smol is Test {
+contract Smol {
     using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
