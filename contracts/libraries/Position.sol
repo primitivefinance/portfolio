@@ -55,7 +55,8 @@ library Position {
         Slot.Data storage upperSlot,
         Epoch.Data memory epoch
     ) internal returns (PositiveBalanceChange memory balanceChange) {
-        uint256 epochsPassed = (epoch.endTime - position.lastUpdatedTimestamp) / EPOCH_LENGTH;
+        uint256 epochsPassed = (epoch.endTime - (position.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
+        // TODO: double check boundary condition
         if (epochsPassed > 0) {
             if (position.liquidityPending != 0) {
                 uint256 lastUpdateEpoch = epoch.id - epochsPassed;

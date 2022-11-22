@@ -37,17 +37,28 @@ contract Smol {
 
     address public auctionFeeCollector;
 
-    constructor(uint256 transitionTime, address _auctionFeeCollector) {
-        require(transitionTime > block.timestamp);
-        epoch = Epoch.Data({id: 0, endTime: transitionTime});
+    constructor(uint256 startTime, address _auctionFeeCollector) {
+        require(startTime > block.timestamp);
+        epoch = Epoch.Data({id: 0, endTime: startTime});
         auctionFeeCollector = _auctionFeeCollector;
+    }
+
+    modifier started() {
+        require(epoch.id > 0, "Hyper not started yet.");
+        _;
+    }
+
+    function start() public {
+        epoch.sync();
+        require(epoch.id > 0, "Hyper not started yet.");
+        // TODO: emit ActivateHyper
     }
 
     function activatePool(
         address tokenA,
         address tokenB,
         uint256 activeSqrtPriceFixedPoint
-    ) public {
+    ) public started {
         epoch.sync();
         pools.activate(tokenA, tokenB, activeSqrtPriceFixedPoint);
 
@@ -59,7 +70,7 @@ contract Smol {
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
-    ) public {
+    ) public started {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
 
@@ -232,7 +243,7 @@ contract Smol {
         address tokenB,
         uint256 tendered,
         bool direction
-    ) public {
+    ) public started {
         uint256 tenderedRemaining = tendered;
         uint256 received;
 
@@ -248,7 +259,7 @@ contract Smol {
         address refunder,
         address swapper,
         uint256 amount
-    ) public {
+    ) public started {
         if (amount == 0) revert();
 
         Pool.Data storage pool = pools[poolId];

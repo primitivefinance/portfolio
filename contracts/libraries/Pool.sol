@@ -65,7 +65,8 @@ library Pool {
     }
 
     function sync(Data storage pool, Epoch.Data memory epoch) internal {
-        uint256 epochsPassed = (epoch.endTime - pool.lastUpdatedTimestamp) / EPOCH_LENGTH;
+        uint256 epochsPassed = (epoch.endTime - (pool.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
+        // TODO: double check boundary condition
         if (epochsPassed > 0) {
             // update proceeds growth to epoch transition
             uint256 lastUpdateEpoch = epoch.id - epochsPassed;
