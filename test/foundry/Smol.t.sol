@@ -11,7 +11,7 @@ contract TestSmol is Test {
     function setUp() public {
         smol = new Smol(1000, address(0xbeef));
         vm.warp(1000);
-        smol.warmUp();
+        smol.start();
     }
 
     function test_initiatePool() public {
