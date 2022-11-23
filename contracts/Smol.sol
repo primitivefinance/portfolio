@@ -153,7 +153,7 @@ contract Smol {
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == uint256(0)) {
                 // TODO: add to / initialize slot in bitmap
-                // TODO: initialize growth outside values
+                // TODO: initialize per liquidity outside values
                 upperSlot.liquidityGross += uint256(addAmountLeft);
             }
 
