@@ -42,12 +42,23 @@ contract Smol {
 
     address public auctionFeeCollector;
 
-    constructor(uint256 transitionTime, address _auctionFeeCollector) {
-        require(transitionTime > block.timestamp);
-        epoch = Epoch.Data({id: 0, endTime: transitionTime});
+    constructor(uint256 startTime, address _auctionFeeCollector) {
+        require(startTime > block.timestamp);
+        epoch = Epoch.Data({id: 0, endTime: startTime});
         auctionFeeCollector = _auctionFeeCollector;
     }
 
+    modifier started() {
+        require(epoch.id > 0, "Hyper not started yet.");
+        _;
+    }
+
+    function start() public {
+        epoch.sync();
+        require(epoch.id > 0, "Hyper not started yet.");
+        // TODO: emit ActivateHyper
+    }
+    
     function fund(address to, address token, uint256 amount) public {
         SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), amount);
         balanceOf[to][token] += amount;
@@ -61,10 +72,10 @@ contract Smol {
     function activatePool(
         address tokenA,
         address tokenB,
-        uint256 activeSqrtPriceFixedPoint
-    ) public {
+        uint256 sqrtPriceFixedPoint
+    ) public started {
         epoch.sync();
-        pools.activate(tokenA, tokenB, activeSqrtPriceFixedPoint);
+        pools.activate(tokenA, tokenB, sqrtPriceFixedPoint);
 
         // TODO: emit ActivatePool event
     }
@@ -74,7 +85,7 @@ contract Smol {
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
-    ) public {
+    ) public started {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
 
@@ -118,38 +129,64 @@ contract Smol {
         Position.Data storage position,
         uint256 amount
     ) internal {
-        position.liquidity += amount;
-        position.liquidityPending += int256(amount);
+        uint256 addAmountLeft = amount;
 
-        lowerSlot.liquidityDelta += int256(amount);
-        lowerSlot.liquidityPendingDelta += int256(amount);
-        if (lowerSlot.liquidityGross == uint256(0)) {
-            // TODO: add to / initialize slot in bitmap
-            // TODO: initialize growth outside values
-            lowerSlot.liquidityGross += uint256(amount);
+        // use negative pending liquidity first
+        if (position.pendingLiquidity < int256(0)) {
+            uint256 addedPending = uint256(position.pendingLiquidity) >= amount
+                ? amount
+                : uint256(position.pendingLiquidity);
+
+            position.pendingLiquidity += int256(addedPending);
+
+            lowerSlot.pendingLiquidityDelta += int256(addedPending);
+            upperSlot.pendingLiquidityDelta -= int256(addedPending);
+
+            lowerSlot.pendingLiquidityGross += int256(addedPending);
+            upperSlot.pendingLiquidityGross += int256(addedPending);
+
+            if (position.lowerSlotIndex <= pool.slotIndex && pool.slotIndex < position.upperSlotIndex) {
+                pool.pendingLiquidity += int256(addedPending);
+            }
+
+            addAmountLeft -= addedPending;
         }
 
-        upperSlot.liquidityDelta -= int256(amount);
-        upperSlot.liquidityPendingDelta -= int256(amount);
-        if (upperSlot.liquidityGross == uint256(0)) {
-            // TODO: add to / initialize slot in bitmap
-            // TODO: initialize growth outside values
-            upperSlot.liquidityGross += uint256(amount);
-        }
+        if (addAmountLeft > 0) {
+            position.swapLiquidity += addAmountLeft;
+            position.pendingLiquidity += int256(addAmountLeft);
 
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-            PRICE_GRID_FIXED_POINT,
-            amount,
-            pool.activeSqrtPriceFixedPoint,
-            pool.activeSlotIndex,
-            position.lowerSlotIndex,
-            position.upperSlotIndex
-        );
-        if (amountA != 0 && amountB != 0) {
-            pool.activeLiquidity += amount;
-            pool.activeLiquidityPending += int256(amount);
+            lowerSlot.swapLiquidityDelta += int256(addAmountLeft);
+            lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
+            if (lowerSlot.liquidityGross == uint256(0)) {
+                // TODO: add to / initialize slot in bitmap
+                // TODO: initialize per liquidity outside values
+                lowerSlot.liquidityGross += uint256(addAmountLeft);
+            }
+
+            upperSlot.swapLiquidityDelta -= int256(addAmountLeft);
+            upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
+            if (upperSlot.liquidityGross == uint256(0)) {
+                // TODO: add to / initialize slot in bitmap
+                // TODO: initialize per liquidity outside values
+                upperSlot.liquidityGross += uint256(addAmountLeft);
+            }
+
+            (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
+                PRICE_GRID_FIXED_POINT,
+                addAmountLeft,
+                pool.sqrtPriceFixedPoint,
+                pool.slotIndex,
+                position.lowerSlotIndex,
+                position.upperSlotIndex
+            );
+            if (amountA != 0 && amountB != 0) {
+                pool.swapLiquidity += addAmountLeft;
+                pool.pendingLiquidity += int256(addAmountLeft);
+            }
+
+            // TODO: Remove amountA & amountB from internal balance
         }
-        // TODO: Request amountA & amountB from msg.sender
 
         // TODO: Emit add liquidity event
     }
@@ -163,32 +200,33 @@ contract Smol {
     ) internal {
         uint256 removeAmountLeft = amount;
 
-        // remove positive pending liquidity balance immediately
-        if (position.liquidityPending > int256(0)) {
-            // pending + matured = position.liquidity when liquidity pending is positive
-            if (position.liquidity < amount) revert();
+        // remove positive pending liquidity immediately
+        if (position.pendingLiquidity > int256(0)) {
+            if (position.swapLiquidity < amount) revert();
 
-            uint256 removeLiquidityPending = uint256(position.liquidityPending) >= amount
+            uint256 removedPending = uint256(position.pendingLiquidity) >= amount
                 ? amount
-                : uint256(position.liquidityPending);
+                : uint256(position.pendingLiquidity);
 
-            lowerSlot.liquidityDelta -= int256(removeLiquidityPending);
-            lowerSlot.liquidityPendingDelta -= int256(removeLiquidityPending);
-            lowerSlot.liquidityGross -= removeLiquidityPending;
+            position.swapLiquidity -= removedPending;
+            position.pendingLiquidity -= int256(removedPending);
 
-            upperSlot.liquidityDelta += int256(removeLiquidityPending);
-            upperSlot.liquidityPendingDelta += int256(removeLiquidityPending);
-            upperSlot.liquidityGross -= removeLiquidityPending;
+            lowerSlot.swapLiquidityDelta -= int256(removedPending);
+            lowerSlot.pendingLiquidityDelta -= int256(removedPending);
+            lowerSlot.liquidityGross -= removedPending;
+            // TODO: check liquidity gross value for bitmap
 
-            position.liquidity -= removeLiquidityPending;
-            position.liquidityPending -= int256(removeLiquidityPending);
+            upperSlot.swapLiquidityDelta += int256(removedPending);
+            upperSlot.pendingLiquidityDelta += int256(removedPending);
+            upperSlot.liquidityGross -= removedPending;
+            // TODO: check liquidity gross value for bitmap
 
             // credit tokens owed to the position immediately
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
                 PRICE_GRID_FIXED_POINT,
-                removeLiquidityPending,
-                pool.activeSqrtPriceFixedPoint,
-                pool.activeSlotIndex,
+                removedPending,
+                pool.sqrtPriceFixedPoint,
+                pool.slotIndex,
                 position.lowerSlotIndex,
                 position.upperSlotIndex
             );
@@ -196,38 +234,40 @@ contract Smol {
             // TODO: add amountA & b to internal balance
 
             if (amountA != 0 && amountB != 0) {
-                pool.activeLiquidity -= removeLiquidityPending;
-                pool.activeLiquidityPending -= int256(removeLiquidityPending);
+                pool.swapLiquidity -= removedPending;
+                pool.pendingLiquidity -= int256(removedPending);
             }
 
-            removeAmountLeft -= removeLiquidityPending;
+            removeAmountLeft -= removedPending;
         } else {
-            // pending + position.liquidity = remaining liquidity when liquidity pending is negative (or zero)
-            if (position.liquidity - uint256(position.liquidityPending) < amount) revert();
+            if (position.swapLiquidity - uint256(position.pendingLiquidity) < amount) revert();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
         if (removeAmountLeft > 0) {
-            lowerSlot.liquidityPendingDelta -= int256(removeAmountLeft);
-            upperSlot.liquidityPendingDelta += int256(removeAmountLeft);
+            position.pendingLiquidity -= int256(removeAmountLeft);
 
-            position.liquidityPending -= int256(removeAmountLeft);
+            lowerSlot.pendingLiquidityDelta -= int256(removeAmountLeft);
+            upperSlot.pendingLiquidityDelta += int256(removeAmountLeft);
 
-            if (position.lowerSlotIndex <= pool.activeSlotIndex && pool.activeSlotIndex < position.upperSlotIndex) {
-                pool.activeLiquidityPending -= int256(removeAmountLeft);
+            lowerSlot.pendingLiquidityGross -= int256(removeAmountLeft);
+            upperSlot.pendingLiquidityGross -= int256(removeAmountLeft);
+
+            if (position.lowerSlotIndex <= pool.slotIndex && pool.slotIndex < position.upperSlotIndex) {
+                pool.pendingLiquidity -= int256(removeAmountLeft);
             }
         }
 
         // save slot snapshots
         lowerSlot.snapshots[epoch.id] = Slot.Snapshot({
-            proceedsGrowthOutsideFixedPoint: lowerSlot.proceedsGrowthOutsideFixedPoint,
-            feeGrowthOutsideAFixedPoint: lowerSlot.feeGrowthOutsideAFixedPoint,
-            feeGrowthOutsideBFixedPoint: lowerSlot.feeGrowthOutsideBFixedPoint
+            proceedsPerLiquidityOutsideFixedPoint: lowerSlot.proceedsPerLiquidityOutsideFixedPoint,
+            feesAPerLiquidityOutsideFixedPoint: lowerSlot.feesAPerLiquidityOutsideFixedPoint,
+            feesBPerLiquidityOutsideFixedPoint: lowerSlot.feesBPerLiquidityOutsideFixedPoint
         });
         upperSlot.snapshots[epoch.id] = Slot.Snapshot({
-            proceedsGrowthOutsideFixedPoint: upperSlot.proceedsGrowthOutsideFixedPoint,
-            feeGrowthOutsideAFixedPoint: upperSlot.feeGrowthOutsideAFixedPoint,
-            feeGrowthOutsideBFixedPoint: upperSlot.feeGrowthOutsideBFixedPoint
+            proceedsPerLiquidityOutsideFixedPoint: upperSlot.proceedsPerLiquidityOutsideFixedPoint,
+            feesAPerLiquidityOutsideFixedPoint: upperSlot.feesAPerLiquidityOutsideFixedPoint,
+            feesBPerLiquidityOutsideFixedPoint: upperSlot.feesBPerLiquidityOutsideFixedPoint
         });
 
         // TODO: emit RemoveLiquidity event
@@ -247,7 +287,7 @@ contract Smol {
         address tokenB,
         uint256 tendered,
         bool direction
-    ) public {
+    ) public started {
         uint256 tenderedRemaining = tendered;
         uint256 received;
 
@@ -263,7 +303,7 @@ contract Smol {
         address refunder,
         address swapper,
         uint256 amount
-    ) public {
+    ) public started {
         if (amount == 0) revert();
 
         Pool.Data storage pool = pools[poolId];

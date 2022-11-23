@@ -9,7 +9,9 @@ contract TestSmol is Test {
     Smol public smol;
 
     function setUp() public {
-        smol = new Smol(block.timestamp + 1000, address(0xbeef));
+        smol = new Smol(1000, address(0xbeef));
+        vm.warp(1000);
+        smol.start();
     }
 
     function test_initiatePool() public {
