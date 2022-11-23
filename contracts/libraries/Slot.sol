@@ -13,9 +13,8 @@ library Slot {
         uint256 liquidityGross;
         int256 pendingLiquidityGross;
         int256 swapLiquidityDelta;
-        int256 pendingSwapLiquidityDelta;
         int256 maturedLiquidityDelta;
-        int256 pendingMaturedLiquidityDelta;
+        int256 pendingLiquidityDelta;
         uint256 proceedsPerLiquidityOutsideFixedPoint;
         uint256 feesAPerLiquidityOutsideFixedPoint;
         uint256 feesBPerLiquidityOutsideFixedPoint;
@@ -37,18 +36,16 @@ library Slot {
         uint256 epochsPassed = (epoch.endTime - (slot.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
         if (epochsPassed > 0) {
-            // update liquidity delta values for epoch transition
-            slot.swapLiquidityDelta += slot.pendingSwapLiquidityDelta;
-            slot.maturedLiquidityDelta += slot.pendingMaturedLiquidityDelta;
+            // update liquidity deltas for epoch transition
+            slot.maturedLiquidityDelta += slot.pendingLiquidityDelta;
+            slot.swapLiquidityDelta = slot.maturedLiquidityDelta;
+            slot.pendingLiquidityDelta = int256(0);
 
             // update liquidity gross for epoch transition
             if (slot.pendingLiquidityGross < 0) {
                 slot.liquidityGross -= uint256(slot.pendingLiquidityGross);
                 // TODO: If liquidity gross is now zero, remove from bitmap
             }
-
-            slot.pendingSwapLiquidityDelta = int256(0);
-            slot.pendingMaturedLiquidityDelta = int256(0);
             slot.pendingLiquidityGross = int256(0);
         }
         slot.lastUpdatedTimestamp = block.timestamp;

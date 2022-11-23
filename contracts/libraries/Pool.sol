@@ -15,9 +15,8 @@ library Pool {
         address tokenA;
         address tokenB;
         uint256 swapLiquidity;
-        int256 pendingSwapLiquidity;
         uint256 maturedLiquidity;
-        int256 pendingMaturedLiquidity;
+        int256 pendingLiquidity;
         uint256 sqrtPriceFixedPoint;
         int128 slotIndex;
         uint256 proceedsPerLiquidityFixedPoint;
@@ -86,17 +85,14 @@ library Pool {
                 feesAPerLiquidityFixedPoint: pool.feesAPerLiquidityFixedPoint,
                 feesBPerLiquidityFixedPoint: pool.feesBPerLiquidityFixedPoint
             });
-            // update liquidity values for epoch transition
-            if (pool.pendingSwapLiquidity < 0) {
-                pool.swapLiquidity -= uint256(pool.pendingSwapLiquidity);
-            }
-            if (pool.pendingMaturedLiquidity > 0) {
-                pool.maturedLiquidity += uint256(pool.pendingMaturedLiquidity);
+            // update matured liquidity for epoch transition
+            if (pool.pendingLiquidity > 0) {
+                pool.maturedLiquidity += uint256(pool.pendingLiquidity);
             } else {
-                pool.maturedLiquidity -= uint256(pool.pendingMaturedLiquidity);
+                pool.maturedLiquidity -= uint256(pool.pendingLiquidity);
             }
-            pool.pendingSwapLiquidity = int256(0);
-            pool.pendingMaturedLiquidity = int256(0);
+            pool.swapLiquidity = pool.maturedLiquidity;
+            pool.pendingLiquidity = int256(0);
             // update proceeds per liquidity distributed for next epoch if needed
             if (epochsPassed > 1) {
                 if (pool.maturedLiquidity > 0) {
@@ -105,7 +101,6 @@ library Pool {
                         pool.maturedLiquidity
                     );
                 }
-                // don't save snapshot since no position was touched during epoch
             }
         }
         // add proceeds for time passed in the current epoch

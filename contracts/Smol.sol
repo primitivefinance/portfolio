@@ -116,38 +116,33 @@ contract Smol {
     ) internal {
         uint256 addAmountLeft = amount;
 
-        // use negative pending swap liquidity first
-        if (position.pendingSwapLiquidity < int256(0)) {
-            uint256 removedPending = uint256(position.pendingSwapLiquidity) >= amount
+        // use negative pending liquidity first
+        if (position.pendingLiquidity < int256(0)) {
+            uint256 addedPending = uint256(position.pendingLiquidity) >= amount
                 ? amount
-                : uint256(position.pendingSwapLiquidity);
+                : uint256(position.pendingLiquidity);
 
-            lowerSlot.pendingSwapLiquidityDelta += int256(removedPending);
-            upperSlot.pendingSwapLiquidityDelta -= int256(removedPending);
+            position.pendingLiquidity += int256(addedPending);
 
-            lowerSlot.pendingMaturedLiquidityDelta += int256(removedPending);
-            upperSlot.pendingMaturedLiquidityDelta -= int256(removedPending);
+            lowerSlot.pendingLiquidityDelta += int256(addedPending);
+            upperSlot.pendingLiquidityDelta -= int256(addedPending);
 
-            lowerSlot.pendingLiquidityGross += int256(removedPending);
-            upperSlot.pendingLiquidityGross += int256(removedPending);
-
-            position.pendingSwapLiquidity += int256(removedPending);
-            position.pendingMaturedLiquidity += int256(removedPending);
+            lowerSlot.pendingLiquidityGross += int256(addedPending);
+            upperSlot.pendingLiquidityGross += int256(addedPending);
 
             if (position.lowerSlotIndex <= pool.slotIndex && pool.slotIndex < position.upperSlotIndex) {
-                pool.pendingSwapLiquidity += int256(removedPending);
-                pool.pendingMaturedLiquidity += int256(removedPending);
+                pool.pendingLiquidity += int256(addedPending);
             }
 
-            addAmountLeft -= removedPending;
+            addAmountLeft -= addedPending;
         }
 
         if (addAmountLeft > 0) {
             position.swapLiquidity += addAmountLeft;
-            position.pendingMaturedLiquidity += int256(addAmountLeft);
+            position.pendingLiquidity += int256(addAmountLeft);
 
             lowerSlot.swapLiquidityDelta += int256(addAmountLeft);
-            lowerSlot.pendingMaturedLiquidityDelta += int256(addAmountLeft);
+            lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
             if (lowerSlot.liquidityGross == uint256(0)) {
                 // TODO: add to / initialize slot in bitmap
                 // TODO: initialize per liquidity outside values
@@ -155,7 +150,7 @@ contract Smol {
             }
 
             upperSlot.swapLiquidityDelta -= int256(addAmountLeft);
-            upperSlot.pendingMaturedLiquidityDelta -= int256(addAmountLeft);
+            upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == uint256(0)) {
                 // TODO: add to / initialize slot in bitmap
                 // TODO: initialize growth outside values
@@ -172,7 +167,7 @@ contract Smol {
             );
             if (amountA != 0 && amountB != 0) {
                 pool.swapLiquidity += addAmountLeft;
-                pool.pendingMaturedLiquidity += int256(addAmountLeft);
+                pool.pendingLiquidity += int256(addAmountLeft);
             }
 
             // TODO: Remove amountA & amountB from internal balance
@@ -190,26 +185,26 @@ contract Smol {
     ) internal {
         uint256 removeAmountLeft = amount;
 
-        // remove positive pending matured liquidity immediately
-        if (position.pendingMaturedLiquidity > int256(0)) {
+        // remove positive pending liquidity immediately
+        if (position.pendingLiquidity > int256(0)) {
             if (position.swapLiquidity < amount) revert();
 
-            uint256 removedPending = uint256(position.pendingMaturedLiquidity) >= amount
+            uint256 removedPending = uint256(position.pendingLiquidity) >= amount
                 ? amount
-                : uint256(position.pendingMaturedLiquidity);
+                : uint256(position.pendingLiquidity);
+
+            position.swapLiquidity -= removedPending;
+            position.pendingLiquidity -= int256(removedPending);
 
             lowerSlot.swapLiquidityDelta -= int256(removedPending);
-            lowerSlot.pendingMaturedLiquidityDelta -= int256(removedPending);
+            lowerSlot.pendingLiquidityDelta -= int256(removedPending);
             lowerSlot.liquidityGross -= removedPending;
             // TODO: check liquidity gross value for bitmap
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
-            upperSlot.pendingMaturedLiquidityDelta += int256(removedPending);
+            upperSlot.pendingLiquidityDelta += int256(removedPending);
             upperSlot.liquidityGross -= removedPending;
             // TODO: check liquidity gross value for bitmap
-
-            position.swapLiquidity -= removedPending;
-            position.pendingMaturedLiquidity -= int256(removedPending);
 
             // credit tokens owed to the position immediately
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
@@ -225,31 +220,26 @@ contract Smol {
 
             if (amountA != 0 && amountB != 0) {
                 pool.swapLiquidity -= removedPending;
-                pool.pendingMaturedLiquidity -= int256(removedPending);
+                pool.pendingLiquidity -= int256(removedPending);
             }
 
             removeAmountLeft -= removedPending;
         } else {
-            if (position.swapLiquidity - uint256(position.pendingMaturedLiquidity) < amount) revert();
+            if (position.swapLiquidity - uint256(position.pendingLiquidity) < amount) revert();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
         if (removeAmountLeft > 0) {
-            lowerSlot.pendingSwapLiquidityDelta -= int256(removeAmountLeft);
-            upperSlot.pendingSwapLiquidityDelta += int256(removeAmountLeft);
+            position.pendingLiquidity -= int256(removeAmountLeft);
 
-            lowerSlot.pendingMaturedLiquidityDelta -= int256(removeAmountLeft);
-            upperSlot.pendingMaturedLiquidityDelta += int256(removeAmountLeft);
+            lowerSlot.pendingLiquidityDelta -= int256(removeAmountLeft);
+            upperSlot.pendingLiquidityDelta += int256(removeAmountLeft);
 
             lowerSlot.pendingLiquidityGross -= int256(removeAmountLeft);
             upperSlot.pendingLiquidityGross -= int256(removeAmountLeft);
 
-            position.pendingSwapLiquidity -= int256(removeAmountLeft);
-            position.pendingMaturedLiquidity -= int256(removeAmountLeft);
-
             if (position.lowerSlotIndex <= pool.slotIndex && pool.slotIndex < position.upperSlotIndex) {
-                pool.pendingSwapLiquidity -= int256(removeAmountLeft);
-                pool.pendingMaturedLiquidity -= int256(removeAmountLeft);
+                pool.pendingLiquidity -= int256(removeAmountLeft);
             }
         }
 

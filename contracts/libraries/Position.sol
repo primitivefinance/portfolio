@@ -23,9 +23,8 @@ library Position {
         int128 lowerSlotIndex;
         int128 upperSlotIndex;
         uint256 swapLiquidity;
-        int256 pendingSwapLiquidity;
         uint256 maturedLiquidity;
-        int256 pendingMaturedLiquidity;
+        int256 pendingLiquidity;
         uint256 proceedsPerLiquidityInsideLastFixedPoint;
         uint256 feesAPerLiquidityInsideLastFixedPoint;
         uint256 feesBPerLiquidityInsideLastFixedPoint;
@@ -59,7 +58,7 @@ library Position {
         uint256 epochsPassed = (epoch.endTime - (position.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
         if (epochsPassed > 0) {
-            if (position.pendingSwapLiquidity != 0 || position.pendingMaturedLiquidity != 0) {
+            if (position.pendingLiquidity != 0) {
                 uint256 lastUpdateEpoch = epoch.id - epochsPassed;
                 // update earnings through end of last update epoch
                 balanceChange = position.updateEarningsThroughEpoch(
@@ -68,11 +67,11 @@ library Position {
                     upperSlot.snapshots[lastUpdateEpoch]
                 );
 
-                if (position.pendingSwapLiquidity < 0) {
+                if (position.pendingLiquidity < 0) {
                     // if liquidity was kicked out, add the underlying tokens
                     (uint256 underlyingA, uint256 underlyingB) = _calculateLiquidityDeltas(
                         PRICE_GRID_FIXED_POINT,
-                        uint256(position.pendingSwapLiquidity),
+                        uint256(position.pendingLiquidity),
                         pool.snapshots[lastUpdateEpoch].sqrtPriceFixedPoint,
                         pool.snapshots[lastUpdateEpoch].slotIndex,
                         position.lowerSlotIndex,
@@ -81,17 +80,12 @@ library Position {
                     balanceChange.tokenA += underlyingA;
                     balanceChange.tokenB += underlyingB;
 
-                    position.swapLiquidity -= uint256(position.pendingSwapLiquidity);
-                }
-
-                if (position.pendingMaturedLiquidity < 0) {
-                    position.maturedLiquidity -= uint256(position.pendingMaturedLiquidity);
+                    position.maturedLiquidity -= uint256(position.pendingLiquidity);
                 } else {
-                    position.maturedLiquidity += uint256(position.pendingMaturedLiquidity);
+                    position.maturedLiquidity += uint256(position.pendingLiquidity);
                 }
-
-                position.pendingSwapLiquidity = int256(0);
-                position.pendingMaturedLiquidity = int256(0);
+                pool.swapLiquidity = position.maturedLiquidity;
+                pool.pendingLiquidity = int256(0);
             }
         }
 
