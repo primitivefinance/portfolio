@@ -11,8 +11,6 @@ import "./libraries/Pool.sol";
 import "./libraries/Position.sol";
 import "./libraries/Slot.sol";
 
-import "./interfaces/IERC20.sol";
-
 // TODO:
 // - Add WETH wrapping / unwrapping
 // - Add the internal balances, fund and withdraw
