@@ -22,12 +22,12 @@ library Position {
     struct Data {
         int128 lowerSlotIndex;
         int128 upperSlotIndex;
-        uint256 liquidity;
-        uint256 liquidityMatured;
-        int256 liquidityPending;
-        uint256 proceedsGrowthInsideLastFixedPoint;
-        uint256 feeGrowthInsideLastAFixedPoint;
-        uint256 feeGrowthInsideLastBFixedPoint;
+        uint256 swapLiquidity;
+        uint256 maturedLiquidity;
+        int256 pendingLiquidity;
+        uint256 proceedsPerLiquidityInsideLastFixedPoint;
+        uint256 feesAPerLiquidityInsideLastFixedPoint;
+        uint256 feesBPerLiquidityInsideLastFixedPoint;
         uint256 lastUpdatedTimestamp;
     }
 
@@ -58,40 +58,40 @@ library Position {
         uint256 epochsPassed = (epoch.endTime - (position.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
         if (epochsPassed > 0) {
-            if (position.liquidityPending != 0) {
+            if (position.pendingLiquidity != 0) {
                 uint256 lastUpdateEpoch = epoch.id - epochsPassed;
-                // update growth values through end of pending epoch
-                balanceChange = position.updateGrowthThroughEpoch(
+                // update earnings through end of last update epoch
+                balanceChange = position.updateEarningsThroughEpoch(
                     pool.snapshots[lastUpdateEpoch],
                     lowerSlot.snapshots[lastUpdateEpoch],
                     upperSlot.snapshots[lastUpdateEpoch]
                 );
 
-                if (position.liquidityPending < 0) {
+                if (position.pendingLiquidity < 0) {
                     // if liquidity was kicked out, add the underlying tokens
                     (uint256 underlyingA, uint256 underlyingB) = _calculateLiquidityDeltas(
                         PRICE_GRID_FIXED_POINT,
-                        uint256(position.liquidityPending),
-                        pool.snapshots[lastUpdateEpoch].activeSqrtPriceFixedPoint,
-                        pool.snapshots[lastUpdateEpoch].activeSlotIndex,
+                        uint256(position.pendingLiquidity),
+                        pool.snapshots[lastUpdateEpoch].sqrtPriceFixedPoint,
+                        pool.snapshots[lastUpdateEpoch].slotIndex,
                         position.lowerSlotIndex,
                         position.upperSlotIndex
                     );
                     balanceChange.tokenA += underlyingA;
                     balanceChange.tokenB += underlyingB;
 
-                    position.liquidity -= uint256(position.liquidityPending);
-                    position.liquidityMatured -= uint256(position.liquidityPending);
+                    position.maturedLiquidity -= uint256(position.pendingLiquidity);
                 } else {
-                    position.liquidityMatured += uint256(position.liquidityPending);
+                    position.maturedLiquidity += uint256(position.pendingLiquidity);
                 }
-                position.liquidityPending = int256(0);
+                pool.swapLiquidity = position.maturedLiquidity;
+                pool.pendingLiquidity = int256(0);
             }
         }
 
-        // calculate earned tokens due to growth since last update
+        // calculate earnings since last update
         {
-            PositiveBalanceChange memory _balanceChange = position.updateGrowth(pool, lowerSlot, upperSlot);
+            PositiveBalanceChange memory _balanceChange = position.updateEarnings(pool, lowerSlot, upperSlot);
             balanceChange.tokenA += _balanceChange.tokenA;
             balanceChange.tokenB += _balanceChange.tokenB;
             balanceChange.tokenC += _balanceChange.tokenC;
@@ -101,49 +101,47 @@ library Position {
         position.lastUpdatedTimestamp = block.timestamp;
     }
 
-    function updateGrowth(
+    function updateEarnings(
         Data storage position,
         Pool.Data storage pool,
         Slot.Data storage lowerSlot,
         Slot.Data storage upperSlot
     ) internal returns (PositiveBalanceChange memory balanceChange) {
-        (uint256 proceedsGrowthInside, uint256 feeGrowthInsideA, uint256 feeGrowthInsideB) = getGrowthInside(
-            pool,
-            lowerSlot,
-            upperSlot,
-            position.lowerSlotIndex,
-            position.upperSlotIndex
-        );
+        (
+            uint256 proceedsPerLiquidityInside,
+            uint256 feesAPerLiquidityInside,
+            uint256 feesBPerLiquidityInside
+        ) = getEarningsInside(pool, lowerSlot, upperSlot, position.lowerSlotIndex, position.upperSlotIndex);
         balanceChange.tokenA = PRBMathUD60x18.mul(
-            position.liquidity,
-            feeGrowthInsideA - position.feeGrowthInsideLastAFixedPoint
+            position.swapLiquidity,
+            feesAPerLiquidityInside - position.feesAPerLiquidityInsideLastFixedPoint
         );
         balanceChange.tokenB = PRBMathUD60x18.mul(
-            position.liquidity,
-            feeGrowthInsideB - position.feeGrowthInsideLastBFixedPoint
+            position.swapLiquidity,
+            feesBPerLiquidityInside - position.feesBPerLiquidityInsideLastFixedPoint
         );
-        if (position.liquidityMatured > 0) {
+        if (position.maturedLiquidity > 0) {
             balanceChange.tokenC = PRBMathUD60x18.mul(
-                position.liquidityMatured,
-                proceedsGrowthInside - position.proceedsGrowthInsideLastFixedPoint
+                position.maturedLiquidity,
+                proceedsPerLiquidityInside - position.proceedsPerLiquidityInsideLastFixedPoint
             );
         }
-        position.proceedsGrowthInsideLastFixedPoint = proceedsGrowthInside;
-        position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideA;
-        position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideB;
+        position.proceedsPerLiquidityInsideLastFixedPoint = proceedsPerLiquidityInside;
+        position.feesAPerLiquidityInsideLastFixedPoint = feesAPerLiquidityInside;
+        position.feesBPerLiquidityInsideLastFixedPoint = feesBPerLiquidityInside;
     }
 
-    function updateGrowthThroughEpoch(
+    function updateEarningsThroughEpoch(
         Data storage position,
         Pool.Snapshot storage poolSnapshot,
         Slot.Snapshot storage lowerSlotSnapshot,
         Slot.Snapshot storage upperSlotSnapshot
     ) internal returns (PositiveBalanceChange memory balanceChange) {
         (
-            uint256 proceedsGrowthInsideThroughLastUpdate,
-            uint256 feeGrowthInsideAThroughLastUpdate,
-            uint256 feeGrowthInsideBThroughLastUpdate
-        ) = getGrowthInsideThroughEpoch(
+            uint256 proceedsPerLiquidityInsideThroughLastUpdate,
+            uint256 feesAPerLiquidityInsideThroughLastUpdate,
+            uint256 feesBPerLiquidityInsideThroughLastUpdate
+        ) = getEarningsInsideThroughEpoch(
                 poolSnapshot,
                 lowerSlotSnapshot,
                 upperSlotSnapshot,
@@ -151,25 +149,25 @@ library Position {
                 position.upperSlotIndex
             );
         balanceChange.tokenA = PRBMathUD60x18.mul(
-            position.liquidity,
-            feeGrowthInsideAThroughLastUpdate - position.feeGrowthInsideLastAFixedPoint
+            position.swapLiquidity,
+            feesAPerLiquidityInsideThroughLastUpdate - position.feesAPerLiquidityInsideLastFixedPoint
         );
         balanceChange.tokenB = PRBMathUD60x18.mul(
-            position.liquidity,
-            feeGrowthInsideBThroughLastUpdate - position.feeGrowthInsideLastBFixedPoint
+            position.swapLiquidity,
+            feesBPerLiquidityInsideThroughLastUpdate - position.feesBPerLiquidityInsideLastFixedPoint
         );
-        if (position.liquidityMatured > 0) {
+        if (position.maturedLiquidity > 0) {
             balanceChange.tokenC = PRBMathUD60x18.mul(
-                position.liquidityMatured,
-                proceedsGrowthInsideThroughLastUpdate - position.proceedsGrowthInsideLastFixedPoint
+                position.maturedLiquidity,
+                proceedsPerLiquidityInsideThroughLastUpdate - position.proceedsPerLiquidityInsideLastFixedPoint
             );
         }
-        position.proceedsGrowthInsideLastFixedPoint = proceedsGrowthInsideThroughLastUpdate;
-        position.feeGrowthInsideLastAFixedPoint = feeGrowthInsideAThroughLastUpdate;
-        position.feeGrowthInsideLastBFixedPoint = feeGrowthInsideBThroughLastUpdate;
+        position.proceedsPerLiquidityInsideLastFixedPoint = proceedsPerLiquidityInsideThroughLastUpdate;
+        position.feesAPerLiquidityInsideLastFixedPoint = feesAPerLiquidityInsideThroughLastUpdate;
+        position.feesBPerLiquidityInsideLastFixedPoint = feesBPerLiquidityInsideThroughLastUpdate;
     }
 
-    function getGrowthInside(
+    function getEarningsInside(
         Pool.Data storage pool,
         Slot.Data storage lowerSlot,
         Slot.Data storage upperSlot,
@@ -179,37 +177,40 @@ library Position {
         internal
         view
         returns (
-            uint256 proceedsGrowthInside,
-            uint256 feeGrowthInsideA,
-            uint256 feeGrowthInsideB
+            uint256 proceedsPerLiquidityInside,
+            uint256 feesAPerLiquidityInside,
+            uint256 feesBPerLiquidityInside
         )
     {
-        uint256 proceedsGrowthAbove = pool.activeSlotIndex >= upperSlotIndex
-            ? pool.proceedsGrowthGlobalFixedPoint - upperSlot.proceedsGrowthOutsideFixedPoint
-            : upperSlot.proceedsGrowthOutsideFixedPoint;
-        uint256 feeGrowthAboveA = pool.activeSlotIndex >= upperSlotIndex
-            ? pool.feeGrowthGlobalAFixedPoint - upperSlot.feeGrowthOutsideAFixedPoint
-            : upperSlot.feeGrowthOutsideAFixedPoint;
-        uint256 feeGrowthAboveB = pool.activeSlotIndex >= upperSlotIndex
-            ? pool.feeGrowthGlobalBFixedPoint - upperSlot.feeGrowthOutsideBFixedPoint
-            : upperSlot.feeGrowthOutsideBFixedPoint;
+        uint256 proceedsPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
+            ? pool.proceedsPerLiquidityFixedPoint - upperSlot.proceedsPerLiquidityOutsideFixedPoint
+            : upperSlot.proceedsPerLiquidityOutsideFixedPoint;
+        uint256 feesAPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
+            ? pool.feesAPerLiquidityFixedPoint - upperSlot.feesAPerLiquidityOutsideFixedPoint
+            : upperSlot.feesAPerLiquidityOutsideFixedPoint;
+        uint256 feesBPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
+            ? pool.feesBPerLiquidityFixedPoint - upperSlot.feesBPerLiquidityOutsideFixedPoint
+            : upperSlot.feesBPerLiquidityOutsideFixedPoint;
 
-        uint256 proceedsGrowthBelow = pool.activeSlotIndex >= lowerSlotIndex
-            ? lowerSlot.proceedsGrowthOutsideFixedPoint
-            : pool.proceedsGrowthGlobalFixedPoint - lowerSlot.proceedsGrowthOutsideFixedPoint;
-        uint256 feeGrowthBelowA = pool.activeSlotIndex >= lowerSlotIndex
-            ? lowerSlot.feeGrowthOutsideAFixedPoint
-            : pool.feeGrowthGlobalAFixedPoint - lowerSlot.feeGrowthOutsideAFixedPoint;
-        uint256 feeGrowthBelowB = pool.activeSlotIndex >= lowerSlotIndex
-            ? lowerSlot.feeGrowthOutsideBFixedPoint
-            : pool.feeGrowthGlobalBFixedPoint - lowerSlot.feeGrowthOutsideBFixedPoint;
+        uint256 proceedsPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
+            ? lowerSlot.proceedsPerLiquidityOutsideFixedPoint
+            : pool.proceedsPerLiquidityFixedPoint - lowerSlot.proceedsPerLiquidityOutsideFixedPoint;
+        uint256 feesAPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
+            ? lowerSlot.feesAPerLiquidityOutsideFixedPoint
+            : pool.feesAPerLiquidityFixedPoint - lowerSlot.feesAPerLiquidityOutsideFixedPoint;
+        uint256 feesBPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
+            ? lowerSlot.feesBPerLiquidityOutsideFixedPoint
+            : pool.feesBPerLiquidityFixedPoint - lowerSlot.feesBPerLiquidityOutsideFixedPoint;
 
-        proceedsGrowthInside = pool.proceedsGrowthGlobalFixedPoint - proceedsGrowthBelow - proceedsGrowthAbove;
-        feeGrowthInsideA = pool.feeGrowthGlobalAFixedPoint - feeGrowthBelowA - feeGrowthAboveA;
-        feeGrowthInsideB = pool.feeGrowthGlobalBFixedPoint - feeGrowthBelowB - feeGrowthAboveB;
+        proceedsPerLiquidityInside =
+            pool.proceedsPerLiquidityFixedPoint -
+            proceedsPerLiquidityBelow -
+            proceedsPerLiquidityAbove;
+        feesAPerLiquidityInside = pool.feesAPerLiquidityFixedPoint - feesAPerLiquidityBelow - feesAPerLiquidityAbove;
+        feesBPerLiquidityInside = pool.feesBPerLiquidityFixedPoint - feesBPerLiquidityBelow - feesBPerLiquidityAbove;
     }
 
-    function getGrowthInsideThroughEpoch(
+    function getEarningsInsideThroughEpoch(
         Pool.Snapshot storage poolSnapshot,
         Slot.Snapshot storage lowerSlotSnapshot,
         Slot.Snapshot storage upperSlotSnapshot,
@@ -219,33 +220,42 @@ library Position {
         internal
         view
         returns (
-            uint256 proceedsGrowthInside,
-            uint256 feeGrowthInsideA,
-            uint256 feeGrowthInsideB
+            uint256 proceedsPerLiquidityInside,
+            uint256 feesAPerLiquidityInside,
+            uint256 feesBPerLiquidityInside
         )
     {
-        uint256 proceedsGrowthAbove = poolSnapshot.activeSlotIndex >= upperSlotIndex
-            ? poolSnapshot.proceedsGrowthGlobalFixedPoint - upperSlotSnapshot.proceedsGrowthOutsideFixedPoint
-            : upperSlotSnapshot.proceedsGrowthOutsideFixedPoint;
-        uint256 feeGrowthAboveA = poolSnapshot.activeSlotIndex >= upperSlotIndex
-            ? poolSnapshot.feeGrowthGlobalAFixedPoint - upperSlotSnapshot.feeGrowthOutsideAFixedPoint
-            : upperSlotSnapshot.feeGrowthOutsideAFixedPoint;
-        uint256 feeGrowthAboveB = poolSnapshot.activeSlotIndex >= upperSlotIndex
-            ? poolSnapshot.feeGrowthGlobalBFixedPoint - upperSlotSnapshot.feeGrowthOutsideBFixedPoint
-            : upperSlotSnapshot.feeGrowthOutsideBFixedPoint;
+        uint256 proceedsPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
+            ? poolSnapshot.proceedsPerLiquidityFixedPoint - upperSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint
+            : upperSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint;
+        uint256 feesAPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
+            ? poolSnapshot.feesAPerLiquidityFixedPoint - upperSlotSnapshot.feesAPerLiquidityOutsideFixedPoint
+            : upperSlotSnapshot.feesAPerLiquidityOutsideFixedPoint;
+        uint256 feesBPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
+            ? poolSnapshot.feesBPerLiquidityFixedPoint - upperSlotSnapshot.feesBPerLiquidityOutsideFixedPoint
+            : upperSlotSnapshot.feesBPerLiquidityOutsideFixedPoint;
 
-        uint256 proceedsGrowthBelow = poolSnapshot.activeSlotIndex >= lowerSlotIndex
-            ? lowerSlotSnapshot.proceedsGrowthOutsideFixedPoint
-            : poolSnapshot.proceedsGrowthGlobalFixedPoint - lowerSlotSnapshot.proceedsGrowthOutsideFixedPoint;
-        uint256 feeGrowthBelowA = poolSnapshot.activeSlotIndex >= lowerSlotIndex
-            ? lowerSlotSnapshot.feeGrowthOutsideAFixedPoint
-            : poolSnapshot.feeGrowthGlobalAFixedPoint - lowerSlotSnapshot.feeGrowthOutsideAFixedPoint;
-        uint256 feeGrowthBelowB = poolSnapshot.activeSlotIndex >= lowerSlotIndex
-            ? lowerSlotSnapshot.feeGrowthOutsideBFixedPoint
-            : poolSnapshot.feeGrowthGlobalBFixedPoint - lowerSlotSnapshot.feeGrowthOutsideBFixedPoint;
+        uint256 proceedsPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
+            ? lowerSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint
+            : poolSnapshot.proceedsPerLiquidityFixedPoint - lowerSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint;
+        uint256 feesAPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
+            ? lowerSlotSnapshot.feesAPerLiquidityOutsideFixedPoint
+            : poolSnapshot.feesAPerLiquidityFixedPoint - lowerSlotSnapshot.feesAPerLiquidityOutsideFixedPoint;
+        uint256 feesBPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
+            ? lowerSlotSnapshot.feesBPerLiquidityOutsideFixedPoint
+            : poolSnapshot.feesBPerLiquidityFixedPoint - lowerSlotSnapshot.feesBPerLiquidityOutsideFixedPoint;
 
-        proceedsGrowthInside = poolSnapshot.proceedsGrowthGlobalFixedPoint - proceedsGrowthBelow - proceedsGrowthAbove;
-        feeGrowthInsideA = poolSnapshot.feeGrowthGlobalAFixedPoint - feeGrowthBelowA - feeGrowthAboveA;
-        feeGrowthInsideB = poolSnapshot.feeGrowthGlobalBFixedPoint - feeGrowthBelowB - feeGrowthAboveB;
+        proceedsPerLiquidityInside =
+            poolSnapshot.proceedsPerLiquidityFixedPoint -
+            proceedsPerLiquidityBelow -
+            proceedsPerLiquidityAbove;
+        feesAPerLiquidityInside =
+            poolSnapshot.feesAPerLiquidityFixedPoint -
+            feesAPerLiquidityBelow -
+            feesAPerLiquidityAbove;
+        feesBPerLiquidityInside =
+            poolSnapshot.feesBPerLiquidityFixedPoint -
+            feesBPerLiquidityBelow -
+            feesBPerLiquidityAbove;
     }
 }
