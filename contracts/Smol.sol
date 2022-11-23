@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {ERC20} from "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
 import "./libraries/BrainMath.sol";
@@ -9,6 +10,8 @@ import "./libraries/GlobalDefaults.sol";
 import "./libraries/Pool.sol";
 import "./libraries/Position.sol";
 import "./libraries/Slot.sol";
+
+import "./interfaces/IERC20.sol";
 
 // TODO:
 // - Add WETH wrapping / unwrapping
@@ -38,7 +41,7 @@ contract Smol {
     mapping(bytes32 => Slot.Data) public slots;
 
     /// @notice Internal token balances
-    mapping(address => mapping(address => uint256)) public balanceOf;
+    mapping(address => mapping(address => uint256)) public internalBalances;
 
     address public auctionFeeCollector;
 
@@ -58,15 +61,24 @@ contract Smol {
         require(epoch.id > 0, "Hyper not started yet.");
         // TODO: emit ActivateHyper
     }
-    
-    function fund(address to, address token, uint256 amount) public {
-        SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), amount);
-        balanceOf[to][token] += amount;
+
+    function fund(
+        address to,
+        address token,
+        uint256 amount
+    ) public {
+        SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
+        internalBalances[to][token] += amount;
     }
 
-    function withdraw(address to, address token, uint256 amount) public {
-        balanceOf[msg.sender][token] -= amount;
-        SafeTransferLib.safeTransferFrom(token, address(this), to, amount);
+    function withdraw(
+        address to,
+        address token,
+        uint256 amount
+    ) public {
+        require(internalBalances[msg.sender][token] >= amount);
+        internalBalances[msg.sender][token] -= amount;
+        SafeTransferLib.safeTransferFrom(ERC20(token), address(this), to, amount);
     }
 
     function activatePool(
