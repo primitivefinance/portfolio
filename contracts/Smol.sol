@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "solmate/utils/SafeTransferLib.sol";
+
 import "./libraries/BrainMath.sol";
 import "./libraries/Epoch.sol";
 import "./libraries/GlobalDefaults.sol";
@@ -35,6 +37,9 @@ contract Smol {
     mapping(bytes32 => Position.Data) public positions;
     mapping(bytes32 => Slot.Data) public slots;
 
+    /// @notice Internal token balances
+    mapping(address => mapping(address => uint256)) public balanceOf;
+
     address public auctionFeeCollector;
 
     constructor(uint256 startTime, address _auctionFeeCollector) {
@@ -52,6 +57,16 @@ contract Smol {
         epoch.sync();
         require(epoch.id > 0, "Hyper not started yet.");
         // TODO: emit ActivateHyper
+    }
+    
+    function fund(address to, address token, uint256 amount) public {
+        SafeTransferLib.safeTransferFrom(token, msg.sender, address(this), amount);
+        balanceOf[to][token] += amount;
+    }
+
+    function withdraw(address to, address token, uint256 amount) public {
+        balanceOf[msg.sender][token] -= amount;
+        SafeTransferLib.safeTransferFrom(token, address(this), to, amount);
     }
 
     function activatePool(
