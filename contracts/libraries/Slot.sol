@@ -12,20 +12,21 @@ library Slot {
     struct Data {
         uint256 liquidityGross;
         int256 pendingLiquidityGross;
-        int256 liquidityDelta;
-        int256 liquidityMaturedDelta;
-        int256 liquidityPendingDelta;
-        uint256 proceedsGrowthOutsideFixedPoint;
-        uint256 feeGrowthOutsideAFixedPoint;
-        uint256 feeGrowthOutsideBFixedPoint;
-        mapping(uint256 => Snapshot) snapshots;
+        int256 swapLiquidityDelta;
+        int256 pendingSwapLiquidityDelta;
+        int256 maturedLiquidityDelta;
+        int256 pendingMaturedLiquidityDelta;
+        uint256 proceedsPerLiquidityOutsideFixedPoint;
+        uint256 feesAPerLiquidityOutsideFixedPoint;
+        uint256 feesBPerLiquidityOutsideFixedPoint;
         uint256 lastUpdatedTimestamp;
+        mapping(uint256 => Snapshot) snapshots;
     }
 
     struct Snapshot {
-        uint256 proceedsGrowthOutsideFixedPoint;
-        uint256 feeGrowthOutsideAFixedPoint;
-        uint256 feeGrowthOutsideBFixedPoint;
+        uint256 proceedsPerLiquidityOutsideFixedPoint;
+        uint256 feesAPerLiquidityOutsideFixedPoint;
+        uint256 feesBPerLiquidityOutsideFixedPoint;
     }
 
     function getId(bytes32 poolId, int128 slotIndex) public pure returns (bytes32) {
@@ -36,18 +37,18 @@ library Slot {
         uint256 epochsPassed = (epoch.endTime - (slot.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
         if (epochsPassed > 0) {
-            if (slot.liquidityPendingDelta < 0) {
-                slot.liquidityDelta += slot.liquidityPendingDelta;
-                slot.liquidityMaturedDelta += slot.liquidityPendingDelta;
-            } else if (slot.liquidityPendingDelta > 0) {
-                slot.liquidityMaturedDelta += slot.liquidityPendingDelta;
-            }
-            slot.liquidityPendingDelta = int256(0);
+            // update liquidity delta values for epoch transition
+            slot.swapLiquidityDelta += slot.pendingSwapLiquidityDelta;
+            slot.maturedLiquidityDelta += slot.pendingMaturedLiquidityDelta;
 
+            // update liquidity gross for epoch transition
             if (slot.pendingLiquidityGross < 0) {
                 slot.liquidityGross -= uint256(slot.pendingLiquidityGross);
                 // TODO: If liquidity gross is now zero, remove from bitmap
             }
+
+            slot.pendingSwapLiquidityDelta = int256(0);
+            slot.pendingMaturedLiquidityDelta = int256(0);
             slot.pendingLiquidityGross = int256(0);
         }
         slot.lastUpdatedTimestamp = block.timestamp;

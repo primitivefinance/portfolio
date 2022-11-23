@@ -14,14 +14,15 @@ library Pool {
     struct Data {
         address tokenA;
         address tokenB;
-        uint256 activeLiquidity;
-        uint256 activeLiquidityMatured;
-        int256 activeLiquidityPending;
-        uint256 activeSqrtPriceFixedPoint;
-        int128 activeSlotIndex;
-        uint256 proceedsGrowthGlobalFixedPoint;
-        uint256 feeGrowthGlobalAFixedPoint;
-        uint256 feeGrowthGlobalBFixedPoint;
+        uint256 swapLiquidity;
+        int256 pendingSwapLiquidity;
+        uint256 maturedLiquidity;
+        int256 pendingMaturedLiquidity;
+        uint256 sqrtPriceFixedPoint;
+        int128 slotIndex;
+        uint256 proceedsPerLiquidityFixedPoint;
+        uint256 feesAPerLiquidityFixedPoint;
+        uint256 feesBPerLiquidityFixedPoint;
         uint256 lastUpdatedTimestamp;
         mapping(uint256 => Bid) bids;
         mapping(uint256 => Snapshot) snapshots;
@@ -35,11 +36,11 @@ library Pool {
     }
 
     struct Snapshot {
-        uint256 activeSqrtPriceFixedPoint;
-        int128 activeSlotIndex;
-        uint256 proceedsGrowthGlobalFixedPoint;
-        uint256 feeGrowthGlobalAFixedPoint;
-        uint256 feeGrowthGlobalBFixedPoint;
+        uint256 sqrtPriceFixedPoint;
+        int128 slotIndex;
+        uint256 proceedsPerLiquidityFixedPoint;
+        uint256 feesAPerLiquidityFixedPoint;
+        uint256 feesBPerLiquidityFixedPoint;
     }
 
     function getId(address tokenA, address tokenB) public pure returns (bytes32) {
@@ -52,14 +53,14 @@ library Pool {
         mapping(bytes32 => Data) storage pools,
         address tokenA,
         address tokenB,
-        uint256 activeSqrtPriceFixedPoint
+        uint256 sqrtPriceFixedPoint
     ) internal {
         Data storage pool = pools[getId(tokenA, tokenB)];
 
         if (pool.lastUpdatedTimestamp != 0) revert();
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
-        pool.activeSqrtPriceFixedPoint = activeSqrtPriceFixedPoint;
+        pool.sqrtPriceFixedPoint = sqrtPriceFixedPoint;
         // TODO: set active slot index?
         pool.lastUpdatedTimestamp = block.timestamp;
     }
@@ -68,36 +69,40 @@ library Pool {
         uint256 epochsPassed = (epoch.endTime - (pool.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
         if (epochsPassed > 0) {
-            // update proceeds growth to epoch transition
+            // update proceeds per liquidity distributed to end of epoch
             uint256 lastUpdateEpoch = epoch.id - epochsPassed;
-            if (pool.activeLiquidityMatured > 0) {
-                uint256 timeToTransition = (epoch.endTime - pool.lastUpdatedTimestamp) - (epochsPassed * EPOCH_LENGTH);
-                pool.proceedsGrowthGlobalFixedPoint += PRBMathUD60x18.div(
+            if (pool.maturedLiquidity > 0) {
+                uint256 timeToTransition = epoch.endTime - (epochsPassed * EPOCH_LENGTH) - pool.lastUpdatedTimestamp;
+                pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
                     PRBMathUD60x18.mul(pool.bids[lastUpdateEpoch].proceedsPerSecondFixedPoint, timeToTransition),
-                    pool.activeLiquidityMatured
+                    pool.maturedLiquidity
                 );
             }
-            if (pool.activeLiquidityPending < 0) {
-                pool.activeLiquidity -= uint256(pool.activeLiquidityPending);
-                pool.activeLiquidityMatured -= uint256(pool.activeLiquidityPending);
-            } else {
-                pool.activeLiquidityMatured += uint256(pool.activeLiquidityPending);
-            }
-            pool.activeLiquidityPending = int256(0);
-            // save snapshot
+            // save pool snapshot at end of epoch
             pool.snapshots[lastUpdateEpoch] = Snapshot({
-                activeSqrtPriceFixedPoint: pool.activeSqrtPriceFixedPoint,
-                activeSlotIndex: pool.activeSlotIndex,
-                proceedsGrowthGlobalFixedPoint: pool.proceedsGrowthGlobalFixedPoint,
-                feeGrowthGlobalAFixedPoint: pool.feeGrowthGlobalAFixedPoint,
-                feeGrowthGlobalBFixedPoint: pool.feeGrowthGlobalBFixedPoint
+                sqrtPriceFixedPoint: pool.sqrtPriceFixedPoint,
+                slotIndex: pool.slotIndex,
+                proceedsPerLiquidityFixedPoint: pool.proceedsPerLiquidityFixedPoint,
+                feesAPerLiquidityFixedPoint: pool.feesAPerLiquidityFixedPoint,
+                feesBPerLiquidityFixedPoint: pool.feesBPerLiquidityFixedPoint
             });
-            // update proceeds for next epoch if pool untouched for multiple epochs
+            // update liquidity values for epoch transition
+            if (pool.pendingSwapLiquidity < 0) {
+                pool.swapLiquidity -= uint256(pool.pendingSwapLiquidity);
+            }
+            if (pool.pendingMaturedLiquidity > 0) {
+                pool.maturedLiquidity += uint256(pool.pendingMaturedLiquidity);
+            } else {
+                pool.maturedLiquidity -= uint256(pool.pendingMaturedLiquidity);
+            }
+            pool.pendingSwapLiquidity = int256(0);
+            pool.pendingMaturedLiquidity = int256(0);
+            // update proceeds per liquidity distributed for next epoch if needed
             if (epochsPassed > 1) {
-                if (pool.activeLiquidityMatured > 0) {
-                    pool.proceedsGrowthGlobalFixedPoint += PRBMathUD60x18.div(
+                if (pool.maturedLiquidity > 0) {
+                    pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
                         PRBMathUD60x18.mul(pool.bids[lastUpdateEpoch + 1].proceedsPerSecondFixedPoint, EPOCH_LENGTH),
-                        pool.activeLiquidityMatured
+                        pool.maturedLiquidity
                     );
                 }
                 // don't save snapshot since no position was touched during epoch
@@ -105,10 +110,10 @@ library Pool {
         }
         // add proceeds for time passed in the current epoch
         uint256 timePassedInCurrentEpoch = block.timestamp - (epoch.endTime - EPOCH_LENGTH);
-        if (pool.activeLiquidityMatured > 0 && timePassedInCurrentEpoch > 0) {
-            pool.proceedsGrowthGlobalFixedPoint += PRBMathUD60x18.div(
+        if (pool.maturedLiquidity > 0 && timePassedInCurrentEpoch > 0) {
+            pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
                 PRBMathUD60x18.mul(pool.bids[epoch.id].proceedsPerSecondFixedPoint, timePassedInCurrentEpoch),
-                pool.activeLiquidityMatured
+                pool.maturedLiquidity
             );
         }
         // finally update last saved timestamp
