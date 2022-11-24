@@ -177,8 +177,6 @@ contract Hyper is IHyper {
         )
     {
         Pool.Data storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert();
-
         refunder = pool.bids[epochId].refunder;
         swapper = pool.bids[epochId].swapper;
         amount = pool.bids[epochId].amount;
