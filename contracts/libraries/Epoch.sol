@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "./GlobalDefaults.sol";
+import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 /// @title   Epoch Library
 /// @author  Primitive

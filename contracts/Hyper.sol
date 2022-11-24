@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {IHyper} from "./interfaces/IHyper.sol";
+
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
@@ -13,17 +15,15 @@ import "./libraries/Slot.sol";
 
 // TODO:
 // - Add WETH wrapping / unwrapping
-// - Add the internal balances, fund and withdraw
 // - Add Multicall?
 // - Fixed point library
 // - Slippage checks
 // - Extra function parameters
 // - Events
 // - Custom errors
-// - Interface
 // - slots bitmap
 
-contract Smol {
+contract Hyper is IHyper {
     using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
@@ -35,8 +35,8 @@ contract Smol {
     Epoch.Data public epoch;
 
     mapping(bytes32 => Pool.Data) public pools;
-    mapping(bytes32 => Position.Data) public positions;
     mapping(bytes32 => Slot.Data) public slots;
+    mapping(bytes32 => Position.Data) public positions;
 
     /// @notice Internal token balances
     mapping(address => mapping(address => uint256)) public internalBalances;
@@ -54,6 +54,137 @@ contract Smol {
         _;
     }
 
+    function getGlobalDefaults()
+        public
+        pure
+        override
+        returns (
+            uint256 publicSwapFee,
+            uint256 epochLength,
+            uint256 auctionLength,
+            address auctionSettlementToken,
+            uint256 auctionFee
+        )
+    {
+        publicSwapFee = PUBLIC_SWAP_FEE;
+        epochLength = EPOCH_LENGTH;
+        auctionLength = AUCTION_LENGTH;
+        auctionSettlementToken = AUCTION_SETTLEMENT_TOKEN;
+        auctionFee = AUCTION_FEE;
+    }
+
+    function getPool(bytes32 poolId)
+        public
+        view
+        override
+        started
+        returns (
+            address tokenA,
+            address tokenB,
+            uint256 swapLiquidity,
+            uint256 maturedLiquidity,
+            int256 pendingLiquidity,
+            uint256 sqrtPriceFixedPoint,
+            int128 slotIndex,
+            uint256 proceedsPerLiquidityFixedPoint,
+            uint256 feesAPerLiquidityFixedPoint,
+            uint256 feesBPerLiquidityFixedPoint,
+            uint256 lastUpdatedTimestamp
+        )
+    {
+        Pool.Data storage pool = pools[poolId];
+        tokenA = pool.tokenA;
+        tokenB = pool.tokenB;
+        swapLiquidity = pool.swapLiquidity;
+        maturedLiquidity = pool.maturedLiquidity;
+        pendingLiquidity = pool.pendingLiquidity;
+        sqrtPriceFixedPoint = pool.sqrtPriceFixedPoint;
+        slotIndex = pool.slotIndex;
+        proceedsPerLiquidityFixedPoint = pool.proceedsPerLiquidityFixedPoint;
+        feesAPerLiquidityFixedPoint = pool.feesAPerLiquidityFixedPoint;
+        feesBPerLiquidityFixedPoint = pool.feesBPerLiquidityFixedPoint;
+        lastUpdatedTimestamp = pool.lastUpdatedTimestamp;
+    }
+
+    function getSlot(bytes32 slotId)
+        public
+        view
+        override
+        started
+        returns (
+            uint256 liquidityGross,
+            int256 pendingLiquidityGross,
+            int256 swapLiquidityDelta,
+            int256 maturedLiquidityDelta,
+            int256 pendingLiquidityDelta,
+            uint256 proceedsPerLiquidityOutsideFixedPoint,
+            uint256 feesAPerLiquidityOutsideFixedPoint,
+            uint256 feesBPerLiquidityOutsideFixedPoint,
+            uint256 lastUpdatedTimestamp
+        )
+    {
+        Slot.Data storage slot = slots[slotId];
+        liquidityGross = slot.liquidityGross;
+        pendingLiquidityGross = slot.pendingLiquidityGross;
+        swapLiquidityDelta = slot.swapLiquidityDelta;
+        maturedLiquidityDelta = slot.maturedLiquidityDelta;
+        pendingLiquidityDelta = slot.pendingLiquidityDelta;
+        proceedsPerLiquidityOutsideFixedPoint = slot.proceedsPerLiquidityOutsideFixedPoint;
+        feesAPerLiquidityOutsideFixedPoint = slot.feesAPerLiquidityOutsideFixedPoint;
+        feesBPerLiquidityOutsideFixedPoint = slot.feesBPerLiquidityOutsideFixedPoint;
+        lastUpdatedTimestamp = slot.lastUpdatedTimestamp;
+    }
+
+    function getPosition(bytes32 positionId)
+        public
+        view
+        override
+        started
+        returns (
+            int128 lowerSlotIndex,
+            int128 upperSlotIndex,
+            uint256 swapLiquidity,
+            uint256 maturedLiquidity,
+            int256 pendingLiquidity,
+            uint256 proceedsPerLiquidityInsideLastFixedPoint,
+            uint256 feesAPerLiquidityInsideLastFixedPoint,
+            uint256 feesBPerLiquidityInsideLastFixedPoint,
+            uint256 lastUpdatedTimestamp
+        )
+    {
+        Position.Data storage position = positions[positionId];
+        lowerSlotIndex = position.lowerSlotIndex;
+        upperSlotIndex = position.upperSlotIndex;
+        swapLiquidity = position.swapLiquidity;
+        maturedLiquidity = position.maturedLiquidity;
+        pendingLiquidity = position.pendingLiquidity;
+        proceedsPerLiquidityInsideLastFixedPoint = position.proceedsPerLiquidityInsideLastFixedPoint;
+        feesAPerLiquidityInsideLastFixedPoint = position.feesAPerLiquidityInsideLastFixedPoint;
+        feesBPerLiquidityInsideLastFixedPoint = position.feesBPerLiquidityInsideLastFixedPoint;
+        lastUpdatedTimestamp = position.lastUpdatedTimestamp;
+    }
+
+    function getLeadingBid(bytes32 poolId, uint256 epochId)
+        public
+        view
+        override
+        started
+        returns (
+            address refunder,
+            address swapper,
+            uint256 amount,
+            uint256 proceedsPerSecondFixedPoint
+        )
+    {
+        Pool.Data storage pool = pools[poolId];
+        if (pool.lastUpdatedTimestamp == 0) revert();
+
+        refunder = pool.bids[epochId].refunder;
+        swapper = pool.bids[epochId].swapper;
+        amount = pool.bids[epochId].amount;
+        proceedsPerSecondFixedPoint = pool.bids[epochId].proceedsPerSecondFixedPoint;
+    }
+
     function start() public {
         epoch.sync();
         require(epoch.id > 0, "Hyper not started yet.");
@@ -64,7 +195,7 @@ contract Smol {
         address to,
         address token,
         uint256 amount
-    ) public {
+    ) public started {
         SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         internalBalances[to][token] += amount;
     }
@@ -73,7 +204,7 @@ contract Smol {
         address to,
         address token,
         uint256 amount
-    ) public {
+    ) public started {
         require(internalBalances[msg.sender][token] >= amount);
         internalBalances[msg.sender][token] -= amount;
         SafeTransferLib.safeTransferFrom(ERC20(token), address(this), to, amount);
@@ -183,7 +314,6 @@ contract Smol {
             }
 
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-                PRICE_GRID_FIXED_POINT,
                 addAmountLeft,
                 pool.sqrtPriceFixedPoint,
                 pool.slotIndex,
@@ -233,7 +363,6 @@ contract Smol {
 
             // credit tokens owed to the position immediately
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-                PRICE_GRID_FIXED_POINT,
                 removedPending,
                 pool.sqrtPriceFixedPoint,
                 pool.slotIndex,

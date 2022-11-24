@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
+
 import "./BrainMath.sol";
 import "./Epoch.sol";
-import "./GlobalDefaults.sol";
 
 /// @title   Pool Library
 /// @author  Primitive
