@@ -21,7 +21,7 @@ interface IHyper {
             uint256 auctionFee
         );
 
-    function getPool(bytes32 poolId)
+    function pools(bytes32 poolId)
         external
         view
         returns (
@@ -38,7 +38,7 @@ interface IHyper {
             uint256 lastUpdatedTimestamp
         );
 
-    function getSlot(bytes32 slotId)
+    function slots(bytes32 slotId)
         external
         view
         returns (
@@ -53,7 +53,7 @@ interface IHyper {
             uint256 lastUpdatedTimestamp
         );
 
-    function getPosition(bytes32 positionId)
+    function positions(bytes32 positionId)
         external
         view
         returns (

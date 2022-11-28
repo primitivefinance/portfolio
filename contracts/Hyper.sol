@@ -22,6 +22,7 @@ import "./libraries/Slot.sol";
 // - Events
 // - Custom errors
 // - slots bitmap
+// - swap
 
 contract Hyper is IHyper {
     using Epoch for Epoch.Data;
@@ -71,97 +72,6 @@ contract Hyper is IHyper {
         auctionLength = AUCTION_LENGTH;
         auctionSettlementToken = AUCTION_SETTLEMENT_TOKEN;
         auctionFee = AUCTION_FEE;
-    }
-
-    function getPool(bytes32 poolId)
-        public
-        view
-        override
-        started
-        returns (
-            address tokenA,
-            address tokenB,
-            uint256 swapLiquidity,
-            uint256 maturedLiquidity,
-            int256 pendingLiquidity,
-            uint256 sqrtPriceFixedPoint,
-            int128 slotIndex,
-            uint256 proceedsPerLiquidityFixedPoint,
-            uint256 feesAPerLiquidityFixedPoint,
-            uint256 feesBPerLiquidityFixedPoint,
-            uint256 lastUpdatedTimestamp
-        )
-    {
-        Pool.Data storage pool = pools[poolId];
-        tokenA = pool.tokenA;
-        tokenB = pool.tokenB;
-        swapLiquidity = pool.swapLiquidity;
-        maturedLiquidity = pool.maturedLiquidity;
-        pendingLiquidity = pool.pendingLiquidity;
-        sqrtPriceFixedPoint = pool.sqrtPriceFixedPoint;
-        slotIndex = pool.slotIndex;
-        proceedsPerLiquidityFixedPoint = pool.proceedsPerLiquidityFixedPoint;
-        feesAPerLiquidityFixedPoint = pool.feesAPerLiquidityFixedPoint;
-        feesBPerLiquidityFixedPoint = pool.feesBPerLiquidityFixedPoint;
-        lastUpdatedTimestamp = pool.lastUpdatedTimestamp;
-    }
-
-    function getSlot(bytes32 slotId)
-        public
-        view
-        override
-        started
-        returns (
-            uint256 liquidityGross,
-            int256 pendingLiquidityGross,
-            int256 swapLiquidityDelta,
-            int256 maturedLiquidityDelta,
-            int256 pendingLiquidityDelta,
-            uint256 proceedsPerLiquidityOutsideFixedPoint,
-            uint256 feesAPerLiquidityOutsideFixedPoint,
-            uint256 feesBPerLiquidityOutsideFixedPoint,
-            uint256 lastUpdatedTimestamp
-        )
-    {
-        Slot.Data storage slot = slots[slotId];
-        liquidityGross = slot.liquidityGross;
-        pendingLiquidityGross = slot.pendingLiquidityGross;
-        swapLiquidityDelta = slot.swapLiquidityDelta;
-        maturedLiquidityDelta = slot.maturedLiquidityDelta;
-        pendingLiquidityDelta = slot.pendingLiquidityDelta;
-        proceedsPerLiquidityOutsideFixedPoint = slot.proceedsPerLiquidityOutsideFixedPoint;
-        feesAPerLiquidityOutsideFixedPoint = slot.feesAPerLiquidityOutsideFixedPoint;
-        feesBPerLiquidityOutsideFixedPoint = slot.feesBPerLiquidityOutsideFixedPoint;
-        lastUpdatedTimestamp = slot.lastUpdatedTimestamp;
-    }
-
-    function getPosition(bytes32 positionId)
-        public
-        view
-        override
-        started
-        returns (
-            int128 lowerSlotIndex,
-            int128 upperSlotIndex,
-            uint256 swapLiquidity,
-            uint256 maturedLiquidity,
-            int256 pendingLiquidity,
-            uint256 proceedsPerLiquidityInsideLastFixedPoint,
-            uint256 feesAPerLiquidityInsideLastFixedPoint,
-            uint256 feesBPerLiquidityInsideLastFixedPoint,
-            uint256 lastUpdatedTimestamp
-        )
-    {
-        Position.Data storage position = positions[positionId];
-        lowerSlotIndex = position.lowerSlotIndex;
-        upperSlotIndex = position.upperSlotIndex;
-        swapLiquidity = position.swapLiquidity;
-        maturedLiquidity = position.maturedLiquidity;
-        pendingLiquidity = position.pendingLiquidity;
-        proceedsPerLiquidityInsideLastFixedPoint = position.proceedsPerLiquidityInsideLastFixedPoint;
-        feesAPerLiquidityInsideLastFixedPoint = position.feesAPerLiquidityInsideLastFixedPoint;
-        feesBPerLiquidityInsideLastFixedPoint = position.feesBPerLiquidityInsideLastFixedPoint;
-        lastUpdatedTimestamp = position.lastUpdatedTimestamp;
     }
 
     function getLeadingBid(bytes32 poolId, uint256 epochId)
