@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
+
 import "./BrainMath.sol";
 import "./Epoch.sol";
-import "./GlobalDefaults.sol";
 import "./Pool.sol";
 import "./Slot.sol";
 
@@ -70,7 +71,6 @@ library Position {
                 if (position.pendingLiquidity < 0) {
                     // if liquidity was kicked out, add the underlying tokens
                     (uint256 underlyingA, uint256 underlyingB) = _calculateLiquidityDeltas(
-                        PRICE_GRID_FIXED_POINT,
                         uint256(position.pendingLiquidity),
                         pool.snapshots[lastUpdateEpoch].sqrtPriceFixedPoint,
                         pool.snapshots[lastUpdateEpoch].slotIndex,

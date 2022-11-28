@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {IHyper} from "./interfaces/IHyper.sol";
+
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
@@ -13,17 +15,16 @@ import "./libraries/Slot.sol";
 
 // TODO:
 // - Add WETH wrapping / unwrapping
-// - Add the internal balances, fund and withdraw
 // - Add Multicall?
 // - Fixed point library
 // - Slippage checks
 // - Extra function parameters
 // - Events
 // - Custom errors
-// - Interface
 // - slots bitmap
+// - swap
 
-contract Smol {
+contract Hyper is IHyper {
     using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
@@ -35,8 +36,8 @@ contract Smol {
     Epoch.Data public epoch;
 
     mapping(bytes32 => Pool.Data) public pools;
-    mapping(bytes32 => Position.Data) public positions;
     mapping(bytes32 => Slot.Data) public slots;
+    mapping(bytes32 => Position.Data) public positions;
 
     /// @notice Internal token balances
     mapping(address => mapping(address => uint256)) public internalBalances;
@@ -54,6 +55,44 @@ contract Smol {
         _;
     }
 
+    function getGlobalDefaults()
+        public
+        pure
+        override
+        returns (
+            uint256 publicSwapFee,
+            uint256 epochLength,
+            uint256 auctionLength,
+            address auctionSettlementToken,
+            uint256 auctionFee
+        )
+    {
+        publicSwapFee = PUBLIC_SWAP_FEE;
+        epochLength = EPOCH_LENGTH;
+        auctionLength = AUCTION_LENGTH;
+        auctionSettlementToken = AUCTION_SETTLEMENT_TOKEN;
+        auctionFee = AUCTION_FEE;
+    }
+
+    function getLeadingBid(bytes32 poolId, uint256 epochId)
+        public
+        view
+        override
+        started
+        returns (
+            address refunder,
+            address swapper,
+            uint256 amount,
+            uint256 proceedsPerSecondFixedPoint
+        )
+    {
+        Pool.Data storage pool = pools[poolId];
+        refunder = pool.bids[epochId].refunder;
+        swapper = pool.bids[epochId].swapper;
+        amount = pool.bids[epochId].amount;
+        proceedsPerSecondFixedPoint = pool.bids[epochId].proceedsPerSecondFixedPoint;
+    }
+
     function start() public {
         epoch.sync();
         require(epoch.id > 0, "Hyper not started yet.");
@@ -64,7 +103,7 @@ contract Smol {
         address to,
         address token,
         uint256 amount
-    ) public {
+    ) public started {
         SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         internalBalances[to][token] += amount;
     }
@@ -73,7 +112,7 @@ contract Smol {
         address to,
         address token,
         uint256 amount
-    ) public {
+    ) public started {
         require(internalBalances[msg.sender][token] >= amount);
         internalBalances[msg.sender][token] -= amount;
         SafeTransferLib.safeTransferFrom(ERC20(token), address(this), to, amount);
@@ -183,7 +222,6 @@ contract Smol {
             }
 
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-                PRICE_GRID_FIXED_POINT,
                 addAmountLeft,
                 pool.sqrtPriceFixedPoint,
                 pool.slotIndex,
@@ -233,7 +271,6 @@ contract Smol {
 
             // credit tokens owed to the position immediately
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
-                PRICE_GRID_FIXED_POINT,
                 removedPending,
                 pool.sqrtPriceFixedPoint,
                 pool.slotIndex,
