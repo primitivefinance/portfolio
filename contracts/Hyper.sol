@@ -96,7 +96,7 @@ contract Hyper is IHyper {
     function start() public {
         epoch.sync();
         require(epoch.id > 0, "Hyper not started yet.");
-        // TODO: emit ActivateHyper
+        emit SetEpoch(epoch.id, epoch.endTime);
     }
 
     function fund(
@@ -106,6 +106,7 @@ contract Hyper is IHyper {
     ) public started {
         SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         internalBalances[to][token] += amount;
+        emit Fund(to, token, amount);
     }
 
     function withdraw(
@@ -116,6 +117,7 @@ contract Hyper is IHyper {
         require(internalBalances[msg.sender][token] >= amount);
         internalBalances[msg.sender][token] -= amount;
         SafeTransferLib.safeTransferFrom(ERC20(token), address(this), to, amount);
+        emit Withdraw(to, token, amount);
     }
 
     function activatePool(
@@ -123,10 +125,10 @@ contract Hyper is IHyper {
         address tokenB,
         uint256 sqrtPriceFixedPoint
     ) public started {
-        epoch.sync();
+        bool newEpoch = epoch.sync();
+        if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
         pools.activate(tokenA, tokenB, sqrtPriceFixedPoint);
-
-        // TODO: emit ActivatePool event
+        emit ActivatePool(tokenA, tokenB);
     }
 
     function updateLiquidity(
@@ -141,7 +143,8 @@ contract Hyper is IHyper {
         Pool.Data storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert();
 
-        epoch.sync();
+        bool newEpoch = epoch.sync();
+        if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
         pool.sync(epoch);
 
         bytes32 lowerSlotId = Slot.getId(poolId, lowerSlotIndex);
@@ -169,6 +172,8 @@ contract Hyper is IHyper {
         } else {
             _removeLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
         }
+
+        emit UpdateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, amount);
     }
 
     function _addLiquidity(
@@ -235,8 +240,6 @@ contract Hyper is IHyper {
 
             // TODO: Remove amountA & amountB from internal balance
         }
-
-        // TODO: Emit add liquidity event
     }
 
     function _removeLiquidity(
@@ -316,8 +319,6 @@ contract Hyper is IHyper {
             feesAPerLiquidityOutsideFixedPoint: upperSlot.feesAPerLiquidityOutsideFixedPoint,
             feesBPerLiquidityOutsideFixedPoint: upperSlot.feesBPerLiquidityOutsideFixedPoint
         });
-
-        // TODO: emit RemoveLiquidity event
     }
 
     struct SwapCache {
@@ -330,8 +331,7 @@ contract Hyper is IHyper {
     }
 
     function swap(
-        address tokenA,
-        address tokenB,
+        bytes32 poolId,
         uint256 tendered,
         bool direction
     ) public started {
@@ -356,7 +356,9 @@ contract Hyper is IHyper {
         Pool.Data storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert();
 
-        epoch.sync();
+        bool newEpoch = epoch.sync();
+        if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
+
         if (epochId != epoch.id + 1) revert();
         if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert();
 
@@ -365,9 +367,9 @@ contract Hyper is IHyper {
         uint256 fee = (amount * AUCTION_FEE) / 10000;
         amount -= fee;
 
-        if (amount > pool.bids[epoch.id + 1].amount) {
+        if (amount > pool.bids[epochId].amount) {
             // TO-DO: balance changes for msg.sender, auctionFeeCollector, previous bid refunder
-            pool.bids[epoch.id + 1] = Pool.Bid({
+            pool.bids[epochId] = Pool.Bid({
                 refunder: refunder,
                 swapper: swapper,
                 amount: amount,
@@ -375,6 +377,6 @@ contract Hyper is IHyper {
             });
         }
 
-        // TODO: emit event
+        emit LeadingBid(poolId, epochId, swapper, amount);
     }
 }

@@ -108,8 +108,7 @@ interface IHyper {
     ) external;
 
     function swap(
-        address tokenA,
-        address tokenB,
+        bytes32 poolId,
         uint256 tendered,
         bool direction
     ) external;
@@ -121,4 +120,20 @@ interface IHyper {
         address swapper,
         uint256 amount
     ) external;
+
+    // ===== Events =====
+
+    event SetEpoch(uint256 id, uint256 endTime);
+
+    event Fund(address to, address token, uint256 amount);
+
+    event Withdraw(address to, address token, uint256 amount);
+
+    event ActivatePool(address tokenA, address tokenB);
+
+    event UpdateLiquidity(bytes32 poolId, int128 lowerSlotIndex, int128 upperSlotIndex, int256 amount);
+
+    event Swap(bytes32 poolId, uint256 tendered, bool direction);
+
+    event LeadingBid(bytes32 poolId, uint256 epochId, address swapper, uint256 amount);
 }
