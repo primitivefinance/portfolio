@@ -10,17 +10,6 @@ interface IHyper {
 
     function auctionFeeCollector() external view returns (address);
 
-    function getGlobalDefaults()
-        external
-        view
-        returns (
-            uint256 publicSwapFee,
-            uint256 epochLength,
-            uint256 auctionLength,
-            address auctionSettlementToken,
-            uint256 auctionFee
-        );
-
     function pools(bytes32 poolId)
         external
         view
@@ -68,6 +57,17 @@ interface IHyper {
             uint256 lastUpdatedTimestamp
         );
 
+    function getGlobalDefaults()
+        external
+        view
+        returns (
+            uint256 publicSwapFee,
+            uint256 epochLength,
+            uint256 auctionLength,
+            address auctionSettlementToken,
+            uint256 auctionFee
+        );
+
     function getLeadingBid(bytes32 poolId, uint256 epochId)
         external
         view
@@ -77,4 +77,48 @@ interface IHyper {
             uint256 amount,
             uint256 proceedsPerSecondFixedPoint
         );
+
+    // ===== Public State Changing =====
+
+    function start() external;
+
+    function fund(
+        address to,
+        address token,
+        uint256 amount
+    ) external;
+
+    function withdraw(
+        address to,
+        address token,
+        uint256 amount
+    ) external;
+
+    function activatePool(
+        address tokenA,
+        address tokenB,
+        uint256 sqrtPriceFixedPoint
+    ) external;
+
+    function updateLiquidity(
+        bytes32 poolId,
+        int128 lowerSlotIndex,
+        int128 upperSlotIndex,
+        int256 amount
+    ) external;
+
+    function swap(
+        address tokenA,
+        address tokenB,
+        uint256 tendered,
+        bool direction
+    ) external;
+
+    function bid(
+        bytes32 poolId,
+        uint256 epochId,
+        address refunder,
+        address swapper,
+        uint256 amount
+    ) external;
 }
