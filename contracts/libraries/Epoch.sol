@@ -16,12 +16,15 @@ library Epoch {
     }
 
     /// @notice                Updates the epoch data w.r.t. time passing
-    function sync(Data storage epoch) internal {
+    function sync(Data storage epoch) internal returns (bool newEpoch) {
         if (block.timestamp >= epoch.endTime) {
             // TODO: definitely double check this
             uint256 epochsPassed = (block.timestamp - epoch.endTime) / EPOCH_LENGTH;
             epoch.id += (1 + epochsPassed);
             epoch.endTime += (EPOCH_LENGTH + (epochsPassed * EPOCH_LENGTH));
+            newEpoch = true;
+        } else {
+            newEpoch = false;
         }
     }
 }
