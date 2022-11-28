@@ -19,7 +19,6 @@ import "./libraries/Slot.sol";
 // - Fixed point library
 // - Slippage checks
 // - Extra function parameters
-// - Events
 // - Custom errors
 // - slots bitmap
 // - swap
