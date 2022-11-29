@@ -27,24 +27,24 @@ contract TestBitMath is Test {
 
     function test_findNextSlotWithinChunk_left() public {
         uint256 bitmap;
-        bitmap = BitMath.flip(bitmap, 22);
+        bitmap = BitMath.flip(bitmap, 24);
         bitmap = BitMath.flip(bitmap, 12);
         bitmap = BitMath.flip(bitmap, 6);
 
         assertEq(
             BitMath.findNextSlotWithinChunk(bitmap, 12, true),
-            22
+            24
         );
     }
 
     function test_findNextSlotWithinChunk_right() public {
         uint256 bitmap;
         bitmap = BitMath.flip(bitmap, 22);
-        bitmap = BitMath.flip(bitmap, 12);
+        bitmap = BitMath.flip(bitmap, 11);
         bitmap = BitMath.flip(bitmap, 6);
 
         assertEq(
-            BitMath.findNextSlotWithinChunk(bitmap, 12, false),
+            BitMath.findNextSlotWithinChunk(bitmap, 11, false),
             6
         );
     }
