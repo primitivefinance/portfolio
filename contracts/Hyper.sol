@@ -312,7 +312,7 @@ contract Hyper is IHyper {
 
             removeAmountLeft -= removedPending;
         } else {
-            if (position.swapLiquidity - uint256(position.pendingLiquidity) < amount) revert();
+            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
