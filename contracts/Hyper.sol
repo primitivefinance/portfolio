@@ -6,6 +6,7 @@ import {IHyper} from "./interfaces/IHyper.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
+import "./libraries/BitMath.sol";
 import "./libraries/BrainMath.sol";
 import "./libraries/Epoch.sol";
 import "./libraries/GlobalDefaults.sol";
@@ -37,6 +38,9 @@ contract Hyper is IHyper {
     mapping(bytes32 => Pool.Data) public pools;
     mapping(bytes32 => Slot.Data) public slots;
     mapping(bytes32 => Position.Data) public positions;
+
+    // TODO: Not sure if this should be stored here
+    mapping(bytes32 => mapping(int16 => uint256)) public bitmaps;
 
     /// @notice Internal token balances
     mapping(address => mapping(address => uint256)) public internalBalances;
