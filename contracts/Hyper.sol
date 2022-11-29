@@ -351,27 +351,19 @@ contract Hyper is IHyper {
         });
     }
 
-    struct SwapCache {
-        int128 activeSlotIndex;
-        uint256 slotProportionF;
-        uint256 activeLiquidity;
-        uint256 activePrice;
-        int128 slotIndexOfNextDelta;
-        int128 nextDelta;
-    }
-
     function swap(
         bytes32 poolId,
-        uint256 tendered,
+        int256 amountIn,
         bool direction
     ) public started {
-        uint256 tenderedRemaining = tendered;
-        uint256 received;
-
+        uint256 amountOut;
         uint256 cumulativeFees;
-        SwapCache memory swapCache;
 
-        if (!direction) {} else {}
+        if (direction) {
+
+        } else {
+
+        }
     }
 
     function bid(
