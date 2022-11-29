@@ -109,7 +109,7 @@ interface IHyper {
 
     function swap(
         bytes32 poolId,
-        uint256 tendered,
+        int256 amount,
         bool direction
     ) external;
 
