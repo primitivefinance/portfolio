@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
-// TODO: Check which one is the best to use?
-import "@prb/math/contracts/PRBMathSD59x18.sol";
 import "@prb/math/contracts/PRBMathUD60x18.sol";
 
 uint256 constant PRICE_GRID_FIXED_POINT = 1000100000000000000; // 1.0001
+
+function abs(int128 n) pure returns (uint128) {
+    return uint128(n > 0 ? n : ~n + 1);
+}
 
 /// @dev Get the price square root using the slot index
 ///      $$p(i)=1.0001^i$$
 function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (uint256) {
     return
         uint256(
-            PRBMathUD60x18.pow(PRICE_GRID_FIXED_POINT, PRBMathUD60x18.div(uint256(PRBMathSD59x18.abs(slotIndex)), 2))
+            PRBMathUD60x18.pow(PRICE_GRID_FIXED_POINT, PRBMathUD60x18.div(abs(slotIndex), 2))
         );
 }
 
