@@ -25,7 +25,7 @@ library BitMath {
         bool shouldCheckLeft
     ) internal returns (uint8 nextSlot) {
         if (shouldCheckLeft) {
-            nextSlot = mostSignificantBit(chunk >> bit + 1) + bit + 1;
+            nextSlot = leastSignificantBit(chunk >> bit + 1) + bit + 1;
         } else {
             nextSlot = mostSignificantBit(chunk & ((1 << bit) - 1));
         }
