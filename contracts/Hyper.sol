@@ -190,9 +190,9 @@ contract Hyper is IHyper {
 
         // use negative pending liquidity first
         if (position.pendingLiquidity < int256(0)) {
-            uint256 addedPending = uint256(position.pendingLiquidity) >= amount
+            uint256 addedPending = abs(position.pendingLiquidity) >= amount
                 ? amount
-                : uint256(position.pendingLiquidity);
+                : abs(position.pendingLiquidity);
 
             position.pendingLiquidity += int256(addedPending);
 
