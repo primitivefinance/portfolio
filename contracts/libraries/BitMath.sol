@@ -1,18 +1,33 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity >=0.5.0;
 
-/// @title BitMath
-/// @dev This library provides functionality for computing bit properties of an unsigned integer
 library BitMath {
-    function flip(uint256 bitmap, uint256 index) internal pure returns (uint256 flipped) {
+    function flip(uint256 bitmap, uint8 index) internal pure returns (uint256 flipped) {
         assembly {
             flipped := xor(bitmap, shl(index, 1))
         }
     }
 
-    function hasLiquidity(uint256 bitmap, uint256 index) internal pure returns (bool yay) {
+    function hasLiquidity(uint256 bitmap, uint8 index) internal pure returns (bool has) {
         assembly {
-            yay := and(bitmap, shl(index, 1))
+            has := and(bitmap, shl(index, 1))
+        }
+    }
+
+    function getSlotPositionInBitmap(int24 slotId) internal pure returns (int16 chunk, uint8 bit) {
+        chunk = int16(slotId / 256);
+        bit = uint8(uint24(slotId % 256));
+    }
+
+    function findNextSlotWithinChunk(
+        uint256 chunk,
+        uint8 bit,
+        bool shouldCheckLeft
+    ) internal returns (uint8 nextSlot) {
+        if (shouldCheckLeft) {
+            nextSlot = mostSignificantBit(chunk >> bit + 1) + bit + 1;
+        } else {
+            nextSlot = mostSignificantBit(chunk & ((1 << 12) - 1));
         }
     }
 
