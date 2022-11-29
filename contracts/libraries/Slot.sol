@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 import "./Epoch.sol";
+import "./BitMath.sol";
 
 /// @title   Slot Library
 /// @author  Primitive
@@ -34,7 +35,12 @@ library Slot {
         return keccak256(abi.encodePacked(poolId, slotIndex));
     }
 
-    function sync(Data storage slot, Epoch.Data memory epoch) internal {
+    function sync(
+        Data storage slot,
+        mapping(int16 => uint256) storage chunks,
+        int24 slotIndex,
+        Epoch.Data memory epoch
+    ) internal {
         uint256 epochsPassed = (epoch.endTime - (slot.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
         if (epochsPassed > 0) {
@@ -46,7 +52,11 @@ library Slot {
             // update liquidity gross for epoch transition
             if (slot.pendingLiquidityGross < 0) {
                 slot.liquidityGross -= uint256(slot.pendingLiquidityGross);
-                // TODO: If liquidity gross is now zero, remove from bitmap
+
+                if (slot.liquidityGross == 0) {
+                    (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(slotIndex);
+                    chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                }
             }
             slot.pendingLiquidityGross = int256(0);
         }

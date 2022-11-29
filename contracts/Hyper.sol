@@ -150,13 +150,13 @@ contract Hyper is IHyper {
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
         pool.sync(epoch);
 
-        bytes32 lowerSlotId = Slot.getId(poolId, lowerSlotIndex);
+        bytes32 lowerSlotId = Slot.getId(poolId, int24(lowerSlotIndex));
         Slot.Data storage lowerSlot = slots[lowerSlotId];
-        lowerSlot.sync(epoch);
+        lowerSlot.sync(bitmaps[poolId], int24(lowerSlotIndex), epoch);
 
-        bytes32 upperSlotId = Slot.getId(poolId, upperSlotIndex);
+        bytes32 upperSlotId = Slot.getId(poolId, int24(upperSlotIndex));
         Slot.Data storage upperSlot = slots[upperSlotId];
-        upperSlot.sync(epoch);
+        upperSlot.sync(bitmaps[poolId], int24(upperSlotIndex), epoch);
 
         bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
         Position.Data storage position = positions[positionId];
@@ -217,14 +217,12 @@ contract Hyper is IHyper {
             lowerSlot.swapLiquidityDelta += int256(addAmountLeft);
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
             if (lowerSlot.liquidityGross == 0) {
-                {
-                    (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
-                        int24(position.lowerSlotIndex)
-                    );
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.lowerSlotIndex)
+                );
 
-                    if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
-                        chunks[chunk] = BitMath.flip(chunks[chunk], bit);
-                    }
+                if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
+                    chunks[chunk] = BitMath.flip(chunks[chunk], bit);
                 }
 
                 // TODO: initialize per liquidity outside values
@@ -234,14 +232,12 @@ contract Hyper is IHyper {
             upperSlot.swapLiquidityDelta -= int256(addAmountLeft);
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == 0) {
-               {
-                    (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
-                        int24(position.upperSlotIndex)
-                    );
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.upperSlotIndex)
+                );
 
-                    if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
-                        chunks[chunk] = BitMath.flip(chunks[chunk], bit);
-                    }
+                if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
+                    chunks[chunk] = BitMath.flip(chunks[chunk], bit);
                 }
                 // TODO: initialize per liquidity outside values
                 upperSlot.liquidityGross += uint256(addAmountLeft);
@@ -287,12 +283,24 @@ contract Hyper is IHyper {
             lowerSlot.swapLiquidityDelta -= int256(removedPending);
             lowerSlot.pendingLiquidityDelta -= int256(removedPending);
             lowerSlot.liquidityGross -= removedPending;
-            // TODO: check liquidity gross value for bitmap
+
+            if (lowerSlot.liquidityGross == 0) {
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.lowerSlotIndex)
+                );
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+            }
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
             upperSlot.pendingLiquidityDelta += int256(removedPending);
             upperSlot.liquidityGross -= removedPending;
-            // TODO: check liquidity gross value for bitmap
+
+            if (upperSlot.liquidityGross == 0) {
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.upperSlotIndex)
+                );
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+            }
 
             // credit tokens owed to the position immediately
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
