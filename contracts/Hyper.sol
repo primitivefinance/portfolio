@@ -189,7 +189,7 @@ contract Hyper is IHyper {
         uint256 addAmountLeft = amount;
 
         // use negative pending liquidity first
-        if (position.pendingLiquidity < int256(0)) {
+        if (position.pendingLiquidity < 0) {
             uint256 addedPending = abs(position.pendingLiquidity) >= amount
                 ? amount
                 : abs(position.pendingLiquidity);
@@ -215,7 +215,7 @@ contract Hyper is IHyper {
 
             lowerSlot.swapLiquidityDelta += int256(addAmountLeft);
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
-            if (lowerSlot.liquidityGross == uint256(0)) {
+            if (lowerSlot.liquidityGross == 0) {
                 // TODO: add to / initialize slot in bitmap
                 // TODO: initialize per liquidity outside values
                 lowerSlot.liquidityGross += uint256(addAmountLeft);
@@ -223,7 +223,7 @@ contract Hyper is IHyper {
 
             upperSlot.swapLiquidityDelta -= int256(addAmountLeft);
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
-            if (upperSlot.liquidityGross == uint256(0)) {
+            if (upperSlot.liquidityGross == 0) {
                 // TODO: add to / initialize slot in bitmap
                 // TODO: initialize per liquidity outside values
                 upperSlot.liquidityGross += uint256(addAmountLeft);
@@ -255,7 +255,7 @@ contract Hyper is IHyper {
         uint256 removeAmountLeft = amount;
 
         // remove positive pending liquidity immediately
-        if (position.pendingLiquidity > int256(0)) {
+        if (position.pendingLiquidity > 0) {
             if (position.swapLiquidity < amount) revert();
 
             uint256 removedPending = uint256(position.pendingLiquidity) >= amount
