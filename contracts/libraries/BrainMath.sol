@@ -5,7 +5,12 @@ import "@prb/math/contracts/PRBMathUD60x18.sol";
 
 uint256 constant PRICE_GRID_FIXED_POINT = 1000100000000000000; // 1.0001
 
-function abs(int128 n) pure returns (uint128) {
+// TODO: Solve the overloading issue or delete one of these functions
+function abs(int256 n) pure returns (uint256) {
+    return uint256(n > 0 ? n : ~n + 1);
+}
+
+function abs_(int128 n) pure returns (uint128) {
     return uint128(n > 0 ? n : ~n + 1);
 }
 
@@ -14,7 +19,7 @@ function abs(int128 n) pure returns (uint128) {
 function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (uint256) {
     return
         uint256(
-            PRBMathUD60x18.pow(PRICE_GRID_FIXED_POINT, PRBMathUD60x18.div(abs(slotIndex), 2))
+            PRBMathUD60x18.pow(PRICE_GRID_FIXED_POINT, PRBMathUD60x18.div(abs_(slotIndex), 2))
         );
 }
 
