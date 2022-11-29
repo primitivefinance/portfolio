@@ -27,7 +27,7 @@ library BitMath {
         if (shouldCheckLeft) {
             nextSlot = mostSignificantBit(chunk >> bit + 1) + bit + 1;
         } else {
-            nextSlot = mostSignificantBit(chunk & ((1 << 12) - 1));
+            nextSlot = mostSignificantBit(chunk & ((1 << bit) - 1));
         }
     }
 
