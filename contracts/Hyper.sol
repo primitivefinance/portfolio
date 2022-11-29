@@ -6,6 +6,7 @@ import {IHyper} from "./interfaces/IHyper.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
 
+import "./libraries/BitMath.sol";
 import "./libraries/BrainMath.sol";
 import "./libraries/Epoch.sol";
 import "./libraries/GlobalDefaults.sol";
@@ -37,6 +38,9 @@ contract Hyper is IHyper {
     mapping(bytes32 => Pool.Data) public pools;
     mapping(bytes32 => Slot.Data) public slots;
     mapping(bytes32 => Position.Data) public positions;
+
+    // TODO: Not sure if this should be stored here
+    mapping(bytes32 => mapping(int16 => uint256)) public bitmaps;
 
     /// @notice Internal token balances
     mapping(address => mapping(address => uint256)) public internalBalances;
@@ -146,13 +150,13 @@ contract Hyper is IHyper {
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
         pool.sync(epoch);
 
-        bytes32 lowerSlotId = Slot.getId(poolId, lowerSlotIndex);
+        bytes32 lowerSlotId = Slot.getId(poolId, int24(lowerSlotIndex));
         Slot.Data storage lowerSlot = slots[lowerSlotId];
-        lowerSlot.sync(epoch);
+        lowerSlot.sync(bitmaps[poolId], int24(lowerSlotIndex), epoch);
 
-        bytes32 upperSlotId = Slot.getId(poolId, upperSlotIndex);
+        bytes32 upperSlotId = Slot.getId(poolId, int24(upperSlotIndex));
         Slot.Data storage upperSlot = slots[upperSlotId];
-        upperSlot.sync(epoch);
+        upperSlot.sync(bitmaps[poolId], int24(upperSlotIndex), epoch);
 
         bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
         Position.Data storage position = positions[positionId];
@@ -167,9 +171,9 @@ contract Hyper is IHyper {
         }
 
         if (amount > 0) {
-            _addLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
+            _addLiquidity(pool, bitmaps[poolId], lowerSlot, upperSlot, position, uint256(amount));
         } else {
-            _removeLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
+            _removeLiquidity(pool, bitmaps[poolId], lowerSlot, upperSlot, position, uint256(amount));
         }
 
         emit UpdateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, amount);
@@ -177,6 +181,7 @@ contract Hyper is IHyper {
 
     function _addLiquidity(
         Pool.Data storage pool,
+        mapping(int16 => uint256) storage chunks,
         Slot.Data storage lowerSlot,
         Slot.Data storage upperSlot,
         Position.Data storage position,
@@ -185,10 +190,10 @@ contract Hyper is IHyper {
         uint256 addAmountLeft = amount;
 
         // use negative pending liquidity first
-        if (position.pendingLiquidity < int256(0)) {
-            uint256 addedPending = uint256(position.pendingLiquidity) >= amount
+        if (position.pendingLiquidity < 0) {
+            uint256 addedPending = abs(position.pendingLiquidity) >= amount
                 ? amount
-                : uint256(position.pendingLiquidity);
+                : abs(position.pendingLiquidity);
 
             position.pendingLiquidity += int256(addedPending);
 
@@ -211,16 +216,29 @@ contract Hyper is IHyper {
 
             lowerSlot.swapLiquidityDelta += int256(addAmountLeft);
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
-            if (lowerSlot.liquidityGross == uint256(0)) {
-                // TODO: add to / initialize slot in bitmap
+            if (lowerSlot.liquidityGross == 0) {
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.lowerSlotIndex)
+                );
+
+                if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
+                    chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                }
+
                 // TODO: initialize per liquidity outside values
                 lowerSlot.liquidityGross += uint256(addAmountLeft);
             }
 
             upperSlot.swapLiquidityDelta -= int256(addAmountLeft);
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
-            if (upperSlot.liquidityGross == uint256(0)) {
-                // TODO: add to / initialize slot in bitmap
+            if (upperSlot.liquidityGross == 0) {
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.upperSlotIndex)
+                );
+
+                if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
+                    chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                }
                 // TODO: initialize per liquidity outside values
                 upperSlot.liquidityGross += uint256(addAmountLeft);
             }
@@ -243,6 +261,7 @@ contract Hyper is IHyper {
 
     function _removeLiquidity(
         Pool.Data storage pool,
+        mapping(int16 => uint256) storage chunks,
         Slot.Data storage lowerSlot,
         Slot.Data storage upperSlot,
         Position.Data storage position,
@@ -251,7 +270,7 @@ contract Hyper is IHyper {
         uint256 removeAmountLeft = amount;
 
         // remove positive pending liquidity immediately
-        if (position.pendingLiquidity > int256(0)) {
+        if (position.pendingLiquidity > 0) {
             if (position.swapLiquidity < amount) revert();
 
             uint256 removedPending = uint256(position.pendingLiquidity) >= amount
@@ -264,12 +283,24 @@ contract Hyper is IHyper {
             lowerSlot.swapLiquidityDelta -= int256(removedPending);
             lowerSlot.pendingLiquidityDelta -= int256(removedPending);
             lowerSlot.liquidityGross -= removedPending;
-            // TODO: check liquidity gross value for bitmap
+
+            if (lowerSlot.liquidityGross == 0) {
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.lowerSlotIndex)
+                );
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+            }
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
             upperSlot.pendingLiquidityDelta += int256(removedPending);
             upperSlot.liquidityGross -= removedPending;
-            // TODO: check liquidity gross value for bitmap
+
+            if (upperSlot.liquidityGross == 0) {
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(position.upperSlotIndex)
+                );
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+            }
 
             // credit tokens owed to the position immediately
             (uint256 amountA, uint256 amountB) = _calculateLiquidityDeltas(
@@ -289,7 +320,7 @@ contract Hyper is IHyper {
 
             removeAmountLeft -= removedPending;
         } else {
-            if (position.swapLiquidity - uint256(position.pendingLiquidity) < amount) revert();
+            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
@@ -320,27 +351,19 @@ contract Hyper is IHyper {
         });
     }
 
-    struct SwapCache {
-        int128 activeSlotIndex;
-        uint256 slotProportionF;
-        uint256 activeLiquidity;
-        uint256 activePrice;
-        int128 slotIndexOfNextDelta;
-        int128 nextDelta;
-    }
-
     function swap(
         bytes32 poolId,
-        uint256 tendered,
+        int256 amountIn,
         bool direction
     ) public started {
-        uint256 tenderedRemaining = tendered;
-        uint256 received;
-
+        uint256 amountOut;
         uint256 cumulativeFees;
-        SwapCache memory swapCache;
 
-        if (!direction) {} else {}
+        if (direction) {
+
+        } else {
+
+        }
     }
 
     function bid(
