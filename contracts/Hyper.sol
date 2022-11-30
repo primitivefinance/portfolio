@@ -385,7 +385,9 @@ contract Hyper is IHyper {
                 int24(swapDetails.activeSlot)
             );
             (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
-                bitmaps[poolId][chunk], bit, false
+                // If direction is true: swapping A for B
+                // Decreasing the slot index -> going right into the bitmap (reducing the index)
+                bitmaps[poolId][chunk], bit, !direction
             );
             int128 nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
 
@@ -425,6 +427,9 @@ contract Hyper is IHyper {
                 swapDetails.amountOut += deltaX;
             }
 
+            if (hasNextSlot) {
+                // crossing the tick
+            }
         }
     }
 
