@@ -31,10 +31,10 @@ contract TestBitMath is Test {
         bitmap = BitMath.flip(bitmap, 12);
         bitmap = BitMath.flip(bitmap, 6);
 
-        assertEq(
-            BitMath.findNextSlotWithinChunk(bitmap, 12, true),
-            24
-        );
+        (bool hasNextSlot, uint8 nextSlot) = BitMath.findNextSlotWithinChunk(bitmap, 12, true);
+
+        assertEq(hasNextSlot, true);
+        assertEq(nextSlot, 24);
     }
 
     function test_findNextSlotWithinChunk_right() public {
@@ -43,9 +43,16 @@ contract TestBitMath is Test {
         bitmap = BitMath.flip(bitmap, 11);
         bitmap = BitMath.flip(bitmap, 6);
 
-        assertEq(
-            BitMath.findNextSlotWithinChunk(bitmap, 11, false),
-            6
-        );
+        (bool hasNextSlot, uint8 nextSlot) = BitMath.findNextSlotWithinChunk(bitmap, 11, false);
+
+        assertEq(hasNextSlot, true);
+        assertEq(nextSlot, 6);
+    }
+
+    function test_findNextSlotWithinChunk_right_empty() public {
+        uint256 bitmap;
+        (bool hasNextSlot, uint8 nextSlot) = BitMath.findNextSlotWithinChunk(bitmap, 11, false);
+        assertEq(hasNextSlot, false);
+        console.log(nextSlot);
     }
 }
