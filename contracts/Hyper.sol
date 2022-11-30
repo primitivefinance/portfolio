@@ -215,25 +215,38 @@ contract Hyper is IHyper {
             lowerSlot.swapLiquidityDelta += int256(addAmountLeft);
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
             if (lowerSlot.liquidityGross == 0) {
+                // flip slot in bitmap
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-
-                if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
-                    chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                // initialize per liquidity outside values
+                if (pool.slotIndex >= position.lowerSlotIndex) {
+                    lowerSlot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint;
+                    lowerSlot.feesAPerLiquidityOutsideFixedPoint = pool.feesAPerLiquidityFixedPoint;
+                    lowerSlot.feesBPerLiquidityOutsideFixedPoint = pool.feesBPerLiquidityFixedPoint;
+                } else {
+                    lowerSlot.proceedsPerLiquidityOutsideFixedPoint = 0;
+                    lowerSlot.feesAPerLiquidityOutsideFixedPoint = 0;
+                    lowerSlot.feesBPerLiquidityOutsideFixedPoint = 0;
                 }
-
-                // TODO: initialize per liquidity outside values
                 lowerSlot.liquidityGross += uint256(addAmountLeft);
             }
 
             upperSlot.swapLiquidityDelta -= int256(addAmountLeft);
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == 0) {
+                // flip slot in bitmap
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
-
-                if (!BitMath.hasLiquidity(chunks[chunk], bit)) {
-                    chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                // initialize per liquidity outside values
+                if (pool.slotIndex >= position.upperSlotIndex) {
+                    upperSlot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint;
+                    upperSlot.feesAPerLiquidityOutsideFixedPoint = pool.feesAPerLiquidityFixedPoint;
+                    upperSlot.feesBPerLiquidityOutsideFixedPoint = pool.feesBPerLiquidityFixedPoint;
+                } else {
+                    upperSlot.proceedsPerLiquidityOutsideFixedPoint = 0;
+                    upperSlot.feesAPerLiquidityOutsideFixedPoint = 0;
+                    upperSlot.feesBPerLiquidityOutsideFixedPoint = 0;
                 }
-                // TODO: initialize per liquidity outside values
                 upperSlot.liquidityGross += uint256(addAmountLeft);
             }
 
@@ -356,8 +369,11 @@ contract Hyper is IHyper {
         bytes32 poolId,
         uint256 amountIn,
         bool direction
+    )
+        public
         // TODO: Add an amount limit and a recipient address
-    ) public started {
+        started
+    {
         if (amountIn == 0) revert();
 
         Pool.Data storage pool = pools[poolId];
@@ -381,19 +397,17 @@ contract Hyper is IHyper {
 
         while (swapDetails.remaining > 0) {
             // Get the next slot or the border of a bitmap
-            (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
-                int24(swapDetails.activeSlot)
-            );
+            (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(swapDetails.activeSlot));
             (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
                 // If direction is true: swapping A for B
                 // Decreasing the slot index -> going right into the bitmap (reducing the index)
-                bitmaps[poolId][chunk], bit, !direction
+                bitmaps[poolId][chunk],
+                bit,
+                !direction
             );
             int128 nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
 
             swapDetails.activeSlot = nextSlotIndex;
-
-
 
             uint256 deltaX = getXMaxToNextSlot(
                 swapDetails.sqrtPriceFixedPoint,
