@@ -341,15 +341,62 @@ contract Hyper is IHyper {
         });
     }
 
-    function swap(
-        bytes32 poolId,
-        int256 amount,
-        bool direction
-    ) public started {
+    struct SwapDetails {
+        int128 activeSlot;
+        uint256 activeLiquidity;
         uint256 amountOut;
         uint256 cumulativeFees;
+        int128 slotIndexOfNextDelta;
+        uint256 remaining;
+        int256 nextDelta;
+        uint256 sqrtPriceFixedPoint;
+    }
 
-        if (direction) {} else {}
+    function swap(
+        bytes32 poolId,
+        uint256 amountIn,
+        bool direction
+    ) public started {
+        if (amountIn == 0) revert();
+
+        Pool.Data storage pool = pools[poolId];
+        if (pool.lastUpdatedTimestamp == 0) revert(); // TODO: revert PoolNotInitialized();
+
+        bool newEpoch = epoch.sync();
+        if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
+
+        pool.sync(epoch);
+
+        SwapDetails memory swapDetails;
+        swapDetails.remaining = amountIn;
+        swapDetails.sqrtPriceFixedPoint = pool.sqrtPriceFixedPoint;
+
+        if (direction) {
+            // Swapping from A to B
+
+            while (swapDetails.remaining > 0) {
+                int128 currentSlotIndex = pool.slotIndex;
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                    int24(currentSlotIndex)
+                );
+                (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
+                    bitmaps[poolId][chunk], bit, false
+                );
+                int128 nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
+
+                uint256 deltaX = getXMaxToNextSlot(
+                    swapDetails.sqrtPriceFixedPoint,
+                    _getSqrtPriceAtSlot(nextSlotIndex),
+                    pool.swapLiquidity
+                );
+
+                if (swapDetails.remaining <= deltaX) {
+                    swapDetails.remaining = 0;
+                } else {
+
+                }
+            }
+        } else {}
     }
 
     function bid(
