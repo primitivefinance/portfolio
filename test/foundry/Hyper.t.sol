@@ -14,7 +14,7 @@ contract TestHyper is Test {
         hyper.start();
     }
 
-    function test_initiatePool() public {
+    function test_activatePool() public {
         hyper.activatePool(address(0xbeef), address(0xbabe), 10 ether);
     }
 
