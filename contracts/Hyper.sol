@@ -356,6 +356,7 @@ contract Hyper is IHyper {
         bytes32 poolId,
         uint256 amountIn,
         bool direction
+        // TODO: Add an amount limit and a recipient address
     ) public started {
         if (amountIn == 0) revert();
 
@@ -367,36 +368,64 @@ contract Hyper is IHyper {
 
         pool.sync(epoch);
 
-        SwapDetails memory swapDetails;
-        swapDetails.remaining = amountIn;
-        swapDetails.sqrtPriceFixedPoint = pool.sqrtPriceFixedPoint;
+        SwapDetails memory swapDetails = SwapDetails({
+            activeSlot: pool.slotIndex,
+            activeLiquidity: pool.swapLiquidity,
+            amountOut: 0,
+            cumulativeFees: 0,
+            slotIndexOfNextDelta: 0,
+            remaining: amountIn,
+            nextDelta: 0,
+            sqrtPriceFixedPoint: pool.sqrtPriceFixedPoint
+        });
 
-        if (direction) {
-            // Swapping from A to B
+        while (swapDetails.remaining > 0) {
+            // Get the next slot or the border of a bitmap
+            (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
+                int24(swapDetails.activeSlot)
+            );
+            (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
+                bitmaps[poolId][chunk], bit, false
+            );
+            int128 nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
 
-            while (swapDetails.remaining > 0) {
-                int128 currentSlotIndex = pool.slotIndex;
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(
-                    int24(currentSlotIndex)
-                );
-                (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
-                    bitmaps[poolId][chunk], bit, false
-                );
-                int128 nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
+            swapDetails.activeSlot = nextSlotIndex;
 
-                uint256 deltaX = getXMaxToNextSlot(
-                    swapDetails.sqrtPriceFixedPoint,
-                    _getSqrtPriceAtSlot(nextSlotIndex),
-                    pool.swapLiquidity
-                );
 
+
+            uint256 deltaX = getXMaxToNextSlot(
+                swapDetails.sqrtPriceFixedPoint,
+                _getSqrtPriceAtSlot(nextSlotIndex),
+                pool.swapLiquidity
+            );
+
+            uint256 deltaY = getYMaxToNextSlot(
+                swapDetails.sqrtPriceFixedPoint,
+                _getSqrtPriceAtSlot(nextSlotIndex),
+                pool.swapLiquidity
+            );
+
+            // TODO: Remove the fees from swapDetails.remaining
+
+            if (direction) {
                 if (swapDetails.remaining <= deltaX) {
                     swapDetails.remaining = 0;
                 } else {
-
+                    swapDetails.remaining -= deltaX;
                 }
+
+                swapDetails.amountOut += deltaY;
+            } else {
+                if (swapDetails.remaining <= deltaY) {
+                    swapDetails.remaining = 0;
+                } else {
+                    swapDetails.remaining -= deltaY;
+                }
+
+                swapDetails.amountOut += deltaX;
             }
-        } else {}
+
+        }
     }
 
     function bid(
