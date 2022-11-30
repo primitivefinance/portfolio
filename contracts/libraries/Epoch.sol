@@ -23,8 +23,6 @@ library Epoch {
             epoch.id += (1 + epochsPassed);
             epoch.endTime += (EPOCH_LENGTH + (epochsPassed * EPOCH_LENGTH));
             newEpoch = true;
-        } else {
-            newEpoch = false;
         }
     }
 }
