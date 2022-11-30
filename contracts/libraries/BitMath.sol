@@ -14,20 +14,26 @@ library BitMath {
         }
     }
 
-    function getSlotPositionInBitmap(int24 slotId) internal pure returns (int16 chunk, uint8 bit) {
-        chunk = int16(slotId / 256);
-        bit = uint8(uint24(slotId % 256));
+    function getSlotPositionInBitmap(int24 slotIndex) internal pure returns (int16 chunk, uint8 bit) {
+        chunk = int16(slotIndex / 256);
+        bit = uint8(uint24(slotIndex % 256));
     }
 
     function findNextSlotWithinChunk(
         uint256 chunk,
         uint8 bit,
         bool shouldCheckLeft
-    ) internal returns (uint8 nextSlot) {
-        if (shouldCheckLeft) {
-            nextSlot = leastSignificantBit(chunk >> bit + 1) + bit + 1;
+    ) internal returns (bool hasNextSlot, uint8 nextSlotBit) {
+        if (chunk != 0) {
+            hasNextSlot = true;
+
+            if (shouldCheckLeft) {
+                nextSlotBit = leastSignificantBit(chunk >> bit + 1) + bit + 1;
+            } else {
+                nextSlotBit = mostSignificantBit(chunk & ((1 << bit) - 1));
+            }
         } else {
-            nextSlot = mostSignificantBit(chunk & ((1 << bit) - 1));
+            nextSlotBit = shouldCheckLeft ? 255 : 0;
         }
     }
 
