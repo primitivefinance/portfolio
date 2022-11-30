@@ -23,7 +23,7 @@ library BitMath {
         uint256 chunk,
         uint8 bit,
         bool shouldCheckLeft
-    ) internal returns (bool hasNextSlot, uint8 nextSlotBit) {
+    ) pure internal returns (bool hasNextSlot, uint8 nextSlotBit) {
         if (chunk != 0) {
             hasNextSlot = true;
 
