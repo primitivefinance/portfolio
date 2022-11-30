@@ -71,3 +71,34 @@ function _calculateLiquidityDeltas(
         );
     }
 }
+
+function getXMaxToNextSlot(
+    uint256 sqrtPriceCurrentSlotFixedPoint,
+    uint256 sqrtPriceNextSlotFixedPoint,
+    uint256 liquidity
+) returns (uint256) {
+    return PRBMathUD60x18.div(PRBMathUD60x18.toUint(liquidity), sqrtPriceNextSlotFixedPoint) - PRBMathUD60x18.div(PRBMathUD60x18.toUint(liquidity), sqrtPriceCurrentSlotFixedPoint);
+}
+
+function getYMaxToNextSlot(
+    uint256 sqrtPriceCurrentSlotFixedPoint,
+    uint256 sqrtPriceNextSlotFixedPoint,
+    uint256 liquidity
+) returns (uint256) {
+    return PRBMathUD60x18.mul(PRBMathUD60x18.toUint(liquidity), sqrtPriceNextSlotFixedPoint - sqrtPriceCurrentSlotFixedPoint);
+}
+
+function getNewPrice(
+    uint256 sqrtPriceCurrentSlotFixedPoint,
+    uint256 liquidity,
+    uint256 deltaX
+) returns (uint256) {
+    return PRBMathUD60x18.div(
+        PRBMathUD60x18.mul(
+            sqrtPriceCurrentSlotFixedPoint, PRBMathUD60x18.toUint(liquidity)
+        ),
+        PRBMathUD60x18.mul(
+            deltaX, sqrtPriceCurrentSlotFixedPoint
+        ) + PRBMathUD60x18.toUint(liquidity),
+    );
+}
