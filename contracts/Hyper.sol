@@ -21,8 +21,6 @@ import "./libraries/Slot.sol";
 // - Slippage checks
 // - Extra function parameters
 // - Custom errors
-// - slots bitmap
-// - swap
 
 contract Hyper is IHyper {
     using Epoch for Epoch.Data;
