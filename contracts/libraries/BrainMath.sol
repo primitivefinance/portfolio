@@ -102,3 +102,11 @@ function getTargetPriceUsingDeltaX(
         ) + PRBMathUD60x18.toUint(liquidity)
     );
 }
+
+function getTargetPriceUsingDeltaY(
+    uint256 sqrtPriceCurrentSlotFixedPoint,
+    uint256 liquidity,
+    uint256 deltaY
+) pure returns (uint256) {
+    return PRBMathUD60x18.div(deltaY, PRBMathUD60x18.toUint(liquidity)) + sqrtPriceCurrentSlotFixedPoint;
+}

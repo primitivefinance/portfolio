@@ -357,6 +357,8 @@ contract Hyper is IHyper {
     struct SwapDetails {
         int128 activeSlot;
         uint256 swapLiquidity;
+        uint256 maturedLiquidity;
+        int256 pendingLiquidity;
         uint256 amountOut;
         uint256 cumulativeFeesPerLiquidityFixedPoint;
         int128 slotIndexOfNextDelta;
@@ -388,6 +390,8 @@ contract Hyper is IHyper {
         SwapDetails memory swapDetails = SwapDetails({
             activeSlot: pool.slotIndex,
             swapLiquidity: pool.swapLiquidity,
+            maturedLiquidity: pool.maturedLiquidity,
+            pendingLiquidity: pool.pendingLiquidity,
             amountOut: 0,
             cumulativeFeesPerLiquidityFixedPoint: 0,
             sqrtPriceOfNextDeltaFixedPoint: 0,
@@ -444,6 +448,9 @@ contract Hyper is IHyper {
                     swapDetails.activeSlot = _getSlotAtSqrtPrice(targetPrice);
                     swapDetails.remaining = 0;
                 } else {
+                    uint256 feeAmount = deltaX * feeTier / 10_000;
+                    swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
+
                     swapDetails.remaining -= deltaX;
                     swapDetails.activeSlot = swapDetails.slotIndexOfNextDelta;
                     swapDetails.sqrtPriceFixedPoint = swapDetails.sqrtPriceOfNextDeltaFixedPoint;
@@ -453,7 +460,13 @@ contract Hyper is IHyper {
                         nextSlot.sync(bitmaps[poolId], int24(swapDetails.slotIndexOfNextDelta), epoch);
                         nextSlot.cross(pool, epoch.id);
 
+                        swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
+                            ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta) : swapDetails.swapLiquidity + abs(nextSlot.swapLiquidityDelta);
 
+                        swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
+                            ? swapDetails.maturedLiquidity - uint256(nextSlot.maturedLiquidityDelta) : swapDetails.maturedLiquidity + abs(nextSlot.maturedLiquidityDelta);
+
+                        swapDetails.pendingLiquidity -= nextSlot.pendingLiquidityDelta;
                     }
                 }
 
@@ -466,18 +479,53 @@ contract Hyper is IHyper {
                 );
 
                 if (swapDetails.remaining <= deltaY) {
+                    uint256 feeAmount = swapDetails.remaining * feeTier / 10_000;
+                    swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
+
+                    uint256 targetPrice = getTargetPriceUsingDeltaY(
+                        swapDetails.sqrtPriceFixedPoint,
+                        swapDetails.swapLiquidity,
+                        swapDetails.remaining
+                    );
+
+                    deltaX = getDeltaXToNextPrice(
+                        swapDetails.sqrtPriceFixedPoint,
+                        targetPrice,
+                        swapDetails.swapLiquidity
+                    );
+
+                    swapDetails.sqrtPriceFixedPoint = targetPrice;
+                    swapDetails.activeSlot = _getSlotAtSqrtPrice(targetPrice);
                     swapDetails.remaining = 0;
                 } else {
+                    uint256 feeAmount = deltaY * feeTier / 10_000;
+                    swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
+
                     swapDetails.remaining -= deltaY;
+
+                    swapDetails.activeSlot = swapDetails.slotIndexOfNextDelta;
+                    swapDetails.sqrtPriceFixedPoint = swapDetails.sqrtPriceOfNextDeltaFixedPoint;
+
+                    if (hasNextSlot) {
+                        Slot.Data storage nextSlot = slots[Slot.getId(poolId, swapDetails.slotIndexOfNextDelta)];
+                        nextSlot.sync(bitmaps[poolId], int24(swapDetails.slotIndexOfNextDelta), epoch);
+                        nextSlot.cross(pool, epoch.id);
+
+                        swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
+                            ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta) : swapDetails.swapLiquidity - abs(nextSlot.swapLiquidityDelta);
+
+                        swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
+                            ? swapDetails.maturedLiquidity + uint256(nextSlot.maturedLiquidityDelta) : swapDetails.maturedLiquidity - abs(nextSlot.maturedLiquidityDelta);
+
+                        swapDetails.pendingLiquidity += nextSlot.pendingLiquidityDelta;
+                    }
                 }
 
                 swapDetails.amountOut += deltaX;
             }
-
-            if (hasNextSlot) {
-                // crossing the tick
-            }
         }
+
+
     }
 
     function bid(
