@@ -139,7 +139,21 @@ contract Hyper is IHyper {
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
-    ) public started {
+    ) public {
+        _updateLiquidity(
+            poolId,
+            lowerSlotIndex,
+            upperSlotIndex,
+            amount
+        );
+    }
+
+    function _updateLiquidity(
+        bytes32 poolId,
+        int128 lowerSlotIndex,
+        int128 upperSlotIndex,
+        int256 amount
+    ) internal started {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
 
@@ -374,7 +388,17 @@ contract Hyper is IHyper {
         bool direction
     )
         public
+    {
+        _swap(poolId, amountIn, direction);
+    }
+
+    function _swap(
+        bytes32 poolId,
+        uint256 amountIn,
+        bool direction
         // TODO: Add an amount limit and a recipient address
+    )
+        internal
         started
     {
         if (amountIn == 0) revert();
