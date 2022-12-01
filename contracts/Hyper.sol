@@ -421,6 +421,8 @@ contract Hyper is IHyper {
             uint256 deltaX;
             uint256 deltaY;
 
+            uint256 feeAmount = swapDetails.remaining * feeTier / 10_000;
+
             if (direction) {
                 deltaX = getDeltaXToNextPrice(
                     swapDetails.sqrtPriceFixedPoint,
@@ -428,9 +430,9 @@ contract Hyper is IHyper {
                     swapDetails.swapLiquidity
                 );
 
-                if (swapDetails.remaining <= deltaX) {
-                    uint256 feeAmount = swapDetails.remaining * feeTier / 10_000;
+                if (swapDetails.remaining - feeAmount <= deltaX) {
                     swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
+                    swapDetails.remaining -= feeAmount;
 
                     uint256 targetPrice = getTargetPriceUsingDeltaX(
                         swapDetails.sqrtPriceFixedPoint,
@@ -448,10 +450,10 @@ contract Hyper is IHyper {
                     swapDetails.activeSlot = _getSlotAtSqrtPrice(targetPrice);
                     swapDetails.remaining = 0;
                 } else {
-                    uint256 feeAmount = deltaX * feeTier / 10_000;
+                    feeAmount = deltaX * feeTier / 10_000;
                     swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
 
-                    swapDetails.remaining -= deltaX;
+                    swapDetails.remaining -= deltaX + feeAmount;
                     swapDetails.activeSlot = swapDetails.slotIndexOfNextDelta;
                     swapDetails.sqrtPriceFixedPoint = swapDetails.sqrtPriceOfNextDeltaFixedPoint;
 
@@ -478,9 +480,9 @@ contract Hyper is IHyper {
                     swapDetails.swapLiquidity
                 );
 
-                if (swapDetails.remaining <= deltaY) {
-                    uint256 feeAmount = swapDetails.remaining * feeTier / 10_000;
+                if (swapDetails.remaining - feeAmount <= deltaY) {
                     swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
+                    swapDetails.remaining -= feeAmount;
 
                     uint256 targetPrice = getTargetPriceUsingDeltaY(
                         swapDetails.sqrtPriceFixedPoint,
@@ -498,11 +500,10 @@ contract Hyper is IHyper {
                     swapDetails.activeSlot = _getSlotAtSqrtPrice(targetPrice);
                     swapDetails.remaining = 0;
                 } else {
-                    uint256 feeAmount = deltaY * feeTier / 10_000;
+                    feeAmount = deltaY * feeTier / 10_000;
                     swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
 
-                    swapDetails.remaining -= deltaY;
-
+                    swapDetails.remaining -= deltaY + feeAmount;
                     swapDetails.activeSlot = swapDetails.slotIndexOfNextDelta;
                     swapDetails.sqrtPriceFixedPoint = swapDetails.sqrtPriceOfNextDeltaFixedPoint;
 
