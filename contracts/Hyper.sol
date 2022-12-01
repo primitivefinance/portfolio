@@ -356,10 +356,11 @@ contract Hyper is IHyper {
 
     struct SwapDetails {
         int128 activeSlot;
-        uint256 activeLiquidity;
+        uint256 swapLiquidity;
         uint256 amountOut;
-        uint256 cumulativeFees;
+        uint256 cumulativeFeesPerLiquidityFixedPoint;
         int128 slotIndexOfNextDelta;
+        uint256 sqrtPriceOfNextDeltaFixedPoint;
         uint256 remaining;
         int256 nextDelta;
         uint256 sqrtPriceFixedPoint;
@@ -386,14 +387,18 @@ contract Hyper is IHyper {
 
         SwapDetails memory swapDetails = SwapDetails({
             activeSlot: pool.slotIndex,
-            activeLiquidity: pool.swapLiquidity,
+            swapLiquidity: pool.swapLiquidity,
             amountOut: 0,
-            cumulativeFees: 0,
+            cumulativeFeesPerLiquidityFixedPoint: 0,
+            sqrtPriceOfNextDeltaFixedPoint: 0,
             slotIndexOfNextDelta: 0,
             remaining: amountIn,
             nextDelta: 0,
             sqrtPriceFixedPoint: pool.sqrtPriceFixedPoint
         });
+
+        uint256 feeTier = msg.sender == pool.bids[epoch.id].swapper
+            ? 0 : PUBLIC_SWAP_FEE;
 
         while (swapDetails.remaining > 0) {
             // Get the next slot or the border of a bitmap
@@ -405,33 +410,61 @@ contract Hyper is IHyper {
                 bit,
                 !direction
             );
-            int128 nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
 
-            swapDetails.activeSlot = nextSlotIndex;
+            swapDetails.slotIndexOfNextDelta = int128(chunk * 256 + int8(nextSlotBit));
+            swapDetails.sqrtPriceOfNextDeltaFixedPoint = _getSqrtPriceAtSlot(swapDetails.slotIndexOfNextDelta);
 
-            uint256 deltaX = getXMaxToNextSlot(
-                swapDetails.sqrtPriceFixedPoint,
-                _getSqrtPriceAtSlot(nextSlotIndex),
-                pool.swapLiquidity
-            );
-
-            uint256 deltaY = getYMaxToNextSlot(
-                swapDetails.sqrtPriceFixedPoint,
-                _getSqrtPriceAtSlot(nextSlotIndex),
-                pool.swapLiquidity
-            );
-
-            // TODO: Remove the fees from swapDetails.remaining
+            uint256 deltaX;
+            uint256 deltaY;
 
             if (direction) {
+                deltaX = getDeltaXToNextPrice(
+                    swapDetails.sqrtPriceFixedPoint,
+                    swapDetails.sqrtPriceOfNextDeltaFixedPoint,
+                    swapDetails.swapLiquidity
+                );
+
                 if (swapDetails.remaining <= deltaX) {
+                    uint256 feeAmount = swapDetails.remaining * feeTier / 10_000;
+                    swapDetails.cumulativeFeesPerLiquidityFixedPoint += PRBMathUD60x18.div(feeAmount, swapDetails.swapLiquidity);
+
+                    uint256 targetPrice = getTargetPriceUsingDeltaX(
+                        swapDetails.sqrtPriceFixedPoint,
+                        swapDetails.swapLiquidity,
+                        swapDetails.remaining
+                    );
+
+                    deltaY = getDeltaYToNextPrice(
+                        swapDetails.sqrtPriceFixedPoint,
+                        targetPrice,
+                        swapDetails.swapLiquidity
+                    );
+
+                    swapDetails.sqrtPriceFixedPoint = targetPrice;
+                    swapDetails.activeSlot = _getSlotAtSqrtPrice(targetPrice);
                     swapDetails.remaining = 0;
                 } else {
                     swapDetails.remaining -= deltaX;
+                    swapDetails.activeSlot = swapDetails.slotIndexOfNextDelta;
+                    swapDetails.sqrtPriceFixedPoint = swapDetails.sqrtPriceOfNextDeltaFixedPoint;
+
+                    if (hasNextSlot) {
+                        Slot.Data storage nextSlot = slots[Slot.getId(poolId, swapDetails.slotIndexOfNextDelta)];
+                        nextSlot.sync(bitmaps[poolId], int24(swapDetails.slotIndexOfNextDelta), epoch);
+                        nextSlot.cross(pool, epoch.id);
+
+
+                    }
                 }
 
                 swapDetails.amountOut += deltaY;
             } else {
+                deltaY = getDeltaYToNextPrice(
+                    swapDetails.sqrtPriceFixedPoint,
+                    _getSqrtPriceAtSlot(swapDetails.slotIndexOfNextDelta),
+                    swapDetails.swapLiquidity
+                );
+
                 if (swapDetails.remaining <= deltaY) {
                     swapDetails.remaining = 0;
                 } else {

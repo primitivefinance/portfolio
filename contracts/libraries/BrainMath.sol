@@ -72,7 +72,7 @@ function _calculateLiquidityDeltas(
     }
 }
 
-function getXMaxToNextSlot(
+function getDeltaXToNextPrice(
     uint256 sqrtPriceCurrentSlotFixedPoint,
     uint256 sqrtPriceNextSlotFixedPoint,
     uint256 liquidity
@@ -80,7 +80,7 @@ function getXMaxToNextSlot(
     return PRBMathUD60x18.div(PRBMathUD60x18.toUint(liquidity), sqrtPriceNextSlotFixedPoint) - PRBMathUD60x18.div(PRBMathUD60x18.toUint(liquidity), sqrtPriceCurrentSlotFixedPoint);
 }
 
-function getYMaxToNextSlot(
+function getDeltaYToNextPrice(
     uint256 sqrtPriceCurrentSlotFixedPoint,
     uint256 sqrtPriceNextSlotFixedPoint,
     uint256 liquidity
@@ -88,7 +88,7 @@ function getYMaxToNextSlot(
     return PRBMathUD60x18.mul(PRBMathUD60x18.toUint(liquidity), sqrtPriceNextSlotFixedPoint - sqrtPriceCurrentSlotFixedPoint);
 }
 
-function getNewPrice(
+function getTargetPriceUsingDeltaX(
     uint256 sqrtPriceCurrentSlotFixedPoint,
     uint256 liquidity,
     uint256 deltaX

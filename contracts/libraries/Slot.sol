@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
+import "./Pool.sol";
 import "./Epoch.sol";
 import "./BitMath.sol";
 
@@ -33,6 +34,18 @@ library Slot {
 
     function getId(bytes32 poolId, int128 slotIndex) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(poolId, slotIndex));
+    }
+
+    function cross(Slot.Data storage slot, Pool.Data storage pool, uint256 epochId) internal {
+        slot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint - slot.proceedsPerLiquidityOutsideFixedPoint;
+        slot.feesAPerLiquidityOutsideFixedPoint = pool.feesAPerLiquidityFixedPoint - slot.feesAPerLiquidityOutsideFixedPoint;
+        slot.feesBPerLiquidityOutsideFixedPoint = pool.feesBPerLiquidityFixedPoint - slot.feesBPerLiquidityOutsideFixedPoint;
+
+        slot.snapshots[epochId] = Snapshot({
+            proceedsPerLiquidityOutsideFixedPoint: slot.proceedsPerLiquidityOutsideFixedPoint,
+            feesAPerLiquidityOutsideFixedPoint: slot.feesAPerLiquidityOutsideFixedPoint,
+            feesBPerLiquidityOutsideFixedPoint: slot.feesBPerLiquidityOutsideFixedPoint
+        });
     }
 
     function sync(
