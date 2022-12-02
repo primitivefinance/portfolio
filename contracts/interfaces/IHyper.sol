@@ -104,13 +104,15 @@ interface IHyper {
         bytes32 poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
-        int256 amount
+        int256 amount,
+        bool transferOut
     ) external;
 
     function swap(
         bytes32 poolId,
         uint256 amountIn,
-        bool direction
+        bool direction,
+        bool transferOut
     ) external;
 
     function bid(
