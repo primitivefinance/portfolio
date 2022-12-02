@@ -106,6 +106,12 @@ contract Hyper is IHyper {
         //       twice is not great but not sure how to cache it without
         //       triggering the error: "Type struct Pool is only valid in
         //       storage because it contains a (nested) mapping."
+        //
+        //       - Idea 1: Split the poolId in two to get the address of
+        //       the tokens (A and B), maybe this will be cheaper than
+        //       reading from the storage directly.
+        //       - Idea 2: Use `Pool storage pool...`, might want to check
+        //       the gas cost though, not sure what would be cheaper.
         for (uint256 i = 0; i < cachedPoolIds.length;) {
             bytes32 poolId = cachedPoolIds[i];
             address tokenA = pools[poolId].tokenA;
