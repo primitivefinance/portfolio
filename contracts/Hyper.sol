@@ -147,6 +147,7 @@ contract Hyper is IHyper {
         _cachedBalance[token] = 0;
     }
 
+    /// @dev Caches a pool id (if it wasn't cached before)
     function _cachePoolId(bytes32 poolId) internal {
         if (!_isPoolIdCached[poolId]) {
             _isPoolIdCached[poolId] = true;
@@ -154,6 +155,7 @@ contract Hyper is IHyper {
         }
     }
 
+    /// @notice Adds `amount` of `token` to `to` internal balance
     function fund(
         address to,
         address token,
@@ -164,6 +166,7 @@ contract Hyper is IHyper {
         emit Fund(to, token, amount);
     }
 
+    /// @notice Transfers `amount` of `token` from the sender internal balance to `to`
     function withdraw(
         address to,
         address token,
