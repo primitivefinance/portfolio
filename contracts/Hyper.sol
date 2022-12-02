@@ -8,11 +8,11 @@ import "solmate/utils/SafeTransferLib.sol";
 
 import "./libraries/BitMath.sol";
 import "./libraries/BrainMath.sol";
-import "./libraries/Epoch.sol";
 import "./libraries/GlobalDefaults.sol";
-import "./libraries/Pool.sol";
-import "./libraries/Position.sol";
-import "./libraries/Slot.sol";
+import {Epoch} from "./libraries/Epoch.sol";
+import {Pool, Bid, getPoolId} from "./libraries/Pool.sol";
+import {Position, getPositionId} from "./libraries/Position.sol";
+import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
 
 // TODO:
 // - Add WETH wrapping / unwrapping
@@ -23,19 +23,11 @@ import "./libraries/Slot.sol";
 // - Custom errors
 
 contract Hyper is IHyper {
-    using Epoch for Epoch.Data;
-    using Pool for Pool.Data;
-    using Pool for mapping(bytes32 => Pool.Data);
-    using Position for Position.Data;
-    using Position for mapping(bytes32 => Position.Data);
-    using Slot for Slot.Data;
-    using Slot for mapping(bytes32 => Slot.Data);
+    Epoch public epoch;
 
-    Epoch.Data public epoch;
-
-    mapping(bytes32 => Pool.Data) public pools;
-    mapping(bytes32 => Slot.Data) public slots;
-    mapping(bytes32 => Position.Data) public positions;
+    mapping(bytes32 => Pool) public pools;
+    mapping(bytes32 => Slot) public slots;
+    mapping(bytes32 => Position) public positions;
 
     // TODO: Not sure if this should be stored here
     mapping(bytes32 => mapping(int16 => uint256)) public bitmaps;
@@ -47,7 +39,7 @@ contract Hyper is IHyper {
 
     constructor(uint256 startTime, address _auctionFeeCollector) {
         require(startTime > block.timestamp);
-        epoch = Epoch.Data({id: 0, endTime: startTime});
+        epoch = Epoch({id: 0, endTime: startTime});
         auctionFeeCollector = _auctionFeeCollector;
     }
 
@@ -87,7 +79,7 @@ contract Hyper is IHyper {
             uint256 proceedsPerSecondFixedPoint
         )
     {
-        Pool.Data storage pool = pools[poolId];
+        Pool storage pool = pools[poolId];
         refunder = pool.bids[epochId].refunder;
         swapper = pool.bids[epochId].swapper;
         amount = pool.bids[epochId].amount;
@@ -128,7 +120,14 @@ contract Hyper is IHyper {
     ) public started {
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
-        pools.activate(tokenA, tokenB, sqrtPriceFixedPoint);
+
+        Pool storage pool = pools[getPoolId(tokenA, tokenB)];
+        if (pool.lastUpdatedTimestamp != 0) revert();
+        pool.tokenA = tokenA;
+        pool.tokenB = tokenB;
+        pool.sqrtPriceFixedPoint = sqrtPriceFixedPoint;
+        // TODO: set active slot index?
+        pool.lastUpdatedTimestamp = block.timestamp;
         emit ActivatePool(tokenA, tokenB);
     }
 
@@ -141,23 +140,23 @@ contract Hyper is IHyper {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
 
-        Pool.Data storage pool = pools[poolId];
+        Pool storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert();
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
         pool.sync(epoch);
 
-        bytes32 lowerSlotId = Slot.getId(poolId, int24(lowerSlotIndex));
-        Slot.Data storage lowerSlot = slots[lowerSlotId];
+        bytes32 lowerSlotId = getSlotId(poolId, int24(lowerSlotIndex));
+        Slot storage lowerSlot = slots[lowerSlotId];
         lowerSlot.sync(bitmaps[poolId], int24(lowerSlotIndex), epoch);
 
-        bytes32 upperSlotId = Slot.getId(poolId, int24(upperSlotIndex));
-        Slot.Data storage upperSlot = slots[upperSlotId];
+        bytes32 upperSlotId = getSlotId(poolId, int24(upperSlotIndex));
+        Slot storage upperSlot = slots[upperSlotId];
         upperSlot.sync(bitmaps[poolId], int24(upperSlotIndex), epoch);
 
-        bytes32 positionId = Position.getId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
-        Position.Data storage position = positions[positionId];
+        bytes32 positionId = getPositionId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex);
+        Position storage position = positions[positionId];
 
         if (position.lastUpdatedTimestamp == 0) {
             if (amount < 0) revert();
@@ -178,11 +177,11 @@ contract Hyper is IHyper {
     }
 
     function _addLiquidity(
-        Pool.Data storage pool,
+        Pool storage pool,
         mapping(int16 => uint256) storage chunks,
-        Slot.Data storage lowerSlot,
-        Slot.Data storage upperSlot,
-        Position.Data storage position,
+        Slot storage lowerSlot,
+        Slot storage upperSlot,
+        Position storage position,
         uint256 amount
     ) internal {
         uint256 addAmountLeft = amount;
@@ -265,11 +264,11 @@ contract Hyper is IHyper {
     }
 
     function _removeLiquidity(
-        Pool.Data storage pool,
+        Pool storage pool,
         mapping(int16 => uint256) storage chunks,
-        Slot.Data storage lowerSlot,
-        Slot.Data storage upperSlot,
-        Position.Data storage position,
+        Slot storage lowerSlot,
+        Slot storage upperSlot,
+        Position storage position,
         uint256 amount
     ) internal {
         uint256 removeAmountLeft = amount;
@@ -340,12 +339,12 @@ contract Hyper is IHyper {
         }
 
         // save slot snapshots
-        lowerSlot.snapshots[epoch.id] = Slot.Snapshot({
+        lowerSlot.snapshots[epoch.id] = SlotSnapshot({
             proceedsPerLiquidityOutsideFixedPoint: lowerSlot.proceedsPerLiquidityOutsideFixedPoint,
             feesAPerLiquidityOutsideFixedPoint: lowerSlot.feesAPerLiquidityOutsideFixedPoint,
             feesBPerLiquidityOutsideFixedPoint: lowerSlot.feesBPerLiquidityOutsideFixedPoint
         });
-        upperSlot.snapshots[epoch.id] = Slot.Snapshot({
+        upperSlot.snapshots[epoch.id] = SlotSnapshot({
             proceedsPerLiquidityOutsideFixedPoint: upperSlot.proceedsPerLiquidityOutsideFixedPoint,
             feesAPerLiquidityOutsideFixedPoint: upperSlot.feesAPerLiquidityOutsideFixedPoint,
             feesBPerLiquidityOutsideFixedPoint: upperSlot.feesBPerLiquidityOutsideFixedPoint
@@ -378,7 +377,7 @@ contract Hyper is IHyper {
     {
         if (amountIn == 0) revert();
 
-        Pool.Data storage pool = pools[poolId];
+        Pool storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert(); // TODO: revert PoolNotInitialized();
 
         bool newEpoch = epoch.sync();
@@ -467,7 +466,7 @@ contract Hyper is IHyper {
                     swapDetails.slotIndex = swapDetails.nextSlotIndex;
                     // cross the next initialized slot
                     if (swapDetails.nextSlotInitialized) {
-                        Slot.Data storage nextSlot = slots[Slot.getId(poolId, swapDetails.nextSlotIndex)];
+                        Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
                         nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
                         nextSlot.cross(pool, epoch.id);
 
@@ -530,7 +529,7 @@ contract Hyper is IHyper {
                     swapDetails.slotIndex = swapDetails.nextSlotIndex;
                     // cross the next initialized slot
                     if (swapDetails.nextSlotInitialized) {
-                        Slot.Data storage nextSlot = slots[Slot.getId(poolId, swapDetails.nextSlotIndex)];
+                        Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
                         nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
                         nextSlot.cross(pool, epoch.id);
 
@@ -570,7 +569,7 @@ contract Hyper is IHyper {
     ) public started {
         if (amount == 0) revert();
 
-        Pool.Data storage pool = pools[poolId];
+        Pool storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert();
 
         bool newEpoch = epoch.sync();
@@ -586,7 +585,7 @@ contract Hyper is IHyper {
 
         if (amount > pool.bids[epochId].amount) {
             // TO-DO: balance changes for msg.sender, auctionFeeCollector, previous bid refunder
-            pool.bids[epochId] = Pool.Bid({
+            pool.bids[epochId] = Bid({
                 refunder: refunder,
                 swapper: swapper,
                 amount: amount,

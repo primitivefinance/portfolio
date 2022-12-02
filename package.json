@@ -55,7 +55,6 @@
     "node": ">=16.0.0"
   },
   "lint-staged": {
-    "*.sol": "prettier --write",
     "*.js": "prettier --write",
     "*.ts": "prettier --write"
   },
