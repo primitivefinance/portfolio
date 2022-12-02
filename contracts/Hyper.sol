@@ -42,7 +42,9 @@ contract Hyper is IHyper {
     ///
     ///      token => cachedBalance
     ///
-    mapping(address => int256) private cachedBalances;
+    ///      TODO: Reading / writing directly to the storage is more expensive
+    ///      than the memory, let's try to find a better way to implement this
+    mapping(address => int256) private _cachedBalance;
 
     address public auctionFeeCollector;
 
@@ -116,8 +118,8 @@ contract Hyper is IHyper {
             bytes32 poolId = cachedPoolIds[i];
             address tokenA = pools[poolId].tokenA;
             address tokenB = pools[poolId].tokenB;
-            _settleToken(tokenA, cachedBalances[tokenA]);
-            _settleToken(tokenB, cachedBalances[tokenB]);
+            _settleToken(tokenA, _cachedBalance[tokenA]);
+            _settleToken(tokenB, _cachedBalance[tokenB]);
             unchecked { ++i; }
         }
     }
@@ -140,7 +142,7 @@ contract Hyper is IHyper {
             internalBalances[msg.sender][token] += uint256(cachedBalance);
         }
 
-        cachedBalances[token] = 0;
+        _cachedBalance[token] = 0;
     }
 
     function fund(
@@ -188,6 +190,7 @@ contract Hyper is IHyper {
         int128 upperSlotIndex,
         int256 amount
     ) public {
+
         _updateLiquidity(
             poolId,
             lowerSlotIndex,
@@ -324,7 +327,8 @@ contract Hyper is IHyper {
                 pool.pendingLiquidity += int256(addAmountLeft);
             }
 
-            // TODO: Remove amountA & amountB from internal balance
+            _cachedBalance[pool.tokenA] -= amountA;
+            _cachedBalance[pool.tokenB] -= amountB;
         }
     }
 
@@ -376,7 +380,8 @@ contract Hyper is IHyper {
                 position.upperSlotIndex
             );
 
-            // TODO: add amountA & b to internal balance
+            _cachedBalance[pool.tokenA] += amountA;
+            _cachedBalance[pool.tokenB] += amountB;
 
             if (amountA != 0 && amountB != 0) {
                 pool.swapLiquidity -= removedPending;
@@ -629,10 +634,15 @@ contract Hyper is IHyper {
         pool.pendingLiquidity = swapDetails.pendingLiquidity;
         if (direction) {
             pool.feesAPerLiquidityFixedPoint += swapDetails.feesPerLiquidityFixedPoint;
+
+            _cachedBalance[pool.tokenA] -= amountIn;
+            _cachedBalance[pool.tokenB] += swapDetails.amountOut;
         } else {
             pool.feesBPerLiquidityFixedPoint += swapDetails.feesPerLiquidityFixedPoint;
+
+            _cachedBalance[pool.tokenA] += amountIn;
+            _cachedBalance[pool.tokenB] -= swapDetails.amountOut;
         }
-        // TODO: Request tokens from user
     }
 
     function bid(
