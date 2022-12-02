@@ -77,7 +77,7 @@ contract Hyper is IHyper {
         Pool storage pool = pools[poolId];
         refunder = pool.bids[epochId].refunder;
         swapper = pool.bids[epochId].swapper;
-        amount = pool.bids[epochId].amount;
+        amount = pool.bids[epochId].netFeeAmount + pool.bids[epochId].fee;
         proceedsPerSecondFixedPoint = pool.bids[epochId].proceedsPerSecondFixedPoint;
     }
 
@@ -156,7 +156,12 @@ contract Hyper is IHyper {
             if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
         }
 
-        pool.sync(epoch);
+        {
+            uint256 auctionFees = pool.sync(epoch);
+            if (auctionFees > 0) {
+                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += auctionFees;
+            }
+        }
 
         Slot storage lowerSlot;
         {
@@ -427,7 +432,12 @@ contract Hyper is IHyper {
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
 
-        pool.sync(epoch);
+        {
+            uint256 auctionFees = pool.sync(epoch);
+            if (auctionFees > 0) {
+                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += auctionFees;
+            }
+        }
 
         SwapDetails memory swapDetails = SwapDetails({
             feeTier: msg.sender == pool.bids[epoch.id].swapper ? 0 : PUBLIC_SWAP_FEE,
@@ -640,26 +650,33 @@ contract Hyper is IHyper {
         if (epochId != epoch.id + 1) revert();
         if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert();
 
-        pool.sync(epoch); // @dev: pool needs to sync here, assumes no bids otherwise
+        // @dev: pool needs to sync here, assumes no bids otherwise
+        {
+            uint256 auctionFees = pool.sync(epoch);
+            if (auctionFees > 0) {
+                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += auctionFees;
+            }
+        }
 
         uint256 fee = (amount * AUCTION_FEE) / 10000;
-        amount -= fee;
+        uint256 netFeeAmount = amount - fee;
 
-        if (amount > pool.bids[epochId].amount) {
-            // add fee to auction fee collector
-            internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += fee;
+        if (netFeeAmount > pool.bids[epochId].netFeeAmount) {
             // refund previous bid amount to it's refunder address
-            internalBalances[pool.bids[epochId].refunder][AUCTION_SETTLEMENT_TOKEN] += pool.bids[epochId].amount;
-            // update the balance change for msg.sender
+            internalBalances[pool.bids[epochId].refunder][AUCTION_SETTLEMENT_TOKEN] +=
+                pool.bids[epochId].netFeeAmount +
+                pool.bids[epochId].fee;
+            // update the balance change amount to be paid from msg.sender
             balanceChange.amount = -int256(amount);
             // set new leading bid
             pool.bids[epochId] = Bid({
                 refunder: refunder,
                 swapper: swapper,
-                amount: amount,
-                proceedsPerSecondFixedPoint: PRBMathUD60x18.div(amount, EPOCH_LENGTH)
+                netFeeAmount: netFeeAmount,
+                fee: fee,
+                proceedsPerSecondFixedPoint: PRBMathUD60x18.div(netFeeAmount, EPOCH_LENGTH)
             });
-            emit LeadingBid(poolId, epochId, swapper, amount);
+            emit LeadingBid(poolId, epochId, swapper, amount, pool.bids[epochId].proceedsPerSecondFixedPoint);
         }
         balanceChange.token = AUCTION_SETTLEMENT_TOKEN;
     }

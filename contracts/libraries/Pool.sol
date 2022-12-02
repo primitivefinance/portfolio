@@ -27,8 +27,9 @@ struct Pool {
 struct Bid {
     address refunder; // refund address if bid does not win
     address swapper; // address that gets a zero swap fee
-    uint256 amount; // total bid amount in the auction settlement token
-    uint256 proceedsPerSecondFixedPoint; // calculated proceeds per second over an epoch
+    uint256 netFeeAmount; // bid amount - fee in the auction settlement token
+    uint256 fee; // fee collected by auction fee collector in auction settlement token
+    uint256 proceedsPerSecondFixedPoint; // calculated proceeds per second over an epoch, netFeeAmount / EPOCH_LENGTH
 }
 
 struct PoolSnapshot {
@@ -45,18 +46,19 @@ function getPoolId(address tokenA, address tokenB) pure returns (bytes32) {
     return keccak256(abi.encodePacked(tokenA, tokenB));
 }
 
-function sync(Pool storage pool, Epoch memory epoch) {
+function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFees) {
     uint256 epochsPassed = (epoch.endTime - (pool.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
     // TODO: double check boundary condition
     if (epochsPassed > 0) {
         // update proceeds per liquidity distributed to end of epoch
         uint256 lastUpdateEpoch = epoch.id - epochsPassed;
-        if (pool.maturedLiquidity > 0) {
+        if (pool.maturedLiquidity > 0 && pool.bids[lastUpdateEpoch].proceedsPerSecondFixedPoint > 0) {
             uint256 timeToTransition = epoch.endTime - (epochsPassed * EPOCH_LENGTH) - pool.lastUpdatedTimestamp;
             pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
                 PRBMathUD60x18.mul(pool.bids[lastUpdateEpoch].proceedsPerSecondFixedPoint, timeToTransition),
                 pool.maturedLiquidity
             );
+            auctionFees += pool.bids[lastUpdateEpoch].fee;
         }
         // save pool snapshot at end of epoch
         pool.snapshots[lastUpdateEpoch] = PoolSnapshot({
@@ -76,11 +78,12 @@ function sync(Pool storage pool, Epoch memory epoch) {
         pool.pendingLiquidity = int256(0);
         // update proceeds per liquidity distributed for next epoch if needed
         if (epochsPassed > 1) {
-            if (pool.maturedLiquidity > 0) {
+            if (pool.maturedLiquidity > 0 && pool.bids[lastUpdateEpoch + 1].proceedsPerSecondFixedPoint > 0) {
                 pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
                     PRBMathUD60x18.mul(pool.bids[lastUpdateEpoch + 1].proceedsPerSecondFixedPoint, EPOCH_LENGTH),
                     pool.maturedLiquidity
                 );
+                auctionFees += pool.bids[lastUpdateEpoch + 1].fee;
             }
         }
     }

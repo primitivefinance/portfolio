@@ -137,5 +137,11 @@ interface IHyper {
 
     event Swap(bytes32 poolId, uint256 tendered, bool direction);
 
-    event LeadingBid(bytes32 poolId, uint256 epochId, address swapper, uint256 amount);
+    event LeadingBid(
+        bytes32 poolId,
+        uint256 epochId,
+        address swapper,
+        uint256 amount,
+        uint256 proceedsPerSecondFixedPoint
+    );
 }
