@@ -20,16 +20,19 @@ contract TestHyper is Test {
 
     function test_add_liquidity_above_current_slot() public {
         hyper.activatePool(address(0xbeef), address(0xbabe), 10 ether);
+        // TODO: This test should fail now due to token settlement, why is it not?
         hyper.updateLiquidity(getPoolId(address(0xbeef), address(0xbabe)), 11, 12, int256(1), false);
     }
 
     function test_add_liquidity_including_current_slot() public {
         hyper.activatePool(address(0xbeef), address(0xbabe), 10 ether);
+        // TODO: This test should fail now due to token settlement, why is it not?
         hyper.updateLiquidity(getPoolId(address(0xbeef), address(0xbabe)), 9, 11, int256(1000000000000000000), false);
     }
 
     function test_add_liquidity_below_current_slot() public {
         hyper.activatePool(address(0xbeef), address(0xbabe), 10 ether);
+        // TODO: This test should fail now due to token settlement, why is it not?
         hyper.updateLiquidity(getPoolId(address(0xbeef), address(0xbabe)), 8, 9, int256(1), false);
     }
 }
