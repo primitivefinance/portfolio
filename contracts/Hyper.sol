@@ -8,7 +8,7 @@ import "solmate/utils/SafeTransferLib.sol";
 
 import "./libraries/BitMath.sol";
 import "./libraries/BrainMath.sol";
-import "./libraries/Epoch.sol";
+import {Epoch} from "./libraries/Epoch.sol";
 import "./libraries/GlobalDefaults.sol";
 import "./libraries/Pool.sol";
 import "./libraries/Position.sol";
@@ -23,7 +23,6 @@ import "./libraries/Slot.sol";
 // - Custom errors
 
 contract Hyper is IHyper {
-    using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
     using Position for Position.Data;
@@ -31,7 +30,7 @@ contract Hyper is IHyper {
     using Slot for Slot.Data;
     using Slot for mapping(bytes32 => Slot.Data);
 
-    Epoch.Data public epoch;
+    Epoch public epoch;
 
     mapping(bytes32 => Pool.Data) public pools;
     mapping(bytes32 => Slot.Data) public slots;
@@ -47,7 +46,7 @@ contract Hyper is IHyper {
 
     constructor(uint256 startTime, address _auctionFeeCollector) {
         require(startTime > block.timestamp);
-        epoch = Epoch.Data({id: 0, endTime: startTime});
+        epoch = Epoch({id: 0, endTime: startTime});
         auctionFeeCollector = _auctionFeeCollector;
     }
 

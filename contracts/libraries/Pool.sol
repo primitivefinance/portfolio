@@ -4,14 +4,12 @@ pragma solidity 0.8.13;
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 import "./BrainMath.sol";
-import "./Epoch.sol";
+import {Epoch} from "./Epoch.sol";
 
 /// @title   Pool Library
 /// @author  Primitive
 /// @dev     Data structure library for Pools
 library Pool {
-    using Epoch for Epoch.Data;
-
     struct Data {
         address tokenA;
         address tokenB;
@@ -65,7 +63,7 @@ library Pool {
         pool.lastUpdatedTimestamp = block.timestamp;
     }
 
-    function sync(Data storage pool, Epoch.Data memory epoch) internal {
+    function sync(Data storage pool, Epoch memory epoch) internal {
         uint256 epochsPassed = (epoch.endTime - (pool.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
         if (epochsPassed > 0) {

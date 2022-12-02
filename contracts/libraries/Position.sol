@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 import "./BrainMath.sol";
-import "./Epoch.sol";
+import {Epoch} from "./Epoch.sol";
 import "./Pool.sol";
 import "./Slot.sol";
 
@@ -12,7 +12,6 @@ import "./Slot.sol";
 /// @author  Primitive
 /// @dev     Data structure library for Positions
 library Position {
-    using Epoch for Epoch.Data;
     using Pool for Pool.Data;
     using Pool for mapping(bytes32 => Pool.Data);
     using Position for Position.Data;
@@ -54,7 +53,7 @@ library Position {
         Pool.Data storage pool,
         Slot.Data storage lowerSlot,
         Slot.Data storage upperSlot,
-        Epoch.Data memory epoch
+        Epoch memory epoch
     ) internal returns (PositiveBalanceChange memory balanceChange) {
         uint256 epochsPassed = (epoch.endTime - (position.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition

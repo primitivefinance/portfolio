@@ -4,15 +4,13 @@ pragma solidity 0.8.13;
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 import "./Pool.sol";
-import "./Epoch.sol";
+import {Epoch} from "./Epoch.sol";
 import "./BitMath.sol";
 
 /// @title   Slot Library
 /// @author  Primitive
 /// @dev     Data structure library for Slots
 library Slot {
-    using Epoch for Epoch.Data;
-
     struct Data {
         uint256 liquidityGross;
         int256 pendingLiquidityGross;
@@ -36,10 +34,20 @@ library Slot {
         return keccak256(abi.encodePacked(poolId, slotIndex));
     }
 
-    function cross(Slot.Data storage slot, Pool.Data storage pool, uint256 epochId) internal {
-        slot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint - slot.proceedsPerLiquidityOutsideFixedPoint;
-        slot.feesAPerLiquidityOutsideFixedPoint = pool.feesAPerLiquidityFixedPoint - slot.feesAPerLiquidityOutsideFixedPoint;
-        slot.feesBPerLiquidityOutsideFixedPoint = pool.feesBPerLiquidityFixedPoint - slot.feesBPerLiquidityOutsideFixedPoint;
+    function cross(
+        Slot.Data storage slot,
+        Pool.Data storage pool,
+        uint256 epochId
+    ) internal {
+        slot.proceedsPerLiquidityOutsideFixedPoint =
+            pool.proceedsPerLiquidityFixedPoint -
+            slot.proceedsPerLiquidityOutsideFixedPoint;
+        slot.feesAPerLiquidityOutsideFixedPoint =
+            pool.feesAPerLiquidityFixedPoint -
+            slot.feesAPerLiquidityOutsideFixedPoint;
+        slot.feesBPerLiquidityOutsideFixedPoint =
+            pool.feesBPerLiquidityFixedPoint -
+            slot.feesBPerLiquidityOutsideFixedPoint;
 
         slot.snapshots[epochId] = Snapshot({
             proceedsPerLiquidityOutsideFixedPoint: slot.proceedsPerLiquidityOutsideFixedPoint,
@@ -52,7 +60,7 @@ library Slot {
         Data storage slot,
         mapping(int16 => uint256) storage chunks,
         int24 slotIndex,
-        Epoch.Data memory epoch
+        Epoch memory epoch
     ) internal {
         uint256 epochsPassed = (epoch.endTime - (slot.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
         // TODO: double check boundary condition
