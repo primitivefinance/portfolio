@@ -327,8 +327,8 @@ contract Hyper is IHyper {
                 pool.pendingLiquidity += int256(addAmountLeft);
             }
 
-            _cachedBalance[pool.tokenA] -= amountA;
-            _cachedBalance[pool.tokenB] -= amountB;
+            _cachedBalance[pool.tokenA] -= int256(amountA);
+            _cachedBalance[pool.tokenB] -= int256(amountB);
         }
     }
 
@@ -380,8 +380,8 @@ contract Hyper is IHyper {
                 position.upperSlotIndex
             );
 
-            _cachedBalance[pool.tokenA] += amountA;
-            _cachedBalance[pool.tokenB] += amountB;
+            _cachedBalance[pool.tokenA] += int256(amountA);
+            _cachedBalance[pool.tokenB] += int256(amountB);
 
             if (amountA != 0 && amountB != 0) {
                 pool.swapLiquidity -= removedPending;
@@ -635,13 +635,13 @@ contract Hyper is IHyper {
         if (direction) {
             pool.feesAPerLiquidityFixedPoint += swapDetails.feesPerLiquidityFixedPoint;
 
-            _cachedBalance[pool.tokenA] -= amountIn;
-            _cachedBalance[pool.tokenB] += swapDetails.amountOut;
+            _cachedBalance[pool.tokenA] -= int256(amountIn);
+            _cachedBalance[pool.tokenB] += int256(swapDetails.amountOut);
         } else {
             pool.feesBPerLiquidityFixedPoint += swapDetails.feesPerLiquidityFixedPoint;
 
-            _cachedBalance[pool.tokenA] += amountIn;
-            _cachedBalance[pool.tokenB] -= swapDetails.amountOut;
+            _cachedBalance[pool.tokenA] += int256(amountIn);
+            _cachedBalance[pool.tokenB] -= int256(swapDetails.amountOut);
         }
     }
 
