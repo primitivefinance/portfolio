@@ -32,7 +32,7 @@ function getPositionId(
     return keccak256(abi.encodePacked(owner, poolId, lowerSlotIndex, upperSlotIndex));
 }
 
-struct PositiveBalanceChange {
+struct PositionEarnings {
     uint256 tokenA;
     uint256 tokenB;
     uint256 tokenC;
@@ -44,14 +44,14 @@ function sync(
     Slot storage lowerSlot,
     Slot storage upperSlot,
     Epoch memory epoch
-) returns (PositiveBalanceChange memory balanceChange) {
+) returns (PositionEarnings memory earnings) {
     uint256 epochsPassed = (epoch.endTime - (position.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
     // TODO: double check boundary condition
     if (epochsPassed > 0) {
         if (position.pendingLiquidity != 0) {
             uint256 lastUpdateEpoch = epoch.id - epochsPassed;
             // update earnings through end of last update epoch
-            balanceChange = position.updateEarningsThroughEpoch(
+            earnings = position.updateEarningsThroughEpoch(
                 pool.snapshots[lastUpdateEpoch],
                 lowerSlot.snapshots[lastUpdateEpoch],
                 upperSlot.snapshots[lastUpdateEpoch]
@@ -66,8 +66,8 @@ function sync(
                     position.lowerSlotIndex,
                     position.upperSlotIndex
                 );
-                balanceChange.tokenA += underlyingA;
-                balanceChange.tokenB += underlyingB;
+                earnings.tokenA += underlyingA;
+                earnings.tokenB += underlyingB;
 
                 position.maturedLiquidity -= uint256(position.pendingLiquidity);
             } else {
@@ -80,10 +80,10 @@ function sync(
 
     // calculate earnings since last update
     {
-        PositiveBalanceChange memory _balanceChange = position.updateEarnings(pool, lowerSlot, upperSlot);
-        balanceChange.tokenA += _balanceChange.tokenA;
-        balanceChange.tokenB += _balanceChange.tokenB;
-        balanceChange.tokenC += _balanceChange.tokenC;
+        PositionEarnings memory _earnings = position.updateEarnings(pool, lowerSlot, upperSlot);
+        earnings.tokenA += _earnings.tokenA;
+        earnings.tokenB += _earnings.tokenB;
+        earnings.tokenC += _earnings.tokenC;
     }
 
     // finally update position timestamp
@@ -95,22 +95,22 @@ function updateEarnings(
     Pool storage pool,
     Slot storage lowerSlot,
     Slot storage upperSlot
-) returns (PositiveBalanceChange memory balanceChange) {
+) returns (PositionEarnings memory earnings) {
     (
         uint256 proceedsPerLiquidityInside,
         uint256 feesAPerLiquidityInside,
         uint256 feesBPerLiquidityInside
     ) = getEarningsInside(pool, lowerSlot, upperSlot, position.lowerSlotIndex, position.upperSlotIndex);
-    balanceChange.tokenA = PRBMathUD60x18.mul(
+    earnings.tokenA = PRBMathUD60x18.mul(
         position.swapLiquidity,
         feesAPerLiquidityInside - position.feesAPerLiquidityInsideLastFixedPoint
     );
-    balanceChange.tokenB = PRBMathUD60x18.mul(
+    earnings.tokenB = PRBMathUD60x18.mul(
         position.swapLiquidity,
         feesBPerLiquidityInside - position.feesBPerLiquidityInsideLastFixedPoint
     );
     if (position.maturedLiquidity > 0) {
-        balanceChange.tokenC = PRBMathUD60x18.mul(
+        earnings.tokenC = PRBMathUD60x18.mul(
             position.maturedLiquidity,
             proceedsPerLiquidityInside - position.proceedsPerLiquidityInsideLastFixedPoint
         );
@@ -125,7 +125,7 @@ function updateEarningsThroughEpoch(
     PoolSnapshot storage poolSnapshot,
     SlotSnapshot storage lowerSlotSnapshot,
     SlotSnapshot storage upperSlotSnapshot
-) returns (PositiveBalanceChange memory balanceChange) {
+) returns (PositionEarnings memory earnings) {
     (
         uint256 proceedsPerLiquidityInsideThroughLastUpdate,
         uint256 feesAPerLiquidityInsideThroughLastUpdate,
@@ -137,16 +137,16 @@ function updateEarningsThroughEpoch(
             position.lowerSlotIndex,
             position.upperSlotIndex
         );
-    balanceChange.tokenA = PRBMathUD60x18.mul(
+    earnings.tokenA = PRBMathUD60x18.mul(
         position.swapLiquidity,
         feesAPerLiquidityInsideThroughLastUpdate - position.feesAPerLiquidityInsideLastFixedPoint
     );
-    balanceChange.tokenB = PRBMathUD60x18.mul(
+    earnings.tokenB = PRBMathUD60x18.mul(
         position.swapLiquidity,
         feesBPerLiquidityInsideThroughLastUpdate - position.feesBPerLiquidityInsideLastFixedPoint
     );
     if (position.maturedLiquidity > 0) {
-        balanceChange.tokenC = PRBMathUD60x18.mul(
+        earnings.tokenC = PRBMathUD60x18.mul(
             position.maturedLiquidity,
             proceedsPerLiquidityInsideThroughLastUpdate - position.proceedsPerLiquidityInsideLastFixedPoint
         );
