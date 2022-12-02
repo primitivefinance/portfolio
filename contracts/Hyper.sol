@@ -16,6 +16,8 @@ import {Pool, Bid, getPoolId} from "./libraries/Pool.sol";
 import {Position, PositionBalanceChange, getPositionId} from "./libraries/Position.sol";
 import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
 
+// TODO: Reentrancy guard
+
 contract Hyper is IHyper {
     Epoch public epoch;
 
@@ -135,8 +137,10 @@ contract Hyper is IHyper {
         int256 amount,
         bool transferOut
     ) public {
-        BalanceChange[] memory balanceChanges = _updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, amount);
-        _settleBalanceChanges(balanceChanges, transferOut);
+        BalanceChange[3] memory balanceChanges = _updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, amount);
+        for (uint256 i = 0; i < balanceChanges.length; ++i) {
+            _settleBalanceChange(balanceChanges[i], transferOut);
+        }
     }
 
     function _updateLiquidity(
@@ -144,7 +148,7 @@ contract Hyper is IHyper {
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
-    ) internal started returns (BalanceChange[] memory balanceChanges) {
+    ) internal started returns (BalanceChange[3] memory balanceChanges) {
         if (lowerSlotIndex > upperSlotIndex) revert();
         if (amount == 0) revert();
 
@@ -415,15 +419,17 @@ contract Hyper is IHyper {
         bool direction,
         bool transferOut
     ) public {
-        BalanceChange[] memory balanceChanges = _swap(poolId, amountIn, direction);
-        _settleBalanceChanges(balanceChanges, transferOut);
+        BalanceChange[2] memory balanceChanges = _swap(poolId, amountIn, direction);
+        for (uint256 i = 0; i < balanceChanges.length; ++i) {
+            _settleBalanceChange(balanceChanges[i], transferOut);
+        }
     }
 
     function _swap(
         bytes32 poolId,
         uint256 amountIn,
         bool direction
-    ) internal started returns (BalanceChange[] memory balanceChanges) {
+    ) internal started returns (BalanceChange[2] memory balanceChanges) {
         if (amountIn == 0) revert();
 
         Pool storage pool = pools[poolId];
@@ -679,12 +685,6 @@ contract Hyper is IHyper {
             emit LeadingBid(poolId, epochId, swapper, amount, pool.bids[epochId].proceedsPerSecondFixedPoint);
         }
         balanceChange.token = AUCTION_SETTLEMENT_TOKEN;
-    }
-
-    function _settleBalanceChanges(BalanceChange[] memory balanceChanges, bool transferOut) internal {
-        for (uint256 i = 0; i < balanceChanges.length; ++i) {
-            _settleBalanceChange(balanceChanges[i], transferOut);
-        }
     }
 
     function _settleBalanceChange(BalanceChange memory balanceChange, bool transferOut) internal {
