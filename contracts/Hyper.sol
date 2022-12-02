@@ -22,11 +22,6 @@ import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
 // - Extra function parameters
 // - Custom errors
 
-struct NetPosition {
-    address token;
-    int256 amount;
-}
-
 contract Hyper is IHyper {
     Epoch public epoch;
 
@@ -38,7 +33,16 @@ contract Hyper is IHyper {
     mapping(bytes32 => mapping(int16 => uint256)) public bitmaps;
 
     /// @notice Internal token balances
+    /// user => token => balance
     mapping(address => mapping(address => uint256)) public internalBalances;
+
+    /// @dev Keeps track of the credit / debit balances of the user during a
+    ///      transaction. The mapping ALWAYS starts from an empty state and
+    ///      is cleared at the end of the transaction.
+    ///
+    ///      token => cachedBalance
+    ///
+    mapping(address => int256) private cachedBalances;
 
     address public auctionFeeCollector;
 
@@ -97,10 +101,40 @@ contract Hyper is IHyper {
         emit SetEpoch(epoch.id, epoch.endTime);
     }
 
-    function settleBalances(NetPosition[] memory positions) internal {
-        for (uint256 i = 0; i < positions.length;) {
+    function _settleBalances(bytes32[] memory cachedPoolIds) internal {
+        // TODO: Try to optimize this loop. I think reading from the pool
+        //       twice is not great but not sure how to cache it without
+        //       triggering the error: "Type struct Pool is only valid in
+        //       storage because it contains a (nested) mapping."
+        for (uint256 i = 0; i < cachedPoolIds.length;) {
+            bytes32 poolId = cachedPoolIds[i];
+            address tokenA = pools[poolId].tokenA;
+            address tokenB = pools[poolId].tokenB;
+            _settleToken(tokenA, cachedBalances[tokenA]);
+            _settleToken(tokenB, cachedBalances[tokenB]);
             unchecked { ++i; }
         }
+    }
+
+    function _settleToken(address token, int256 cachedBalance) internal {
+        if (cachedBalance < 0) {
+            if (internalBalances[msg.sender][token] >= abs(cachedBalance)) {
+                 internalBalances[msg.sender][token] -= abs(cachedBalance);
+            } else {
+                SafeTransferLib.safeTransferFrom(
+                    ERC20(token),
+                    msg.sender,
+                    address(this),
+                    abs(cachedBalance) - internalBalances[msg.sender][token]
+                );
+
+                internalBalances[msg.sender][token] = 0;
+            }
+        } else {
+            internalBalances[msg.sender][token] += uint256(cachedBalance);
+        }
+
+        cachedBalances[token] = 0;
     }
 
     function fund(
