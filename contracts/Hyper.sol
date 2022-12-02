@@ -22,6 +22,11 @@ import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
 // - Extra function parameters
 // - Custom errors
 
+struct NetPosition {
+    address token;
+    int256 amount;
+}
+
 contract Hyper is IHyper {
     Epoch public epoch;
 
@@ -90,6 +95,12 @@ contract Hyper is IHyper {
         epoch.sync();
         require(epoch.id > 0, "Hyper not started yet.");
         emit SetEpoch(epoch.id, epoch.endTime);
+    }
+
+    function settleBalances(NetPosition[] memory positions) internal {
+        for (uint256 i = 0; i < positions.length;) {
+            unchecked { ++i; }
+        }
     }
 
     function fund(
