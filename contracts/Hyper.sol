@@ -37,7 +37,7 @@ contract Hyper is IHyper {
     mapping(address => mapping(address => uint256)) public internalBalances;
 
     /// @dev Keeps track of the credit / debit balances of the user during a
-    ///      transaction. The mapping ALWAYS starts from an empty state and
+    ///      transaction. This mapping ALWAYS starts from an empty state and
     ///      is cleared at the end of the transaction.
     ///
     ///      token => cachedBalance
@@ -45,6 +45,8 @@ contract Hyper is IHyper {
     ///      TODO: Reading / writing directly to the storage is more expensive
     ///      than the memory, let's try to find a better way to implement this
     mapping(address => int256) private _cachedBalance;
+    bytes32[] private _cachedPoolIds;
+    mapping(bytes32 => bool) private _isPoolIdCached;
 
     address public auctionFeeCollector;
 
@@ -103,7 +105,7 @@ contract Hyper is IHyper {
         emit SetEpoch(epoch.id, epoch.endTime);
     }
 
-    function _settleBalances(bytes32[] memory cachedPoolIds) internal {
+    function _settleBalances() internal {
         // TODO: Try to optimize this loop. I think reading from the pool
         //       twice is not great but not sure how to cache it without
         //       triggering the error: "Type struct Pool is only valid in
@@ -114,8 +116,8 @@ contract Hyper is IHyper {
         //       reading from the storage directly.
         //       - Idea 2: Use `Pool storage pool...`, might want to check
         //       the gas cost though, not sure what would be cheaper.
-        for (uint256 i = 0; i < cachedPoolIds.length;) {
-            bytes32 poolId = cachedPoolIds[i];
+        for (uint256 i = 0; i < _cachedPoolIds.length;) {
+            bytes32 poolId = _cachedPoolIds[i];
             address tokenA = pools[poolId].tokenA;
             address tokenB = pools[poolId].tokenB;
             _settleToken(tokenA, _cachedBalance[tokenA]);
@@ -143,6 +145,13 @@ contract Hyper is IHyper {
         }
 
         _cachedBalance[token] = 0;
+    }
+
+    function _cachePoolId(bytes32 poolId) internal {
+        if (!_isPoolIdCached[poolId]) {
+            _isPoolIdCached[poolId] = true;
+            _cachedPoolIds.push(poolId);
+        }
     }
 
     function fund(
@@ -190,13 +199,13 @@ contract Hyper is IHyper {
         int128 upperSlotIndex,
         int256 amount
     ) public {
-
         _updateLiquidity(
             poolId,
             lowerSlotIndex,
             upperSlotIndex,
             amount
         );
+        _settleBalances();
     }
 
     function _updateLiquidity(
@@ -210,6 +219,7 @@ contract Hyper is IHyper {
 
         Pool storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert();
+        _cachePoolId(poolId);
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
@@ -440,10 +450,9 @@ contract Hyper is IHyper {
         bytes32 poolId,
         uint256 amountIn,
         bool direction
-    )
-        public
-    {
+    ) public {
         _swap(poolId, amountIn, direction);
+        _settleBalances();
     }
 
     function _swap(
@@ -459,6 +468,7 @@ contract Hyper is IHyper {
 
         Pool storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert(); // TODO: revert PoolNotInitialized();
+        _cachePoolId(poolId);
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
