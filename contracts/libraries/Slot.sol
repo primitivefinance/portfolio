@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 import "./BitMath.sol";
@@ -15,17 +17,17 @@ struct Slot {
     int256 swapLiquidityDelta;
     int256 maturedLiquidityDelta;
     int256 pendingLiquidityDelta;
-    uint256 proceedsPerLiquidityOutsideFixedPoint;
-    uint256 feesAPerLiquidityOutsideFixedPoint;
-    uint256 feesBPerLiquidityOutsideFixedPoint;
+    UD60x18 proceedsPerLiquidityOutside;
+    UD60x18 feesAPerLiquidityOutside;
+    UD60x18 feesBPerLiquidityOutside;
     uint256 lastUpdatedTimestamp;
     mapping(uint256 => SlotSnapshot) snapshots;
 }
 
 struct SlotSnapshot {
-    uint256 proceedsPerLiquidityOutsideFixedPoint;
-    uint256 feesAPerLiquidityOutsideFixedPoint;
-    uint256 feesBPerLiquidityOutsideFixedPoint;
+    UD60x18 proceedsPerLiquidityOutside;
+    UD60x18 feesAPerLiquidityOutside;
+    UD60x18 feesBPerLiquidityOutside;
 }
 
 function getSlotId(bytes32 poolId, int128 slotIndex) pure returns (bytes32) {
@@ -65,19 +67,16 @@ function cross(
     Pool storage pool,
     uint256 epochId
 ) {
-    slot.proceedsPerLiquidityOutsideFixedPoint =
-        pool.proceedsPerLiquidityFixedPoint -
-        slot.proceedsPerLiquidityOutsideFixedPoint;
-    slot.feesAPerLiquidityOutsideFixedPoint =
-        pool.feesAPerLiquidityFixedPoint -
-        slot.feesAPerLiquidityOutsideFixedPoint;
-    slot.feesBPerLiquidityOutsideFixedPoint =
-        pool.feesBPerLiquidityFixedPoint -
-        slot.feesBPerLiquidityOutsideFixedPoint;
+    slot.proceedsPerLiquidityOutside =
+        pool.proceedsPerLiquidity.sub(slot.proceedsPerLiquidityOutside);
+    slot.feesAPerLiquidityOutside =
+        pool.feesAPerLiquidity.sub(slot.feesAPerLiquidityOutside);
+    slot.feesBPerLiquidityOutside =
+        pool.feesBPerLiquidity.sub(slot.feesBPerLiquidityOutside);
 
     slot.snapshots[epochId] = SlotSnapshot({
-        proceedsPerLiquidityOutsideFixedPoint: slot.proceedsPerLiquidityOutsideFixedPoint,
-        feesAPerLiquidityOutsideFixedPoint: slot.feesAPerLiquidityOutsideFixedPoint,
-        feesBPerLiquidityOutsideFixedPoint: slot.feesBPerLiquidityOutsideFixedPoint
+        proceedsPerLiquidityOutside: slot.proceedsPerLiquidityOutside,
+        feesAPerLiquidityOutside: slot.feesAPerLiquidityOutside,
+        feesBPerLiquidityOutside: slot.feesBPerLiquidityOutside
     });
 }

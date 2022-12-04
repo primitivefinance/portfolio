@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+
 import {IHyper} from "./interfaces/IHyper.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
@@ -73,14 +75,14 @@ contract Hyper is IHyper {
             address refunder,
             address swapper,
             uint256 amount,
-            uint256 proceedsPerSecondFixedPoint
+            UD60x18 proceedsPerSecond
         )
     {
         Pool storage pool = pools[poolId];
         refunder = pool.bids[epochId].refunder;
         swapper = pool.bids[epochId].swapper;
         amount = pool.bids[epochId].netFeeAmount + pool.bids[epochId].fee;
-        proceedsPerSecondFixedPoint = pool.bids[epochId].proceedsPerSecondFixedPoint;
+        proceedsPerSecond = pool.bids[epochId].proceedsPerSecond;
     }
 
     function start() public {
@@ -115,7 +117,7 @@ contract Hyper is IHyper {
     function activatePool(
         address tokenA,
         address tokenB,
-        uint256 sqrtPriceFixedPoint
+        UD60x18 sqrtPrice
     ) public started {
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
@@ -124,8 +126,8 @@ contract Hyper is IHyper {
         if (pool.lastUpdatedTimestamp != 0) revert();
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
-        pool.sqrtPriceFixedPoint = sqrtPriceFixedPoint;
-        // TODO: set active slot index?
+        pool.sqrtPrice = sqrtPrice;
+        pool.slotIndex = _getSlotAtSqrtPrice(sqrtPrice);
         pool.lastUpdatedTimestamp = block.timestamp;
         emit ActivatePool(tokenA, tokenB);
     }
@@ -268,13 +270,9 @@ contract Hyper is IHyper {
                 chunks[chunk] = flip(chunks[chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.lowerSlotIndex) {
-                    lowerSlot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint;
-                    lowerSlot.feesAPerLiquidityOutsideFixedPoint = pool.feesAPerLiquidityFixedPoint;
-                    lowerSlot.feesBPerLiquidityOutsideFixedPoint = pool.feesBPerLiquidityFixedPoint;
-                } else {
-                    lowerSlot.proceedsPerLiquidityOutsideFixedPoint = 0;
-                    lowerSlot.feesAPerLiquidityOutsideFixedPoint = 0;
-                    lowerSlot.feesBPerLiquidityOutsideFixedPoint = 0;
+                    lowerSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
+                    lowerSlot.feesAPerLiquidityOutside = pool.feesAPerLiquidity;
+                    lowerSlot.feesBPerLiquidityOutside = pool.feesBPerLiquidity;
                 }
                 lowerSlot.liquidityGross += uint256(addAmountLeft);
             }
@@ -287,20 +285,15 @@ contract Hyper is IHyper {
                 chunks[chunk] = flip(chunks[chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.upperSlotIndex) {
-                    upperSlot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint;
-                    upperSlot.feesAPerLiquidityOutsideFixedPoint = pool.feesAPerLiquidityFixedPoint;
-                    upperSlot.feesBPerLiquidityOutsideFixedPoint = pool.feesBPerLiquidityFixedPoint;
-                } else {
-                    upperSlot.proceedsPerLiquidityOutsideFixedPoint = 0;
-                    upperSlot.feesAPerLiquidityOutsideFixedPoint = 0;
-                    upperSlot.feesBPerLiquidityOutsideFixedPoint = 0;
+                    upperSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
+                    upperSlot.feesAPerLiquidityOutside = pool.feesAPerLiquidity;
+                    upperSlot.feesBPerLiquidityOutside = pool.feesBPerLiquidity;
                 }
                 upperSlot.liquidityGross += uint256(addAmountLeft);
             }
-
-            (amountA, amountB) = _calculateLiquidityDeltas(
+            (amountA, amountB) = _calculateLiquidityUnderlying(
                 addAmountLeft,
-                pool.sqrtPriceFixedPoint,
+                pool.sqrtPrice,
                 pool.slotIndex,
                 position.lowerSlotIndex,
                 position.upperSlotIndex
@@ -352,9 +345,9 @@ contract Hyper is IHyper {
             }
 
             // credit tokens owed to the position immediately
-            (amountA, amountB) = _calculateLiquidityDeltas(
+            (amountA, amountB) = _calculateLiquidityUnderlying(
                 removedPending,
-                pool.sqrtPriceFixedPoint,
+                pool.sqrtPrice,
                 pool.slotIndex,
                 position.lowerSlotIndex,
                 position.upperSlotIndex
@@ -387,14 +380,14 @@ contract Hyper is IHyper {
 
         // save slot snapshots
         lowerSlot.snapshots[epoch.id] = SlotSnapshot({
-            proceedsPerLiquidityOutsideFixedPoint: lowerSlot.proceedsPerLiquidityOutsideFixedPoint,
-            feesAPerLiquidityOutsideFixedPoint: lowerSlot.feesAPerLiquidityOutsideFixedPoint,
-            feesBPerLiquidityOutsideFixedPoint: lowerSlot.feesBPerLiquidityOutsideFixedPoint
+            proceedsPerLiquidityOutside: lowerSlot.proceedsPerLiquidityOutside,
+            feesAPerLiquidityOutside: lowerSlot.feesAPerLiquidityOutside,
+            feesBPerLiquidityOutside: lowerSlot.feesBPerLiquidityOutside
         });
         upperSlot.snapshots[epoch.id] = SlotSnapshot({
-            proceedsPerLiquidityOutsideFixedPoint: upperSlot.proceedsPerLiquidityOutsideFixedPoint,
-            feesAPerLiquidityOutsideFixedPoint: upperSlot.feesAPerLiquidityOutsideFixedPoint,
-            feesBPerLiquidityOutsideFixedPoint: upperSlot.feesBPerLiquidityOutsideFixedPoint
+            proceedsPerLiquidityOutside: upperSlot.proceedsPerLiquidityOutside,
+            feesAPerLiquidityOutside: upperSlot.feesAPerLiquidityOutside,
+            feesBPerLiquidityOutside: upperSlot.feesBPerLiquidityOutside
         });
     }
 
@@ -403,14 +396,14 @@ contract Hyper is IHyper {
         uint256 remaining;
         uint256 amountOut;
         int128 slotIndex;
-        uint256 sqrtPriceFixedPoint;
+        UD60x18 sqrtPrice;
         uint256 swapLiquidity;
         uint256 maturedLiquidity;
         int256 pendingLiquidity;
-        uint256 feesPerLiquidityFixedPoint;
+        UD60x18 feesPerLiquidity;
         bool nextSlotInitialized;
         int128 nextSlotIndex;
-        uint256 nextSqrtPriceFixedPoint;
+        UD60x18 nextSqrtPrice;
     }
 
     function swap(
@@ -450,14 +443,14 @@ contract Hyper is IHyper {
             remaining: amountIn,
             amountOut: 0,
             slotIndex: pool.slotIndex,
-            sqrtPriceFixedPoint: pool.sqrtPriceFixedPoint,
+            sqrtPrice: pool.sqrtPrice,
             swapLiquidity: pool.swapLiquidity,
             maturedLiquidity: pool.maturedLiquidity,
             pendingLiquidity: pool.pendingLiquidity,
-            feesPerLiquidityFixedPoint: 0,
+            feesPerLiquidity: ud(0),
             nextSlotInitialized: false,
             nextSlotIndex: 0,
-            nextSqrtPriceFixedPoint: 0
+            nextSqrtPrice: ud(0)
         });
 
         while (swapDetails.remaining > 0) {
@@ -473,56 +466,54 @@ contract Hyper is IHyper {
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
                 swapDetails.nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
-                swapDetails.nextSqrtPriceFixedPoint = _getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
+                swapDetails.nextSqrtPrice = _getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
 
             uint256 remainingFeeAmount = (swapDetails.remaining * swapDetails.feeTier) / 10_000;
 
             if (direction) {
                 uint256 maxXToDelta = getDeltaXToNextPrice(
-                    swapDetails.sqrtPriceFixedPoint,
-                    swapDetails.nextSqrtPriceFixedPoint,
+                    swapDetails.sqrtPrice,
+                    swapDetails.nextSqrtPrice,
                     swapDetails.swapLiquidity
                 );
                 if (swapDetails.remaining - remainingFeeAmount < maxXToDelta) {
                     // remove fees from remaining amount
                     swapDetails.remaining -= remainingFeeAmount;
                     // save fees per liquidity
-                    swapDetails.feesPerLiquidityFixedPoint += PRBMathUD60x18.div(
-                        remainingFeeAmount,
-                        swapDetails.swapLiquidity
+                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
+                        toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                     );
                     // update price and amount out after swapping remaining amount
-                    uint256 targetPrice = getTargetPriceUsingDeltaX(
-                        swapDetails.sqrtPriceFixedPoint,
+                    UD60x18 targetPrice = getTargetPriceUsingDeltaX(
+                        swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
                         swapDetails.remaining
                     );
                     swapDetails.amountOut += getDeltaYToNextPrice(
-                        swapDetails.sqrtPriceFixedPoint,
+                        swapDetails.sqrtPrice,
                         targetPrice,
                         swapDetails.swapLiquidity
                     );
                     swapDetails.remaining = 0;
-                    swapDetails.sqrtPriceFixedPoint = targetPrice;
-                    swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPriceFixedPoint);
+                    swapDetails.sqrtPrice = targetPrice;
+                    swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
                 } else {
                     // swapping maxXToDelta, only take fees on this amount
                     uint256 maxXFeeAmount = (maxXToDelta * swapDetails.feeTier) / 10_000;
                     // remove fees and swap amount
                     swapDetails.remaining -= maxXFeeAmount + maxXToDelta;
                     // save fees per liquidity
-                    swapDetails.feesPerLiquidityFixedPoint += PRBMathUD60x18.div(
-                        maxXFeeAmount,
-                        swapDetails.swapLiquidity
+                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
+                        toUD60x18(maxXFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                     );
                     // update price and amount out after swapping
                     swapDetails.amountOut += getDeltaYToNextPrice(
-                        swapDetails.sqrtPriceFixedPoint,
-                        swapDetails.nextSqrtPriceFixedPoint,
+                        swapDetails.sqrtPrice,
+                        swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity
                     );
-                    swapDetails.sqrtPriceFixedPoint = swapDetails.nextSqrtPriceFixedPoint;
+                    swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
                     swapDetails.slotIndex = swapDetails.nextSlotIndex;
                     // cross the next initialized slot
                     if (swapDetails.nextSlotInitialized) {
@@ -544,7 +535,7 @@ contract Hyper is IHyper {
                 }
             } else {
                 uint256 maxYToDelta = getDeltaYToNextPrice(
-                    swapDetails.sqrtPriceFixedPoint,
+                    swapDetails.sqrtPrice,
                     _getSqrtPriceAtSlot(swapDetails.nextSlotIndex),
                     swapDetails.swapLiquidity
                 );
@@ -552,41 +543,39 @@ contract Hyper is IHyper {
                     // remove fees from remaining amount
                     swapDetails.remaining -= remainingFeeAmount;
                     // save fees per liquidity
-                    swapDetails.feesPerLiquidityFixedPoint += PRBMathUD60x18.div(
-                        remainingFeeAmount,
-                        swapDetails.swapLiquidity
+                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
+                        toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                     );
                     // update price and amount out after swapping remaining amount
-                    uint256 targetPrice = getTargetPriceUsingDeltaY(
-                        swapDetails.sqrtPriceFixedPoint,
+                    UD60x18 targetPrice = getTargetPriceUsingDeltaY(
+                        swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
                         swapDetails.remaining
                     );
                     swapDetails.amountOut += getDeltaXToNextPrice(
-                        swapDetails.sqrtPriceFixedPoint,
+                        swapDetails.sqrtPrice,
                         targetPrice,
                         swapDetails.swapLiquidity
                     );
                     swapDetails.remaining = 0;
-                    swapDetails.sqrtPriceFixedPoint = targetPrice;
-                    swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPriceFixedPoint);
+                    swapDetails.sqrtPrice = targetPrice;
+                    swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
                 } else {
                     // swapping maxYToDelta, only take fees on this amount
                     uint256 maxYFeeAmount = (maxYToDelta * swapDetails.feeTier) / 10_000;
                     // remove fees and swap amount
                     swapDetails.remaining -= maxYFeeAmount + maxYToDelta;
                     // save fees per liquidity
-                    swapDetails.feesPerLiquidityFixedPoint += PRBMathUD60x18.div(
-                        maxYFeeAmount,
-                        swapDetails.swapLiquidity
+                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
+                        toUD60x18(maxYFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                     );
                     // update price and amount out after swapping
                     swapDetails.amountOut += getDeltaXToNextPrice(
-                        swapDetails.sqrtPriceFixedPoint,
-                        swapDetails.nextSqrtPriceFixedPoint,
+                        swapDetails.sqrtPrice,
+                        swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity
                     );
-                    swapDetails.sqrtPriceFixedPoint = swapDetails.nextSqrtPriceFixedPoint;
+                    swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
                     swapDetails.slotIndex = swapDetails.nextSlotIndex;
                     // cross the next initialized slot
                     if (swapDetails.nextSlotInitialized) {
@@ -609,18 +598,18 @@ contract Hyper is IHyper {
             }
         }
         // update pool's state based on swap details
-        pool.sqrtPriceFixedPoint = swapDetails.sqrtPriceFixedPoint;
+        pool.sqrtPrice = swapDetails.sqrtPrice;
         pool.slotIndex = swapDetails.slotIndex;
         pool.swapLiquidity = swapDetails.swapLiquidity;
         pool.maturedLiquidity = swapDetails.maturedLiquidity;
         pool.pendingLiquidity = swapDetails.pendingLiquidity;
         if (direction) {
-            pool.feesAPerLiquidityFixedPoint += swapDetails.feesPerLiquidityFixedPoint;
+            pool.feesAPerLiquidity = pool.feesAPerLiquidity.add(swapDetails.feesPerLiquidity);
 
             balanceChanges[0] = BalanceChange({token: pool.tokenA, amount: -int256(amountIn)});
             balanceChanges[1] = BalanceChange({token: pool.tokenB, amount: int256(swapDetails.amountOut)});
         } else {
-            pool.feesBPerLiquidityFixedPoint += swapDetails.feesPerLiquidityFixedPoint;
+            pool.feesBPerLiquidity = pool.feesBPerLiquidity.add(swapDetails.feesPerLiquidity);
 
             balanceChanges[0] = BalanceChange({token: pool.tokenA, amount: int256(amountIn)});
             balanceChanges[1] = BalanceChange({token: pool.tokenB, amount: -int256(swapDetails.amountOut)});
@@ -680,9 +669,9 @@ contract Hyper is IHyper {
                 swapper: swapper,
                 netFeeAmount: netFeeAmount,
                 fee: fee,
-                proceedsPerSecondFixedPoint: PRBMathUD60x18.div(netFeeAmount, EPOCH_LENGTH)
+                proceedsPerSecond: toUD60x18(netFeeAmount).div(toUD60x18(EPOCH_LENGTH))
             });
-            emit LeadingBid(poolId, epochId, swapper, amount, pool.bids[epochId].proceedsPerSecondFixedPoint);
+            emit LeadingBid(poolId, epochId, swapper, amount, pool.bids[epochId].proceedsPerSecond);
         }
         balanceChange.token = AUCTION_SETTLEMENT_TOKEN;
     }

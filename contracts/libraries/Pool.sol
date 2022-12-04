@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 import "./BrainMath.sol";
@@ -14,11 +16,11 @@ struct Pool {
     uint256 swapLiquidity;
     uint256 maturedLiquidity;
     int256 pendingLiquidity;
-    uint256 sqrtPriceFixedPoint;
+    UD60x18 sqrtPrice;
     int128 slotIndex;
-    uint256 proceedsPerLiquidityFixedPoint;
-    uint256 feesAPerLiquidityFixedPoint;
-    uint256 feesBPerLiquidityFixedPoint;
+    UD60x18 proceedsPerLiquidity;
+    UD60x18 feesAPerLiquidity;
+    UD60x18 feesBPerLiquidity;
     uint256 lastUpdatedTimestamp;
     mapping(uint256 => Bid) bids;
     mapping(uint256 => PoolSnapshot) snapshots;
@@ -29,15 +31,15 @@ struct Bid {
     address swapper; // address that gets a zero swap fee
     uint256 netFeeAmount; // bid amount - fee in the auction settlement token
     uint256 fee; // fee collected by auction fee collector in auction settlement token
-    uint256 proceedsPerSecondFixedPoint; // calculated proceeds per second over an epoch, netFeeAmount / EPOCH_LENGTH
+    UD60x18 proceedsPerSecond; // calculated proceeds per second over an epoch, netFeeAmount / EPOCH_LENGTH
 }
 
 struct PoolSnapshot {
-    uint256 sqrtPriceFixedPoint;
+    UD60x18 sqrtPrice;
     int128 slotIndex;
-    uint256 proceedsPerLiquidityFixedPoint;
-    uint256 feesAPerLiquidityFixedPoint;
-    uint256 feesBPerLiquidityFixedPoint;
+    UD60x18 proceedsPerLiquidity;
+    UD60x18 feesAPerLiquidity;
+    UD60x18 feesBPerLiquidity;
 }
 
 function getPoolId(address tokenA, address tokenB) pure returns (bytes32) {
@@ -52,21 +54,22 @@ function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFee
     if (epochsPassed > 0) {
         // update proceeds per liquidity distributed to end of epoch
         uint256 lastUpdateEpoch = epoch.id - epochsPassed;
-        if (pool.maturedLiquidity > 0 && pool.bids[lastUpdateEpoch].proceedsPerSecondFixedPoint > 0) {
+        if (pool.maturedLiquidity > 0 && !pool.bids[lastUpdateEpoch].proceedsPerSecond.isZero()) {
             uint256 timeToTransition = epoch.endTime - (epochsPassed * EPOCH_LENGTH) - pool.lastUpdatedTimestamp;
-            pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
-                PRBMathUD60x18.mul(pool.bids[lastUpdateEpoch].proceedsPerSecondFixedPoint, timeToTransition),
-                pool.maturedLiquidity
+            pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
+                pool.bids[lastUpdateEpoch].proceedsPerSecond.mul(
+                    toUD60x18(timeToTransition)).div(toUD60x18(pool.maturedLiquidity)
+                )
             );
             auctionFees += pool.bids[lastUpdateEpoch].fee;
         }
         // save pool snapshot at end of epoch
         pool.snapshots[lastUpdateEpoch] = PoolSnapshot({
-            sqrtPriceFixedPoint: pool.sqrtPriceFixedPoint,
+            sqrtPrice: pool.sqrtPrice,
             slotIndex: pool.slotIndex,
-            proceedsPerLiquidityFixedPoint: pool.proceedsPerLiquidityFixedPoint,
-            feesAPerLiquidityFixedPoint: pool.feesAPerLiquidityFixedPoint,
-            feesBPerLiquidityFixedPoint: pool.feesBPerLiquidityFixedPoint
+            proceedsPerLiquidity: pool.proceedsPerLiquidity,
+            feesAPerLiquidity: pool.feesAPerLiquidity,
+            feesBPerLiquidity: pool.feesBPerLiquidity
         });
         // update matured liquidity for epoch transition
         if (pool.pendingLiquidity > 0) {
@@ -78,10 +81,10 @@ function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFee
         pool.pendingLiquidity = int256(0);
         // update proceeds per liquidity distributed for next epoch if needed
         if (epochsPassed > 1) {
-            if (pool.maturedLiquidity > 0 && pool.bids[lastUpdateEpoch + 1].proceedsPerSecondFixedPoint > 0) {
-                pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
-                    PRBMathUD60x18.mul(pool.bids[lastUpdateEpoch + 1].proceedsPerSecondFixedPoint, EPOCH_LENGTH),
-                    pool.maturedLiquidity
+            if (pool.maturedLiquidity > 0 && !pool.bids[lastUpdateEpoch + 1].proceedsPerSecond.isZero()) {
+                pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
+                    pool.bids[lastUpdateEpoch + 1].proceedsPerSecond.mul(
+                        toUD60x18(EPOCH_LENGTH)).div(toUD60x18(pool.maturedLiquidity))
                 );
                 auctionFees += pool.bids[lastUpdateEpoch + 1].fee;
             }
@@ -90,9 +93,9 @@ function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFee
     // add proceeds for time passed in the current epoch
     uint256 timePassedInCurrentEpoch = block.timestamp - (epoch.endTime - EPOCH_LENGTH);
     if (pool.maturedLiquidity > 0 && timePassedInCurrentEpoch > 0) {
-        pool.proceedsPerLiquidityFixedPoint += PRBMathUD60x18.div(
-            PRBMathUD60x18.mul(pool.bids[epoch.id].proceedsPerSecondFixedPoint, timePassedInCurrentEpoch),
-            pool.maturedLiquidity
+        pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
+            pool.bids[epoch.id].proceedsPerSecond.mul(
+                toUD60x18(timePassedInCurrentEpoch)).div(toUD60x18(pool.maturedLiquidity))
         );
     }
     // finally update last saved timestamp
