@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "@prb/math/UD60x18.sol";
+
 interface IHyper {
     // ===== View =====
 
@@ -19,11 +21,11 @@ interface IHyper {
             uint256 swapLiquidity,
             uint256 maturedLiquidity,
             int256 pendingLiquidity,
-            uint256 sqrtPriceFixedPoint,
+            UD60x18 sqrtPrice,
             int128 slotIndex,
-            uint256 proceedsPerLiquidityFixedPoint,
-            uint256 feesAPerLiquidityFixedPoint,
-            uint256 feesBPerLiquidityFixedPoint,
+            UD60x18 proceedsPerLiquidity,
+            UD60x18 feesAPerLiquidity,
+            UD60x18 feesBPerLiquidity,
             uint256 lastUpdatedTimestamp
         );
 
@@ -36,9 +38,9 @@ interface IHyper {
             int256 swapLiquidityDelta,
             int256 maturedLiquidityDelta,
             int256 pendingLiquidityDelta,
-            uint256 proceedsPerLiquidityOutsideFixedPoint,
-            uint256 feesAPerLiquidityOutsideFixedPoint,
-            uint256 feesBPerLiquidityOutsideFixedPoint,
+            UD60x18 proceedsPerLiquidityOutside,
+            UD60x18 feesAPerLiquidityOutside,
+            UD60x18 feesBPerLiquidityOutside,
             uint256 lastUpdatedTimestamp
         );
 
@@ -51,9 +53,9 @@ interface IHyper {
             uint256 swapLiquidity,
             uint256 maturedLiquidity,
             int256 pendingLiquidity,
-            uint256 proceedsPerLiquidityInsideLastFixedPoint,
-            uint256 feesAPerLiquidityInsideLastFixedPoint,
-            uint256 feesBPerLiquidityInsideLastFixedPoint,
+            UD60x18 proceedsPerLiquidityInsideLast,
+            UD60x18 feesAPerLiquidityInsideLast,
+            UD60x18 feesBPerLiquidityInsideLast,
             uint256 lastUpdatedTimestamp
         );
 
@@ -75,7 +77,7 @@ interface IHyper {
             address refunder,
             address swapper,
             uint256 amount,
-            uint256 proceedsPerSecondFixedPoint
+            UD60x18 proceedsPerSecond
         );
 
     // ===== Public State Changing =====
@@ -97,7 +99,7 @@ interface IHyper {
     function activatePool(
         address tokenA,
         address tokenB,
-        uint256 sqrtPriceFixedPoint
+        UD60x18 sqrtPrice
     ) external;
 
     function updateLiquidity(
@@ -137,11 +139,5 @@ interface IHyper {
 
     event Swap(bytes32 poolId, uint256 tendered, bool direction);
 
-    event LeadingBid(
-        bytes32 poolId,
-        uint256 epochId,
-        address swapper,
-        uint256 amount,
-        uint256 proceedsPerSecondFixedPoint
-    );
+    event LeadingBid(bytes32 poolId, uint256 epochId, address swapper, uint256 amount, UD60x18 proceedsPerSecond);
 }

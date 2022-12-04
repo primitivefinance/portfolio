@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
-import "@prb/math/contracts/PRBMathUD60x18.sol";
+import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+import {SD59x18, fromSD59x18, toSD59x18, sd} from "@prb/math/SD59x18.sol";
 
-uint256 constant PRICE_GRID_FIXED_POINT = 1000100000000000000; // 1.0001
+uint256 constant PRICE_GRID_BASE = 1000100000000000000; // 1.0001e18
 
 // TODO: Solve the overloading issue or delete one of these functions
 function abs(int256 n) pure returns (uint256) {
@@ -16,97 +17,80 @@ function abs_(int128 n) pure returns (uint128) {
 
 /// @dev Get the price square root using the slot index
 ///      $$p(i)=1.0001^i$$
-function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (uint256) {
-    return
-        uint256(
-            PRBMathUD60x18.pow(PRICE_GRID_FIXED_POINT, PRBMathUD60x18.div(abs_(slotIndex), 2))
-        );
+function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) {
+    if (slotIndex == 0) {
+        sqrtPrice = ud(PRICE_GRID_BASE);
+    } else {
+        sqrtPrice = ud(PRICE_GRID_BASE).pow(toUD60x18(abs_(slotIndex)).div(toUD60x18(2)));
+        if (slotIndex < 0) {
+            sqrtPrice = toUD60x18(1).div(sqrtPrice);
+        }
+    }
 }
 
 /// @dev Get the slot index using price square root
 ///      $$i = log_{1.0001}p(i)$$
-function _getSlotAtSqrtPrice(uint256 sqrtPriceFixedPoint) pure returns (int128) {
-    return
-        int128(
-            uint128(
-                PRBMathUD60x18.mul(
-                    PRBMathUD60x18.log10(PRBMathUD60x18.sqrt(PRICE_GRID_FIXED_POINT)),
-                    PRBMathUD60x18.sqrt(sqrtPriceFixedPoint)
-                )
-            )
-        );
+function _getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) {
+    // convert to SD59x18 in order to get signed slot indexes
+    SD59x18 _sqrtPrice = toSD59x18(int256(fromUD60x18(sqrtPrice)));
+    slotIndex = int128(fromSD59x18(sd(int256(PRICE_GRID_BASE)).sqrt().log10().mul(_sqrtPrice)));
 }
 
-function _calculateLiquidityDeltas(
-    uint256 liquidityDeltaFixedPoint,
-    uint256 sqrtPriceCurrentSlotFixedPoint,
+function _calculateLiquidityUnderlying(
+    uint256 liquidity,
+    UD60x18 sqrtPriceCurrentSlot,
     int128 currentSlotIndex,
     int128 lowerSlotIndex,
     int128 upperSlotIndex
 ) pure returns (uint256 amountA, uint256 amountB) {
-    uint256 sqrtPriceUpperSlotFixedPoint = _getSqrtPriceAtSlot(upperSlotIndex);
-    uint256 sqrtPriceLowerSlotFixedPoint = _getSqrtPriceAtSlot(lowerSlotIndex);
+    UD60x18 sqrtPriceUpperSlot = _getSqrtPriceAtSlot(upperSlotIndex);
+    UD60x18 sqrtPriceLowerSlot = _getSqrtPriceAtSlot(lowerSlotIndex);
 
     if (currentSlotIndex < lowerSlotIndex) {
-        amountA = PRBMathUD60x18.mul(
-            liquidityDeltaFixedPoint,
-            PRBMathUD60x18.div(PRBMathUD60x18.toUint(1), sqrtPriceLowerSlotFixedPoint) -
-                PRBMathUD60x18.div(PRBMathUD60x18.toUint(1), sqrtPriceUpperSlotFixedPoint)
+        amountA = fromUD60x18(
+            toUD60x18(liquidity).mul(toUD60x18(1).div(sqrtPriceLowerSlot).sub(toUD60x18(1).div(sqrtPriceUpperSlot)))
         );
     } else if (currentSlotIndex < upperSlotIndex) {
-        amountA = PRBMathUD60x18.mul(
-            liquidityDeltaFixedPoint,
-            PRBMathUD60x18.div(PRBMathUD60x18.toUint(1), sqrtPriceCurrentSlotFixedPoint) -
-                PRBMathUD60x18.div(PRBMathUD60x18.toUint(1), sqrtPriceUpperSlotFixedPoint)
+        amountA = fromUD60x18(
+            toUD60x18(liquidity).mul(toUD60x18(1).div(sqrtPriceCurrentSlot).sub(toUD60x18(1).div(sqrtPriceUpperSlot)))
         );
-
-        amountB = PRBMathUD60x18.mul(
-            liquidityDeltaFixedPoint,
-            sqrtPriceCurrentSlotFixedPoint - sqrtPriceLowerSlotFixedPoint
-        );
+        amountB = fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceCurrentSlot.sub(sqrtPriceLowerSlot)));
     } else {
-        amountB = PRBMathUD60x18.mul(
-            liquidityDeltaFixedPoint,
-            sqrtPriceUpperSlotFixedPoint - sqrtPriceLowerSlotFixedPoint
-        );
+        amountB = fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceUpperSlot.sub(sqrtPriceLowerSlot)));
     }
 }
 
 function getDeltaXToNextPrice(
-    uint256 sqrtPriceCurrentSlotFixedPoint,
-    uint256 sqrtPriceNextSlotFixedPoint,
+    UD60x18 sqrtPriceCurrentSlot,
+    UD60x18 sqrtPriceNextSlot,
     uint256 liquidity
 ) pure returns (uint256) {
-    return PRBMathUD60x18.div(PRBMathUD60x18.toUint(liquidity), sqrtPriceNextSlotFixedPoint) - PRBMathUD60x18.div(PRBMathUD60x18.toUint(liquidity), sqrtPriceCurrentSlotFixedPoint);
+    return fromUD60x18(toUD60x18(liquidity).div(sqrtPriceNextSlot).sub(toUD60x18(liquidity).div(sqrtPriceCurrentSlot)));
 }
 
 function getDeltaYToNextPrice(
-    uint256 sqrtPriceCurrentSlotFixedPoint,
-    uint256 sqrtPriceNextSlotFixedPoint,
+    UD60x18 sqrtPriceCurrentSlot,
+    UD60x18 sqrtPriceNextSlot,
     uint256 liquidity
 ) pure returns (uint256) {
-    return PRBMathUD60x18.mul(PRBMathUD60x18.toUint(liquidity), sqrtPriceNextSlotFixedPoint - sqrtPriceCurrentSlotFixedPoint);
+    return fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot)));
 }
 
 function getTargetPriceUsingDeltaX(
-    uint256 sqrtPriceCurrentSlotFixedPoint,
+    UD60x18 sqrtPriceCurrentSlot,
     uint256 liquidity,
     uint256 deltaX
-) pure returns (uint256) {
-    return PRBMathUD60x18.div(
-        PRBMathUD60x18.mul(
-            sqrtPriceCurrentSlotFixedPoint, PRBMathUD60x18.toUint(liquidity)
-        ),
-        PRBMathUD60x18.mul(
-            deltaX, sqrtPriceCurrentSlotFixedPoint
-        ) + PRBMathUD60x18.toUint(liquidity)
-    );
+) pure returns (UD60x18) {
+    return
+        toUD60x18(liquidity).mul(sqrtPriceCurrentSlot).div(
+            toUD60x18(deltaX).mul(sqrtPriceCurrentSlot).add(toUD60x18(liquidity))
+        );
 }
 
 function getTargetPriceUsingDeltaY(
-    uint256 sqrtPriceCurrentSlotFixedPoint,
+    UD60x18 sqrtPriceCurrentSlot,
     uint256 liquidity,
     uint256 deltaY
-) pure returns (uint256) {
-    return PRBMathUD60x18.div(deltaY, PRBMathUD60x18.toUint(liquidity)) + sqrtPriceCurrentSlotFixedPoint;
+) pure returns (UD60x18) {
+    return toUD60x18(deltaY).div(toUD60x18(liquidity)).add(sqrtPriceCurrentSlot);
 }

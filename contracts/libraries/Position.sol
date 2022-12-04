@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
 import "./BrainMath.sol";
@@ -17,9 +19,9 @@ struct Position {
     uint256 swapLiquidity;
     uint256 maturedLiquidity;
     int256 pendingLiquidity;
-    uint256 proceedsPerLiquidityInsideLastFixedPoint;
-    uint256 feesAPerLiquidityInsideLastFixedPoint;
-    uint256 feesBPerLiquidityInsideLastFixedPoint;
+    UD60x18 proceedsPerLiquidityInsideLast;
+    UD60x18 feesAPerLiquidityInsideLast;
+    UD60x18 feesBPerLiquidityInsideLast;
     uint256 lastUpdatedTimestamp;
 }
 
@@ -59,9 +61,9 @@ function sync(
 
             if (position.pendingLiquidity < 0) {
                 // if liquidity was kicked out, add the underlying tokens
-                (uint256 underlyingA, uint256 underlyingB) = _calculateLiquidityDeltas(
+                (uint256 underlyingA, uint256 underlyingB) = _calculateLiquidityUnderlying(
                     uint256(position.pendingLiquidity),
-                    pool.snapshots[lastUpdateEpoch].sqrtPriceFixedPoint,
+                    pool.snapshots[lastUpdateEpoch].sqrtPrice,
                     pool.snapshots[lastUpdateEpoch].slotIndex,
                     position.lowerSlotIndex,
                     position.upperSlotIndex
@@ -97,27 +99,27 @@ function updateEarnings(
     Slot storage upperSlot
 ) returns (PositionBalanceChange memory balanceChange) {
     (
-        uint256 proceedsPerLiquidityInside,
-        uint256 feesAPerLiquidityInside,
-        uint256 feesBPerLiquidityInside
-    ) = getEarningsInside(pool, lowerSlot, upperSlot, position.lowerSlotIndex, position.upperSlotIndex);
-    balanceChange.amountA = PRBMathUD60x18.mul(
-        position.swapLiquidity,
-        feesAPerLiquidityInside - position.feesAPerLiquidityInsideLastFixedPoint
+        UD60x18 proceedsPerLiquidityInside,
+        UD60x18 feesAPerLiquidityInside,
+        UD60x18 feesBPerLiquidityInside
+    ) = getEarningsInside(
+        pool, 
+        lowerSlot, 
+        upperSlot, 
+        position.lowerSlotIndex, 
+        position.upperSlotIndex
     );
-    balanceChange.amountB = PRBMathUD60x18.mul(
-        position.swapLiquidity,
-        feesBPerLiquidityInside - position.feesBPerLiquidityInsideLastFixedPoint
+
+    balanceChange = getBalanceChange(
+        position, 
+        proceedsPerLiquidityInside, 
+        feesAPerLiquidityInside, 
+        feesBPerLiquidityInside
     );
-    if (position.maturedLiquidity > 0) {
-        balanceChange.amountC = PRBMathUD60x18.mul(
-            position.maturedLiquidity,
-            proceedsPerLiquidityInside - position.proceedsPerLiquidityInsideLastFixedPoint
-        );
-    }
-    position.proceedsPerLiquidityInsideLastFixedPoint = proceedsPerLiquidityInside;
-    position.feesAPerLiquidityInsideLastFixedPoint = feesAPerLiquidityInside;
-    position.feesBPerLiquidityInsideLastFixedPoint = feesBPerLiquidityInside;
+
+    position.proceedsPerLiquidityInsideLast = proceedsPerLiquidityInside;
+    position.feesAPerLiquidityInsideLast = feesAPerLiquidityInside;
+    position.feesBPerLiquidityInsideLast = feesBPerLiquidityInside;
 }
 
 function updateEarningsThroughEpoch(
@@ -127,9 +129,9 @@ function updateEarningsThroughEpoch(
     SlotSnapshot storage upperSlotSnapshot
 ) returns (PositionBalanceChange memory balanceChange) {
     (
-        uint256 proceedsPerLiquidityInsideThroughLastUpdate,
-        uint256 feesAPerLiquidityInsideThroughLastUpdate,
-        uint256 feesBPerLiquidityInsideThroughLastUpdate
+        UD60x18 proceedsPerLiquidityInsideThroughEpoch,
+        UD60x18 feesAPerLiquidityInsideThroughEpoch,
+        UD60x18 feesBPerLiquidityInsideThroughEpoch
     ) = getEarningsInsideThroughEpoch(
             poolSnapshot,
             lowerSlotSnapshot,
@@ -137,23 +139,36 @@ function updateEarningsThroughEpoch(
             position.lowerSlotIndex,
             position.upperSlotIndex
         );
-    balanceChange.amountA = PRBMathUD60x18.mul(
-        position.swapLiquidity,
-        feesAPerLiquidityInsideThroughLastUpdate - position.feesAPerLiquidityInsideLastFixedPoint
+    
+    balanceChange = getBalanceChange(
+        position, 
+        proceedsPerLiquidityInsideThroughEpoch, 
+        feesAPerLiquidityInsideThroughEpoch, 
+        feesBPerLiquidityInsideThroughEpoch
     );
-    balanceChange.amountB = PRBMathUD60x18.mul(
-        position.swapLiquidity,
-        feesBPerLiquidityInsideThroughLastUpdate - position.feesBPerLiquidityInsideLastFixedPoint
+    
+    position.proceedsPerLiquidityInsideLast = proceedsPerLiquidityInsideThroughEpoch;
+    position.feesAPerLiquidityInsideLast = feesAPerLiquidityInsideThroughEpoch;
+    position.feesBPerLiquidityInsideLast = feesBPerLiquidityInsideThroughEpoch;
+}
+
+function getBalanceChange(
+    Position storage position,
+    UD60x18 proceedsPerLiquidityInside,
+    UD60x18 feesAPerLiquidityInside,
+    UD60x18 feesBPerLiquidityInside
+) view returns (PositionBalanceChange memory balanceChange) {
+    UD60x18 swapLiquidity = toUD60x18(position.swapLiquidity);
+
+    balanceChange.amountA = fromUD60x18(
+        swapLiquidity.mul(feesAPerLiquidityInside.sub(position.feesAPerLiquidityInsideLast))
+    );
+    balanceChange.amountB = fromUD60x18(
+        swapLiquidity.mul(feesBPerLiquidityInside.sub(position.feesBPerLiquidityInsideLast))
     );
     if (position.maturedLiquidity > 0) {
-        balanceChange.amountC = PRBMathUD60x18.mul(
-            position.maturedLiquidity,
-            proceedsPerLiquidityInsideThroughLastUpdate - position.proceedsPerLiquidityInsideLastFixedPoint
-        );
+        balanceChange.amountC = fromUD60x18(toUD60x18(position.maturedLiquidity).mul(proceedsPerLiquidityInside.sub(position.proceedsPerLiquidityInsideLast)));
     }
-    position.proceedsPerLiquidityInsideLastFixedPoint = proceedsPerLiquidityInsideThroughLastUpdate;
-    position.feesAPerLiquidityInsideLastFixedPoint = feesAPerLiquidityInsideThroughLastUpdate;
-    position.feesBPerLiquidityInsideLastFixedPoint = feesBPerLiquidityInsideThroughLastUpdate;
 }
 
 function getEarningsInside(
@@ -165,37 +180,39 @@ function getEarningsInside(
 )
     view
     returns (
-        uint256 proceedsPerLiquidityInside,
-        uint256 feesAPerLiquidityInside,
-        uint256 feesBPerLiquidityInside
+        UD60x18 proceedsPerLiquidityInside,
+        UD60x18 feesAPerLiquidityInside,
+        UD60x18 feesBPerLiquidityInside
     )
 {
-    uint256 proceedsPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
-        ? pool.proceedsPerLiquidityFixedPoint - upperSlot.proceedsPerLiquidityOutsideFixedPoint
-        : upperSlot.proceedsPerLiquidityOutsideFixedPoint;
-    uint256 feesAPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
-        ? pool.feesAPerLiquidityFixedPoint - upperSlot.feesAPerLiquidityOutsideFixedPoint
-        : upperSlot.feesAPerLiquidityOutsideFixedPoint;
-    uint256 feesBPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
-        ? pool.feesBPerLiquidityFixedPoint - upperSlot.feesBPerLiquidityOutsideFixedPoint
-        : upperSlot.feesBPerLiquidityOutsideFixedPoint;
-
-    uint256 proceedsPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
-        ? lowerSlot.proceedsPerLiquidityOutsideFixedPoint
-        : pool.proceedsPerLiquidityFixedPoint - lowerSlot.proceedsPerLiquidityOutsideFixedPoint;
-    uint256 feesAPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
-        ? lowerSlot.feesAPerLiquidityOutsideFixedPoint
-        : pool.feesAPerLiquidityFixedPoint - lowerSlot.feesAPerLiquidityOutsideFixedPoint;
-    uint256 feesBPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
-        ? lowerSlot.feesBPerLiquidityOutsideFixedPoint
-        : pool.feesBPerLiquidityFixedPoint - lowerSlot.feesBPerLiquidityOutsideFixedPoint;
-
-    proceedsPerLiquidityInside =
-        pool.proceedsPerLiquidityFixedPoint -
-        proceedsPerLiquidityBelow -
-        proceedsPerLiquidityAbove;
-    feesAPerLiquidityInside = pool.feesAPerLiquidityFixedPoint - feesAPerLiquidityBelow - feesAPerLiquidityAbove;
-    feesBPerLiquidityInside = pool.feesBPerLiquidityFixedPoint - feesBPerLiquidityBelow - feesBPerLiquidityAbove;
+    {
+        UD60x18 proceedsPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
+            ? pool.proceedsPerLiquidity.sub(upperSlot.proceedsPerLiquidityOutside)
+            : upperSlot.proceedsPerLiquidityOutside;
+        UD60x18 proceedsPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
+            ? lowerSlot.proceedsPerLiquidityOutside
+            : pool.proceedsPerLiquidity.sub(lowerSlot.proceedsPerLiquidityOutside);
+        proceedsPerLiquidityInside =
+            pool.proceedsPerLiquidity.sub(proceedsPerLiquidityBelow).sub(proceedsPerLiquidityAbove);
+    }
+    {
+        UD60x18 feesAPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
+            ? pool.feesAPerLiquidity.sub(upperSlot.feesAPerLiquidityOutside)
+            : upperSlot.feesAPerLiquidityOutside;
+        UD60x18 feesAPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
+            ? lowerSlot.feesAPerLiquidityOutside
+            : pool.feesAPerLiquidity.sub(lowerSlot.feesAPerLiquidityOutside);
+        feesAPerLiquidityInside = pool.feesAPerLiquidity.sub(feesAPerLiquidityBelow).sub(feesAPerLiquidityAbove);
+    }
+    {
+        UD60x18 feesBPerLiquidityAbove = pool.slotIndex >= upperSlotIndex
+            ? pool.feesBPerLiquidity.sub(upperSlot.feesBPerLiquidityOutside)
+            : upperSlot.feesBPerLiquidityOutside;
+        UD60x18 feesBPerLiquidityBelow = pool.slotIndex >= lowerSlotIndex
+            ? lowerSlot.feesBPerLiquidityOutside
+            : pool.feesBPerLiquidity.sub(lowerSlot.feesBPerLiquidityOutside);
+        feesBPerLiquidityInside = pool.feesBPerLiquidity.sub(feesBPerLiquidityBelow).sub(feesBPerLiquidityAbove);
+    }
 }
 
 function getEarningsInsideThroughEpoch(
@@ -207,41 +224,39 @@ function getEarningsInsideThroughEpoch(
 )
     view
     returns (
-        uint256 proceedsPerLiquidityInside,
-        uint256 feesAPerLiquidityInside,
-        uint256 feesBPerLiquidityInside
+        UD60x18 proceedsPerLiquidityInside,
+        UD60x18 feesAPerLiquidityInside,
+        UD60x18 feesBPerLiquidityInside
     )
 {
-    uint256 proceedsPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
-        ? poolSnapshot.proceedsPerLiquidityFixedPoint - upperSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint
-        : upperSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint;
-    uint256 feesAPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
-        ? poolSnapshot.feesAPerLiquidityFixedPoint - upperSlotSnapshot.feesAPerLiquidityOutsideFixedPoint
-        : upperSlotSnapshot.feesAPerLiquidityOutsideFixedPoint;
-    uint256 feesBPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
-        ? poolSnapshot.feesBPerLiquidityFixedPoint - upperSlotSnapshot.feesBPerLiquidityOutsideFixedPoint
-        : upperSlotSnapshot.feesBPerLiquidityOutsideFixedPoint;
-
-    uint256 proceedsPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
-        ? lowerSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint
-        : poolSnapshot.proceedsPerLiquidityFixedPoint - lowerSlotSnapshot.proceedsPerLiquidityOutsideFixedPoint;
-    uint256 feesAPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
-        ? lowerSlotSnapshot.feesAPerLiquidityOutsideFixedPoint
-        : poolSnapshot.feesAPerLiquidityFixedPoint - lowerSlotSnapshot.feesAPerLiquidityOutsideFixedPoint;
-    uint256 feesBPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
-        ? lowerSlotSnapshot.feesBPerLiquidityOutsideFixedPoint
-        : poolSnapshot.feesBPerLiquidityFixedPoint - lowerSlotSnapshot.feesBPerLiquidityOutsideFixedPoint;
-
-    proceedsPerLiquidityInside =
-        poolSnapshot.proceedsPerLiquidityFixedPoint -
-        proceedsPerLiquidityBelow -
-        proceedsPerLiquidityAbove;
-    feesAPerLiquidityInside =
-        poolSnapshot.feesAPerLiquidityFixedPoint -
-        feesAPerLiquidityBelow -
-        feesAPerLiquidityAbove;
-    feesBPerLiquidityInside =
-        poolSnapshot.feesBPerLiquidityFixedPoint -
-        feesBPerLiquidityBelow -
-        feesBPerLiquidityAbove;
+    {
+        UD60x18 proceedsPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
+            ? poolSnapshot.proceedsPerLiquidity.sub(upperSlotSnapshot.proceedsPerLiquidityOutside)
+            : upperSlotSnapshot.proceedsPerLiquidityOutside;
+        UD60x18 proceedsPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
+            ? lowerSlotSnapshot.proceedsPerLiquidityOutside
+            : poolSnapshot.proceedsPerLiquidity.sub(lowerSlotSnapshot.proceedsPerLiquidityOutside);
+        proceedsPerLiquidityInside =
+            poolSnapshot.proceedsPerLiquidity.sub(proceedsPerLiquidityBelow).sub(proceedsPerLiquidityAbove);
+    }
+    {
+        UD60x18 feesAPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
+            ? poolSnapshot.feesAPerLiquidity.sub(upperSlotSnapshot.feesAPerLiquidityOutside)
+            : upperSlotSnapshot.feesAPerLiquidityOutside;
+        UD60x18 feesAPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
+            ? lowerSlotSnapshot.feesAPerLiquidityOutside
+            : poolSnapshot.feesAPerLiquidity.sub(lowerSlotSnapshot.feesAPerLiquidityOutside);
+        feesAPerLiquidityInside =
+            poolSnapshot.feesAPerLiquidity.sub(feesAPerLiquidityBelow).sub(feesAPerLiquidityAbove);
+    }
+    {
+        UD60x18 feesBPerLiquidityAbove = poolSnapshot.slotIndex >= upperSlotIndex
+            ? poolSnapshot.feesBPerLiquidity.sub(upperSlotSnapshot.feesBPerLiquidityOutside)
+            : upperSlotSnapshot.feesBPerLiquidityOutside;
+        UD60x18 feesBPerLiquidityBelow = poolSnapshot.slotIndex >= lowerSlotIndex
+            ? lowerSlotSnapshot.feesBPerLiquidityOutside
+            : poolSnapshot.feesBPerLiquidity.sub(lowerSlotSnapshot.feesBPerLiquidityOutside);
+        feesBPerLiquidityInside =
+            poolSnapshot.feesBPerLiquidity.sub(feesBPerLiquidityBelow).sub(feesBPerLiquidityAbove);
+    }
 }
