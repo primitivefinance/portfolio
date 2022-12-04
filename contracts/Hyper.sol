@@ -195,7 +195,7 @@ contract Hyper is IHyper {
             PositionBalanceChange memory syncBalanceChange = position.sync(pool, lowerSlot, upperSlot, epoch);
             if (syncBalanceChange.amountA != 0) balanceChanges[0].amount = int256(syncBalanceChange.amountA);
             if (syncBalanceChange.amountB != 0) balanceChanges[1].amount = int256(syncBalanceChange.amountB);
-            if (syncBalanceChange.amountA != 0) balanceChanges[2].amount = int256(syncBalanceChange.amountC);
+            if (syncBalanceChange.amountC != 0) balanceChanges[2].amount = int256(syncBalanceChange.amountC);
         }
 
         if (amount > 0) {
