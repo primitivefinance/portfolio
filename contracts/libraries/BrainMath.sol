@@ -29,11 +29,11 @@ function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) 
 }
 
 /// @dev Get the slot index using price square root
-///      $$i = log_{\sqrt{1.0001}}\sqrt{p(i)}$$
+///      $$i = 2log_{1.0001}\sqrt{p(i)}$$
 function _getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) {
     // convert to SD59x18 in order to get signed slot indexes
     SD59x18 _sqrtPrice = toSD59x18(int256(fromUD60x18(sqrtPrice)));
-    slotIndex = int128(fromSD59x18(sd(int256(PRICE_GRID_BASE)).sqrt().log10().mul(_sqrtPrice)));
+    slotIndex = 2 * int128(fromSD59x18(sd(int256(PRICE_GRID_BASE)).log10().mul(_sqrtPrice)));
 }
 
 function _calculateLiquidityUnderlying(
