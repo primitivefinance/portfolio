@@ -16,7 +16,7 @@ function abs_(int128 n) pure returns (uint128) {
 }
 
 /// @dev Get the price square root using the slot index
-///      $$p(i)=1.0001^i$$
+///      $$\sqrt{p(i)}=1.0001^{(i/2)}$$
 function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) {
     if (slotIndex == 0) {
         sqrtPrice = ud(PRICE_GRID_BASE);
@@ -29,7 +29,7 @@ function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) 
 }
 
 /// @dev Get the slot index using price square root
-///      $$i = log_{1.0001}p(i)$$
+///      $$i = log_{\sqrt{1.0001}}\sqrt{p(i)}$$
 function _getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) {
     // convert to SD59x18 in order to get signed slot indexes
     SD59x18 _sqrtPrice = toSD59x18(int256(fromUD60x18(sqrtPrice)));
