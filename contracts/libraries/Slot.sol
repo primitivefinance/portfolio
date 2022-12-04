@@ -51,8 +51,8 @@ function sync(
             slot.liquidityGross -= uint256(slot.pendingLiquidityGross);
 
             if (slot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(slotIndex);
-                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(slotIndex);
+                chunks[chunk] = flip(chunks[chunk], bit);
             }
         }
         slot.pendingLiquidityGross = int256(0);

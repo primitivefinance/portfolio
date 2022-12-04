@@ -264,8 +264,8 @@ contract Hyper is IHyper {
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
             if (lowerSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                chunks[chunk] = flip(chunks[chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.lowerSlotIndex) {
                     lowerSlot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint;
@@ -283,8 +283,8 @@ contract Hyper is IHyper {
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                chunks[chunk] = flip(chunks[chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.upperSlotIndex) {
                     upperSlot.proceedsPerLiquidityOutsideFixedPoint = pool.proceedsPerLiquidityFixedPoint;
@@ -338,8 +338,8 @@ contract Hyper is IHyper {
             lowerSlot.liquidityGross -= removedPending;
 
             if (lowerSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                chunks[chunk] = flip(chunks[chunk], bit);
             }
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
@@ -347,8 +347,8 @@ contract Hyper is IHyper {
             upperSlot.liquidityGross -= removedPending;
 
             if (upperSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                chunks[chunk] = flip(chunks[chunk], bit);
             }
 
             // credit tokens owed to the position immediately
@@ -463,8 +463,8 @@ contract Hyper is IHyper {
         while (swapDetails.remaining > 0) {
             {
                 // Get the next slot or the border of a bitmap
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(swapDetails.slotIndex));
-                (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
+                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(swapDetails.slotIndex));
+                (bool hasNextSlot, uint8 nextSlotBit) = findNextSlotWithinChunk(
                     // If direction is true: swapping A for B
                     // Decreasing the slot index -> going right into the bitmap (reducing the index)
                     bitmaps[poolId][chunk],
