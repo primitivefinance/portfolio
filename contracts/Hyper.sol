@@ -43,7 +43,7 @@ contract Hyper is IHyper {
     }
 
     modifier started() {
-        require(epoch.id > 0, "Hyper not started yet.");
+        if (epoch.id < 1) revert HyperNotStartedError();
         _;
     }
 
