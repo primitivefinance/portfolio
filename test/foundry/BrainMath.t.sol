@@ -30,7 +30,7 @@ contract TestBrainMath is Test {
         emit log_uint(unwrap(sqrtPrice));
     }
 
-    function test_calculateLiquidityUnderlying_should_round_down() public returns (uint256 amountA, uint256 amountB) {
+    function test_calculateLiquidityUnderlying_should_round_down() public {
         int128 currentSlotIndex = 0;
 
         (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
@@ -46,7 +46,7 @@ contract TestBrainMath is Test {
         assertEq(amountB, 0);
     }
 
-    function test_calculateLiquidityUnderlying_should_round_up() public returns (uint256 amountA, uint256 amountB) {
+    function test_calculateLiquidityUnderlying_should_round_up() public {
         int128 currentSlotIndex = 0;
 
         (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
@@ -60,5 +60,31 @@ contract TestBrainMath is Test {
 
         assertEq(amountA, 1);
         assertEq(amountB, 1);
+    }
+
+    function test_getDeltaXToNextPrice_should_round_up() public {
+        int128 currentSlotIndex = 0;
+
+        (uint256 deltaX) = getDeltaXToNextPrice(
+            _getSqrtPriceAtSlot(10),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            10,
+            true
+        );
+
+        assertEq(deltaX, 1);
+    }
+
+    function test_getDeltaXToNextPrice_should_round_down() public {
+        int128 currentSlotIndex = 0;
+
+        (uint256 deltaX) = getDeltaXToNextPrice(
+            _getSqrtPriceAtSlot(10),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            10,
+            false
+        );
+
+        assertEq(deltaX, 0);
     }
 }
