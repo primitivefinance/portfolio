@@ -66,7 +66,8 @@ function sync(
                     pool.snapshots[lastUpdateEpoch].sqrtPrice,
                     pool.snapshots[lastUpdateEpoch].slotIndex,
                     position.lowerSlotIndex,
-                    position.upperSlotIndex
+                    position.upperSlotIndex,
+                    false
                 );
                 balanceChange.amountA += underlyingA;
                 balanceChange.amountB += underlyingB;
@@ -103,17 +104,17 @@ function updateEarnings(
         UD60x18 feesAPerLiquidityInside,
         UD60x18 feesBPerLiquidityInside
     ) = getEarningsInside(
-        pool, 
-        lowerSlot, 
-        upperSlot, 
-        position.lowerSlotIndex, 
+        pool,
+        lowerSlot,
+        upperSlot,
+        position.lowerSlotIndex,
         position.upperSlotIndex
     );
 
     balanceChange = getBalanceChange(
-        position, 
-        proceedsPerLiquidityInside, 
-        feesAPerLiquidityInside, 
+        position,
+        proceedsPerLiquidityInside,
+        feesAPerLiquidityInside,
         feesBPerLiquidityInside
     );
 
@@ -139,14 +140,14 @@ function updateEarningsThroughEpoch(
             position.lowerSlotIndex,
             position.upperSlotIndex
         );
-    
+
     balanceChange = getBalanceChange(
-        position, 
-        proceedsPerLiquidityInsideThroughEpoch, 
-        feesAPerLiquidityInsideThroughEpoch, 
+        position,
+        proceedsPerLiquidityInsideThroughEpoch,
+        feesAPerLiquidityInsideThroughEpoch,
         feesBPerLiquidityInsideThroughEpoch
     );
-    
+
     position.proceedsPerLiquidityInsideLast = proceedsPerLiquidityInsideThroughEpoch;
     position.feesAPerLiquidityInsideLast = feesAPerLiquidityInsideThroughEpoch;
     position.feesBPerLiquidityInsideLast = feesBPerLiquidityInsideThroughEpoch;

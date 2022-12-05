@@ -46,19 +46,26 @@ function _calculateLiquidityUnderlying(
     UD60x18 sqrtPriceCurrentSlot,
     int128 currentSlotIndex,
     int128 lowerSlotIndex,
-    int128 upperSlotIndex
+    int128 upperSlotIndex,
+    bool shouldRoundUp
 ) pure returns (uint256 amountA, uint256 amountB) {
     UD60x18 sqrtPriceUpperSlot = _getSqrtPriceAtSlot(upperSlotIndex);
     UD60x18 sqrtPriceLowerSlot = _getSqrtPriceAtSlot(lowerSlotIndex);
 
+    UD60x18 rawAmountA;
+    UD60x18 rawAmountB;
+
     if (currentSlotIndex < lowerSlotIndex) {
-        amountA = fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceLowerSlot.inv().sub(sqrtPriceUpperSlot.inv())));
+        rawAmountA = toUD60x18(liquidity).mul(sqrtPriceLowerSlot.inv().sub(sqrtPriceUpperSlot.inv()));
     } else if (currentSlotIndex < upperSlotIndex) {
-        amountA = fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceCurrentSlot.inv().sub(sqrtPriceUpperSlot.inv())));
-        amountB = fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceCurrentSlot.sub(sqrtPriceLowerSlot)));
+        rawAmountA = toUD60x18(liquidity).mul(sqrtPriceCurrentSlot.inv().sub(sqrtPriceUpperSlot.inv()));
+        rawAmountB = toUD60x18(liquidity).mul(sqrtPriceCurrentSlot.sub(sqrtPriceLowerSlot));
     } else {
-        amountB = fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceUpperSlot.sub(sqrtPriceLowerSlot)));
+        rawAmountB = toUD60x18(liquidity).mul(sqrtPriceUpperSlot.sub(sqrtPriceLowerSlot));
     }
+
+    amountA = fromUD60x18(shouldRoundUp ? rawAmountA.ceil() : rawAmountA);
+    amountB = fromUD60x18(shouldRoundUp ? rawAmountB.ceil() : rawAmountB);
 }
 
 function getDeltaXToNextPrice(

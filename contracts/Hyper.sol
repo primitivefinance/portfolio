@@ -296,7 +296,8 @@ contract Hyper is IHyper {
                 pool.sqrtPrice,
                 pool.slotIndex,
                 position.lowerSlotIndex,
-                position.upperSlotIndex
+                position.upperSlotIndex,
+                true
             );
             if (amountA != 0 && amountB != 0) {
                 pool.swapLiquidity += addAmountLeft;
@@ -350,7 +351,8 @@ contract Hyper is IHyper {
                 pool.sqrtPrice,
                 pool.slotIndex,
                 position.lowerSlotIndex,
-                position.upperSlotIndex
+                position.upperSlotIndex,
+                false
             );
 
             if (amountA != 0 && amountB != 0) {
