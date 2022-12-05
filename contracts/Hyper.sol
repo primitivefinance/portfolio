@@ -475,14 +475,13 @@ contract Hyper is IHyper {
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
 
             if (direction) {
-                // TODO: Double check if we should round up or not
                 uint256 maxXToDelta = getDeltaXToNextPrice(
                     swapDetails.sqrtPrice,
                     swapDetails.nextSqrtPrice,
                     swapDetails.swapLiquidity,
                     true
                 );
-                if (swapDetails.remaining - remainingFeeAmount < maxXToDelta) {
+                if (swapDetails.remaining < maxXToDelta + remainingFeeAmount) {
                     // remove fees from remaining amount
                     swapDetails.remaining -= remainingFeeAmount;
                     // save fees per liquidity
@@ -541,14 +540,13 @@ contract Hyper is IHyper {
                     }
                 }
             } else {
-                // TODO: Double check if we should round up or not
                 uint256 maxYToDelta = getDeltaYToNextPrice(
                     swapDetails.sqrtPrice,
                     _getSqrtPriceAtSlot(swapDetails.nextSlotIndex),
                     swapDetails.swapLiquidity,
                     true
                 );
-                if (swapDetails.remaining - remainingFeeAmount < maxYToDelta) {
+                if (swapDetails.remaining < maxYToDelta + remainingFeeAmount) {
                     // remove fees from remaining amount
                     swapDetails.remaining -= remainingFeeAmount;
                     // save fees per liquidity
