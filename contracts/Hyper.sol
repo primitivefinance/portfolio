@@ -123,6 +123,7 @@ contract Hyper is IHyper {
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
 
         Pool storage pool = pools[getPoolId(tokenA, tokenB)];
+        // TODO: Add a proper revert error
         if (pool.lastUpdatedTimestamp != 0) revert();
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
@@ -151,10 +152,15 @@ contract Hyper is IHyper {
         int128 upperSlotIndex,
         int256 amount
     ) internal started returns (BalanceChange[3] memory balanceChanges) {
+        // TODO: Add a proper revert error
         if (lowerSlotIndex > upperSlotIndex) revert();
+
+        // TODO: Add a proper revert error
         if (amount == 0) revert();
 
         Pool storage pool = pools[poolId];
+
+        // TODO: Add a proper revert error
         if (pool.lastUpdatedTimestamp == 0) revert();
 
         {
@@ -187,6 +193,7 @@ contract Hyper is IHyper {
         }
 
         if (position.lastUpdatedTimestamp == 0) {
+            // TODO: Add a proper revert error
             if (amount < 0) revert();
             position.lowerSlotIndex = lowerSlotIndex;
             position.upperSlotIndex = upperSlotIndex;
@@ -318,6 +325,7 @@ contract Hyper is IHyper {
 
         // remove positive pending liquidity immediately
         if (position.pendingLiquidity > 0) {
+            // TODO: Add a proper revert error
             if (position.swapLiquidity < amount) revert();
 
             uint256 removedPending = uint256(position.pendingLiquidity) >= amount
@@ -425,6 +433,7 @@ contract Hyper is IHyper {
         uint256 amountIn,
         bool direction
     ) internal started returns (BalanceChange[2] memory balanceChanges) {
+        // TODO: Add a proper revert error
         if (amountIn == 0) revert();
 
         Pool storage pool = pools[poolId];
@@ -644,15 +653,19 @@ contract Hyper is IHyper {
         address swapper,
         uint256 amount
     ) internal started returns (BalanceChange memory balanceChange) {
+        // TODO: Add a proper revert error
         if (amount == 0) revert();
 
         Pool storage pool = pools[poolId];
+        // TODO: Add a proper revert error
         if (pool.lastUpdatedTimestamp == 0) revert();
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
 
+        // TODO: Add a proper revert error
         if (epochId != epoch.id + 1) revert();
+        // TODO: Add a proper revert error
         if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert();
 
         // @dev: pool needs to sync here, assumes no bids otherwise
