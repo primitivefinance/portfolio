@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18} from "@prb/math/UD60x18.sol";
 
-import {IHyper} from "./interfaces/IHyper.sol";
+import "./interfaces/IHyper.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
@@ -123,8 +123,7 @@ contract Hyper is IHyper {
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
 
         Pool storage pool = pools[getPoolId(tokenA, tokenB)];
-        // TODO: Add a proper revert error
-        if (pool.lastUpdatedTimestamp != 0) revert();
+        if (pool.lastUpdatedTimestamp != 0) revert PoolAlreadyInitializedError();
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
         pool.sqrtPrice = sqrtPrice;

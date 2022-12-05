@@ -32,7 +32,7 @@ contract TestHyper is Test {
 
     function test_activatePool_should_fail() public {
         hyper.activatePool(address(tokenA), address(tokenB), toUD60x18(10));
-        vm.expectRevert();
+        vm.expectRevert(PoolAlreadyInitializedError.selector);
         hyper.activatePool(address(tokenA), address(tokenB), toUD60x18(10));
     }
 
