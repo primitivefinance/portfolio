@@ -431,11 +431,10 @@ contract Hyper is IHyper {
         uint256 amountIn,
         bool direction
     ) internal started returns (BalanceChange[2] memory balanceChanges) {
-        // TODO: Add a proper revert error
-        if (amountIn == 0) revert();
+        if (amountIn == 0) revert AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert(); // TODO: revert PoolNotInitialized();
+        if (pool.lastUpdatedTimestamp == 0) revert PoolNotInitializedError();
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
@@ -654,8 +653,7 @@ contract Hyper is IHyper {
         if (amount == 0) revert AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        // TODO: Add a proper revert error
-        if (pool.lastUpdatedTimestamp == 0) revert();
+        if (pool.lastUpdatedTimestamp == 0) revert PoolNotInitializedError();
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
