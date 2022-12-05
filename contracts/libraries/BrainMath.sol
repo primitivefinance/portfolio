@@ -71,17 +71,21 @@ function _calculateLiquidityUnderlying(
 function getDeltaXToNextPrice(
     UD60x18 sqrtPriceCurrentSlot,
     UD60x18 sqrtPriceNextSlot,
-    uint256 liquidity
+    uint256 liquidity,
+    bool shouldRoundUp
 ) pure returns (uint256) {
-    return fromUD60x18(toUD60x18(liquidity).div(sqrtPriceNextSlot).sub(toUD60x18(liquidity).div(sqrtPriceCurrentSlot)));
+    UD60x18 rawDeltaX = toUD60x18(liquidity).div(sqrtPriceNextSlot).sub(toUD60x18(liquidity).div(sqrtPriceCurrentSlot));
+    return fromUD60x18(shouldRoundUp ? rawDeltaX.ceil() : rawDeltaX);
 }
 
 function getDeltaYToNextPrice(
     UD60x18 sqrtPriceCurrentSlot,
     UD60x18 sqrtPriceNextSlot,
-    uint256 liquidity
+    uint256 liquidity,
+    bool shouldRoundUp
 ) pure returns (uint256) {
-    return fromUD60x18(toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot)));
+    UD60x18 rawDeltaY = toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot));
+    return fromUD60x18(shouldRoundUp ? rawDeltaY.ceil() : rawDeltaY);
 }
 
 function getTargetPriceUsingDeltaX(

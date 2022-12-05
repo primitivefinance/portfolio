@@ -474,10 +474,12 @@ contract Hyper is IHyper {
             uint256 remainingFeeAmount = (swapDetails.remaining * swapDetails.feeTier) / 10_000;
 
             if (direction) {
+                // TODO: Double check if we should round up or not
                 uint256 maxXToDelta = getDeltaXToNextPrice(
                     swapDetails.sqrtPrice,
                     swapDetails.nextSqrtPrice,
-                    swapDetails.swapLiquidity
+                    swapDetails.swapLiquidity,
+                    true
                 );
                 if (swapDetails.remaining - remainingFeeAmount < maxXToDelta) {
                     // remove fees from remaining amount
@@ -490,12 +492,13 @@ contract Hyper is IHyper {
                     UD60x18 targetPrice = getTargetPriceUsingDeltaX(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
-                        swapDetails.remaining
+                        swapDetails.remaining,
                     );
                     swapDetails.amountOut += getDeltaYToNextPrice(
                         swapDetails.sqrtPrice,
                         targetPrice,
-                        swapDetails.swapLiquidity
+                        swapDetails.swapLiquidity,
+                        false
                     );
                     swapDetails.remaining = 0;
                     swapDetails.sqrtPrice = targetPrice;
@@ -513,7 +516,8 @@ contract Hyper is IHyper {
                     swapDetails.amountOut += getDeltaYToNextPrice(
                         swapDetails.sqrtPrice,
                         swapDetails.nextSqrtPrice,
-                        swapDetails.swapLiquidity
+                        swapDetails.swapLiquidity,
+                        false
                     );
                     swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
                     swapDetails.slotIndex = swapDetails.nextSlotIndex;
@@ -536,10 +540,12 @@ contract Hyper is IHyper {
                     }
                 }
             } else {
+                // TODO: Double check if we should round up or not
                 uint256 maxYToDelta = getDeltaYToNextPrice(
                     swapDetails.sqrtPrice,
                     _getSqrtPriceAtSlot(swapDetails.nextSlotIndex),
-                    swapDetails.swapLiquidity
+                    swapDetails.swapLiquidity,
+                    true
                 );
                 if (swapDetails.remaining - remainingFeeAmount < maxYToDelta) {
                     // remove fees from remaining amount
@@ -557,7 +563,8 @@ contract Hyper is IHyper {
                     swapDetails.amountOut += getDeltaXToNextPrice(
                         swapDetails.sqrtPrice,
                         targetPrice,
-                        swapDetails.swapLiquidity
+                        swapDetails.swapLiquidity,
+                        false
                     );
                     swapDetails.remaining = 0;
                     swapDetails.sqrtPrice = targetPrice;
@@ -575,7 +582,8 @@ contract Hyper is IHyper {
                     swapDetails.amountOut += getDeltaXToNextPrice(
                         swapDetails.sqrtPrice,
                         swapDetails.nextSqrtPrice,
-                        swapDetails.swapLiquidity
+                        swapDetails.swapLiquidity,
+                        false
                     );
                     swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
                     swapDetails.slotIndex = swapDetails.nextSlotIndex;
