@@ -683,7 +683,12 @@ contract Hyper is IHyper {
             } else {
                 uint256 amountOwed = abs(balanceChange.amount) - internalBalances[msg.sender][balanceChange.token];
                 internalBalances[msg.sender][balanceChange.token] = 0;
+                uint256 initBalance = ERC20(balanceChange.token).balanceOf(address(this));
                 SafeTransferLib.safeTransferFrom(ERC20(balanceChange.token), msg.sender, address(this), amountOwed);
+                require(
+                    ERC20(balanceChange.token).balanceOf(address(this)) >= initBalance + amountOwed,
+                    "Insufficient tokens transferred in"
+                );
             }
         } else if (balanceChange.amount > 0) {
             if (transferOut) {
