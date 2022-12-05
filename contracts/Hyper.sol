@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18} from "@prb/math/UD60x18.sol";
 
 import {IHyper} from "./interfaces/IHyper.sol";
 
@@ -447,10 +447,10 @@ contract Hyper is IHyper {
             swapLiquidity: pool.swapLiquidity,
             maturedLiquidity: pool.maturedLiquidity,
             pendingLiquidity: pool.pendingLiquidity,
-            feesPerLiquidity: ud(0),
+            feesPerLiquidity: wrapUD60x18(0),
             nextSlotInitialized: false,
             nextSlotIndex: 0,
-            nextSqrtPrice: ud(0)
+            nextSqrtPrice: wrapUD60x18(0)
         });
 
         while (swapDetails.remaining > 0) {

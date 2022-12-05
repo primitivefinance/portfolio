@@ -5,7 +5,6 @@ import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
 
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
-import "./BrainMath.sol";
 import {Epoch} from "./Epoch.sol";
 
 using {sync} for Pool global;
