@@ -1,6 +1,7 @@
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
+import "forge-std/Vm.sol";
 
 import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
 
@@ -25,7 +26,13 @@ contract TestHyper is Test {
         vm.startPrank(alice);
     }
 
-    function test_activatePool() public {
+    function test_activatePool_should_work() public {
+        hyper.activatePool(address(tokenA), address(tokenB), toUD60x18(10));
+    }
+
+    function test_activatePool_should_fail() public {
+        hyper.activatePool(address(tokenA), address(tokenB), toUD60x18(10));
+        vm.expectRevert();
         hyper.activatePool(address(tokenA), address(tokenB), toUD60x18(10));
     }
 
