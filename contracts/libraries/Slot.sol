@@ -64,15 +64,17 @@ function sync(
 
 function cross(
     Slot storage slot,
-    Pool storage pool,
-    uint256 epochId
+    uint256 epochId,
+    UD60x18 proceedsPerLiquidity,
+    UD60x18 feesAPerLiquidity,
+    UD60x18 feesBPerLiquidity
 ) {
     slot.proceedsPerLiquidityOutside =
-        pool.proceedsPerLiquidity.sub(slot.proceedsPerLiquidityOutside);
+        proceedsPerLiquidity.sub(slot.proceedsPerLiquidityOutside);
     slot.feesAPerLiquidityOutside =
-        pool.feesAPerLiquidity.sub(slot.feesAPerLiquidityOutside);
+        feesAPerLiquidity.sub(slot.feesAPerLiquidityOutside);
     slot.feesBPerLiquidityOutside =
-        pool.feesBPerLiquidity.sub(slot.feesBPerLiquidityOutside);
+        feesBPerLiquidity.sub(slot.feesBPerLiquidityOutside);
 
     slot.snapshots[epochId] = SlotSnapshot({
         proceedsPerLiquidityOutside: slot.proceedsPerLiquidityOutside,

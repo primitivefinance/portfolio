@@ -450,7 +450,7 @@ contract Hyper is IHyper {
             swapLiquidity: pool.swapLiquidity,
             maturedLiquidity: pool.maturedLiquidity,
             pendingLiquidity: pool.pendingLiquidity,
-            feesPerLiquidity: wrapUD60x18(0),
+            feesPerLiquidity: direction ? pool.feesAPerLiquidity : pool.feesBPerLiquidity,
             nextSlotInitialized: false,
             nextSlotIndex: 0,
             nextSqrtPrice: wrapUD60x18(0)
@@ -525,8 +525,12 @@ contract Hyper is IHyper {
                     if (swapDetails.nextSlotInitialized) {
                         Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
                         nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
-                        // TODO: need to update pool's per liquidity values or pass swapDetails
-                        nextSlot.cross(pool, epoch.id);
+                        nextSlot.cross(
+                            epoch.id,
+                            pool.proceedsPerLiquidity,
+                            swapDetails.feesPerLiquidity,
+                            pool.feesBPerLiquidity
+                        );
 
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta)
@@ -590,8 +594,12 @@ contract Hyper is IHyper {
                     if (swapDetails.nextSlotInitialized) {
                         Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
                         nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
-                        // TODO: need to update pool's per liquidity values or pass swapDetails
-                        nextSlot.cross(pool, epoch.id);
+                        nextSlot.cross(
+                            epoch.id,
+                            pool.proceedsPerLiquidity,
+                            pool.feesAPerLiquidity,
+                            swapDetails.feesPerLiquidity
+                        );
 
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta)
@@ -613,12 +621,12 @@ contract Hyper is IHyper {
         pool.maturedLiquidity = swapDetails.maturedLiquidity;
         pool.pendingLiquidity = swapDetails.pendingLiquidity;
         if (direction) {
-            pool.feesAPerLiquidity = pool.feesAPerLiquidity.add(swapDetails.feesPerLiquidity);
+            pool.feesAPerLiquidity = swapDetails.feesPerLiquidity;
 
             balanceChanges[0] = BalanceChange({token: pool.tokenA, amount: -int256(amountIn)});
             balanceChanges[1] = BalanceChange({token: pool.tokenB, amount: int256(swapDetails.amountOut)});
         } else {
-            pool.feesBPerLiquidity = pool.feesBPerLiquidity.add(swapDetails.feesPerLiquidity);
+            pool.feesBPerLiquidity = swapDetails.feesPerLiquidity;
 
             balanceChanges[0] = BalanceChange({token: pool.tokenA, amount: int256(amountIn)});
             balanceChanges[1] = BalanceChange({token: pool.tokenB, amount: -int256(swapDetails.amountOut)});
