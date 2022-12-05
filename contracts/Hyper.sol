@@ -52,7 +52,7 @@ contract Hyper is IHyper {
         pure
         override
         returns (
-            uint256 publicSwapFee,
+            UD60x18 publicSwapFee,
             uint256 epochLength,
             uint256 auctionLength,
             address auctionSettlementToken,
@@ -394,7 +394,7 @@ contract Hyper is IHyper {
     }
 
     struct SwapDetails {
-        uint256 feeTier;
+        UD60x18 feeTier;
         uint256 remaining;
         uint256 amountOut;
         int128 slotIndex;
@@ -441,7 +441,7 @@ contract Hyper is IHyper {
         }
 
         SwapDetails memory swapDetails = SwapDetails({
-            feeTier: msg.sender == pool.bids[epoch.id].swapper ? 0 : PUBLIC_SWAP_FEE,
+            feeTier: msg.sender == pool.bids[epoch.id].swapper ? wrapUD60x18(0) : PUBLIC_SWAP_FEE,
             remaining: amountIn,
             amountOut: 0,
             slotIndex: pool.slotIndex,
@@ -471,7 +471,7 @@ contract Hyper is IHyper {
                 swapDetails.nextSqrtPrice = _getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
 
-            uint256 remainingFeeAmount = (swapDetails.remaining * swapDetails.feeTier) / 10_000;
+            uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
 
             if (direction) {
                 // TODO: Double check if we should round up or not
@@ -492,7 +492,7 @@ contract Hyper is IHyper {
                     UD60x18 targetPrice = getTargetPriceUsingDeltaX(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
-                        swapDetails.remaining,
+                        swapDetails.remaining
                     );
                     swapDetails.amountOut += getDeltaYToNextPrice(
                         swapDetails.sqrtPrice,
@@ -505,7 +505,7 @@ contract Hyper is IHyper {
                     swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
                 } else {
                     // swapping maxXToDelta, only take fees on this amount
-                    uint256 maxXFeeAmount = (maxXToDelta * swapDetails.feeTier) / 10_000;
+                    uint256 maxXFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxXToDelta)).ceil());
                     // remove fees and swap amount
                     swapDetails.remaining -= maxXFeeAmount + maxXToDelta;
                     // save fees per liquidity
@@ -571,7 +571,7 @@ contract Hyper is IHyper {
                     swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
                 } else {
                     // swapping maxYToDelta, only take fees on this amount
-                    uint256 maxYFeeAmount = (maxYToDelta * swapDetails.feeTier) / 10_000;
+                    uint256 maxYFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxYToDelta)).ceil());
                     // remove fees and swap amount
                     swapDetails.remaining -= maxYFeeAmount + maxYToDelta;
                     // save fees per liquidity

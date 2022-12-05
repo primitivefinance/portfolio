@@ -63,7 +63,7 @@ interface IHyper {
         external
         view
         returns (
-            uint256 publicSwapFee,
+            UD60x18 publicSwapFee,
             uint256 epochLength,
             uint256 auctionLength,
             address auctionSettlementToken,
