@@ -300,7 +300,7 @@ contract Hyper is IHyper {
                 position.upperSlotIndex,
                 true
             );
-            if (amountA != 0 && amountB != 0) {
+            if (position.lowerSlotIndex <= pool.slotIndex && position.upperSlotIndex > pool.slotIndex) {
                 pool.swapLiquidity += addAmountLeft;
                 pool.pendingLiquidity += int256(addAmountLeft);
             }
@@ -356,7 +356,7 @@ contract Hyper is IHyper {
                 false
             );
 
-            if (amountA != 0 && amountB != 0) {
+            if (position.lowerSlotIndex <= pool.slotIndex && position.upperSlotIndex > pool.slotIndex) {
                 pool.swapLiquidity -= removedPending;
                 pool.pendingLiquidity -= int256(removedPending);
             }
