@@ -48,8 +48,7 @@ function getPoolId(address tokenA, address tokenB) pure returns (bytes32) {
 }
 
 function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFees) {
-    uint256 epochsPassed = (epoch.endTime - (pool.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
-    // TODO: double check boundary condition
+    uint256 epochsPassed = epoch.getEpochsPassedSince(pool.lastUpdatedTimestamp);
     if (epochsPassed > 0) {
         // update proceeds per liquidity distributed to end of epoch
         uint256 lastUpdateEpoch = epoch.id - epochsPassed;

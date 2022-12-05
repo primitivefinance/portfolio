@@ -47,7 +47,7 @@ function sync(
     Slot storage upperSlot,
     Epoch memory epoch
 ) returns (PositionBalanceChange memory balanceChange) {
-    uint256 epochsPassed = (epoch.endTime - (position.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
+    uint256 epochsPassed = epoch.getEpochsPassedSince(position.lastUpdatedTimestamp);
     // TODO: double check boundary condition
     if (epochsPassed > 0) {
         if (position.pendingLiquidity != 0) {

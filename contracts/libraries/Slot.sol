@@ -40,8 +40,7 @@ function sync(
     int24 slotIndex,
     Epoch memory epoch
 ) {
-    uint256 epochsPassed = (epoch.endTime - (slot.lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
-    // TODO: double check boundary condition
+    uint256 epochsPassed = epoch.getEpochsPassedSince(slot.lastUpdatedTimestamp);
     if (epochsPassed > 0) {
         // update liquidity deltas for epoch transition
         slot.maturedLiquidityDelta += slot.pendingLiquidityDelta;

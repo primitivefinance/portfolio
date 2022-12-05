@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 
-using {sync} for Epoch global;
+using {sync, getEpochsPassedSince} for Epoch global;
 
 struct Epoch {
     uint256 id;
@@ -18,4 +18,9 @@ function sync(Epoch storage epoch) returns (bool newEpoch) {
         epoch.endTime += (EPOCH_LENGTH + (epochsPassed * EPOCH_LENGTH));
         newEpoch = true;
     }
+}
+
+function getEpochsPassedSince(Epoch memory epoch, uint256 lastUpdatedTimestamp) pure returns (uint256 epochsPassed) {
+    // TODO: double check boundary condition
+    epochsPassed = (epoch.endTime - (lastUpdatedTimestamp + 1)) / EPOCH_LENGTH;
 }
