@@ -151,15 +151,12 @@ contract Hyper is IHyper {
         int128 upperSlotIndex,
         int256 amount
     ) internal started returns (BalanceChange[3] memory balanceChanges) {
-        // TODO: Add a proper revert error
-        if (lowerSlotIndex > upperSlotIndex) revert();
-
+        if (lowerSlotIndex > upperSlotIndex) revert PositionInvalidRangeError();
         if (amount == 0) revert AmountZeroError();
 
         Pool storage pool = pools[poolId];
 
-        // TODO: Add a proper revert error
-        if (pool.lastUpdatedTimestamp == 0) revert();
+        if (pool.lastUpdatedTimestamp == 0) revert PoolUninitializedError();
 
         {
             bool newEpoch = epoch.sync();
@@ -191,8 +188,7 @@ contract Hyper is IHyper {
         }
 
         if (position.lastUpdatedTimestamp == 0) {
-            // TODO: Add a proper revert error
-            if (amount < 0) revert();
+            if (amount < 0) revert RemoveLiquidityUninitializedError();
             position.lowerSlotIndex = lowerSlotIndex;
             position.upperSlotIndex = upperSlotIndex;
             position.lastUpdatedTimestamp = block.timestamp;
@@ -323,8 +319,7 @@ contract Hyper is IHyper {
 
         // remove positive pending liquidity immediately
         if (position.pendingLiquidity > 0) {
-            // TODO: Add a proper revert error
-            if (position.swapLiquidity < amount) revert();
+            if (position.swapLiquidity < amount) revert RemovePendingLiquidityError();
 
             uint256 removedPending = uint256(position.pendingLiquidity) >= amount
                 ? amount
@@ -368,7 +363,7 @@ contract Hyper is IHyper {
 
             removeAmountLeft -= removedPending;
         } else {
-            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert();
+            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert RemoveLiquidityError();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
@@ -658,10 +653,8 @@ contract Hyper is IHyper {
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
 
-        // TODO: Add a proper revert error
-        if (epochId != epoch.id + 1) revert();
-        // TODO: Add a proper revert error
-        if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert();
+        if (epochId != epoch.id + 1) revert InvalidBidEpochError();
+        if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert AuctionNotStartedError();
 
         // @dev: pool needs to sync here, assumes no bids otherwise
         {

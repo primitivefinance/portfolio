@@ -7,6 +7,13 @@ error HyperNotStartedError();
 error PoolAlreadyInitializedError();
 error AmountZeroError();
 error PoolNotInitializedError();
+error InvalidBidEpochError();
+error AuctionNotStartedError();
+error RemoveLiquidityError();
+error RemovePendingLiquidityError();
+error RemoveLiquidityUninitializedError();
+error PositionInvalidRangeError();
+error PoolUninitializedError();
 
 interface IHyper {
     // ===== View =====
