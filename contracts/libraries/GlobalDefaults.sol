@@ -10,4 +10,4 @@ uint256 constant AUCTION_LENGTH = 60; // in seconds
 
 address constant AUCTION_SETTLEMENT_TOKEN = address(0);
 
-uint256 constant AUCTION_FEE = 60; // in bips?
+UD60x18 constant AUCTION_FEE = UD60x18.wrap(6000000000000000); // in bips? 0.6%

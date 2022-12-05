@@ -67,7 +67,7 @@ interface IHyper {
             uint256 epochLength,
             uint256 auctionLength,
             address auctionSettlementToken,
-            uint256 auctionFee
+            UD60x18 auctionFee
         );
 
     function getLeadingBid(bytes32 poolId, uint256 epochId)

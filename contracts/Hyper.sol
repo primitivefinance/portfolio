@@ -56,7 +56,7 @@ contract Hyper is IHyper {
             uint256 epochLength,
             uint256 auctionLength,
             address auctionSettlementToken,
-            uint256 auctionFee
+            UD60x18 auctionFee
         )
     {
         publicSwapFee = PUBLIC_SWAP_FEE;
@@ -663,7 +663,7 @@ contract Hyper is IHyper {
             }
         }
 
-        uint256 fee = (amount * AUCTION_FEE) / 10000;
+        uint256 fee = fromUD60x18(AUCTION_FEE.mul(toUD60x18(amount)).ceil());
         uint256 netFeeAmount = amount - fee;
 
         if (netFeeAmount > pool.bids[epochId].netFeeAmount) {
