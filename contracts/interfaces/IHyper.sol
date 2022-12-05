@@ -5,6 +5,7 @@ import "@prb/math/UD60x18.sol";
 
 error HyperNotStartedError();
 error PoolAlreadyInitializedError();
+error AmountZeroError();
 
 interface IHyper {
     // ===== View =====

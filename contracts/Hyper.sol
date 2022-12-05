@@ -154,8 +154,7 @@ contract Hyper is IHyper {
         // TODO: Add a proper revert error
         if (lowerSlotIndex > upperSlotIndex) revert();
 
-        // TODO: Add a proper revert error
-        if (amount == 0) revert();
+        if (amount == 0) revert AmountZeroError();
 
         Pool storage pool = pools[poolId];
 
@@ -652,8 +651,7 @@ contract Hyper is IHyper {
         address swapper,
         uint256 amount
     ) internal started returns (BalanceChange memory balanceChange) {
-        // TODO: Add a proper revert error
-        if (amount == 0) revert();
+        if (amount == 0) revert AmountZeroError();
 
         Pool storage pool = pools[poolId];
         // TODO: Add a proper revert error
