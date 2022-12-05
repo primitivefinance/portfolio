@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+import {UD60x18, fromUD60x18, toUD60x18} from "@prb/math/UD60x18.sol";
 
-import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
-
-import "./BrainMath.sol";
+import "./BrainMath.sol" as BrainMath;
 import {Epoch} from "./Epoch.sol";
 import {Pool, PoolSnapshot} from "./Pool.sol";
 import {Slot, SlotSnapshot} from "./Slot.sol";
@@ -48,7 +46,6 @@ function sync(
     Epoch memory epoch
 ) returns (PositionBalanceChange memory balanceChange) {
     uint256 epochsPassed = epoch.getEpochsPassedSince(position.lastUpdatedTimestamp);
-    // TODO: double check boundary condition
     if (epochsPassed > 0) {
         if (position.pendingLiquidity != 0) {
             uint256 lastUpdateEpoch = epoch.id - epochsPassed;
@@ -61,7 +58,7 @@ function sync(
 
             if (position.pendingLiquidity < 0) {
                 // if liquidity was kicked out, add the underlying tokens
-                (uint256 underlyingA, uint256 underlyingB) = _calculateLiquidityUnderlying(
+                (uint256 underlyingA, uint256 underlyingB) = BrainMath._calculateLiquidityUnderlying(
                     uint256(position.pendingLiquidity),
                     pool.snapshots[lastUpdateEpoch].sqrtPrice,
                     pool.snapshots[lastUpdateEpoch].slotIndex,

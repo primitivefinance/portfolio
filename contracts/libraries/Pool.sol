@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+import {UD60x18, toUD60x18} from "@prb/math/UD60x18.sol";
 
 import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
 

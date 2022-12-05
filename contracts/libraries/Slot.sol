@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {UD60x18, fromUD60x18, toUD60x18, ud} from "@prb/math/UD60x18.sol";
+import {UD60x18} from "@prb/math/UD60x18.sol";
 
-import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
-
-import "./BitMath.sol";
+import "./BitMath.sol" as BitMath;
 import {Epoch} from "./Epoch.sol";
 import {Pool} from "./Pool.sol";
 
@@ -52,8 +50,8 @@ function sync(
             slot.liquidityGross -= uint256(slot.pendingLiquidityGross);
 
             if (slot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(slotIndex);
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(slotIndex);
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
             }
         }
         slot.pendingLiquidityGross = int256(0);
