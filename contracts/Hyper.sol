@@ -473,142 +473,94 @@ contract Hyper is IHyper {
             }
 
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
-
-            if (direction) {
-                uint256 maxXToDelta = getDeltaXToNextPrice(
+            uint256 maxToDelta = direction
+                ? getDeltaXToNextPrice(
+                    swapDetails.sqrtPrice,
+                    swapDetails.nextSqrtPrice,
+                    swapDetails.swapLiquidity,
+                    true
+                )
+                : getDeltaYToNextPrice(
                     swapDetails.sqrtPrice,
                     swapDetails.nextSqrtPrice,
                     swapDetails.swapLiquidity,
                     true
                 );
-                if (swapDetails.remaining < maxXToDelta + remainingFeeAmount) {
-                    // remove fees from remaining amount
-                    swapDetails.remaining -= remainingFeeAmount;
-                    // save fees per liquidity
-                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
-                        toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
-                    );
-                    // update price and amount out after swapping remaining amount
-                    UD60x18 targetPrice = getTargetPriceUsingDeltaX(
+            if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
+                // remove fees from remaining amount
+                swapDetails.remaining -= remainingFeeAmount;
+                // save fees per liquidity
+                swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
+                    toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
+                );
+                // update price and amount out after swapping remaining amount
+                UD60x18 targetPrice = direction
+                    ? getTargetPriceUsingDeltaX(swapDetails.sqrtPrice, swapDetails.swapLiquidity, swapDetails.remaining)
+                    : getTargetPriceUsingDeltaY(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
                         swapDetails.remaining
                     );
-                    swapDetails.amountOut += getDeltaYToNextPrice(
+                swapDetails.amountOut += direction
+                    ? getDeltaYToNextPrice(swapDetails.sqrtPrice, targetPrice, swapDetails.swapLiquidity, false)
+                    : getDeltaXToNextPrice(swapDetails.sqrtPrice, targetPrice, swapDetails.swapLiquidity, false);
+                swapDetails.remaining = 0;
+                swapDetails.sqrtPrice = targetPrice;
+                swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
+            } else {
+                // swapping maxToDelta, only take fees on this amount
+                uint256 maxFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxToDelta)).ceil());
+                // remove fees and swap amount
+                swapDetails.remaining -= maxFeeAmount + maxToDelta;
+                // update fees per liquidity
+                swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
+                    toUD60x18(maxFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
+                );
+                // update price and amount out after swapping
+                swapDetails.amountOut += direction
+                    ? getDeltaYToNextPrice(
                         swapDetails.sqrtPrice,
-                        targetPrice,
+                        swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity,
                         false
-                    );
-                    swapDetails.remaining = 0;
-                    swapDetails.sqrtPrice = targetPrice;
-                    swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
-                } else {
-                    // swapping maxXToDelta, only take fees on this amount
-                    uint256 maxXFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxXToDelta)).ceil());
-                    // remove fees and swap amount
-                    swapDetails.remaining -= maxXFeeAmount + maxXToDelta;
-                    // save fees per liquidity
-                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
-                        toUD60x18(maxXFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
-                    );
-                    // update price and amount out after swapping
-                    swapDetails.amountOut += getDeltaYToNextPrice(
+                    )
+                    : getDeltaXToNextPrice(
                         swapDetails.sqrtPrice,
                         swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity,
                         false
                     );
-                    swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
-                    swapDetails.slotIndex = swapDetails.nextSlotIndex;
-                    // cross the next initialized slot
-                    if (swapDetails.nextSlotInitialized) {
-                        Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
-                        nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
-                        nextSlot.cross(
-                            epoch.id,
-                            pool.proceedsPerLiquidity,
-                            swapDetails.feesPerLiquidity,
-                            pool.feesBPerLiquidity
-                        );
-
+                swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
+                swapDetails.slotIndex = swapDetails.nextSlotIndex;
+                // cross the next initialized slot
+                if (swapDetails.nextSlotInitialized) {
+                    // update slot
+                    Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
+                    nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
+                    nextSlot.cross(
+                        epoch.id,
+                        pool.proceedsPerLiquidity,
+                        direction ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity,
+                        direction ? swapDetails.feesPerLiquidity : pool.feesBPerLiquidity
+                    );
+                    // update swap details state (eventually gets saved to pool)
+                    if (direction) {
+                        // crosing slot from right to left? TODO: review swap direction logic
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta)
                             : swapDetails.swapLiquidity + abs(nextSlot.swapLiquidityDelta);
-
                         swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
                             ? swapDetails.maturedLiquidity - uint256(nextSlot.maturedLiquidityDelta)
                             : swapDetails.maturedLiquidity + abs(nextSlot.maturedLiquidityDelta);
-
                         swapDetails.pendingLiquidity -= nextSlot.pendingLiquidityDelta;
-                    }
-                }
-            } else {
-                uint256 maxYToDelta = getDeltaYToNextPrice(
-                    swapDetails.sqrtPrice,
-                    _getSqrtPriceAtSlot(swapDetails.nextSlotIndex),
-                    swapDetails.swapLiquidity,
-                    true
-                );
-                if (swapDetails.remaining < maxYToDelta + remainingFeeAmount) {
-                    // remove fees from remaining amount
-                    swapDetails.remaining -= remainingFeeAmount;
-                    // save fees per liquidity
-                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
-                        toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
-                    );
-                    // update price and amount out after swapping remaining amount
-                    UD60x18 targetPrice = getTargetPriceUsingDeltaY(
-                        swapDetails.sqrtPrice,
-                        swapDetails.swapLiquidity,
-                        swapDetails.remaining
-                    );
-                    swapDetails.amountOut += getDeltaXToNextPrice(
-                        swapDetails.sqrtPrice,
-                        targetPrice,
-                        swapDetails.swapLiquidity,
-                        false
-                    );
-                    swapDetails.remaining = 0;
-                    swapDetails.sqrtPrice = targetPrice;
-                    swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
-                } else {
-                    // swapping maxYToDelta, only take fees on this amount
-                    uint256 maxYFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxYToDelta)).ceil());
-                    // remove fees and swap amount
-                    swapDetails.remaining -= maxYFeeAmount + maxYToDelta;
-                    // save fees per liquidity
-                    swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
-                        toUD60x18(maxYFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
-                    );
-                    // update price and amount out after swapping
-                    swapDetails.amountOut += getDeltaXToNextPrice(
-                        swapDetails.sqrtPrice,
-                        swapDetails.nextSqrtPrice,
-                        swapDetails.swapLiquidity,
-                        false
-                    );
-                    swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
-                    swapDetails.slotIndex = swapDetails.nextSlotIndex;
-                    // cross the next initialized slot
-                    if (swapDetails.nextSlotInitialized) {
-                        Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
-                        nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
-                        nextSlot.cross(
-                            epoch.id,
-                            pool.proceedsPerLiquidity,
-                            pool.feesAPerLiquidity,
-                            swapDetails.feesPerLiquidity
-                        );
-
+                    } else {
+                        // crosing slot from left to right? TODO: review swap direction logic
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta)
                             : swapDetails.swapLiquidity - abs(nextSlot.swapLiquidityDelta);
-
                         swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
                             ? swapDetails.maturedLiquidity + uint256(nextSlot.maturedLiquidityDelta)
                             : swapDetails.maturedLiquidity - abs(nextSlot.maturedLiquidityDelta);
-
                         swapDetails.pendingLiquidity += nextSlot.pendingLiquidityDelta;
                     }
                 }
