@@ -540,7 +540,7 @@ contract Hyper is IHyper {
                         epoch.id,
                         pool.proceedsPerLiquidity,
                         direction ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity,
-                        direction ? swapDetails.feesPerLiquidity : pool.feesBPerLiquidity
+                        direction ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
                     );
                     // update swap details state (eventually gets saved to pool)
                     if (direction) {
