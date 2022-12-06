@@ -64,3 +64,29 @@ fn _get_delta_x_to_next_price(
   let raw: f64 = liquidity / sqrt_price_next_slot - liquidity / sqrt_price_current_slot;
   if should_round_up { raw.ceil() } else { raw.floor() }
 }
+
+fn _get_delta_y_to_next_price(
+  sqrt_price_current_slot: f64,
+  sqrt_price_next_slot: f64,
+  liquidity: f64,
+  should_round_up: bool,
+) -> f64 {
+  let raw: f64 = liquidity * (sqrt_price_next_slot - sqrt_price_current_slot);
+  if should_round_up { raw.ceil() } else { raw.floor() }
+}
+
+fn _get_target_price_using_delta_x(
+  sqrt_price_current_slot: f64,
+  liquidity: f64,
+  delta_x: f64
+) -> f64 {
+  liquidity * sqrt_price_current_slot / (delta_x * sqrt_price_current_slot + liquidity)
+}
+
+fn _get_target_price_using_delta_y(
+  sqrt_price_current_slot: f64,
+  liquidity: f64,
+  delta_y: f64
+) -> f64 {
+    delta_y / liquidity + sqrt_price_current_slot
+}
