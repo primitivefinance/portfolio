@@ -216,7 +216,7 @@ contract Hyper is IHyper {
                 lowerSlot,
                 upperSlot,
                 position,
-                uint256(amount)
+                abs(amount)
             );
             if (removeAmountA != 0) balanceChanges[0].amount += int256(removeAmountA);
             if (removeAmountB != 0) balanceChanges[1].amount += int256(removeAmountB);

@@ -141,4 +141,34 @@ contract TestHyper is Test {
         // check only tokenB balance increases
         assert(tokenA.balanceOf(address(hyper)) == 0 && tokenB.balanceOf(address(hyper)) > 0);
     }
+
+    function test_updateLiquidity_remove_pending_above_current_slot_succeeds() public mintApproveTokens {
+        // activate pool
+        hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
+        // get pool id
+        bytes32 poolId = getPoolId(address(tokenA), address(tokenB));
+        // fetch activated pool
+        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        // set position range params
+        int128 lowerSlotIndex = slotIndex + 10;
+        int128 upperSlotIndex = lowerSlotIndex + 10;
+        // don't transfer out (shouldn't matter here)
+        bool transferOut = true;
+        // add liquidity
+        hyper.updateLiquidity(
+            getPoolId(address(tokenA), address(tokenB)),
+            lowerSlotIndex,
+            upperSlotIndex,
+            int256(100),
+            transferOut
+        );
+        // remove liquidity
+        hyper.updateLiquidity(
+            getPoolId(address(tokenA), address(tokenB)),
+            lowerSlotIndex,
+            upperSlotIndex,
+            -int256(100),
+            transferOut
+        );
+    }
 }
