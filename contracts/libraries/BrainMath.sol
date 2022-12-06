@@ -55,9 +55,9 @@ function _calculateLiquidityUnderlying(
     UD60x18 rawAmountA;
     UD60x18 rawAmountB;
 
-    if (currentSlotIndex < lowerSlotIndex) {
+    if (sqrtPriceCurrentSlot.lte(sqrtPriceLowerSlot)) {
         rawAmountA = toUD60x18(liquidity).mul(sqrtPriceLowerSlot.inv().sub(sqrtPriceUpperSlot.inv()));
-    } else if (currentSlotIndex < upperSlotIndex) {
+    } else if (sqrtPriceCurrentSlot.lt(sqrtPriceUpperSlot)) {
         rawAmountA = toUD60x18(liquidity).mul(sqrtPriceCurrentSlot.inv().sub(sqrtPriceUpperSlot.inv()));
         rawAmountB = toUD60x18(liquidity).mul(sqrtPriceCurrentSlot.sub(sqrtPriceLowerSlot));
     } else {
