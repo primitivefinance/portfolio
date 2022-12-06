@@ -151,11 +151,10 @@ contract Hyper is IHyper {
         int128 upperSlotIndex,
         int256 amount
     ) internal started returns (BalanceChange[3] memory balanceChanges) {
-        if (lowerSlotIndex > upperSlotIndex) revert PositionInvalidRangeError();
+        if (lowerSlotIndex >= upperSlotIndex) revert PositionInvalidRangeError();
         if (amount == 0) revert AmountZeroError();
 
         Pool storage pool = pools[poolId];
-
         if (pool.lastUpdatedTimestamp == 0) revert PoolUninitializedError();
 
         {
