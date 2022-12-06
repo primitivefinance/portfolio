@@ -6,7 +6,7 @@ import "forge-std/Vm.sol";
 import "../../contracts/Hyper.sol";
 import "../../contracts/test/TestERC20.sol";
 
-contract TestHyper is Test {
+contract TestUpdateLiquidity is Test {
     Hyper public hyper;
 
     TestERC20 public tokenA;
@@ -46,16 +46,6 @@ contract TestHyper is Test {
         // decimals factor = 10^(tokenB.decimals - tokenA.decimals) = 1e12
         UD60x18 usdcPrice = usdPrice.mul(toUD60x18(1e12));
         sqrtPrice = usdcPrice.sqrt();
-    }
-
-    function test_activatePool_succeeds() public {
-        hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
-    }
-
-    function test_activatePool_duplication_reverts() public {
-        hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
-        vm.expectRevert(PoolAlreadyInitializedError.selector);
-        hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
     }
 
     function test_updateLiquidity_add_above_current_slot_succeeds() public mintApproveTokens {
