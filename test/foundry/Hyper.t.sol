@@ -123,4 +123,22 @@ contract TestHyper is Test {
             transferOut
         );
     }
+
+    function test_updateLiquidity_add_above_current_slot_tokenA_balance_increases() public {
+        test_updateLiquidity_add_above_current_slot_succeeds();
+        // check only tokenA balance increases
+        assert(tokenA.balanceOf(address(hyper)) > 0 && tokenB.balanceOf(address(hyper)) == 0);
+    }
+
+    function test_updateLiquidity_add_including_current_slot_tokenAB_balance_increases() public {
+        test_updateLiquidity_add_including_current_slot_succeeds();
+        // check both token balances increase
+        assert(tokenA.balanceOf(address(hyper)) > 0 && tokenB.balanceOf(address(hyper)) > 0);
+    }
+
+    function test_updateLiquidity_add_below_current_slot_tokenB_balance_increases() public {
+        test_updateLiquidity_add_below_current_slot_succeeds();
+        // check both token balances increase
+        assert(tokenA.balanceOf(address(hyper)) == 0 && tokenB.balanceOf(address(hyper)) > 0);
+    }
 }
