@@ -138,7 +138,7 @@ contract TestHyper is Test {
 
     function test_updateLiquidity_add_below_current_slot_tokenB_balance_increases() public {
         test_updateLiquidity_add_below_current_slot_succeeds();
-        // check both token balances increase
+        // check only tokenB balance increases
         assert(tokenA.balanceOf(address(hyper)) == 0 && tokenB.balanceOf(address(hyper)) > 0);
     }
 }
