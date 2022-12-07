@@ -6,18 +6,32 @@ fn main() {
   let price: f64 = 1200.0;
   let square_root_price: f64 = price.sqrt();
 
-  println!("{}", price_grid);
-  println!("{}", square_root_price_grid);
-  println!("{}", ln_square_root_price_grid);
+  // println!("{}", square_root_price);
 
-  let slot = _get_slot_at_sqrt_price(square_root_price, ln_square_root_price_grid);
-  println!("{}", slot);
-
-  let p = _get_sqrt_price_at_slot(slot, square_root_price_grid);
+  /*
+  let p = _get_sqrt_price_at_slot(1000.0, square_root_price_grid);
   println!("{}", p);
 
-  let p2 = _get_sqrt_price_at_slot(-70904.0, square_root_price_grid);
+  let p2 = _get_sqrt_price_at_slot(-1000.0, square_root_price_grid);
   println!("{}", p2);
+
+  let p2 = _get_sqrt_price_at_slot(-70904.0, square_root_price_grid);
+  println!("{}", p2.powf(2.0));
+  */
+
+  let fwefew = _get_sqrt_price_at_slot(25000.0, square_root_price_grid);
+
+  let (amount_a, amount_b) = _calculate_liquidity_under_lying(
+    square_root_price_grid,
+    10000.0,
+    fwefew,
+    0.0,
+    10000.0,
+    20000.0,
+    true
+  );
+
+  println!("{} {}", amount_a, amount_b);
 }
 
 fn _get_slot_at_sqrt_price(square_root_price: f64, ln_square_root_price_grid: f64) -> f64 {
@@ -49,7 +63,7 @@ fn _calculate_liquidity_under_lying(
       amount_a = liquidity * (1.0 / sqrt_price_current_slot - 1.0 / sqrt_price_upper_slot);
       amount_b = liquidity * (sqrt_price_current_slot - sqrt_price_lower_slot);
   } else {
-      amount_b = liquidity * (sqrt_price_current_slot - sqrt_price_lower_slot);
+      amount_b = liquidity * (sqrt_price_upper_slot - sqrt_price_lower_slot);
   }
 
   return (amount_a, amount_b);
