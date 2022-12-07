@@ -28,7 +28,6 @@ contract TestBrainMath is Test {
     function test_getSqrtPriceAtSlot_positive_index() public {
         int128 slotIndex = 1000;
         UD60x18 sqrtPrice = _getSqrtPriceAtSlot(slotIndex);
-        emit log_uint(unwrap(sqrtPrice));
         assertApproxEqRel(
             unwrap(sqrtPrice),
             1051268468376662000,
@@ -39,7 +38,6 @@ contract TestBrainMath is Test {
     function test_getSqrtPriceAtSlot_negative_index() public {
         int128 slotIndex = -1000;
         UD60x18 sqrtPrice = _getSqrtPriceAtSlot(slotIndex);
-        emit log_uint(unwrap(sqrtPrice));
         assertApproxEqRel(
             unwrap(sqrtPrice),
             951231802418815800,

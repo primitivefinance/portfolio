@@ -53,6 +53,5 @@ contract TestBitMath is Test {
         uint256 bitmap;
         (bool hasNextSlot, uint8 nextSlot) = findNextSlotWithinChunk(bitmap, 11, false);
         assertEq(hasNextSlot, false);
-        console.log(nextSlot);
     }
 }
