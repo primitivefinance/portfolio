@@ -5,9 +5,11 @@ import {UD60x18} from "@prb/math/UD60x18.sol";
 
 import "./BitMath.sol" as BitMath;
 import {Epoch} from "./Epoch.sol";
-import {Pool} from "./Pool.sol";
+import {PoolId, Pool} from "./Pool.sol";
 
 using {sync, cross} for Slot global;
+
+type SlotId is bytes32;
 
 struct Slot {
     uint256 liquidityGross;
@@ -28,8 +30,8 @@ struct SlotSnapshot {
     UD60x18 feesBPerLiquidityOutside;
 }
 
-function getSlotId(bytes32 poolId, int128 slotIndex) pure returns (bytes32) {
-    return keccak256(abi.encodePacked(poolId, slotIndex));
+function getSlotId(PoolId poolId, int128 slotIndex) pure returns (SlotId) {
+    return SlotId.wrap(keccak256(abi.encodePacked(poolId, slotIndex)));
 }
 
 function sync(

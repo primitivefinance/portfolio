@@ -3,19 +3,19 @@ pragma solidity 0.8.13;
 
 import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18, ZERO as zeroUD60x18, HALF_UNIT as halfUD60x18} from "@prb/math/UD60x18.sol";
 
-import "./interfaces/IHyper.sol";
-
 import {ERC20} from "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeTransferLib.sol";
+
+import {IHyper} from "./interfaces/IHyper.sol";
 
 import "./libraries/BitMath.sol";
 import "./libraries/BrainMath.sol";
 
 import {BalanceChange} from "./libraries/BalanceChange.sol";
 import {Epoch} from "./libraries/Epoch.sol";
-import {Pool, Bid, getPoolId} from "./libraries/Pool.sol";
-import {Position, PositionBalanceChange, getPositionId} from "./libraries/Position.sol";
-import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
+import {getPoolId, PoolId, Pool, Bid} from "./libraries/Pool.sol";
+import {getSlotId, SlotId, Slot, SlotSnapshot} from "./libraries/Slot.sol";
+import {getPositionId, PositionId, Position, PositionBalanceChange} from "./libraries/Position.sol";
 
 // TODO: Reentrancy guard
 
@@ -28,12 +28,11 @@ contract Hyper is IHyper {
 
     Epoch public epoch;
 
-    mapping(bytes32 => Pool) public pools;
-    mapping(bytes32 => Slot) public slots;
-    mapping(bytes32 => Position) public positions;
+    mapping(PoolId => Pool) public pools;
+    mapping(SlotId => Slot) public slots;
+    mapping(PositionId => Position) public positions;
 
-    /// poolId => ? => ?
-    mapping(bytes32 => mapping(int16 => uint256)) public bitmaps;
+    mapping(PoolId => mapping(int16 => uint256)) public bitmaps;
 
     /// @notice Internal token balances
     /// user => token => balance
@@ -68,11 +67,11 @@ contract Hyper is IHyper {
     }
 
     modifier started() {
-        if (epoch.id < 1) revert HyperNotStartedError();
+        if (epoch.id < 1) revert IHyper.HyperNotStartedError();
         _;
     }
 
-    function bids(bytes32 poolId, uint256 epochId)
+    function bids(PoolId poolId, uint256 epochId)
         public
         view
         override
@@ -125,7 +124,7 @@ contract Hyper is IHyper {
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
 
         Pool storage pool = pools[getPoolId(tokenA, tokenB)];
-        if (pool.lastUpdatedTimestamp != 0) revert PoolAlreadyInitializedError();
+        if (pool.lastUpdatedTimestamp != 0) revert IHyper.PoolAlreadyInitializedError();
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
         pool.sqrtPrice = sqrtPrice;
@@ -135,7 +134,7 @@ contract Hyper is IHyper {
     }
 
     function updateLiquidity(
-        bytes32 poolId,
+        PoolId poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount,
@@ -148,16 +147,16 @@ contract Hyper is IHyper {
     }
 
     function _updateLiquidity(
-        bytes32 poolId,
+        PoolId poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
     ) internal started returns (BalanceChange[3] memory balanceChanges) {
-        if (lowerSlotIndex >= upperSlotIndex) revert PositionInvalidRangeError();
-        if (amount == 0) revert AmountZeroError();
+        if (lowerSlotIndex >= upperSlotIndex) revert IHyper.PositionInvalidRangeError();
+        if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert PoolUninitializedError();
+        if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolUninitializedError();
 
         {
             bool newEpoch = epoch.sync();
@@ -189,7 +188,7 @@ contract Hyper is IHyper {
         }
 
         if (position.lastUpdatedTimestamp == 0) {
-            if (amount < 0) revert RemoveLiquidityUninitializedError();
+            if (amount < 0) revert IHyper.RemoveLiquidityUninitializedError();
             position.lowerSlotIndex = lowerSlotIndex;
             position.upperSlotIndex = upperSlotIndex;
             position.lastUpdatedTimestamp = block.timestamp;
@@ -319,7 +318,7 @@ contract Hyper is IHyper {
 
         // remove positive pending liquidity immediately
         if (position.pendingLiquidity > 0) {
-            if (position.swapLiquidity < amount) revert RemovePendingLiquidityError();
+            if (position.swapLiquidity < amount) revert IHyper.RemovePendingLiquidityError();
 
             uint256 removedPending = uint256(position.pendingLiquidity) >= amount
                 ? amount
@@ -362,7 +361,7 @@ contract Hyper is IHyper {
 
             removeAmountLeft -= removedPending;
         } else {
-            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert RemoveLiquidityError();
+            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert IHyper.RemoveLiquidityError();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
@@ -409,7 +408,7 @@ contract Hyper is IHyper {
     }
 
     function swap(
-        bytes32 poolId,
+        PoolId poolId,
         uint256 amountIn,
         bool direction,
         bool transferOut
@@ -421,14 +420,14 @@ contract Hyper is IHyper {
     }
 
     function _swap(
-        bytes32 poolId,
+        PoolId poolId,
         uint256 amountIn,
         bool direction
     ) internal started returns (BalanceChange[2] memory balanceChanges) {
-        if (amountIn == 0) revert AmountZeroError();
+        if (amountIn == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert PoolNotInitializedError();
+        if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolNotInitializedError();
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
@@ -585,7 +584,7 @@ contract Hyper is IHyper {
     }
 
     function bid(
-        bytes32 poolId,
+        PoolId poolId,
         uint256 epochId,
         address refunder,
         address swapper,
@@ -596,22 +595,22 @@ contract Hyper is IHyper {
     }
 
     function _bid(
-        bytes32 poolId,
+        PoolId poolId,
         uint256 epochId,
         address refunder,
         address swapper,
         uint256 amount
     ) internal started returns (BalanceChange memory balanceChange) {
-        if (amount == 0) revert AmountZeroError();
+        if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert PoolNotInitializedError();
+        if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolNotInitializedError();
 
         bool newEpoch = epoch.sync();
         if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
 
-        if (epochId != epoch.id + 1) revert InvalidBidEpochError();
-        if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert AuctionNotStartedError();
+        if (epochId != epoch.id + 1) revert IHyper.InvalidBidEpochError();
+        if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert IHyper.AuctionNotStartedError();
 
         // @dev: pool needs to sync here, assumes no bids otherwise
         {

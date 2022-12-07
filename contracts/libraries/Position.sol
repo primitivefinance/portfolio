@@ -5,11 +5,13 @@ import {UD60x18, fromUD60x18, toUD60x18} from "@prb/math/UD60x18.sol";
 
 import "./BrainMath.sol" as BrainMath;
 import {Epoch} from "./Epoch.sol";
-import {Pool, PoolSnapshot} from "./Pool.sol";
+import {PoolId, Pool, PoolSnapshot} from "./Pool.sol";
 import {Slot, SlotSnapshot} from "./Slot.sol";
 
 using {sync} for Position global;
 using {updateEarnings, updateEarningsThroughEpoch} for Position;
+
+type PositionId is bytes32;
 
 struct Position {
     int128 lowerSlotIndex;
@@ -25,11 +27,11 @@ struct Position {
 
 function getPositionId(
     address owner,
-    bytes32 poolId,
+    PoolId poolId,
     int128 lowerSlotIndex,
     int128 upperSlotIndex
-) pure returns (bytes32) {
-    return keccak256(abi.encodePacked(owner, poolId, lowerSlotIndex, upperSlotIndex));
+) pure returns (PositionId) {
+    return PositionId.wrap(keccak256(abi.encodePacked(owner, poolId, lowerSlotIndex, upperSlotIndex)));
 }
 
 struct PositionBalanceChange {

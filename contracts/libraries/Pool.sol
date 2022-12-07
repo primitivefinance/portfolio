@@ -7,6 +7,8 @@ import {Epoch} from "./Epoch.sol";
 
 using {sync} for Pool global;
 
+type PoolId is bytes32;
+
 struct Pool {
     address tokenA;
     address tokenB;
@@ -39,10 +41,10 @@ struct PoolSnapshot {
     UD60x18 feesBPerLiquidity;
 }
 
-function getPoolId(address tokenA, address tokenB) pure returns (bytes32) {
+function getPoolId(address tokenA, address tokenB) pure returns (PoolId) {
     if (tokenA == tokenB) revert();
     (tokenA, tokenB) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-    return keccak256(abi.encodePacked(tokenA, tokenB));
+    return PoolId.wrap(keccak256(abi.encodePacked(tokenA, tokenB)));
 }
 
 function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFees) {
