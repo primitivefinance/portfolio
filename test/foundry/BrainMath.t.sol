@@ -53,38 +53,6 @@ contract TestBrainMath is Test {
         assertEq(slotIndex, 70904);
     }
 
-    function test_calculateLiquidityUnderlying_should_round_down() public {
-        int128 currentSlotIndex = 0;
-
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
-            100,
-            _getSqrtPriceAtSlot(currentSlotIndex),
-            currentSlotIndex,
-            -100,
-            200,
-            false
-        );
-
-        assertEq(amountA, 0);
-        assertEq(amountB, 0);
-    }
-
-    function test_calculateLiquidityUnderlying_should_round_up() public {
-        int128 currentSlotIndex = 0;
-
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
-            100,
-            _getSqrtPriceAtSlot(currentSlotIndex),
-            currentSlotIndex,
-            -100,
-            200,
-            true
-        );
-
-        assertEq(amountA, 1);
-        assertEq(amountB, 1);
-    }
-
     function test_getDeltaXToNextPrice_should_round_up() public {
         int128 currentSlotIndex = 0;
 
