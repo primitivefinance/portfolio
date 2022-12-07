@@ -61,7 +61,6 @@ function sync(
                 (uint256 underlyingA, uint256 underlyingB) = BrainMath._calculateLiquidityUnderlying(
                     uint256(position.pendingLiquidity),
                     pool.snapshots[lastUpdateEpoch].sqrtPrice,
-                    pool.snapshots[lastUpdateEpoch].slotIndex,
                     position.lowerSlotIndex,
                     position.upperSlotIndex,
                     false
@@ -73,8 +72,8 @@ function sync(
             } else {
                 position.maturedLiquidity += uint256(position.pendingLiquidity);
             }
-            pool.swapLiquidity = position.maturedLiquidity;
-            pool.pendingLiquidity = int256(0);
+            position.swapLiquidity = position.maturedLiquidity;
+            position.pendingLiquidity = int256(0);
         }
     }
 
