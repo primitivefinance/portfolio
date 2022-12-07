@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "forge-std/Test.sol";
+
 import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18} from "@prb/math/UD60x18.sol";
 
 import "./interfaces/IHyper.sol";
@@ -20,7 +22,7 @@ import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
 
 // TODO: Reentrancy guard
 
-contract Hyper is IHyper {
+contract Hyper is IHyper, Test {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
 
     Epoch public epoch;
@@ -463,9 +465,11 @@ contract Hyper is IHyper {
         });
 
         while (swapDetails.remaining > 0) {
+            emit log("here");
             {
                 // Get the next slot or the border of a bitmap
                 (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(swapDetails.slotIndex));
+                emit log("here.1");
                 (bool hasNextSlot, uint8 nextSlotBit) = findNextSlotWithinChunk(
                     // If direction is true: swapping A for B
                     // Decreasing the slot index -> going right into the bitmap (reducing the index)
@@ -473,12 +477,18 @@ contract Hyper is IHyper {
                     bit,
                     !direction
                 );
+                emit log("has next slot");
+                emit log(hasNextSlot ? "true" : "false");
+                emit log("here.2");
                 swapDetails.nextSlotInitialized = hasNextSlot;
+                emit log("here.3");
                 swapDetails.nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
+                emit log("here.4");
                 swapDetails.nextSqrtPrice = _getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
-
+            emit log("here 1");
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
+            emit log("here 2");
             uint256 maxToDelta = direction
                 ? getDeltaXToNextPrice(
                     swapDetails.sqrtPrice,
@@ -492,6 +502,7 @@ contract Hyper is IHyper {
                     swapDetails.swapLiquidity,
                     true
                 );
+            emit log("here 3");
             if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
                 // remove fees from remaining amount
                 swapDetails.remaining -= remainingFeeAmount;
