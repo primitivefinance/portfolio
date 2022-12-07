@@ -25,19 +25,18 @@ contract TestUpdateLiquidity is Test {
     }
 
     function setUp() public {
-        hyper = new Hyper(1000, auctionCollector);
+        TestERC20 fakeWETH = new TestERC20("Wrapped Ether", "WETH", 18);
+        TestERC20 fakeUSDC = new TestERC20("USD Coin", "USDC", 6);
+
+        hyper = new Hyper(1000, auctionCollector, address(fakeWETH));
+
+        (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
+        assertTrue(tokenA == fakeUSDC);
 
         vm.warp(1000);
         hyper.start();
 
         vm.startPrank(testUser);
-
-        TestERC20 fakeUSDC = new TestERC20("USD Coin", "USDC", 6);
-        TestERC20 fakeWETH = new TestERC20("Wrapped Ether", "WETH", 18);
-
-        (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
-
-        assertTrue(tokenA == fakeUSDC);
     }
 
     function getStartSqrtPrice() public pure returns (UD60x18 sqrtPrice) {

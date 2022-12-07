@@ -8,6 +8,4 @@ UD60x18 constant PUBLIC_SWAP_FEE = UD60x18.wrap(6000000000000000); // in bips? 0
 uint256 constant EPOCH_LENGTH = 3600; // in seconds
 uint256 constant AUCTION_LENGTH = 60; // in seconds
 
-address constant AUCTION_SETTLEMENT_TOKEN = address(0);
-
 UD60x18 constant AUCTION_FEE = UD60x18.wrap(6000000000000000); // in bips? 0.6%

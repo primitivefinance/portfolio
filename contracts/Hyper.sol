@@ -21,6 +21,8 @@ import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
 // TODO: Reentrancy guard
 
 contract Hyper is IHyper {
+    address public immutable AUCTION_SETTLEMENT_TOKEN;
+
     Epoch public epoch;
 
     mapping(bytes32 => Pool) public pools;
@@ -36,10 +38,15 @@ contract Hyper is IHyper {
 
     address public auctionFeeCollector;
 
-    constructor(uint256 startTime, address _auctionFeeCollector) {
+    constructor(
+        uint256 startTime,
+        address _auctionFeeCollector,
+        address _auctionSettlementToken
+    ) {
         require(startTime > block.timestamp);
         epoch = Epoch({id: 0, endTime: startTime});
         auctionFeeCollector = _auctionFeeCollector;
+        AUCTION_SETTLEMENT_TOKEN = _auctionSettlementToken;
     }
 
     modifier started() {
@@ -49,7 +56,7 @@ contract Hyper is IHyper {
 
     function getGlobalDefaults()
         public
-        pure
+        view
         override
         returns (
             UD60x18 publicSwapFee,
