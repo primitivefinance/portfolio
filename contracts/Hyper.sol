@@ -72,23 +72,19 @@ contract Hyper is IHyper {
         _;
     }
 
-    function getLeadingBid(bytes32 poolId, uint256 epochId)
+    function bids(bytes32 poolId, uint256 epochId)
         public
         view
         override
-        started
         returns (
-            address refunder,
-            address swapper,
-            uint256 amount,
-            UD60x18 proceedsPerSecond
+            address,
+            address,
+            uint256,
+            UD60x18
         )
     {
-        Pool storage pool = pools[poolId];
-        refunder = pool.bids[epochId].refunder;
-        swapper = pool.bids[epochId].swapper;
-        amount = pool.bids[epochId].netFeeAmount + pool.bids[epochId].fee;
-        proceedsPerSecond = pool.bids[epochId].proceedsPerSecond;
+        Bid storage bid = pools[poolId].bids[epochId];
+        return (bid.refunder, bid.swapper, bid.netFeeAmount + bid.fee, bid.proceedsPerSecond);
     }
 
     function start() public {

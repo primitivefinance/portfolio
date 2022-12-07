@@ -86,7 +86,7 @@ interface IHyper {
             uint256 lastUpdatedTimestamp
         );
 
-    function getLeadingBid(bytes32 poolId, uint256 epochId)
+    function bids(bytes32 poolId, uint256 epochId)
         external
         view
         returns (
