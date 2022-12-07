@@ -6,7 +6,7 @@ import {UD60x18, fromUD60x18, toUD60x18, ud, wrap, unwrap} from "@prb/math/UD60x
 
 import "../../contracts/libraries/BrainMath.sol";
 
-contract TestBrainMath is Test {
+contract TestCalculateLiquidityUnderlying is Test {
     uint256 constant MAX_PERCENT_DELTA = 0.000000001e18;
 
     function test_calculateLiquidityUnderlying_should_round_up() public {
