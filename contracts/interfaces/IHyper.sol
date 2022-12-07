@@ -18,11 +18,26 @@ error PoolUninitializedError();
 interface IHyper {
     // ===== View =====
 
-    function epoch() external view returns (uint256 id, uint256 endTime);
+    function AUCTION_SETTLEMENT_TOKEN() external view returns (address);
 
-    function internalBalances(address owner, address token) external view returns (uint256);
+    function AUCTION_LENGTH() external view returns (uint256);
+
+    function PUBLIC_SWAP_FEE() external view returns (UD60x18);
+
+    function AUCTION_FEE() external view returns (UD60x18);
+
+    function epoch()
+        external
+        view
+        returns (
+            uint256 id,
+            uint256 endTime,
+            uint256 length
+        );
 
     function auctionFeeCollector() external view returns (address);
+
+    function internalBalances(address owner, address token) external view returns (uint256);
 
     function pools(bytes32 poolId)
         external
@@ -69,17 +84,6 @@ interface IHyper {
             UD60x18 feesAPerLiquidityInsideLast,
             UD60x18 feesBPerLiquidityInsideLast,
             uint256 lastUpdatedTimestamp
-        );
-
-    function getGlobalDefaults()
-        external
-        view
-        returns (
-            UD60x18 publicSwapFee,
-            uint256 epochLength,
-            uint256 auctionLength,
-            address auctionSettlementToken,
-            UD60x18 auctionFee
         );
 
     function getLeadingBid(bytes32 poolId, uint256 epochId)

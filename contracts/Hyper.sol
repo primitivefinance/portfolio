@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18} from "@prb/math/UD60x18.sol";
+import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18, ZERO as zeroUD60x18, HALF_UNIT as halfUD60x18} from "@prb/math/UD60x18.sol";
 
 import "./interfaces/IHyper.sol";
 
@@ -10,7 +10,6 @@ import "solmate/utils/SafeTransferLib.sol";
 
 import "./libraries/BitMath.sol";
 import "./libraries/BrainMath.sol";
-import "./libraries/GlobalDefaults.sol";
 
 import {BalanceChange} from "./libraries/BalanceChange.sol";
 import {Epoch} from "./libraries/Epoch.sol";
@@ -22,6 +21,10 @@ import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
 
 contract Hyper is IHyper {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
+    uint256 public immutable AUCTION_LENGTH;
+
+    UD60x18 public immutable PUBLIC_SWAP_FEE;
+    UD60x18 public immutable AUCTION_FEE;
 
     Epoch public epoch;
 
@@ -29,7 +32,7 @@ contract Hyper is IHyper {
     mapping(bytes32 => Slot) public slots;
     mapping(bytes32 => Position) public positions;
 
-    // TODO: Not sure if this should be stored here
+    /// poolId => ? => ?
     mapping(bytes32 => mapping(int16 => uint256)) public bitmaps;
 
     /// @notice Internal token balances
@@ -40,37 +43,33 @@ contract Hyper is IHyper {
 
     constructor(
         uint256 startTime,
-        address _auctionFeeCollector,
-        address _auctionSettlementToken
+        address _auctionSettlementToken,
+        uint256 _epochLength,
+        uint256 _auctionLength,
+        UD60x18 _publicSwapFee,
+        UD60x18 _auctionFee
     ) {
-        require(startTime > block.timestamp);
-        epoch = Epoch({id: 0, endTime: startTime});
-        auctionFeeCollector = _auctionFeeCollector;
+        auctionFeeCollector = msg.sender;
+
+        require(startTime > block.timestamp && _epochLength > 0);
+        epoch = Epoch({id: 0, endTime: startTime, length: _epochLength});
+
+        require(_auctionSettlementToken != address(0));
         AUCTION_SETTLEMENT_TOKEN = _auctionSettlementToken;
+
+        require(_auctionLength > 0 && _auctionLength < (_epochLength / 2));
+        AUCTION_LENGTH = _auctionLength;
+
+        require(_publicSwapFee.gt(zeroUD60x18) && _publicSwapFee.lt(halfUD60x18));
+        PUBLIC_SWAP_FEE = _publicSwapFee;
+
+        require(_auctionFee.gt(zeroUD60x18) && _auctionFee.lt(halfUD60x18));
+        AUCTION_FEE = _auctionFee;
     }
 
     modifier started() {
         if (epoch.id < 1) revert HyperNotStartedError();
         _;
-    }
-
-    function getGlobalDefaults()
-        public
-        view
-        override
-        returns (
-            UD60x18 publicSwapFee,
-            uint256 epochLength,
-            uint256 auctionLength,
-            address auctionSettlementToken,
-            UD60x18 auctionFee
-        )
-    {
-        publicSwapFee = PUBLIC_SWAP_FEE;
-        epochLength = EPOCH_LENGTH;
-        auctionLength = AUCTION_LENGTH;
-        auctionSettlementToken = AUCTION_SETTLEMENT_TOKEN;
-        auctionFee = AUCTION_FEE;
     }
 
     function getLeadingBid(bytes32 poolId, uint256 epochId)
@@ -301,7 +300,6 @@ contract Hyper is IHyper {
             (amountA, amountB) = _calculateLiquidityUnderlying(
                 addAmountLeft,
                 pool.sqrtPrice,
-                pool.slotIndex,
                 position.lowerSlotIndex,
                 position.upperSlotIndex,
                 true
@@ -356,7 +354,6 @@ contract Hyper is IHyper {
             (amountA, amountB) = _calculateLiquidityUnderlying(
                 removedPending,
                 pool.sqrtPrice,
-                pool.slotIndex,
                 position.lowerSlotIndex,
                 position.upperSlotIndex,
                 false
@@ -644,7 +641,7 @@ contract Hyper is IHyper {
                 swapper: swapper,
                 netFeeAmount: netFeeAmount,
                 fee: fee,
-                proceedsPerSecond: toUD60x18(netFeeAmount).div(toUD60x18(EPOCH_LENGTH))
+                proceedsPerSecond: toUD60x18(netFeeAmount).div(toUD60x18(epoch.length))
             });
             emit LeadingBid(poolId, epochId, swapper, amount, pool.bids[epochId].proceedsPerSecond);
         }

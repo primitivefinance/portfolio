@@ -44,8 +44,6 @@ function _getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) 
 function _calculateLiquidityUnderlying(
     uint256 liquidity,
     UD60x18 sqrtPriceCurrentSlot,
-    // TODO: Do we really need the currentSlotIndex?
-    int128 currentSlotIndex,
     int128 lowerSlotIndex,
     int128 upperSlotIndex,
     bool shouldRoundUp

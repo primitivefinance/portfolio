@@ -3,8 +3,6 @@ pragma solidity 0.8.13;
 
 import {UD60x18, toUD60x18} from "@prb/math/UD60x18.sol";
 
-import {EPOCH_LENGTH} from "./GlobalDefaults.sol";
-
 import {Epoch} from "./Epoch.sol";
 
 using {sync} for Pool global;
@@ -53,7 +51,7 @@ function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFee
         // update proceeds per liquidity distributed to end of epoch
         uint256 lastUpdateEpoch = epoch.id - epochsPassed;
         if (pool.maturedLiquidity > 0 && !pool.bids[lastUpdateEpoch].proceedsPerSecond.isZero()) {
-            uint256 timeToTransition = epoch.endTime - (epochsPassed * EPOCH_LENGTH) - pool.lastUpdatedTimestamp;
+            uint256 timeToTransition = epoch.endTime - (epochsPassed * epoch.length) - pool.lastUpdatedTimestamp;
             pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
                 pool.bids[lastUpdateEpoch].proceedsPerSecond.mul(
                     toUD60x18(timeToTransition)).div(toUD60x18(pool.maturedLiquidity)
@@ -82,14 +80,14 @@ function sync(Pool storage pool, Epoch memory epoch) returns (uint256 auctionFee
             if (pool.maturedLiquidity > 0 && !pool.bids[lastUpdateEpoch + 1].proceedsPerSecond.isZero()) {
                 pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
                     pool.bids[lastUpdateEpoch + 1].proceedsPerSecond.mul(
-                        toUD60x18(EPOCH_LENGTH)).div(toUD60x18(pool.maturedLiquidity))
+                        toUD60x18(epoch.length)).div(toUD60x18(pool.maturedLiquidity))
                 );
                 auctionFees += pool.bids[lastUpdateEpoch + 1].fee;
             }
         }
     }
     // add proceeds for time passed in the current epoch
-    uint256 timePassedInCurrentEpoch = block.timestamp - (epoch.endTime - EPOCH_LENGTH);
+    uint256 timePassedInCurrentEpoch = block.timestamp - (epoch.endTime - epoch.length);
     if (pool.maturedLiquidity > 0 && timePassedInCurrentEpoch > 0) {
         pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
             pool.bids[epoch.id].proceedsPerSecond.mul(
