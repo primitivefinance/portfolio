@@ -163,5 +163,6 @@ interface IHyper {
     error RemovePendingLiquidityError();
     error RemoveLiquidityUninitializedError();
     error PositionInvalidRangeError();
+    error PositionInvalidSpacingError();
     error PoolUninitializedError();
 }

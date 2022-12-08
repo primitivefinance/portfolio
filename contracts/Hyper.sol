@@ -17,10 +17,9 @@ import {getSlotId, getSlotSnapshot, SlotId, Slot, SlotSnapshot} from "./librarie
 import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInside, Earnings, PositionId, Position} from "./libraries/Position.sol";
 
 // TODO:
-// - check the types
+// - check the types on integers
 // - price limit on swap
 // - fix amount out
-// - slot index spacing
 
 contract Hyper is IHyper, ReentrancyGuard {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
@@ -28,6 +27,8 @@ contract Hyper is IHyper, ReentrancyGuard {
 
     UD60x18 public immutable PUBLIC_SWAP_FEE;
     UD60x18 public immutable AUCTION_FEE;
+
+    uint8 public immutable SLOT_SPACING;
 
     Epoch public epoch;
 
@@ -53,7 +54,8 @@ contract Hyper is IHyper, ReentrancyGuard {
         uint256 _epochLength,
         uint256 _auctionLength,
         UD60x18 _publicSwapFee,
-        UD60x18 _auctionFee
+        UD60x18 _auctionFee,
+        uint8 _slotSpacing
     ) {
         auctionFeeCollector = msg.sender;
 
@@ -71,6 +73,9 @@ contract Hyper is IHyper, ReentrancyGuard {
 
         require(_auctionFee.gt(zeroUD60x18) && _auctionFee.lt(halfUD60x18));
         AUCTION_FEE = _auctionFee;
+
+        require(_slotSpacing > 0);
+        SLOT_SPACING = _slotSpacing;
     }
 
     modifier started() {
@@ -314,6 +319,8 @@ contract Hyper is IHyper, ReentrancyGuard {
         int256 amount
     ) public nonReentrant started {
         if (lowerSlotIndex >= upperSlotIndex) revert IHyper.PositionInvalidRangeError();
+        if (BrainMath.abs_(lowerSlotIndex) % SLOT_SPACING != 0 || BrainMath.abs_(upperSlotIndex) % SLOT_SPACING != 0)
+            revert IHyper.PositionInvalidSpacingError();
         if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
