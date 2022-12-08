@@ -100,6 +100,6 @@ contract TestSwap is Test {
         );
 
         // perform swap
-        hyper.swap(poolId, PoolToken.A, tokenBAmountIn);
+        hyper.swap(poolId, PoolToken.B, tokenBAmountIn);
     }
 }
