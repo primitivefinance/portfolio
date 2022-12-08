@@ -192,6 +192,8 @@ contract Hyper is IHyper, Test {
                 if (slot.liquidityGross == 0) {
                     (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(slotIndex));
                     bitmaps[poolId][chunk] = BitMath.flip(bitmaps[poolId][chunk], bit);
+                    delete slots[slot.id];
+                    return;
                 }
             }
             slot.pendingLiquidityGross = int256(0);
@@ -356,6 +358,10 @@ contract Hyper is IHyper, Test {
         if (amount > 0) {
             _addLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
         } else {
+            // save slot snapshots
+            slotSnapshots[lowerSlot.id][epoch.id] = getSlotSnapshot(lowerSlot);
+            slotSnapshots[upperSlot.id][epoch.id] = getSlotSnapshot(upperSlot);
+            // remove liquidity
             _removeLiquidity(pool, lowerSlot, upperSlot, position, BrainMath.abs(amount));
         }
 
@@ -475,6 +481,7 @@ contract Hyper is IHyper, Test {
             if (lowerSlot.liquidityGross == 0) {
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
                 bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
+                delete slots[lowerSlot.id];
             }
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
@@ -484,6 +491,7 @@ contract Hyper is IHyper, Test {
             if (upperSlot.liquidityGross == 0) {
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
                 bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
+                delete slots[upperSlot.id];
             }
 
             // credit tokens owed to the position immediately
@@ -520,10 +528,6 @@ contract Hyper is IHyper, Test {
                 pool.pendingLiquidity -= int256(removeAmountLeft);
             }
         }
-
-        // save slot snapshots
-        slotSnapshots[lowerSlot.id][epoch.id] = getSlotSnapshot(lowerSlot);
-        slotSnapshots[upperSlot.id][epoch.id] = getSlotSnapshot(upperSlot);
 
         // add to internal balance
         if (amountA != 0) internalBalances[msg.sender][pool.tokenA] += amountA;
