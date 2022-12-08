@@ -3,36 +3,40 @@ pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
 
-import {UD60x18, fromUD60x18, toUD60x18, unwrap, wrap as wrapUD60x18} from "@prb/math/UD60x18.sol";
+import {ERC20, SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
-import "./interfaces/IHyper.sol";
+import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18, ZERO as zeroUD60x18, HALF_UNIT as halfUD60x18} from "@prb/math/UD60x18.sol";
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
-import "solmate/utils/SafeTransferLib.sol";
+import {IHyper} from "./interfaces/IHyper.sol";
 
-import "./libraries/BitMath.sol";
-import "./libraries/BrainMath.sol";
-import "./libraries/GlobalDefaults.sol";
+import "./libraries/BitMath.sol" as BitMath;
+import "./libraries/BrainMath.sol" as BrainMath;
 
-import {BalanceChange} from "./libraries/BalanceChange.sol";
 import {Epoch} from "./libraries/Epoch.sol";
-import {Pool, Bid, getPoolId} from "./libraries/Pool.sol";
-import {Position, PositionBalanceChange, getPositionId} from "./libraries/Position.sol";
-import {Slot, SlotSnapshot, getSlotId} from "./libraries/Slot.sol";
+import {getPoolId, getPoolSnapshot, PoolId, Pool, PoolToken, PoolSnapshot, Bid} from "./libraries/Pool.sol";
+import {getSlotId, getSlotSnapshot, SlotId, Slot, SlotSnapshot} from "./libraries/Slot.sol";
+import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInside, Earnings, PositionId, Position} from "./libraries/Position.sol";
 
 // TODO: Reentrancy guard
 
 contract Hyper is IHyper, Test {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
+    uint256 public immutable AUCTION_LENGTH;
+
+    UD60x18 public immutable PUBLIC_SWAP_FEE;
+    UD60x18 public immutable AUCTION_FEE;
 
     Epoch public epoch;
 
-    mapping(bytes32 => Pool) public pools;
-    mapping(bytes32 => Slot) public slots;
-    mapping(bytes32 => Position) public positions;
+    mapping(PoolId => Pool) public pools;
+    mapping(SlotId => Slot) public slots;
+    mapping(PositionId => Position) public positions;
 
-    // TODO: Not sure if this should be stored here
-    mapping(bytes32 => mapping(int16 => uint256)) public bitmaps;
+    mapping(PoolId => mapping(int16 => uint256)) public bitmaps;
+    mapping(PoolId => mapping(uint256 => Bid)) public bids;
+    mapping(PoolId => mapping(uint256 => PoolSnapshot)) public poolSnapshots;
+
+    mapping(SlotId => mapping(uint256 => SlotSnapshot)) public slotSnapshots;
 
     /// @notice Internal token balances
     /// user => token => balance
@@ -42,62 +46,33 @@ contract Hyper is IHyper, Test {
 
     constructor(
         uint256 startTime,
-        address _auctionFeeCollector,
-        address _auctionSettlementToken
+        address _auctionSettlementToken,
+        uint256 _epochLength,
+        uint256 _auctionLength,
+        UD60x18 _publicSwapFee,
+        UD60x18 _auctionFee
     ) {
-        require(startTime > block.timestamp);
-        epoch = Epoch({id: 0, endTime: startTime});
-        auctionFeeCollector = _auctionFeeCollector;
+        auctionFeeCollector = msg.sender;
+
+        require(startTime > block.timestamp && _epochLength > 0);
+        epoch = Epoch({id: 0, endTime: startTime, length: _epochLength});
+
+        require(_auctionSettlementToken != address(0));
         AUCTION_SETTLEMENT_TOKEN = _auctionSettlementToken;
+
+        require(_auctionLength > 0 && _auctionLength < (_epochLength / 2));
+        AUCTION_LENGTH = _auctionLength;
+
+        require(_publicSwapFee.gt(zeroUD60x18) && _publicSwapFee.lt(halfUD60x18));
+        PUBLIC_SWAP_FEE = _publicSwapFee;
+
+        require(_auctionFee.gt(zeroUD60x18) && _auctionFee.lt(halfUD60x18));
+        AUCTION_FEE = _auctionFee;
     }
 
     modifier started() {
-        if (epoch.id < 1) revert HyperNotStartedError();
+        if (epoch.id == 0) revert IHyper.HyperNotStartedError();
         _;
-    }
-
-    function getGlobalDefaults()
-        public
-        view
-        override
-        returns (
-            UD60x18 publicSwapFee,
-            uint256 epochLength,
-            uint256 auctionLength,
-            address auctionSettlementToken,
-            UD60x18 auctionFee
-        )
-    {
-        publicSwapFee = PUBLIC_SWAP_FEE;
-        epochLength = EPOCH_LENGTH;
-        auctionLength = AUCTION_LENGTH;
-        auctionSettlementToken = AUCTION_SETTLEMENT_TOKEN;
-        auctionFee = AUCTION_FEE;
-    }
-
-    function getLeadingBid(bytes32 poolId, uint256 epochId)
-        public
-        view
-        override
-        started
-        returns (
-            address refunder,
-            address swapper,
-            uint256 amount,
-            UD60x18 proceedsPerSecond
-        )
-    {
-        Pool storage pool = pools[poolId];
-        refunder = pool.bids[epochId].refunder;
-        swapper = pool.bids[epochId].swapper;
-        amount = pool.bids[epochId].netFeeAmount + pool.bids[epochId].fee;
-        proceedsPerSecond = pool.bids[epochId].proceedsPerSecond;
-    }
-
-    function start() public {
-        epoch.sync();
-        require(epoch.id > 0, "Hyper not started yet.");
-        emit SetEpoch(epoch.id, epoch.endTime);
     }
 
     /// @notice Adds `amount` of `token` to `to` internal balance
@@ -123,71 +98,239 @@ contract Hyper is IHyper, Test {
         emit Withdraw(to, token, amount);
     }
 
+    function syncEpoch() internal {
+        if (block.timestamp >= epoch.endTime) {
+            uint256 epochsPassed = (block.timestamp - epoch.endTime) / epoch.length;
+            epoch.id += (1 + epochsPassed);
+            epoch.endTime += (epoch.length + (epochsPassed * epoch.length));
+            emit SetEpoch(epoch.id, epoch.endTime);
+        }
+    }
+
+    function syncPool(Pool storage pool, Epoch memory readEpoch) internal {
+        uint256 epochsPassed = readEpoch.getEpochsPassed(pool.lastUpdatedTimestamp);
+        if (epochsPassed > 0) {
+            uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
+            // distribute remaining proceeds in lastUpdatedEpochId
+            if (pool.maturedLiquidity > 0) {
+                UD60x18 proceedsPerSecond = bids[pool.id][lastUpdatedEpochId].proceedsPerSecond;
+                if (!proceedsPerSecond.isZero()) {
+                    // calculate seconds remaining in lastUpdatedEpochId
+                    uint256 timeToTransition = epoch.getTimeToTransition(epochsPassed, pool.lastUpdatedTimestamp);
+                    // multiple seconds remaining by proceedsPerSecond in lastUpdatedEpochId and add to pool
+                    pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
+                        proceedsPerSecond.mul(toUD60x18(timeToTransition)).div(toUD60x18(pool.maturedLiquidity))
+                    );
+                }
+            }
+            // save pool snapshot for lastUpdatedEpochId
+            poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
+            // update the pool's liquidity due to the transition
+            if (pool.pendingLiquidity > 0) {
+                pool.maturedLiquidity += uint256(pool.pendingLiquidity);
+            } else {
+                pool.maturedLiquidity -= BrainMath.abs(pool.pendingLiquidity);
+            }
+            pool.swapLiquidity = pool.maturedLiquidity;
+            pool.pendingLiquidity = int256(0);
+            // auction fees only accrue after an epoch transition
+            internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[pool.id][lastUpdatedEpochId].fee;
+            if (epochsPassed > 1) {
+                // update proceeds per liquidity distributed for next epoch if needed
+                if (pool.maturedLiquidity > 0) {
+                    UD60x18 proceedsPerSecond = bids[pool.id][lastUpdatedEpochId + 1].proceedsPerSecond;
+                    if (!proceedsPerSecond.isZero()) {
+                        pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
+                            bids[pool.id][lastUpdatedEpochId + 1].proceedsPerSecond.mul(toUD60x18(epoch.length)).div(
+                                toUD60x18(pool.maturedLiquidity)
+                            )
+                        );
+                    }
+                }
+                // add auction fees
+                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[pool.id][lastUpdatedEpochId + 1]
+                    .fee;
+            }
+        }
+        // add proceeds for time passed in the current epoch
+        if (pool.maturedLiquidity > 0) {
+            uint256 timePassedInCurrentEpoch = readEpoch.getTimePassedInCurrentEpoch(pool.lastUpdatedTimestamp);
+            if (timePassedInCurrentEpoch > 0) {
+                UD60x18 proceedsPerSecond = bids[pool.id][readEpoch.id].proceedsPerSecond;
+                if (!proceedsPerSecond.isZero()) {
+                    pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
+                        proceedsPerSecond.mul(toUD60x18(timePassedInCurrentEpoch)).div(toUD60x18(pool.maturedLiquidity))
+                    );
+                }
+            }
+        }
+        pool.lastUpdatedTimestamp = block.timestamp;
+    }
+
+    function syncSlot(
+        PoolId poolId,
+        Slot storage slot,
+        int128 slotIndex,
+        Epoch memory readEpoch
+    ) internal {
+        uint256 epochsPassed = readEpoch.getEpochsPassed(slot.lastUpdatedTimestamp);
+        if (epochsPassed > 0) {
+            // update liquidity deltas for epoch transition
+            slot.maturedLiquidityDelta += slot.pendingLiquidityDelta;
+            slot.swapLiquidityDelta = slot.maturedLiquidityDelta;
+            slot.pendingLiquidityDelta = int256(0);
+
+            // update liquidity gross for epoch transition
+            if (slot.pendingLiquidityGross < 0) {
+                slot.liquidityGross -= BrainMath.abs(slot.pendingLiquidityGross);
+                if (slot.liquidityGross == 0) {
+                    (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(slotIndex));
+                    bitmaps[poolId][chunk] = BitMath.flip(bitmaps[poolId][chunk], bit);
+                }
+            }
+            slot.pendingLiquidityGross = int256(0);
+        }
+        slot.lastUpdatedTimestamp = block.timestamp;
+    }
+
+    function syncPosition(
+        Position storage position,
+        Pool memory pool,
+        Slot memory lowerSlot,
+        Slot memory upperSlot,
+        Epoch memory readEpoch
+    ) internal {
+        Earnings memory earnings;
+
+        uint256 epochsPassed = readEpoch.getEpochsPassed(position.lastUpdatedTimestamp);
+        if (epochsPassed > 0) {
+            if (position.pendingLiquidity != 0) {
+                uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
+                PoolSnapshot memory poolSnapshot = poolSnapshots[pool.id][lastUpdatedEpochId];
+                {
+                    // get per liquidities inside through end of last update epoch
+                    PerLiquiditiesInside memory perLiquiditiesInside = getPerLiquiditiesInside(
+                        position,
+                        poolSnapshot,
+                        slotSnapshots[lowerSlot.id][lastUpdatedEpochId],
+                        slotSnapshots[upperSlot.id][lastUpdatedEpochId]
+                    );
+                    // get earnings from growth in per liquidities
+                    (earnings.amountA, earnings.amountB, earnings.amountC) = getEarnings(
+                        position,
+                        perLiquiditiesInside.proceedsPerLiquidityInside,
+                        perLiquiditiesInside.feesAPerLiquidityInside,
+                        perLiquiditiesInside.feesBPerLiquidityInside
+                    );
+                    // update per liquidities inside
+                    position.proceedsPerLiquidityInsideLast = perLiquiditiesInside.proceedsPerLiquidityInside;
+                    position.feesAPerLiquidityInsideLast = perLiquiditiesInside.feesAPerLiquidityInside;
+                    position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
+                }
+                // if liquidity was kicked out, add the underlying tokens
+                if (position.pendingLiquidity < 0) {
+                    (uint256 kickedOutTokenA, uint256 kickedOutTokenB) = BrainMath._calculateLiquidityUnderlying(
+                        BrainMath.abs(position.pendingLiquidity),
+                        poolSnapshot.sqrtPrice,
+                        position.lowerSlotIndex,
+                        position.upperSlotIndex,
+                        BrainMath.Rounding.Down
+                    );
+                    earnings.amountA += kickedOutTokenA;
+                    earnings.amountB += kickedOutTokenB;
+                    // update position matured liquidity
+                    position.maturedLiquidity -= BrainMath.abs(position.pendingLiquidity);
+                } else {
+                    position.maturedLiquidity += uint256(position.pendingLiquidity);
+                }
+                // finally update swap liquidity and pending liquidity
+                position.swapLiquidity = position.maturedLiquidity;
+                position.pendingLiquidity = int256(0);
+            }
+        }
+        {
+            // get per liquidities inside through end of last update epoch
+            PerLiquiditiesInside memory perLiquiditiesInside = getPerLiquiditiesInside(
+                position,
+                getPoolSnapshot(pool),
+                getSlotSnapshot(lowerSlot),
+                getSlotSnapshot(upperSlot)
+            );
+            (uint256 earningsA, uint256 earningsB, uint256 earningsC) = getEarnings(
+                position,
+                perLiquiditiesInside.proceedsPerLiquidityInside,
+                perLiquiditiesInside.feesAPerLiquidityInside,
+                perLiquiditiesInside.feesBPerLiquidityInside
+            );
+            earnings.amountA += earningsA;
+            earnings.amountB += earningsB;
+            earnings.amountC += earningsC;
+            // update per liquidities inside
+            position.proceedsPerLiquidityInsideLast = perLiquiditiesInside.proceedsPerLiquidityInside;
+            position.feesAPerLiquidityInsideLast = perLiquiditiesInside.feesAPerLiquidityInside;
+            position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
+        }
+        // update internal balances
+        if (earnings.amountA != 0) internalBalances[msg.sender][pool.tokenA] += earnings.amountA;
+        if (earnings.amountB != 0) internalBalances[msg.sender][pool.tokenB] += earnings.amountB;
+        if (earnings.amountC != 0) internalBalances[msg.sender][AUCTION_SETTLEMENT_TOKEN] += earnings.amountC;
+
+        position.lastUpdatedTimestamp = block.timestamp;
+    }
+
+    function start() public {
+        require(epoch.id == 0 && block.timestamp >= epoch.endTime, "Hyper not started yet.");
+        syncEpoch();
+    }
+
     function activatePool(
         address tokenA,
         address tokenB,
         UD60x18 sqrtPrice
     ) public started {
-        bool newEpoch = epoch.sync();
-        if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
+        syncEpoch();
 
-        Pool storage pool = pools[getPoolId(tokenA, tokenB)];
-        if (pool.lastUpdatedTimestamp != 0) revert PoolAlreadyInitializedError();
+        PoolId poolId = getPoolId(tokenA, tokenB);
+        Pool storage pool = pools[poolId];
+        if (pool.lastUpdatedTimestamp != 0) revert IHyper.PoolAlreadyInitializedError();
+        pool.id = poolId;
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
         pool.sqrtPrice = sqrtPrice;
-        pool.slotIndex = _getSlotAtSqrtPrice(sqrtPrice);
+        pool.slotIndex = BrainMath._getSlotAtSqrtPrice(sqrtPrice);
         pool.lastUpdatedTimestamp = block.timestamp;
         emit ActivatePool(tokenA, tokenB);
     }
 
     function updateLiquidity(
-        bytes32 poolId,
-        int128 lowerSlotIndex,
-        int128 upperSlotIndex,
-        int256 amount,
-        bool transferOut
-    ) public {
-        BalanceChange[3] memory balanceChanges = _updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, amount);
-        for (uint256 i = 0; i < balanceChanges.length; ++i) {
-            _settleBalanceChange(balanceChanges[i], transferOut);
-        }
-    }
-
-    function _updateLiquidity(
-        bytes32 poolId,
+        PoolId poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
-    ) internal started returns (BalanceChange[3] memory balanceChanges) {
-        if (lowerSlotIndex >= upperSlotIndex) revert PositionInvalidRangeError();
-        if (amount == 0) revert AmountZeroError();
+    ) public started {
+        if (lowerSlotIndex >= upperSlotIndex) revert IHyper.PositionInvalidRangeError();
+        if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert PoolUninitializedError();
+        if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolUninitializedError();
 
-        {
-            bool newEpoch = epoch.sync();
-            if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
-        }
+        syncEpoch();
+        syncPool(pool, epoch);
 
-        {
-            uint256 auctionFees = pool.sync(epoch);
-            if (auctionFees > 0) {
-                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += auctionFees;
-            }
-        }
-
+        SlotId lowerSlotId;
         Slot storage lowerSlot;
         {
-            lowerSlot = slots[getSlotId(poolId, int24(lowerSlotIndex))];
-            lowerSlot.sync(bitmaps[poolId], int24(lowerSlotIndex), epoch);
+            lowerSlotId = getSlotId(poolId, int24(lowerSlotIndex));
+            lowerSlot = slots[lowerSlotId];
+            syncSlot(poolId, lowerSlot, lowerSlotIndex, epoch);
         }
 
+        SlotId upperSlotId;
         Slot storage upperSlot;
         {
-            upperSlot = slots[getSlotId(poolId, int24(upperSlotIndex))];
-            upperSlot.sync(bitmaps[poolId], int24(upperSlotIndex), epoch);
+            upperSlotId = getSlotId(poolId, int24(upperSlotIndex));
+            upperSlot = slots[upperSlotId];
+            syncSlot(poolId, upperSlot, upperSlotIndex, epoch);
         }
 
         Position storage position;
@@ -196,61 +339,40 @@ contract Hyper is IHyper, Test {
         }
 
         if (position.lastUpdatedTimestamp == 0) {
-            if (amount < 0) revert RemoveLiquidityUninitializedError();
+            if (amount < 0) revert IHyper.RemoveLiquidityUninitializedError();
             position.lowerSlotIndex = lowerSlotIndex;
             position.upperSlotIndex = upperSlotIndex;
             position.lastUpdatedTimestamp = block.timestamp;
         } else {
-            PositionBalanceChange memory syncBalanceChange = position.sync(pool, lowerSlot, upperSlot, epoch);
-            if (syncBalanceChange.amountA != 0) balanceChanges[0].amount = int256(syncBalanceChange.amountA);
-            if (syncBalanceChange.amountB != 0) balanceChanges[1].amount = int256(syncBalanceChange.amountB);
-            if (syncBalanceChange.amountC != 0) balanceChanges[2].amount = int256(syncBalanceChange.amountC);
+            syncPosition(position, pool, lowerSlot, upperSlot, epoch);
         }
 
         if (amount > 0) {
-            (uint256 addAmountA, uint256 addAmountB) = _addLiquidity(
-                pool,
-                bitmaps[poolId],
-                lowerSlot,
-                upperSlot,
-                position,
-                uint256(amount)
-            );
-            if (addAmountA != 0) balanceChanges[0].amount -= int256(addAmountA);
-            if (addAmountB != 0) balanceChanges[1].amount -= int256(addAmountB);
+            _addLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
         } else {
-            (uint256 removeAmountA, uint256 removeAmountB) = _removeLiquidity(
-                pool,
-                bitmaps[poolId],
-                lowerSlot,
-                upperSlot,
-                position,
-                abs(amount)
-            );
-            if (removeAmountA != 0) balanceChanges[0].amount += int256(removeAmountA);
-            if (removeAmountB != 0) balanceChanges[1].amount += int256(removeAmountB);
+            _removeLiquidity(pool, lowerSlot, upperSlot, position, BrainMath.abs(amount));
         }
-
-        balanceChanges[0].token = pool.tokenA;
-        balanceChanges[1].token = pool.tokenB;
-        balanceChanges[2].token = AUCTION_SETTLEMENT_TOKEN;
 
         emit UpdateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, amount);
     }
 
     function _addLiquidity(
         Pool storage pool,
-        mapping(int16 => uint256) storage chunks,
         Slot storage lowerSlot,
         Slot storage upperSlot,
         Position storage position,
         uint256 amount
-    ) internal returns (uint256 amountA, uint256 amountB) {
+    ) internal {
         uint256 addAmountLeft = amount;
+
+        uint256 amountA;
+        uint256 amountB;
 
         // use negative pending liquidity first
         if (position.pendingLiquidity < 0) {
-            uint256 addedPending = abs(position.pendingLiquidity) >= amount ? amount : abs(position.pendingLiquidity);
+            uint256 addedPending = BrainMath.abs(position.pendingLiquidity) >= amount
+                ? amount
+                : BrainMath.abs(position.pendingLiquidity);
 
             position.pendingLiquidity += int256(addedPending);
 
@@ -275,8 +397,8 @@ contract Hyper is IHyper, Test {
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
             if (lowerSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.lowerSlotIndex) {
                     lowerSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
@@ -290,8 +412,8 @@ contract Hyper is IHyper, Test {
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.upperSlotIndex) {
                     upperSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
@@ -300,34 +422,38 @@ contract Hyper is IHyper, Test {
                 }
                 upperSlot.liquidityGross += uint256(addAmountLeft);
             }
-            (amountA, amountB) = _calculateLiquidityUnderlying(
+            (amountA, amountB) = BrainMath._calculateLiquidityUnderlying(
                 addAmountLeft,
                 pool.sqrtPrice,
-                pool.slotIndex,
                 position.lowerSlotIndex,
                 position.upperSlotIndex,
-                true
+                BrainMath.Rounding.Up
             );
             if (position.lowerSlotIndex <= pool.slotIndex && position.upperSlotIndex > pool.slotIndex) {
                 pool.swapLiquidity += addAmountLeft;
                 pool.pendingLiquidity += int256(addAmountLeft);
             }
         }
+
+        if (amountA != 0) settleToken(pool.tokenA, amountA);
+        if (amountB != 0) settleToken(pool.tokenB, amountB);
     }
 
     function _removeLiquidity(
         Pool storage pool,
-        mapping(int16 => uint256) storage chunks,
         Slot storage lowerSlot,
         Slot storage upperSlot,
         Position storage position,
         uint256 amount
-    ) internal returns (uint256 amountA, uint256 amountB) {
+    ) internal {
         uint256 removeAmountLeft = amount;
+
+        uint256 amountA;
+        uint256 amountB;
 
         // remove positive pending liquidity immediately
         if (position.pendingLiquidity > 0) {
-            if (position.swapLiquidity < amount) revert RemovePendingLiquidityError();
+            if (position.swapLiquidity < amount) revert IHyper.RemovePendingLiquidityError();
 
             uint256 removedPending = uint256(position.pendingLiquidity) >= amount
                 ? amount
@@ -341,8 +467,8 @@ contract Hyper is IHyper, Test {
             lowerSlot.liquidityGross -= removedPending;
 
             if (lowerSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
             }
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
@@ -350,18 +476,17 @@ contract Hyper is IHyper, Test {
             upperSlot.liquidityGross -= removedPending;
 
             if (upperSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
             }
 
             // credit tokens owed to the position immediately
-            (amountA, amountB) = _calculateLiquidityUnderlying(
+            (amountA, amountB) = BrainMath._calculateLiquidityUnderlying(
                 removedPending,
                 pool.sqrtPrice,
-                pool.slotIndex,
                 position.lowerSlotIndex,
                 position.upperSlotIndex,
-                false
+                BrainMath.Rounding.Down
             );
 
             if (position.lowerSlotIndex <= pool.slotIndex && position.upperSlotIndex > pool.slotIndex) {
@@ -371,7 +496,8 @@ contract Hyper is IHyper, Test {
 
             removeAmountLeft -= removedPending;
         } else {
-            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert RemoveLiquidityError();
+            if (position.swapLiquidity - BrainMath.abs(position.pendingLiquidity) < amount)
+                revert IHyper.RemoveLiquidityError();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
@@ -390,16 +516,12 @@ contract Hyper is IHyper, Test {
         }
 
         // save slot snapshots
-        lowerSlot.snapshots[epoch.id] = SlotSnapshot({
-            proceedsPerLiquidityOutside: lowerSlot.proceedsPerLiquidityOutside,
-            feesAPerLiquidityOutside: lowerSlot.feesAPerLiquidityOutside,
-            feesBPerLiquidityOutside: lowerSlot.feesBPerLiquidityOutside
-        });
-        upperSlot.snapshots[epoch.id] = SlotSnapshot({
-            proceedsPerLiquidityOutside: upperSlot.proceedsPerLiquidityOutside,
-            feesAPerLiquidityOutside: upperSlot.feesAPerLiquidityOutside,
-            feesBPerLiquidityOutside: upperSlot.feesBPerLiquidityOutside
-        });
+        slotSnapshots[lowerSlot.id][epoch.id] = getSlotSnapshot(lowerSlot);
+        slotSnapshots[upperSlot.id][epoch.id] = getSlotSnapshot(upperSlot);
+
+        // add to internal balance
+        if (amountA != 0) internalBalances[msg.sender][pool.tokenA] += amountA;
+        if (amountB != 0) internalBalances[msg.sender][pool.tokenB] += amountB;
     }
 
     struct SwapDetails {
@@ -418,39 +540,20 @@ contract Hyper is IHyper, Test {
     }
 
     function swap(
-        bytes32 poolId,
-        uint256 amountIn,
-        bool direction,
-        bool transferOut
-    ) public {
-        BalanceChange[2] memory balanceChanges = _swap(poolId, amountIn, direction);
-        for (uint256 i = 0; i < balanceChanges.length; ++i) {
-            _settleBalanceChange(balanceChanges[i], transferOut);
-        }
-    }
-
-    function _swap(
-        bytes32 poolId,
-        uint256 amountIn,
-        bool direction
-    ) internal started returns (BalanceChange[2] memory balanceChanges) {
-        if (amountIn == 0) revert AmountZeroError();
+        PoolId poolId,
+        PoolToken tokenIn,
+        uint256 amountIn
+    ) public started {
+        if (amountIn == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert PoolNotInitializedError();
+        if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolNotInitializedError();
 
-        bool newEpoch = epoch.sync();
-        if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
-
-        {
-            uint256 auctionFees = pool.sync(epoch);
-            if (auctionFees > 0) {
-                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += auctionFees;
-            }
-        }
+        syncEpoch();
+        syncPool(pool, epoch);
 
         SwapDetails memory swapDetails = SwapDetails({
-            feeTier: msg.sender == pool.bids[epoch.id].swapper ? wrapUD60x18(0) : PUBLIC_SWAP_FEE,
+            feeTier: msg.sender == bids[poolId][epoch.id].swapper ? wrapUD60x18(0) : PUBLIC_SWAP_FEE,
             remaining: amountIn,
             amountOut: 0,
             slotIndex: pool.slotIndex,
@@ -458,7 +561,7 @@ contract Hyper is IHyper, Test {
             swapLiquidity: pool.swapLiquidity,
             maturedLiquidity: pool.maturedLiquidity,
             pendingLiquidity: pool.pendingLiquidity,
-            feesPerLiquidity: direction ? pool.feesAPerLiquidity : pool.feesBPerLiquidity,
+            feesPerLiquidity: tokenIn == PoolToken.A ? pool.feesAPerLiquidity : pool.feesBPerLiquidity,
             nextSlotInitialized: false,
             nextSlotIndex: 0,
             nextSqrtPrice: wrapUD60x18(0)
@@ -467,29 +570,29 @@ contract Hyper is IHyper, Test {
         while (swapDetails.remaining > 0) {
             {
                 // Get the next slot or the border of a bitmap
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(swapDetails.slotIndex));
-                (bool hasNextSlot, uint8 nextSlotBit) = findNextSlotWithinChunk(
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(swapDetails.slotIndex));
+                (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
                     bitmaps[poolId][chunk],
                     bit,
-                    direction
+                    tokenIn == PoolToken.A ? BitMath.SearchDirection.Left : BitMath.SearchDirection.Right
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
                 swapDetails.nextSlotIndex = int128(chunk) * 256 + int8(nextSlotBit);
-                swapDetails.nextSqrtPrice = _getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
+                swapDetails.nextSqrtPrice = BrainMath._getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
-            uint256 maxToDelta = direction
-                ? getDeltaXToNextPrice(
+            uint256 maxToDelta = tokenIn == PoolToken.A
+                ? BrainMath.getDeltaAToNextPrice(
                     swapDetails.sqrtPrice,
                     swapDetails.nextSqrtPrice,
                     swapDetails.swapLiquidity,
-                    true
+                    BrainMath.Rounding.Up
                 )
-                : getDeltaYToNextPrice(
+                : BrainMath.getDeltaBToNextPrice(
                     swapDetails.sqrtPrice,
                     swapDetails.nextSqrtPrice,
                     swapDetails.swapLiquidity,
-                    true
+                    BrainMath.Rounding.Up
                 );
 
             if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
@@ -500,19 +603,33 @@ contract Hyper is IHyper, Test {
                     toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                 );
                 // update price and amount out after swapping remaining amount
-                UD60x18 targetPrice = direction
-                    ? getTargetPriceUsingDeltaX(swapDetails.sqrtPrice, swapDetails.swapLiquidity, swapDetails.remaining)
-                    : getTargetPriceUsingDeltaY(
+                UD60x18 targetPrice = tokenIn == PoolToken.A
+                    ? BrainMath.getTargetPriceUsingDeltaA(
+                        swapDetails.sqrtPrice,
+                        swapDetails.swapLiquidity,
+                        swapDetails.remaining
+                    )
+                    : BrainMath.getTargetPriceUsingDeltaB(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
                         swapDetails.remaining
                     );
-                swapDetails.amountOut += direction
-                    ? getDeltaYToNextPrice(swapDetails.sqrtPrice, targetPrice, swapDetails.swapLiquidity, false)
-                    : getDeltaXToNextPrice(swapDetails.sqrtPrice, targetPrice, swapDetails.swapLiquidity, false);
+                swapDetails.amountOut += tokenIn == PoolToken.A
+                    ? BrainMath.getDeltaBToNextPrice(
+                        swapDetails.sqrtPrice,
+                        targetPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Down
+                    )
+                    : BrainMath.getDeltaAToNextPrice(
+                        swapDetails.sqrtPrice,
+                        targetPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Down
+                    );
                 swapDetails.remaining = 0;
                 swapDetails.sqrtPrice = targetPrice;
-                swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
+                swapDetails.slotIndex = BrainMath._getSlotAtSqrtPrice(swapDetails.sqrtPrice);
             } else {
                 // swapping maxToDelta, only take fees on this amount
                 uint256 maxFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxToDelta)).ceil());
@@ -523,18 +640,18 @@ contract Hyper is IHyper, Test {
                     toUD60x18(maxFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                 );
                 // update price and amount out after swapping
-                swapDetails.amountOut += direction
-                    ? getDeltaYToNextPrice(
+                swapDetails.amountOut += tokenIn == PoolToken.A
+                    ? BrainMath.getDeltaBToNextPrice(
                         swapDetails.sqrtPrice,
                         swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity,
-                        false
+                        BrainMath.Rounding.Down
                     )
-                    : getDeltaXToNextPrice(
+                    : BrainMath.getDeltaAToNextPrice(
                         swapDetails.sqrtPrice,
                         swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity,
-                        false
+                        BrainMath.Rounding.Down
                     );
                 swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
                 swapDetails.slotIndex = swapDetails.nextSlotIndex;
@@ -542,31 +659,32 @@ contract Hyper is IHyper, Test {
                 if (swapDetails.nextSlotInitialized) {
                     // update slot
                     Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
-                    nextSlot.sync(bitmaps[poolId], int24(swapDetails.nextSlotIndex), epoch);
-                    nextSlot.cross(
-                        epoch.id,
-                        pool.proceedsPerLiquidity,
-                        direction ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity,
-                        direction ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
-                    );
+                    syncSlot(poolId, nextSlot, swapDetails.nextSlotIndex, epoch);
+                    // TODO: cross slot
+                    // nextSlot.cross(
+                    //     epoch.id,
+                    //     pool.proceedsPerLiquidity,
+                    //     tokenIn == PoolToken.A ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity,
+                    //     tokenIn == PoolToken.A ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
+                    // );
                     // update swap details state (eventually gets saved to pool)
-                    if (direction) {
-                        // crosing slot from right to left? TODO: review swap direction logic
+                    if (tokenIn == PoolToken.A) {
+                        // crosing slot from right to left
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta)
-                            : swapDetails.swapLiquidity + abs(nextSlot.swapLiquidityDelta);
+                            : swapDetails.swapLiquidity + BrainMath.abs(nextSlot.swapLiquidityDelta);
                         swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
                             ? swapDetails.maturedLiquidity - uint256(nextSlot.maturedLiquidityDelta)
-                            : swapDetails.maturedLiquidity + abs(nextSlot.maturedLiquidityDelta);
+                            : swapDetails.maturedLiquidity + BrainMath.abs(nextSlot.maturedLiquidityDelta);
                         swapDetails.pendingLiquidity -= nextSlot.pendingLiquidityDelta;
                     } else {
-                        // crosing slot from left to right? TODO: review swap direction logic
+                        // crosing slot from left to right
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta)
-                            : swapDetails.swapLiquidity - abs(nextSlot.swapLiquidityDelta);
+                            : swapDetails.swapLiquidity - BrainMath.abs(nextSlot.swapLiquidityDelta);
                         swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
                             ? swapDetails.maturedLiquidity + uint256(nextSlot.maturedLiquidityDelta)
-                            : swapDetails.maturedLiquidity - abs(nextSlot.maturedLiquidityDelta);
+                            : swapDetails.maturedLiquidity - BrainMath.abs(nextSlot.maturedLiquidityDelta);
                         swapDetails.pendingLiquidity += nextSlot.pendingLiquidityDelta;
                     }
                 }
@@ -578,99 +696,78 @@ contract Hyper is IHyper, Test {
         pool.swapLiquidity = swapDetails.swapLiquidity;
         pool.maturedLiquidity = swapDetails.maturedLiquidity;
         pool.pendingLiquidity = swapDetails.pendingLiquidity;
-        if (direction) {
+        if (tokenIn == PoolToken.A) {
             pool.feesAPerLiquidity = swapDetails.feesPerLiquidity;
 
-            balanceChanges[0] = BalanceChange({token: pool.tokenA, amount: -int256(amountIn)});
-            balanceChanges[1] = BalanceChange({token: pool.tokenB, amount: int256(swapDetails.amountOut)});
+            // TODO: review order of operations
+            settleToken(pool.tokenA, amountIn);
+            internalBalances[msg.sender][pool.tokenB] += swapDetails.amountOut;
         } else {
             pool.feesBPerLiquidity = swapDetails.feesPerLiquidity;
 
-            balanceChanges[0] = BalanceChange({token: pool.tokenA, amount: int256(amountIn)});
-            balanceChanges[1] = BalanceChange({token: pool.tokenB, amount: -int256(swapDetails.amountOut)});
+            // TODO: review order of operations
+            settleToken(pool.tokenB, amountIn);
+            internalBalances[msg.sender][pool.tokenA] += swapDetails.amountOut;
         }
     }
 
     function bid(
-        bytes32 poolId,
+        PoolId poolId,
         uint256 epochId,
         address refunder,
         address swapper,
         uint256 amount
-    ) public {
-        BalanceChange memory balanceChange = _bid(poolId, epochId, refunder, swapper, amount);
-        _settleBalanceChange(balanceChange, false);
-    }
-
-    function _bid(
-        bytes32 poolId,
-        uint256 epochId,
-        address refunder,
-        address swapper,
-        uint256 amount
-    ) internal started returns (BalanceChange memory balanceChange) {
-        if (amount == 0) revert AmountZeroError();
+    ) public started {
+        if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
-        if (pool.lastUpdatedTimestamp == 0) revert PoolNotInitializedError();
+        if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolNotInitializedError();
 
-        bool newEpoch = epoch.sync();
-        if (newEpoch) emit SetEpoch(epoch.id, epoch.endTime);
+        syncEpoch();
 
-        if (epochId != epoch.id + 1) revert InvalidBidEpochError();
-        if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert AuctionNotStartedError();
+        if (epochId != epoch.id + 1) revert IHyper.InvalidBidEpochError();
+        if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert IHyper.AuctionNotStartedError();
 
-        // @dev: pool needs to sync here, assumes no bids otherwise
-        {
-            uint256 auctionFees = pool.sync(epoch);
-            if (auctionFees > 0) {
-                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += auctionFees;
-            }
-        }
+        // @dev: pool needs to sync here, assumes no bids otherwise for the next epoch
+        syncPool(pool, epoch);
 
         uint256 fee = fromUD60x18(AUCTION_FEE.mul(toUD60x18(amount)).ceil());
         uint256 netFeeAmount = amount - fee;
 
-        if (netFeeAmount > pool.bids[epochId].netFeeAmount) {
+        Bid memory leadingBid = bids[poolId][epochId];
+
+        if (netFeeAmount > leadingBid.netFeeAmount) {
             // refund previous bid amount to it's refunder address
-            internalBalances[pool.bids[epochId].refunder][AUCTION_SETTLEMENT_TOKEN] +=
-                pool.bids[epochId].netFeeAmount +
-                pool.bids[epochId].fee;
-            // update the balance change amount to be paid from msg.sender
-            balanceChange.amount = -int256(amount);
+            internalBalances[leadingBid.refunder][AUCTION_SETTLEMENT_TOKEN] += leadingBid.netFeeAmount + leadingBid.fee;
+            // calculate new proceeds per second
+            UD60x18 proceedsPerSecond = toUD60x18(netFeeAmount).div(toUD60x18(epoch.length));
             // set new leading bid
-            pool.bids[epochId] = Bid({
+            bids[poolId][epochId] = Bid({
                 refunder: refunder,
                 swapper: swapper,
                 netFeeAmount: netFeeAmount,
                 fee: fee,
-                proceedsPerSecond: toUD60x18(netFeeAmount).div(toUD60x18(EPOCH_LENGTH))
+                proceedsPerSecond: proceedsPerSecond
             });
-            emit LeadingBid(poolId, epochId, swapper, amount, pool.bids[epochId].proceedsPerSecond);
+            // settle tokens owed from msg.sender
+            settleToken(AUCTION_SETTLEMENT_TOKEN, amount);
+
+            emit LeadingBid(poolId, epochId, swapper, amount, proceedsPerSecond);
         }
-        balanceChange.token = AUCTION_SETTLEMENT_TOKEN;
     }
 
-    function _settleBalanceChange(BalanceChange memory balanceChange, bool transferOut) internal {
-        if (balanceChange.amount < 0) {
-            if (internalBalances[msg.sender][balanceChange.token] >= abs(balanceChange.amount)) {
-                internalBalances[msg.sender][balanceChange.token] -= abs(balanceChange.amount);
-            } else {
-                uint256 amountOwed = abs(balanceChange.amount) - internalBalances[msg.sender][balanceChange.token];
-                internalBalances[msg.sender][balanceChange.token] = 0;
-                uint256 initBalance = ERC20(balanceChange.token).balanceOf(address(this));
-                SafeTransferLib.safeTransferFrom(ERC20(balanceChange.token), msg.sender, address(this), amountOwed);
-                require(
-                    ERC20(balanceChange.token).balanceOf(address(this)) >= initBalance + amountOwed,
-                    "Insufficient tokens transferred in"
-                );
-            }
-        } else if (balanceChange.amount > 0) {
-            if (transferOut) {
-                SafeTransferLib.safeTransfer(ERC20(balanceChange.token), msg.sender, abs(balanceChange.amount));
-            } else {
-                internalBalances[msg.sender][balanceChange.token] += uint256(balanceChange.amount);
-            }
+    function settleToken(address token, uint256 amountOwed) internal {
+        if (internalBalances[msg.sender][token] >= amountOwed) {
+            internalBalances[msg.sender][token] -= amountOwed;
+        } else {
+            amountOwed -= internalBalances[msg.sender][token];
+            internalBalances[msg.sender][token] = 0;
+            uint256 initialBalance = ERC20(token).balanceOf(address(this));
+            SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amountOwed);
+            require(
+                ERC20(token).balanceOf(address(this)) >= initialBalance + amountOwed,
+                "Insufficient tokens transferred in"
+            );
         }
     }
 }

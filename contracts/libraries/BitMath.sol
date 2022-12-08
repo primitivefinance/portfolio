@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity >=0.5.0;
 
+enum SearchDirection {
+    Left,
+    Right
+}
+
 function flip(uint256 bitmap, uint8 index) pure returns (uint256 flipped) {
     assembly {
         flipped := xor(bitmap, shl(index, 1))
@@ -21,18 +26,18 @@ function getSlotPositionInBitmap(int24 slotIndex) pure returns (int16 chunk, uin
 function findNextSlotWithinChunk(
     uint256 chunk,
     uint8 bit,
-    bool shouldCheckLeft
+    SearchDirection searchDirection
 ) pure returns (bool hasNextSlot, uint8 nextSlotBit) {
     if (chunk != 0) {
         hasNextSlot = true;
 
-        if (shouldCheckLeft) {
-            nextSlotBit = leastSignificantBit(chunk >> bit + 1) + bit + 1;
+        if (searchDirection == SearchDirection.Left) {
+            nextSlotBit = leastSignificantBit(chunk >> (bit + 1)) + bit + 1;
         } else {
             nextSlotBit = mostSignificantBit(chunk & ((1 << bit) - 1));
         }
     } else {
-        nextSlotBit = shouldCheckLeft ? 255 : 0;
+        nextSlotBit = searchDirection == SearchDirection.Left ? 255 : 0;
     }
 }
 

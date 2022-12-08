@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
+
+import "./PoolDefaults.sol";
 
 import "../../contracts/Hyper.sol";
 import "../../contracts/libraries/Pool.sol";
@@ -12,6 +15,7 @@ contract TestBid is Test {
 
     TestERC20 public tokenA;
     TestERC20 public tokenB;
+    TestERC20 public auctionToken;
 
     address testUser = vm.addr(0xbeef);
     address auctionCollector = vm.addr(0xbabe);
@@ -26,11 +30,16 @@ contract TestBid is Test {
     }
 
     function setUp() public {
-        TestERC20 fakeUSDC = new TestERC20("USD Coin", "USDC", 6);
         TestERC20 fakeWETH = new TestERC20("Wrapped Ether", "WETH", 18);
+        TestERC20 fakeUSDC = new TestERC20("USD Coin", "USDC", 6);
 
-        hyper = new Hyper(1000, auctionCollector, address(fakeWETH));
+        auctionToken = fakeUSDC;
+
+        uint256 startTime = 1000;
+        hyper = new Hyper(startTime, address(auctionToken), EPOCH_LENGTH, AUCTION_LENGTH, PUBLIC_SWAP_FEE, AUCTION_FEE);
+
         (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
+        assertTrue(tokenA == fakeUSDC);
 
         vm.warp(1000);
         hyper.start();
@@ -47,60 +56,36 @@ contract TestBid is Test {
     }
 
     function test_bid_should_fail_if_amount_is_zero() public {
-        vm.expectRevert(AmountZeroError.selector);
+        vm.expectRevert(IHyper.AmountZeroError.selector);
 
-        hyper.bid(
-            getPoolId(address(tokenA), address(tokenB)),
-            0,
-            vm.addr(1),
-            vm.addr(1),
-            0
-        );
+        hyper.bid(getPoolId(address(tokenA), address(tokenB)), 0, vm.addr(1), vm.addr(1), 0);
     }
 
     function test_bid_should_fail_if_pool_is_not_initialized() public {
-        vm.expectRevert(PoolNotInitializedError.selector);
+        vm.expectRevert(IHyper.PoolNotInitializedError.selector);
 
-        hyper.bid(
-            getPoolId(address(0), address(1)),
-            0,
-            vm.addr(1),
-            vm.addr(1),
-            1
-        );
+        hyper.bid(getPoolId(address(0), address(1)), 0, vm.addr(1), vm.addr(1), 1);
     }
 
     function test_bid_should_succeed() public mintApproveTokens {
         vm.warp(3600 - 60);
 
-        (uint256 id, uint256 endTime) = hyper.epoch();
+        (uint256 id, , ) = hyper.epoch();
 
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
 
-        hyper.bid(
-            getPoolId(address(tokenA), address(tokenB)),
-            id + 1,
-            vm.addr(1),
-            vm.addr(1),
-            1
-        );
+        hyper.bid(getPoolId(address(tokenA), address(tokenB)), id + 1, vm.addr(1), vm.addr(1), 1);
     }
 
     function test_bid_should_fail_if_wrong_epoch_id() public {
         vm.warp(3600 - 30);
 
-        (uint256 id, uint256 endTime) = hyper.epoch();
+        (uint256 id, , ) = hyper.epoch();
 
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
 
-        vm.expectRevert(InvalidBidEpochError.selector);
+        vm.expectRevert(IHyper.InvalidBidEpochError.selector);
 
-        hyper.bid(
-            getPoolId(address(tokenA), address(tokenB)),
-            id + 2,
-            vm.addr(1),
-            vm.addr(1),
-            1
-        );
+        hyper.bid(getPoolId(address(tokenA), address(tokenB)), id + 2, vm.addr(1), vm.addr(1), 1);
     }
 }
