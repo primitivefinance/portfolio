@@ -24,7 +24,7 @@ function abs_(int128 n) pure returns (uint128) {
 
 /// @dev Get the price square root using the slot index
 ///      $$\sqrt_p(i)=sqrt(1.0001)^{i}$$
-function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) {
+function getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) {
     if (slotIndex == 0) {
         sqrtPrice = toUD60x18(1);
     } else {
@@ -37,7 +37,7 @@ function _getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) 
 
 /// @dev Get the slot index using price square root
 ///      $$i = ln(sqrtPrice) / ln(sqrt(1.0001))$$
-function _getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) {
+function getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) {
     // convert to SD59x18 in order to get signed slot indexes
     SD59x18 _sqrtPrice = wrapSD59x18(int256(unwrapUD60x18(sqrtPrice)));
     SD59x18 _lnSqrtPriceGridBase = wrapSD59x18(int256(LN_SQRT_PRICE_GRID_BASE));
@@ -46,15 +46,15 @@ function _getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) 
     slotIndex = int128(fromSD59x18(_sqrtPrice.ln().div(_lnSqrtPriceGridBase).floor()));
 }
 
-function _calculateLiquidityUnderlying(
+function calculateLiquidityUnderlying(
     uint256 liquidity,
     UD60x18 sqrtPriceCurrentSlot,
     int128 lowerSlotIndex,
     int128 upperSlotIndex,
     Rounding rounding
 ) pure returns (uint256 amountA, uint256 amountB) {
-    UD60x18 sqrtPriceUpperSlot = _getSqrtPriceAtSlot(upperSlotIndex);
-    UD60x18 sqrtPriceLowerSlot = _getSqrtPriceAtSlot(lowerSlotIndex);
+    UD60x18 sqrtPriceUpperSlot = getSqrtPriceAtSlot(upperSlotIndex);
+    UD60x18 sqrtPriceLowerSlot = getSqrtPriceAtSlot(lowerSlotIndex);
 
     UD60x18 rawAmountA;
     UD60x18 rawAmountB;

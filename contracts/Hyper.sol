@@ -17,7 +17,13 @@ import {getPoolId, getPoolSnapshot, PoolId, Pool, PoolToken, PoolSnapshot, Bid} 
 import {getSlotId, getSlotSnapshot, SlotId, Slot, SlotSnapshot} from "./libraries/Slot.sol";
 import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInside, Earnings, PositionId, Position} from "./libraries/Position.sol";
 
-// TODO: Reentrancy guard
+// TODO:
+// - Reentrancy guard
+// - ETH / WETH
+// - check the types
+// - price limit on swap
+// - fix amount out
+// - slot index spacing
 
 contract Hyper is IHyper, Test {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
@@ -229,7 +235,7 @@ contract Hyper is IHyper, Test {
                 }
                 // if liquidity was kicked out, add the underlying tokens
                 if (position.pendingLiquidity < 0) {
-                    (uint256 kickedOutTokenA, uint256 kickedOutTokenB) = BrainMath._calculateLiquidityUnderlying(
+                    (uint256 kickedOutTokenA, uint256 kickedOutTokenB) = BrainMath.calculateLiquidityUnderlying(
                         BrainMath.abs(position.pendingLiquidity),
                         poolSnapshot.sqrtPrice,
                         position.lowerSlotIndex,
@@ -297,7 +303,7 @@ contract Hyper is IHyper, Test {
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
         pool.sqrtPrice = sqrtPrice;
-        pool.slotIndex = BrainMath._getSlotAtSqrtPrice(sqrtPrice);
+        pool.slotIndex = BrainMath.getSlotAtSqrtPrice(sqrtPrice);
         pool.lastUpdatedTimestamp = block.timestamp;
         emit ActivatePool(tokenA, tokenB);
     }
@@ -422,7 +428,7 @@ contract Hyper is IHyper, Test {
                 }
                 upperSlot.liquidityGross += uint256(addAmountLeft);
             }
-            (amountA, amountB) = BrainMath._calculateLiquidityUnderlying(
+            (amountA, amountB) = BrainMath.calculateLiquidityUnderlying(
                 addAmountLeft,
                 pool.sqrtPrice,
                 position.lowerSlotIndex,
@@ -481,7 +487,7 @@ contract Hyper is IHyper, Test {
             }
 
             // credit tokens owed to the position immediately
-            (amountA, amountB) = BrainMath._calculateLiquidityUnderlying(
+            (amountA, amountB) = BrainMath.calculateLiquidityUnderlying(
                 removedPending,
                 pool.sqrtPrice,
                 position.lowerSlotIndex,
@@ -578,7 +584,7 @@ contract Hyper is IHyper, Test {
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
                 swapDetails.nextSlotIndex = int128(chunk) * 256 + int8(nextSlotBit);
-                swapDetails.nextSqrtPrice = BrainMath._getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
+                swapDetails.nextSqrtPrice = BrainMath.getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
             uint256 maxToDelta = tokenIn == PoolToken.A
@@ -594,7 +600,6 @@ contract Hyper is IHyper, Test {
                     swapDetails.swapLiquidity,
                     BrainMath.Rounding.Up
                 );
-
             if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
                 // remove fees from remaining amount
                 swapDetails.remaining -= remainingFeeAmount;
@@ -629,7 +634,7 @@ contract Hyper is IHyper, Test {
                     );
                 swapDetails.remaining = 0;
                 swapDetails.sqrtPrice = targetPrice;
-                swapDetails.slotIndex = BrainMath._getSlotAtSqrtPrice(swapDetails.sqrtPrice);
+                swapDetails.slotIndex = BrainMath.getSlotAtSqrtPrice(swapDetails.sqrtPrice);
             } else {
                 // swapping maxToDelta, only take fees on this amount
                 uint256 maxFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxToDelta)).ceil());

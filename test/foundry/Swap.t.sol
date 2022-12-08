@@ -72,7 +72,7 @@ contract TestSwap is Test {
 
         uint256 tokenAAmountIn = BrainMath.getDeltaAToNextPrice(
             sqrtPrice,
-            BrainMath._getSqrtPriceAtSlot(lowerSlotIndex),
+            BrainMath.getSqrtPriceAtSlot(upperSlotIndex),
             uint256(liquidity / 2),
             BrainMath.Rounding.Down
         );
@@ -83,24 +83,23 @@ contract TestSwap is Test {
 
     function test_swap_tokenB_liquidity_in_range_succeeds() public mintApproveTokens {
         // fetch slotIndex of pool
-        (, , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
 
         int256 liquidity = int256(1e18);
         int128 lowerSlotIndex = slotIndex - 10;
         int128 upperSlotIndex = slotIndex + 10;
 
         // add liquidity around the pool's slot index
-        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity, false);
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity);
 
-        // swapping tokenB, going down the price grid, max up to upperSlotIndex
-        uint256 tokenBAmountIn = getDeltaYToNextPrice(
+        uint256 tokenBAmountIn = BrainMath.getDeltaBToNextPrice(
             sqrtPrice,
-            _getSqrtPriceAtSlot(upperSlotIndex),
+            BrainMath.getSqrtPriceAtSlot(lowerSlotIndex),
             uint256(liquidity / 2),
-            false
+            BrainMath.Rounding.Down
         );
 
         // perform swap
-        hyper.swap(poolId, tokenBAmountIn, false, false);
+        hyper.swap(poolId, PoolToken.A, tokenBAmountIn);
     }
 }

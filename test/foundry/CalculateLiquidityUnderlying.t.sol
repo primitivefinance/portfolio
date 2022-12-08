@@ -13,9 +13,9 @@ contract TestCalculateLiquidityUnderlying is Test {
     function test_calculateLiquidityUnderlying_should_round_up() public {
         int128 currentSlotIndex = 70904;
 
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
+        (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
-            _getSqrtPriceAtSlot(currentSlotIndex),
+            getSqrtPriceAtSlot(currentSlotIndex),
             10000,
             20000,
             Rounding.Up
@@ -28,9 +28,9 @@ contract TestCalculateLiquidityUnderlying is Test {
     function test_calculateLiquidityUnderlying_should_round_down() public {
         int128 currentSlotIndex = 70904;
 
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
+        (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
-            _getSqrtPriceAtSlot(currentSlotIndex),
+            getSqrtPriceAtSlot(currentSlotIndex),
             10000,
             20000,
             Rounding.Down
@@ -43,9 +43,9 @@ contract TestCalculateLiquidityUnderlying is Test {
     function test_calculateLiquidityUnderlying_current_slot_equals_lower_slot() public {
         int128 currentSlotIndex = 10000;
 
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
+        (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
-            _getSqrtPriceAtSlot(currentSlotIndex),
+            getSqrtPriceAtSlot(currentSlotIndex),
             10000,
             20000,
             Rounding.Down
@@ -58,9 +58,9 @@ contract TestCalculateLiquidityUnderlying is Test {
     function test_calculateLiquidityUnderlying_current_slot_between_slots() public {
         int128 currentSlotIndex = 15000;
 
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
+        (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
-            _getSqrtPriceAtSlot(currentSlotIndex),
+            getSqrtPriceAtSlot(currentSlotIndex),
             10000,
             20000,
             Rounding.Down
@@ -73,9 +73,9 @@ contract TestCalculateLiquidityUnderlying is Test {
     function test_calculateLiquidityUnderlying_current_slot_above_upper_slot() public {
         int128 currentSlotIndex = 25000;
 
-        (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
+        (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
-            _getSqrtPriceAtSlot(currentSlotIndex),
+            getSqrtPriceAtSlot(currentSlotIndex),
             10000,
             20000,
             Rounding.Down
