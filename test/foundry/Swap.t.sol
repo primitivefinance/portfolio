@@ -63,7 +63,7 @@ contract TestSwap is Test {
         // add liquidity around the pool's slot index
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity, false);
 
-        // swapping tokenA, going down the price grid, max down to lowerSlotIndex
+        // swapping tokenA, going up the price grid, max down to lowerSlotIndex
         uint256 tokenAAmountIn = getDeltaXToNextPrice(
             sqrtPrice,
             _getSqrtPriceAtSlot(lowerSlotIndex),
@@ -73,5 +73,28 @@ contract TestSwap is Test {
 
         // perform swap
         hyper.swap(poolId, tokenAAmountIn, true, false);
+    }
+
+    function test_swap_tokenB_liquidity_in_range_succeeds() public mintApproveTokens {
+        // fetch slotIndex of pool
+        (, , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
+
+        int256 liquidity = int256(1e18);
+        int128 lowerSlotIndex = slotIndex - 10;
+        int128 upperSlotIndex = slotIndex + 10;
+
+        // add liquidity around the pool's slot index
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity, false);
+
+        // swapping tokenB, going down the price grid, max up to upperSlotIndex
+        uint256 tokenBAmountIn = getDeltaYToNextPrice(
+            sqrtPrice,
+            _getSqrtPriceAtSlot(upperSlotIndex),
+            uint256(liquidity / 2),
+            false
+        );
+
+        // perform swap
+        hyper.swap(poolId, tokenBAmountIn, false, false);
     }
 }
