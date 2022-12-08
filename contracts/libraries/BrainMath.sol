@@ -85,6 +85,7 @@ function getDeltaYToNextPrice(
     uint256 liquidity,
     bool shouldRoundUp
 ) pure returns (uint256) {
+    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.gte(sqrtPriceCurrentSlot) ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot) : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
     UD60x18 rawDeltaY = toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot));
     return fromUD60x18(shouldRoundUp ? rawDeltaY.ceil() : rawDeltaY);
 }
