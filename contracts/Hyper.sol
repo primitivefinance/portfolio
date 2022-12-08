@@ -573,8 +573,6 @@ contract Hyper is IHyper, Test {
                     }
                 }
             }
-
-                            console.log("6");
         }
         // update pool's state based on swap details
         pool.sqrtPrice = swapDetails.sqrtPrice;
