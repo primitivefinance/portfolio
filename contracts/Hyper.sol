@@ -13,7 +13,7 @@ import "./libraries/BrainMath.sol" as BrainMath;
 import {Epoch} from "./libraries/Epoch.sol";
 import {getPoolId, getPoolSnapshot, PoolId, Pool, PoolToken, PoolSnapshot, Bid} from "./libraries/Pool.sol";
 import {getSlotId, getSlotSnapshot, SlotId, Slot, SlotSnapshot} from "./libraries/Slot.sol";
-import {getPositionId, getPerLiquiditiesInside, getEarnings, PositionId, Position} from "./libraries/Position.sol";
+import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInside, Earnings, PositionId, Position} from "./libraries/Position.sol";
 
 // TODO: Reentrancy guard
 
@@ -105,17 +105,13 @@ contract Hyper is IHyper {
         }
     }
 
-    function syncPool(
-        PoolId poolId,
-        Pool storage pool,
-        Epoch memory readEpoch
-    ) internal {
+    function syncPool(Pool storage pool, Epoch memory readEpoch) internal {
         uint256 epochsPassed = readEpoch.getEpochsPassed(pool.lastUpdatedTimestamp);
         if (epochsPassed > 0) {
             uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
             // distribute remaining proceeds in lastUpdatedEpochId
             if (pool.maturedLiquidity > 0) {
-                UD60x18 proceedsPerSecond = bids[poolId][lastUpdatedEpochId].proceedsPerSecond;
+                UD60x18 proceedsPerSecond = bids[pool.id][lastUpdatedEpochId].proceedsPerSecond;
                 if (!proceedsPerSecond.isZero()) {
                     // calculate seconds remaining in lastUpdatedEpochId
                     uint256 timeToTransition = epoch.getTimeToTransition(epochsPassed, pool.lastUpdatedTimestamp);
@@ -126,7 +122,7 @@ contract Hyper is IHyper {
                 }
             }
             // save pool snapshot for lastUpdatedEpochId
-            poolSnapshots[poolId][lastUpdatedEpochId] = getPoolSnapshot(pool);
+            poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
             // update the pool's liquidity due to the transition
             if (pool.pendingLiquidity > 0) {
                 pool.maturedLiquidity += uint256(pool.pendingLiquidity);
@@ -136,21 +132,21 @@ contract Hyper is IHyper {
             pool.swapLiquidity = pool.maturedLiquidity;
             pool.pendingLiquidity = int256(0);
             // auction fees only accrue after an epoch transition
-            internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[poolId][lastUpdatedEpochId].fee;
+            internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[pool.id][lastUpdatedEpochId].fee;
             if (epochsPassed > 1) {
                 // update proceeds per liquidity distributed for next epoch if needed
                 if (pool.maturedLiquidity > 0) {
-                    UD60x18 proceedsPerSecond = bids[poolId][lastUpdatedEpochId + 1].proceedsPerSecond;
+                    UD60x18 proceedsPerSecond = bids[pool.id][lastUpdatedEpochId + 1].proceedsPerSecond;
                     if (!proceedsPerSecond.isZero()) {
                         pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
-                            bids[poolId][lastUpdatedEpochId + 1].proceedsPerSecond.mul(toUD60x18(epoch.length)).div(
+                            bids[pool.id][lastUpdatedEpochId + 1].proceedsPerSecond.mul(toUD60x18(epoch.length)).div(
                                 toUD60x18(pool.maturedLiquidity)
                             )
                         );
                     }
                 }
                 // add auction fees
-                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[poolId][lastUpdatedEpochId + 1]
+                internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[pool.id][lastUpdatedEpochId + 1]
                     .fee;
             }
         }
@@ -158,7 +154,7 @@ contract Hyper is IHyper {
         if (pool.maturedLiquidity > 0) {
             uint256 timePassedInCurrentEpoch = readEpoch.getTimePassedInCurrentEpoch(pool.lastUpdatedTimestamp);
             if (timePassedInCurrentEpoch > 0) {
-                UD60x18 proceedsPerSecond = bids[poolId][readEpoch.id].proceedsPerSecond;
+                UD60x18 proceedsPerSecond = bids[pool.id][readEpoch.id].proceedsPerSecond;
                 if (!proceedsPerSecond.isZero()) {
                     pool.proceedsPerLiquidity = pool.proceedsPerLiquidity.add(
                         proceedsPerSecond.mul(toUD60x18(timePassedInCurrentEpoch)).div(toUD60x18(pool.maturedLiquidity))
@@ -197,48 +193,38 @@ contract Hyper is IHyper {
 
     function syncPosition(
         Position storage position,
-        PoolId poolId,
-        SlotId lowerSlotId,
-        SlotId upperSlotId,
         Pool memory pool,
         Slot memory lowerSlot,
         Slot memory upperSlot,
         Epoch memory readEpoch
-    )
-        internal
-        returns (
-            uint256 amountA,
-            uint256 amountB,
-            uint256 amountC
-        )
-    {
+    ) internal {
+        Earnings memory earnings;
+
         uint256 epochsPassed = readEpoch.getEpochsPassed(position.lastUpdatedTimestamp);
         if (epochsPassed > 0) {
             if (position.pendingLiquidity != 0) {
                 uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
-                PoolSnapshot memory poolSnapshot = poolSnapshots[poolId][lastUpdatedEpochId];
-                // get per liquidities inside through end of last update epoch
-                (
-                    UD60x18 proceedsPerLiquidityInside,
-                    UD60x18 feesAPerLiquidityInside,
-                    UD60x18 feesBPerLiquidityInside
-                ) = getPerLiquiditiesInside(
+                PoolSnapshot memory poolSnapshot = poolSnapshots[pool.id][lastUpdatedEpochId];
+                {
+                    // get per liquidities inside through end of last update epoch
+                    PerLiquiditiesInside memory perLiquiditiesInside = getPerLiquiditiesInside(
                         position,
                         poolSnapshot,
-                        slotSnapshots[lowerSlotId][lastUpdatedEpochId],
-                        slotSnapshots[upperSlotId][lastUpdatedEpochId]
+                        slotSnapshots[lowerSlot.id][lastUpdatedEpochId],
+                        slotSnapshots[upperSlot.id][lastUpdatedEpochId]
                     );
-                // get earnings from growth in per liquidities
-                (amountA, amountB, amountB) = getEarnings(
-                    position,
-                    proceedsPerLiquidityInside,
-                    feesAPerLiquidityInside,
-                    feesBPerLiquidityInside
-                );
-                // update per liquidities inside
-                position.proceedsPerLiquidityInsideLast = proceedsPerLiquidityInside;
-                position.feesAPerLiquidityInsideLast = feesAPerLiquidityInside;
-                position.feesBPerLiquidityInsideLast = feesBPerLiquidityInside;
+                    // get earnings from growth in per liquidities
+                    (earnings.amountA, earnings.amountB, earnings.amountC) = getEarnings(
+                        position,
+                        perLiquiditiesInside.proceedsPerLiquidityInside,
+                        perLiquiditiesInside.feesAPerLiquidityInside,
+                        perLiquiditiesInside.feesBPerLiquidityInside
+                    );
+                    // update per liquidities inside
+                    position.proceedsPerLiquidityInsideLast = perLiquiditiesInside.proceedsPerLiquidityInside;
+                    position.feesAPerLiquidityInsideLast = perLiquiditiesInside.feesAPerLiquidityInside;
+                    position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
+                }
                 // if liquidity was kicked out, add the underlying tokens
                 if (position.pendingLiquidity < 0) {
                     (uint256 kickedOutTokenA, uint256 kickedOutTokenB) = BrainMath._calculateLiquidityUnderlying(
@@ -248,8 +234,8 @@ contract Hyper is IHyper {
                         position.upperSlotIndex,
                         BrainMath.Rounding.Down
                     );
-                    amountA += kickedOutTokenA;
-                    amountB += kickedOutTokenB;
+                    earnings.amountA += kickedOutTokenA;
+                    earnings.amountB += kickedOutTokenB;
                     // update position matured liquidity
                     position.maturedLiquidity -= BrainMath.abs(position.pendingLiquidity);
                 } else {
@@ -262,34 +248,30 @@ contract Hyper is IHyper {
         }
         {
             // get per liquidities inside through end of last update epoch
-            (
-                UD60x18 proceedsPerLiquidityInside,
-                UD60x18 feesAPerLiquidityInside,
-                UD60x18 feesBPerLiquidityInside
-            ) = getPerLiquiditiesInside(
-                    position,
-                    getPoolSnapshot(pool),
-                    getSlotSnapshot(lowerSlot),
-                    getSlotSnapshot(upperSlot)
-                );
+            PerLiquiditiesInside memory perLiquiditiesInside = getPerLiquiditiesInside(
+                position,
+                getPoolSnapshot(pool),
+                getSlotSnapshot(lowerSlot),
+                getSlotSnapshot(upperSlot)
+            );
             (uint256 earningsA, uint256 earningsB, uint256 earningsC) = getEarnings(
                 position,
-                proceedsPerLiquidityInside,
-                feesAPerLiquidityInside,
-                feesBPerLiquidityInside
+                perLiquiditiesInside.proceedsPerLiquidityInside,
+                perLiquiditiesInside.feesAPerLiquidityInside,
+                perLiquiditiesInside.feesBPerLiquidityInside
             );
-            amountA += earningsA;
-            amountB += earningsB;
-            amountC += earningsC;
+            earnings.amountA += earningsA;
+            earnings.amountB += earningsB;
+            earnings.amountC += earningsC;
             // update per liquidities inside
-            position.proceedsPerLiquidityInsideLast = proceedsPerLiquidityInside;
-            position.feesAPerLiquidityInsideLast = feesAPerLiquidityInside;
-            position.feesBPerLiquidityInsideLast = feesBPerLiquidityInside;
+            position.proceedsPerLiquidityInsideLast = perLiquiditiesInside.proceedsPerLiquidityInside;
+            position.feesAPerLiquidityInsideLast = perLiquiditiesInside.feesAPerLiquidityInside;
+            position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
         }
         // update internal balances
-        if (amountA != 0) internalBalances[msg.sender][pool.tokenA] += amountA;
-        if (amountB != 0) internalBalances[msg.sender][pool.tokenB] += amountB;
-        if (amountC != 0) internalBalances[msg.sender][AUCTION_SETTLEMENT_TOKEN] += amountC;
+        if (earnings.amountA != 0) internalBalances[msg.sender][pool.tokenA] += earnings.amountA;
+        if (earnings.amountB != 0) internalBalances[msg.sender][pool.tokenB] += earnings.amountB;
+        if (earnings.amountC != 0) internalBalances[msg.sender][AUCTION_SETTLEMENT_TOKEN] += earnings.amountC;
 
         position.lastUpdatedTimestamp = block.timestamp;
     }
@@ -306,8 +288,10 @@ contract Hyper is IHyper {
     ) public started {
         syncEpoch();
 
-        Pool storage pool = pools[getPoolId(tokenA, tokenB)];
+        PoolId poolId = getPoolId(tokenA, tokenB);
+        Pool storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp != 0) revert IHyper.PoolAlreadyInitializedError();
+        pool.id = poolId;
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
         pool.sqrtPrice = sqrtPrice;
@@ -329,7 +313,7 @@ contract Hyper is IHyper {
         if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolUninitializedError();
 
         syncEpoch();
-        syncPool(poolId, pool, epoch);
+        syncPool(pool, epoch);
 
         SlotId lowerSlotId;
         Slot storage lowerSlot;
@@ -358,33 +342,13 @@ contract Hyper is IHyper {
             position.upperSlotIndex = upperSlotIndex;
             position.lastUpdatedTimestamp = block.timestamp;
         } else {
-            syncPosition(position, poolId, lowerSlotId, upperSlotId, pool, lowerSlot, upperSlot, epoch);
+            syncPosition(position, pool, lowerSlot, upperSlot, epoch);
         }
 
         if (amount > 0) {
-            (uint256 addAmountA, uint256 addAmountB) = _addLiquidity(
-                pool,
-                poolId,
-                lowerSlot,
-                upperSlot,
-                position,
-                uint256(amount)
-            );
-            if (addAmountA != 0) settleToken(pool.tokenA, addAmountA);
-            if (addAmountB != 0) settleToken(pool.tokenB, addAmountB);
+            _addLiquidity(pool, lowerSlot, upperSlot, position, uint256(amount));
         } else {
-            (uint256 removeAmountA, uint256 removeAmountB) = _removeLiquidity(
-                pool,
-                poolId,
-                lowerSlotId,
-                upperSlotId,
-                lowerSlot,
-                upperSlot,
-                position,
-                BrainMath.abs(amount)
-            );
-            if (removeAmountA != 0) internalBalances[msg.sender][pool.tokenA] += removeAmountA;
-            if (removeAmountB != 0) internalBalances[msg.sender][pool.tokenB] += removeAmountB;
+            _removeLiquidity(pool, lowerSlot, upperSlot, position, BrainMath.abs(amount));
         }
 
         emit UpdateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, amount);
@@ -392,13 +356,15 @@ contract Hyper is IHyper {
 
     function _addLiquidity(
         Pool storage pool,
-        PoolId poolId,
         Slot storage lowerSlot,
         Slot storage upperSlot,
         Position storage position,
         uint256 amount
-    ) internal returns (uint256 amountA, uint256 amountB) {
+    ) internal {
         uint256 addAmountLeft = amount;
+
+        uint256 amountA;
+        uint256 amountB;
 
         // use negative pending liquidity first
         if (position.pendingLiquidity < 0) {
@@ -430,7 +396,7 @@ contract Hyper is IHyper {
             if (lowerSlot.liquidityGross == 0) {
                 // flip slot in bitmap
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                bitmaps[poolId][chunk] = BitMath.flip(bitmaps[poolId][chunk], bit);
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.lowerSlotIndex) {
                     lowerSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
@@ -445,7 +411,7 @@ contract Hyper is IHyper {
             if (upperSlot.liquidityGross == 0) {
                 // flip slot in bitmap
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                bitmaps[poolId][chunk] = BitMath.flip(bitmaps[poolId][chunk], bit);
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.upperSlotIndex) {
                     upperSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
@@ -466,19 +432,22 @@ contract Hyper is IHyper {
                 pool.pendingLiquidity += int256(addAmountLeft);
             }
         }
+
+        if (amountA != 0) settleToken(pool.tokenA, amountA);
+        if (amountB != 0) settleToken(pool.tokenB, amountB);
     }
 
     function _removeLiquidity(
         Pool storage pool,
-        PoolId poolId,
-        SlotId lowerSlotId,
-        SlotId upperSlotId,
         Slot storage lowerSlot,
         Slot storage upperSlot,
         Position storage position,
         uint256 amount
-    ) internal returns (uint256 amountA, uint256 amountB) {
+    ) internal {
         uint256 removeAmountLeft = amount;
+
+        uint256 amountA;
+        uint256 amountB;
 
         // remove positive pending liquidity immediately
         if (position.pendingLiquidity > 0) {
@@ -497,7 +466,7 @@ contract Hyper is IHyper {
 
             if (lowerSlot.liquidityGross == 0) {
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                bitmaps[poolId][chunk] = BitMath.flip(bitmaps[poolId][chunk], bit);
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
             }
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
@@ -506,7 +475,7 @@ contract Hyper is IHyper {
 
             if (upperSlot.liquidityGross == 0) {
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                bitmaps[poolId][chunk] = BitMath.flip(bitmaps[poolId][chunk], bit);
+                bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
             }
 
             // credit tokens owed to the position immediately
@@ -545,8 +514,12 @@ contract Hyper is IHyper {
         }
 
         // save slot snapshots
-        slotSnapshots[lowerSlotId][epoch.id] = getSlotSnapshot(lowerSlot);
-        slotSnapshots[upperSlotId][epoch.id] = getSlotSnapshot(upperSlot);
+        slotSnapshots[lowerSlot.id][epoch.id] = getSlotSnapshot(lowerSlot);
+        slotSnapshots[upperSlot.id][epoch.id] = getSlotSnapshot(upperSlot);
+
+        // add to internal balance
+        if (amountA != 0) internalBalances[msg.sender][pool.tokenA] += amountA;
+        if (amountB != 0) internalBalances[msg.sender][pool.tokenB] += amountB;
     }
 
     struct SwapDetails {
@@ -575,7 +548,7 @@ contract Hyper is IHyper {
         if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolNotInitializedError();
 
         syncEpoch();
-        syncPool(poolId, pool, epoch);
+        syncPool(pool, epoch);
 
         SwapDetails memory swapDetails = SwapDetails({
             feeTier: msg.sender == bids[poolId][epoch.id].swapper ? wrapUD60x18(0) : PUBLIC_SWAP_FEE,
@@ -756,7 +729,7 @@ contract Hyper is IHyper {
         if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert IHyper.AuctionNotStartedError();
 
         // @dev: pool needs to sync here, assumes no bids otherwise for the next epoch
-        syncPool(poolId, pool, epoch);
+        syncPool(pool, epoch);
 
         uint256 fee = fromUD60x18(AUCTION_FEE.mul(toUD60x18(amount)).ceil());
         uint256 netFeeAmount = amount - fee;

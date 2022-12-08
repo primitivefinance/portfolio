@@ -10,6 +10,7 @@ import {PoolId, Pool} from "./Pool.sol";
 type SlotId is bytes32;
 
 struct Slot {
+    SlotId id;
     uint256 liquidityGross;
     int256 pendingLiquidityGross;
     int256 swapLiquidityDelta;

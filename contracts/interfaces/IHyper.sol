@@ -35,6 +35,7 @@ interface IHyper {
         external
         view
         returns (
+            PoolId id,
             address tokenA,
             address tokenB,
             uint256 swapLiquidity,
@@ -52,6 +53,7 @@ interface IHyper {
         external
         view
         returns (
+            SlotId id,
             uint256 liquidityGross,
             int256 pendingLiquidityGross,
             int256 swapLiquidityDelta,
@@ -67,6 +69,7 @@ interface IHyper {
         external
         view
         returns (
+            PositionId id,
             int128 lowerSlotIndex,
             int128 upperSlotIndex,
             uint256 swapLiquidity,

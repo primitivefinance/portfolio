@@ -11,6 +11,7 @@ enum PoolToken {
 }
 
 struct Pool {
+    PoolId id;
     address tokenA;
     address tokenB;
     uint256 swapLiquidity;

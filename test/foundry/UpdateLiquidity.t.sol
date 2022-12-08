@@ -60,7 +60,7 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex + 10;
         int128 upperSlotIndex = lowerSlotIndex + 10;
@@ -74,7 +74,7 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex - 10;
         int128 upperSlotIndex = slotIndex + 10;
@@ -88,7 +88,7 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex - 100;
         int128 upperSlotIndex = slotIndex - 10;
@@ -120,7 +120,7 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex + 10;
         int128 upperSlotIndex = lowerSlotIndex + 10;
@@ -136,7 +136,7 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex + 10;
         int128 upperSlotIndex = lowerSlotIndex + 10;

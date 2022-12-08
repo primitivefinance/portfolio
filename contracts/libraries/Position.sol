@@ -8,7 +8,20 @@ import {Slot, SlotSnapshot} from "./Slot.sol";
 
 type PositionId is bytes32;
 
+struct PerLiquiditiesInside {
+    UD60x18 proceedsPerLiquidityInside;
+    UD60x18 feesAPerLiquidityInside;
+    UD60x18 feesBPerLiquidityInside;
+}
+
+struct Earnings {
+    uint256 amountA;
+    uint256 amountB;
+    uint256 amountC;
+}
+
 struct Position {
+    PositionId id;
     int128 lowerSlotIndex;
     int128 upperSlotIndex;
     uint256 swapLiquidity;
@@ -34,14 +47,7 @@ function getPerLiquiditiesInside(
     PoolSnapshot memory poolSnapshot,
     SlotSnapshot memory lowerSlotSnapshot,
     SlotSnapshot memory upperSlotSnapshot
-)
-    pure
-    returns (
-        UD60x18 proceedsPerLiquidityInside,
-        UD60x18 feesAPerLiquidityInside,
-        UD60x18 feesBPerLiquidityInside
-    )
-{
+) pure returns (PerLiquiditiesInside memory perLiquiditiesInside) {
     {
         UD60x18 proceedsPerLiquidityAbove = poolSnapshot.slotIndex >= position.upperSlotIndex
             ? poolSnapshot.proceedsPerLiquidity.sub(upperSlotSnapshot.proceedsPerLiquidityOutside)
@@ -49,9 +55,10 @@ function getPerLiquiditiesInside(
         UD60x18 proceedsPerLiquidityBelow = poolSnapshot.slotIndex >= position.lowerSlotIndex
             ? lowerSlotSnapshot.proceedsPerLiquidityOutside
             : poolSnapshot.proceedsPerLiquidity.sub(lowerSlotSnapshot.proceedsPerLiquidityOutside);
-        proceedsPerLiquidityInside = poolSnapshot.proceedsPerLiquidity.sub(proceedsPerLiquidityBelow).sub(
-            proceedsPerLiquidityAbove
-        );
+        perLiquiditiesInside.proceedsPerLiquidityInside = poolSnapshot
+            .proceedsPerLiquidity
+            .sub(proceedsPerLiquidityBelow)
+            .sub(proceedsPerLiquidityAbove);
     }
     {
         UD60x18 feesAPerLiquidityAbove = poolSnapshot.slotIndex >= position.upperSlotIndex
@@ -60,7 +67,7 @@ function getPerLiquiditiesInside(
         UD60x18 feesAPerLiquidityBelow = poolSnapshot.slotIndex >= position.lowerSlotIndex
             ? lowerSlotSnapshot.feesAPerLiquidityOutside
             : poolSnapshot.feesAPerLiquidity.sub(lowerSlotSnapshot.feesAPerLiquidityOutside);
-        feesAPerLiquidityInside = poolSnapshot.feesAPerLiquidity.sub(feesAPerLiquidityBelow).sub(
+        perLiquiditiesInside.feesAPerLiquidityInside = poolSnapshot.feesAPerLiquidity.sub(feesAPerLiquidityBelow).sub(
             feesAPerLiquidityAbove
         );
     }
@@ -71,7 +78,7 @@ function getPerLiquiditiesInside(
         UD60x18 feesBPerLiquidityBelow = poolSnapshot.slotIndex >= position.lowerSlotIndex
             ? lowerSlotSnapshot.feesBPerLiquidityOutside
             : poolSnapshot.feesBPerLiquidity.sub(lowerSlotSnapshot.feesBPerLiquidityOutside);
-        feesBPerLiquidityInside = poolSnapshot.feesBPerLiquidity.sub(feesBPerLiquidityBelow).sub(
+        perLiquiditiesInside.feesBPerLiquidityInside = poolSnapshot.feesBPerLiquidity.sub(feesBPerLiquidityBelow).sub(
             feesBPerLiquidityAbove
         );
     }

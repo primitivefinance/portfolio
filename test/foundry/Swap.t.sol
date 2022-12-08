@@ -61,7 +61,7 @@ contract TestSwap is Test {
 
     function test_swap_tokenA_liquidity_in_range_succeeds() public mintApproveTokens {
         // fetch slotIndex of pool
-        (, , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
 
         int256 liquidity = int256(1e18);
         int128 lowerSlotIndex = slotIndex - 10;
