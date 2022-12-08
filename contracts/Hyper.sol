@@ -469,8 +469,6 @@ contract Hyper is IHyper, Test {
                 // Get the next slot or the border of a bitmap
                 (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(swapDetails.slotIndex));
                 (bool hasNextSlot, uint8 nextSlotBit) = findNextSlotWithinChunk(
-                    // If direction is true: swapping A for B
-                    // Decreasing the slot index -> going right into the bitmap (reducing the index)
                     bitmaps[poolId][chunk],
                     bit,
                     direction
