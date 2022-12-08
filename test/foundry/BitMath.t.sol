@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
@@ -31,7 +32,7 @@ contract TestBitMath is Test {
         bitmap = flip(bitmap, 12);
         bitmap = flip(bitmap, 6);
 
-        (bool hasNextSlot, uint8 nextSlot) = findNextSlotWithinChunk(bitmap, 12, true);
+        (bool hasNextSlot, uint8 nextSlot) = findNextSlotWithinChunk(bitmap, 12, SearchDirection.Left);
 
         assertEq(hasNextSlot, true);
         assertEq(nextSlot, 24);
@@ -43,7 +44,7 @@ contract TestBitMath is Test {
         bitmap = flip(bitmap, 11);
         bitmap = flip(bitmap, 6);
 
-        (bool hasNextSlot, uint8 nextSlot) = findNextSlotWithinChunk(bitmap, 11, false);
+        (bool hasNextSlot, uint8 nextSlot) = findNextSlotWithinChunk(bitmap, 11, SearchDirection.Right);
 
         assertEq(hasNextSlot, true);
         assertEq(nextSlot, 6);
@@ -51,7 +52,7 @@ contract TestBitMath is Test {
 
     function test_findNextSlotWithinChunk_right_empty() public {
         uint256 bitmap;
-        (bool hasNextSlot, uint8 nextSlot) = findNextSlotWithinChunk(bitmap, 11, false);
+        (bool hasNextSlot, ) = findNextSlotWithinChunk(bitmap, 11, SearchDirection.Right);
         assertEq(hasNextSlot, false);
     }
 }

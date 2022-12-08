@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
@@ -15,10 +16,9 @@ contract TestCalculateLiquidityUnderlying is Test {
         (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
             10000,
             _getSqrtPriceAtSlot(currentSlotIndex),
-            currentSlotIndex,
             10000,
             20000,
-            true
+            Rounding.Up
         );
 
         assertEq(amountA, 0);
@@ -31,10 +31,9 @@ contract TestCalculateLiquidityUnderlying is Test {
         (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
             10000,
             _getSqrtPriceAtSlot(currentSlotIndex),
-            currentSlotIndex,
             10000,
             20000,
-            false
+            Rounding.Down
         );
 
         assertEq(amountA, 0);
@@ -47,10 +46,9 @@ contract TestCalculateLiquidityUnderlying is Test {
         (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
             10000,
             _getSqrtPriceAtSlot(currentSlotIndex),
-            currentSlotIndex,
             10000,
             20000,
-            false
+            Rounding.Down
         );
 
         assertEq(amountA, 2386);
@@ -63,10 +61,9 @@ contract TestCalculateLiquidityUnderlying is Test {
         (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
             10000,
             _getSqrtPriceAtSlot(currentSlotIndex),
-            currentSlotIndex,
             10000,
             20000,
-            false
+            Rounding.Down
         );
 
         assertEq(amountA, 1044);
@@ -79,10 +76,9 @@ contract TestCalculateLiquidityUnderlying is Test {
         (uint256 amountA, uint256 amountB) = _calculateLiquidityUnderlying(
             10000,
             _getSqrtPriceAtSlot(currentSlotIndex),
-            currentSlotIndex,
             10000,
             20000,
-            false
+            Rounding.Down
         );
 
         assertEq(amountA, 0);

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
@@ -28,21 +29,13 @@ contract TestBrainMath is Test {
     function test_getSqrtPriceAtSlot_positive_index() public {
         int128 slotIndex = 1000;
         UD60x18 sqrtPrice = _getSqrtPriceAtSlot(slotIndex);
-        assertApproxEqRel(
-            unwrap(sqrtPrice),
-            1051268468376662000,
-            MAX_PERCENT_DELTA
-        );
+        assertApproxEqRel(unwrap(sqrtPrice), 1051268468376662000, MAX_PERCENT_DELTA);
     }
 
     function test_getSqrtPriceAtSlot_negative_index() public {
         int128 slotIndex = -1000;
         UD60x18 sqrtPrice = _getSqrtPriceAtSlot(slotIndex);
-        assertApproxEqRel(
-            unwrap(sqrtPrice),
-            951231802418815800,
-            MAX_PERCENT_DELTA
-        );
+        assertApproxEqRel(unwrap(sqrtPrice), 951231802418815800, MAX_PERCENT_DELTA);
     }
 
     function test_getSlotAtSqrtPrice_random_price() public {
@@ -51,29 +44,29 @@ contract TestBrainMath is Test {
         assertEq(slotIndex, 70904);
     }
 
-    function test_getDeltaXToNextPrice_should_round_up() public {
+    function test_getDeltaAToNextPrice_should_round_up() public {
         int128 currentSlotIndex = 0;
 
-        (uint256 deltaX) = getDeltaXToNextPrice(
+        uint256 deltaA = getDeltaAToNextPrice(
             _getSqrtPriceAtSlot(10),
             _getSqrtPriceAtSlot(currentSlotIndex),
             10,
-            true
+            Rounding.Up
         );
 
-        assertEq(deltaX, 1);
+        assertEq(deltaA, 1);
     }
 
-    function test_getDeltaXToNextPrice_should_round_down() public {
+    function test_getDeltaAToNextPrice_should_round_down() public {
         int128 currentSlotIndex = 0;
 
-        (uint256 deltaX) = getDeltaXToNextPrice(
+        uint256 deltaA = getDeltaAToNextPrice(
             _getSqrtPriceAtSlot(10),
             _getSqrtPriceAtSlot(currentSlotIndex),
             10,
-            false
+            Rounding.Down
         );
 
-        assertEq(deltaX, 0);
+        assertEq(deltaA, 0);
     }
 }
