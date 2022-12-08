@@ -91,7 +91,7 @@ contract Hyper is IHyper, ReentrancyGuard {
     ) public nonReentrant started {
         SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         internalBalances[to][token] += amount;
-        emit Fund(to, token, amount);
+        emit InternalBalanceChange(to, token, int256(amount));
     }
 
     /// @notice Transfers `amount` of `token` from the sender internal balance to `to`
@@ -103,7 +103,7 @@ contract Hyper is IHyper, ReentrancyGuard {
         require(internalBalances[msg.sender][token] >= amount);
         internalBalances[msg.sender][token] -= amount;
         SafeTransferLib.safeTransferFrom(ERC20(token), address(this), to, amount);
-        emit Withdraw(to, token, amount);
+        emit InternalBalanceChange(to, token, -int256(amount));
     }
 
     function syncEpoch() internal {
@@ -143,6 +143,12 @@ contract Hyper is IHyper, ReentrancyGuard {
             pool.pendingLiquidity = int256(0);
             // auction fees only accrue after an epoch transition
             internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[pool.id][lastUpdatedEpochId].fee;
+            emit InternalBalanceChange(
+                auctionFeeCollector,
+                AUCTION_SETTLEMENT_TOKEN,
+                int256(bids[pool.id][lastUpdatedEpochId].fee)
+            );
+            // check if multiple epochs have passed
             if (epochsPassed > 1) {
                 // update proceeds per liquidity distributed for next epoch if needed
                 if (pool.maturedLiquidity > 0) {
@@ -158,6 +164,11 @@ contract Hyper is IHyper, ReentrancyGuard {
                 // add auction fees
                 internalBalances[auctionFeeCollector][AUCTION_SETTLEMENT_TOKEN] += bids[pool.id][lastUpdatedEpochId + 1]
                     .fee;
+                emit InternalBalanceChange(
+                    auctionFeeCollector,
+                    AUCTION_SETTLEMENT_TOKEN,
+                    int256(bids[pool.id][lastUpdatedEpochId + 1].fee)
+                );
             }
         }
         // add proceeds for time passed in the current epoch
@@ -281,9 +292,18 @@ contract Hyper is IHyper, ReentrancyGuard {
             position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
         }
         // update internal balances
-        if (earnings.amountA != 0) internalBalances[msg.sender][pool.tokenA] += earnings.amountA;
-        if (earnings.amountB != 0) internalBalances[msg.sender][pool.tokenB] += earnings.amountB;
-        if (earnings.amountC != 0) internalBalances[msg.sender][AUCTION_SETTLEMENT_TOKEN] += earnings.amountC;
+        if (earnings.amountA != 0) {
+            internalBalances[msg.sender][pool.tokenA] += earnings.amountA;
+            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(earnings.amountA));
+        }
+        if (earnings.amountB != 0) {
+            internalBalances[msg.sender][pool.tokenB] += earnings.amountB;
+            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(earnings.amountB));
+        }
+        if (earnings.amountC != 0) {
+            internalBalances[msg.sender][AUCTION_SETTLEMENT_TOKEN] += earnings.amountC;
+            emit InternalBalanceChange(msg.sender, AUCTION_SETTLEMENT_TOKEN, int256(earnings.amountC));
+        }
 
         position.lastUpdatedTimestamp = block.timestamp;
     }
@@ -534,8 +554,14 @@ contract Hyper is IHyper, ReentrancyGuard {
         }
 
         // add to internal balance
-        if (amountA != 0) internalBalances[msg.sender][pool.tokenA] += amountA;
-        if (amountB != 0) internalBalances[msg.sender][pool.tokenB] += amountB;
+        if (amountA != 0) {
+            internalBalances[msg.sender][pool.tokenA] += amountA;
+            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(amountA));
+        }
+        if (amountB != 0) {
+            internalBalances[msg.sender][pool.tokenB] += amountB;
+            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(amountB));
+        }
     }
 
     struct SwapDetails {
@@ -721,12 +747,14 @@ contract Hyper is IHyper, ReentrancyGuard {
             // TODO: review order of operations
             settleToken(pool.tokenA, amountIn);
             internalBalances[msg.sender][pool.tokenB] += swapDetails.amountOut;
+            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(swapDetails.amountOut));
         } else {
             pool.feesBPerLiquidity = swapDetails.feesPerLiquidity;
 
             // TODO: review order of operations
             settleToken(pool.tokenB, amountIn);
             internalBalances[msg.sender][pool.tokenA] += swapDetails.amountOut;
+            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(swapDetails.amountOut));
         }
     }
 
@@ -758,6 +786,11 @@ contract Hyper is IHyper, ReentrancyGuard {
         if (netFeeAmount > leadingBid.netFeeAmount) {
             // refund previous bid amount to it's refunder address
             internalBalances[leadingBid.refunder][AUCTION_SETTLEMENT_TOKEN] += leadingBid.netFeeAmount + leadingBid.fee;
+            emit InternalBalanceChange(
+                leadingBid.refunder,
+                AUCTION_SETTLEMENT_TOKEN,
+                int256(leadingBid.netFeeAmount + leadingBid.fee)
+            );
             // calculate new proceeds per second
             UD60x18 proceedsPerSecond = toUD60x18(netFeeAmount).div(toUD60x18(epoch.length));
             // set new leading bid
@@ -778,9 +811,13 @@ contract Hyper is IHyper, ReentrancyGuard {
     function settleToken(address token, uint256 amountOwed) internal {
         if (internalBalances[msg.sender][token] >= amountOwed) {
             internalBalances[msg.sender][token] -= amountOwed;
+            emit InternalBalanceChange(msg.sender, token, -int256(amountOwed));
         } else {
-            amountOwed -= internalBalances[msg.sender][token];
-            internalBalances[msg.sender][token] = 0;
+            if (internalBalances[msg.sender][token] > 0) {
+                amountOwed -= internalBalances[msg.sender][token];
+                emit InternalBalanceChange(msg.sender, token, -int256(internalBalances[msg.sender][token]));
+                internalBalances[msg.sender][token] = 0;
+            }
             uint256 initialBalance = ERC20(token).balanceOf(address(this));
             SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amountOwed);
             require(
