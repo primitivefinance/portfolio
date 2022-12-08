@@ -662,19 +662,25 @@ contract Hyper is IHyper, Test {
                 swapDetails.slotIndex = swapDetails.nextSlotIndex;
                 // cross the next initialized slot
                 if (swapDetails.nextSlotInitialized) {
-                    // update slot
-                    Slot storage nextSlot = slots[getSlotId(poolId, swapDetails.nextSlotIndex)];
+                    // sync slot
+                    SlotId nextSlotId = getSlotId(poolId, swapDetails.nextSlotIndex);
+                    Slot storage nextSlot = slots[nextSlotId];
                     syncSlot(poolId, nextSlot, swapDetails.nextSlotIndex, epoch);
-                    // TODO: cross slot
-                    // nextSlot.cross(
-                    //     epoch.id,
-                    //     pool.proceedsPerLiquidity,
-                    //     tokenIn == PoolToken.A ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity,
-                    //     tokenIn == PoolToken.A ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
-                    // );
+                    // update per liquidities outside
+                    nextSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity.sub(
+                        nextSlot.proceedsPerLiquidityOutside
+                    );
+                    nextSlot.feesAPerLiquidityOutside = (
+                        tokenIn == PoolToken.A ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity
+                    ).sub(nextSlot.feesAPerLiquidityOutside);
+                    nextSlot.feesBPerLiquidityOutside = (
+                        tokenIn == PoolToken.A ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
+                    ).sub(nextSlot.feesBPerLiquidityOutside);
+                    // save slot snapshot for the current epoch id
+                    slotSnapshots[nextSlotId][epoch.id] = getSlotSnapshot(nextSlot);
                     // update swap details state (eventually gets saved to pool)
                     if (tokenIn == PoolToken.A) {
-                        // crosing slot from right to left
+                        // moving down the grid, from right to left (receiving less tokenB per input tokenA)
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta)
                             : swapDetails.swapLiquidity + BrainMath.abs(nextSlot.swapLiquidityDelta);
@@ -683,7 +689,7 @@ contract Hyper is IHyper, Test {
                             : swapDetails.maturedLiquidity + BrainMath.abs(nextSlot.maturedLiquidityDelta);
                         swapDetails.pendingLiquidity -= nextSlot.pendingLiquidityDelta;
                     } else {
-                        // crosing slot from left to right
+                        // moving up the grid, from left to right (receiving less tokenA per input tokenB)
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta)
                             : swapDetails.swapLiquidity - BrainMath.abs(nextSlot.swapLiquidityDelta);

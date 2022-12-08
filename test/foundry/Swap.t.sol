@@ -6,6 +6,8 @@ import "forge-std/Vm.sol";
 
 import "./PoolDefaults.sol";
 
+import {unwrap as unwrapUD60x18} from "@prb/math/UD60x18.sol";
+
 import "../../contracts/Hyper.sol";
 import "../../contracts/test/TestERC20.sol";
 
@@ -63,6 +65,9 @@ contract TestSwap is Test {
         // fetch slotIndex of pool
         (, , , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
 
+        emit log("before swap: sqrt price");
+        emit log_uint(unwrapUD60x18(sqrtPrice));
+
         int256 liquidity = int256(1e18);
         int128 lowerSlotIndex = slotIndex - 10;
         int128 upperSlotIndex = slotIndex + 10;
@@ -79,11 +84,19 @@ contract TestSwap is Test {
 
         // perform swap
         hyper.swap(poolId, PoolToken.A, tokenAAmountIn);
+
+        (, , , , , , UD60x18 _sqrtPrice, , , , , ) = hyper.pools(poolId);
+
+        emit log("after swap: sqrt price");
+        emit log_uint(unwrapUD60x18(_sqrtPrice));
     }
 
     function test_swap_tokenB_liquidity_in_range_succeeds() public mintApproveTokens {
         // fetch slotIndex of pool
         (, , , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
+
+        emit log("before swap: sqrt price");
+        emit log_uint(unwrapUD60x18(sqrtPrice));
 
         int256 liquidity = int256(1e18);
         int128 lowerSlotIndex = slotIndex - 10;
@@ -101,5 +114,10 @@ contract TestSwap is Test {
 
         // perform swap
         hyper.swap(poolId, PoolToken.B, tokenBAmountIn);
+
+        (, , , , , , UD60x18 _sqrtPrice, , , , , ) = hyper.pools(poolId);
+
+        emit log("after swap: sqrt price");
+        emit log_uint(unwrapUD60x18(_sqrtPrice));
     }
 }
