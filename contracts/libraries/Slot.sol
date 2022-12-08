@@ -3,9 +3,7 @@ pragma solidity 0.8.13;
 
 import {UD60x18} from "@prb/math/UD60x18.sol";
 
-import "./BitMath.sol" as BitMath;
-import {Epoch} from "./Epoch.sol";
-import {PoolId, Pool} from "./Pool.sol";
+import {PoolId} from "./Pool.sol";
 
 type SlotId is bytes32;
 

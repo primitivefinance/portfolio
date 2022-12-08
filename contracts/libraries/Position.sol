@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import {UD60x18, fromUD60x18, toUD60x18} from "@prb/math/UD60x18.sol";
 
 import {PoolId, PoolSnapshot} from "./Pool.sol";
-import {Slot, SlotSnapshot} from "./Slot.sol";
+import {SlotSnapshot} from "./Slot.sol";
 
 type PositionId is bytes32;
 
