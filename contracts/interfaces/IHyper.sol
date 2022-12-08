@@ -18,6 +18,8 @@ interface IHyper {
 
     function AUCTION_FEE() external view returns (UD60x18);
 
+    function SLOT_SPACING() external view returns (uint8);
+
     function epoch()
         external
         view
