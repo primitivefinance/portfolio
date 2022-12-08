@@ -18,8 +18,8 @@ function abs(int256 n) pure returns (uint256) {
     return uint256(n > 0 ? n : ~n + 1);
 }
 
-function abs_(int128 n) pure returns (uint128) {
-    return uint128(n > 0 ? n : ~n + 1);
+function abs_(int24 n) pure returns (uint24) {
+    return uint24(n > 0 ? n : ~n + 1);
 }
 
 /// @dev Get the price square root using the slot index
