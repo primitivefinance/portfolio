@@ -164,4 +164,14 @@ contract TestBrainMath is Test {
 
         assertApproxEqRel(unwrap(targetPrice), 2718145926819817600, MAX_PERCENT_DELTA);
     }
+
+    function test_getTargetPriceUsingDeltaY_should() public {
+        UD60x18 targetPrice = getTargetPriceUsingDeltaY(
+            _getSqrtPriceAtSlot(20000),
+            1000000000000000000000000000,
+            10000000000
+        );
+
+        assertApproxEqRel(unwrap(targetPrice), 2718145926819817600, MAX_PERCENT_DELTA);
+    }
 }
