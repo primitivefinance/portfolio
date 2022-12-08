@@ -36,7 +36,15 @@ contract TestBid is Test {
         auctionToken = fakeUSDC;
 
         uint256 startTime = 1000;
-        hyper = new Hyper(startTime, address(auctionToken), EPOCH_LENGTH, AUCTION_LENGTH, PUBLIC_SWAP_FEE, AUCTION_FEE);
+        hyper = new Hyper(
+            startTime,
+            address(auctionToken),
+            EPOCH_LENGTH,
+            AUCTION_LENGTH,
+            PUBLIC_SWAP_FEE,
+            AUCTION_FEE,
+            SLOT_SPACING
+        );
 
         (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
         assertTrue(tokenA == fakeUSDC);

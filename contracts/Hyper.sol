@@ -17,10 +17,9 @@ import {getSlotId, getSlotSnapshot, SlotId, Slot, SlotSnapshot} from "./librarie
 import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInside, Earnings, PositionId, Position} from "./libraries/Position.sol";
 
 // TODO:
-// - check the types
+// - check the types on integers
 // - price limit on swap
 // - fix amount out
-// - slot index spacing
 
 contract Hyper is IHyper, ReentrancyGuard {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
@@ -28,6 +27,8 @@ contract Hyper is IHyper, ReentrancyGuard {
 
     UD60x18 public immutable PUBLIC_SWAP_FEE;
     UD60x18 public immutable AUCTION_FEE;
+
+    uint8 public immutable SLOT_SPACING;
 
     Epoch public epoch;
 
@@ -53,7 +54,8 @@ contract Hyper is IHyper, ReentrancyGuard {
         uint256 _epochLength,
         uint256 _auctionLength,
         UD60x18 _publicSwapFee,
-        UD60x18 _auctionFee
+        UD60x18 _auctionFee,
+        uint8 _slotSpacing
     ) {
         auctionFeeCollector = msg.sender;
 
@@ -71,6 +73,9 @@ contract Hyper is IHyper, ReentrancyGuard {
 
         require(_auctionFee.gt(zeroUD60x18) && _auctionFee.lt(halfUD60x18));
         AUCTION_FEE = _auctionFee;
+
+        require(_slotSpacing > 0);
+        SLOT_SPACING = _slotSpacing;
     }
 
     modifier started() {
@@ -173,7 +178,7 @@ contract Hyper is IHyper, ReentrancyGuard {
     function syncSlot(
         PoolId poolId,
         Slot storage slot,
-        int128 slotIndex,
+        int24 slotIndex,
         Epoch memory readEpoch
     ) internal {
         uint256 epochsPassed = readEpoch.getEpochsPassed(slot.lastUpdatedTimestamp);
@@ -187,7 +192,7 @@ contract Hyper is IHyper, ReentrancyGuard {
             if (slot.pendingLiquidityGross < 0) {
                 slot.liquidityGross -= BrainMath.abs(slot.pendingLiquidityGross);
                 if (slot.liquidityGross == 0) {
-                    (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(slotIndex));
+                    (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(slotIndex);
                     bitmaps[poolId][chunk] = BitMath.flip(bitmaps[poolId][chunk], bit);
                     delete slots[slot.id];
                     return;
@@ -309,11 +314,13 @@ contract Hyper is IHyper, ReentrancyGuard {
 
     function updateLiquidity(
         PoolId poolId,
-        int128 lowerSlotIndex,
-        int128 upperSlotIndex,
+        int24 lowerSlotIndex,
+        int24 upperSlotIndex,
         int256 amount
     ) public nonReentrant started {
         if (lowerSlotIndex >= upperSlotIndex) revert IHyper.PositionInvalidRangeError();
+        if (BrainMath.abs_(lowerSlotIndex) % SLOT_SPACING != 0 || BrainMath.abs_(upperSlotIndex) % SLOT_SPACING != 0)
+            revert IHyper.PositionInvalidSpacingError();
         if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
@@ -325,7 +332,7 @@ contract Hyper is IHyper, ReentrancyGuard {
         SlotId lowerSlotId;
         Slot storage lowerSlot;
         {
-            lowerSlotId = getSlotId(poolId, int24(lowerSlotIndex));
+            lowerSlotId = getSlotId(poolId, lowerSlotIndex);
             lowerSlot = slots[lowerSlotId];
             syncSlot(poolId, lowerSlot, lowerSlotIndex, epoch);
         }
@@ -333,7 +340,7 @@ contract Hyper is IHyper, ReentrancyGuard {
         SlotId upperSlotId;
         Slot storage upperSlot;
         {
-            upperSlotId = getSlotId(poolId, int24(upperSlotIndex));
+            upperSlotId = getSlotId(poolId, upperSlotIndex);
             upperSlot = slots[upperSlotId];
             syncSlot(poolId, upperSlot, upperSlotIndex, epoch);
         }
@@ -406,7 +413,7 @@ contract Hyper is IHyper, ReentrancyGuard {
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
             if (lowerSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(position.lowerSlotIndex);
                 bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.lowerSlotIndex) {
@@ -421,7 +428,7 @@ contract Hyper is IHyper, ReentrancyGuard {
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(position.upperSlotIndex);
                 bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.upperSlotIndex) {
@@ -476,7 +483,7 @@ contract Hyper is IHyper, ReentrancyGuard {
             lowerSlot.liquidityGross -= removedPending;
 
             if (lowerSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(position.lowerSlotIndex);
                 bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 delete slots[lowerSlot.id];
             }
@@ -486,7 +493,7 @@ contract Hyper is IHyper, ReentrancyGuard {
             upperSlot.liquidityGross -= removedPending;
 
             if (upperSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(position.upperSlotIndex);
                 bitmaps[pool.id][chunk] = BitMath.flip(bitmaps[pool.id][chunk], bit);
                 delete slots[upperSlot.id];
             }
@@ -535,14 +542,14 @@ contract Hyper is IHyper, ReentrancyGuard {
         UD60x18 feeTier;
         uint256 remaining;
         uint256 amountOut;
-        int128 slotIndex;
+        int24 slotIndex;
         UD60x18 sqrtPrice;
         uint256 swapLiquidity;
         uint256 maturedLiquidity;
         int256 pendingLiquidity;
         UD60x18 feesPerLiquidity;
         bool nextSlotInitialized;
-        int128 nextSlotIndex;
+        int24 nextSlotIndex;
         UD60x18 nextSqrtPrice;
     }
 
@@ -577,14 +584,14 @@ contract Hyper is IHyper, ReentrancyGuard {
         while (swapDetails.remaining > 0) {
             {
                 // Get the next slot or the border of a bitmap
-                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(swapDetails.slotIndex));
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(swapDetails.slotIndex);
                 (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
                     bitmaps[poolId][chunk],
                     bit,
                     tokenIn == PoolToken.A ? BitMath.SearchDirection.Left : BitMath.SearchDirection.Right
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
-                swapDetails.nextSlotIndex = int128(chunk) * 256 + int8(nextSlotBit);
+                swapDetails.nextSlotIndex = int24(chunk) * 256 + int8(nextSlotBit);
                 swapDetails.nextSqrtPrice = BrainMath.getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());

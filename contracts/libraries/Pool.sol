@@ -18,7 +18,7 @@ struct Pool {
     uint256 maturedLiquidity;
     int256 pendingLiquidity;
     UD60x18 sqrtPrice;
-    int128 slotIndex;
+    int24 slotIndex;
     UD60x18 proceedsPerLiquidity;
     UD60x18 feesAPerLiquidity;
     UD60x18 feesBPerLiquidity;
@@ -35,7 +35,7 @@ struct Bid {
 
 struct PoolSnapshot {
     UD60x18 sqrtPrice;
-    int128 slotIndex;
+    int24 slotIndex;
     UD60x18 proceedsPerLiquidity;
     UD60x18 feesAPerLiquidity;
     UD60x18 feesBPerLiquidity;

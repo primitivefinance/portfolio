@@ -39,7 +39,15 @@ contract TestSwap is Test {
         auctionToken = fakeUSDC;
 
         uint256 startTime = 1000;
-        hyper = new Hyper(startTime, address(auctionToken), EPOCH_LENGTH, AUCTION_LENGTH, PUBLIC_SWAP_FEE, AUCTION_FEE);
+        hyper = new Hyper(
+            startTime,
+            address(auctionToken),
+            EPOCH_LENGTH,
+            AUCTION_LENGTH,
+            PUBLIC_SWAP_FEE,
+            AUCTION_FEE,
+            SLOT_SPACING
+        );
 
         (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
         assertTrue(tokenA == fakeUSDC);
@@ -63,14 +71,14 @@ contract TestSwap is Test {
 
     function test_swap_tokenA_liquidity_in_range_succeeds() public mintApproveTokens {
         // fetch slotIndex of pool
-        (, , , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , UD60x18 sqrtPrice, int24 slotIndex, , , , ) = hyper.pools(poolId);
 
         emit log("before swap: sqrt price");
         emit log_uint(unwrapUD60x18(sqrtPrice));
 
         int256 liquidity = int256(1e18);
-        int128 lowerSlotIndex = slotIndex - 10;
-        int128 upperSlotIndex = slotIndex + 10;
+        int24 lowerSlotIndex = slotIndex - 10;
+        int24 upperSlotIndex = slotIndex + 10;
 
         // add liquidity around the pool's slot index
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity);
@@ -93,14 +101,14 @@ contract TestSwap is Test {
 
     function test_swap_tokenB_liquidity_in_range_succeeds() public mintApproveTokens {
         // fetch slotIndex of pool
-        (, , , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , UD60x18 sqrtPrice, int24 slotIndex, , , , ) = hyper.pools(poolId);
 
         emit log("before swap: sqrt price");
         emit log_uint(unwrapUD60x18(sqrtPrice));
 
         int256 liquidity = int256(1e18);
-        int128 lowerSlotIndex = slotIndex - 10;
-        int128 upperSlotIndex = slotIndex + 10;
+        int24 lowerSlotIndex = slotIndex - 10;
+        int24 upperSlotIndex = slotIndex + 10;
 
         // add liquidity around the pool's slot index
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity);

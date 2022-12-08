@@ -35,7 +35,15 @@ contract TestUpdateLiquidity is Test {
         auctionToken = fakeUSDC;
 
         uint256 startTime = 1000;
-        hyper = new Hyper(startTime, address(auctionToken), EPOCH_LENGTH, AUCTION_LENGTH, PUBLIC_SWAP_FEE, AUCTION_FEE);
+        hyper = new Hyper(
+            startTime,
+            address(auctionToken),
+            EPOCH_LENGTH,
+            AUCTION_LENGTH,
+            PUBLIC_SWAP_FEE,
+            AUCTION_FEE,
+            SLOT_SPACING
+        );
 
         (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
         assertTrue(tokenA == fakeUSDC);
@@ -60,10 +68,10 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int24 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
-        int128 lowerSlotIndex = slotIndex + 10;
-        int128 upperSlotIndex = lowerSlotIndex + 10;
+        int24 lowerSlotIndex = slotIndex + 10;
+        int24 upperSlotIndex = lowerSlotIndex + 10;
         // finally, add liquidity
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
     }
@@ -74,10 +82,10 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int24 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
-        int128 lowerSlotIndex = slotIndex - 10;
-        int128 upperSlotIndex = slotIndex + 10;
+        int24 lowerSlotIndex = slotIndex - 10;
+        int24 upperSlotIndex = slotIndex + 10;
         // finally, add liquidity
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
     }
@@ -88,10 +96,10 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int24 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
-        int128 lowerSlotIndex = slotIndex - 100;
-        int128 upperSlotIndex = slotIndex - 10;
+        int24 lowerSlotIndex = slotIndex - 100;
+        int24 upperSlotIndex = slotIndex - 10;
         // finally, add liquidity
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
     }
@@ -120,10 +128,10 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int24 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
-        int128 lowerSlotIndex = slotIndex + 10;
-        int128 upperSlotIndex = lowerSlotIndex + 10;
+        int24 lowerSlotIndex = slotIndex + 10;
+        int24 upperSlotIndex = lowerSlotIndex + 10;
         // add liquidity
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
         // remove liquidity
@@ -136,10 +144,10 @@ contract TestUpdateLiquidity is Test {
         // get pool id
         PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int24 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
-        int128 lowerSlotIndex = slotIndex + 10;
-        int128 upperSlotIndex = lowerSlotIndex + 10;
+        int24 lowerSlotIndex = slotIndex + 10;
+        int24 upperSlotIndex = lowerSlotIndex + 10;
         // add liquidity
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
         // get current epoch
