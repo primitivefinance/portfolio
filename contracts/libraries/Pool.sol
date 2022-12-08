@@ -9,6 +9,11 @@ using {sync} for Pool global;
 
 type PoolId is bytes32;
 
+enum PoolToken {
+    A,
+    B
+}
+
 struct Pool {
     address tokenA;
     address tokenB;

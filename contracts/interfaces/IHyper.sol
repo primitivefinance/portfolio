@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "@prb/math/UD60x18.sol";
+import {UD60x18} from "@prb/math/UD60x18.sol";
 
-import {PoolId} from "../libraries/Pool.sol";
+import {PoolId, PoolToken} from "../libraries/Pool.sol";
 import {SlotId} from "../libraries/Slot.sol";
 import {PositionId} from "../libraries/Position.sol";
 
@@ -120,8 +120,8 @@ interface IHyper {
 
     function swap(
         PoolId poolId,
+        PoolToken tokenIn,
         uint256 amountIn,
-        bool direction,
         bool transferOut
     ) external;
 

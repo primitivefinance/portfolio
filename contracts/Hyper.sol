@@ -8,12 +8,12 @@ import "solmate/utils/SafeTransferLib.sol";
 
 import {IHyper} from "./interfaces/IHyper.sol";
 
-import "./libraries/BitMath.sol";
-import "./libraries/BrainMath.sol";
+import "./libraries/BitMath.sol" as BitMath;
+import "./libraries/BrainMath.sol" as BrainMath;
 
 import {BalanceChange} from "./libraries/BalanceChange.sol";
 import {Epoch} from "./libraries/Epoch.sol";
-import {getPoolId, PoolId, Pool, Bid} from "./libraries/Pool.sol";
+import {getPoolId, PoolId, Pool, PoolToken, Bid} from "./libraries/Pool.sol";
 import {getSlotId, SlotId, Slot, SlotSnapshot} from "./libraries/Slot.sol";
 import {getPositionId, PositionId, Position, PositionBalanceChange} from "./libraries/Position.sol";
 
@@ -128,7 +128,7 @@ contract Hyper is IHyper {
         pool.tokenA = tokenA;
         pool.tokenB = tokenB;
         pool.sqrtPrice = sqrtPrice;
-        pool.slotIndex = _getSlotAtSqrtPrice(sqrtPrice);
+        pool.slotIndex = BrainMath._getSlotAtSqrtPrice(sqrtPrice);
         pool.lastUpdatedTimestamp = block.timestamp;
         emit ActivatePool(tokenA, tokenB);
     }
@@ -217,7 +217,7 @@ contract Hyper is IHyper {
                 lowerSlot,
                 upperSlot,
                 position,
-                abs(amount)
+                BrainMath.abs(amount)
             );
             if (removeAmountA != 0) balanceChanges[0].amount += int256(removeAmountA);
             if (removeAmountB != 0) balanceChanges[1].amount += int256(removeAmountB);
@@ -242,7 +242,9 @@ contract Hyper is IHyper {
 
         // use negative pending liquidity first
         if (position.pendingLiquidity < 0) {
-            uint256 addedPending = abs(position.pendingLiquidity) >= amount ? amount : abs(position.pendingLiquidity);
+            uint256 addedPending = BrainMath.abs(position.pendingLiquidity) >= amount
+                ? amount
+                : BrainMath.abs(position.pendingLiquidity);
 
             position.pendingLiquidity += int256(addedPending);
 
@@ -267,8 +269,8 @@ contract Hyper is IHyper {
             lowerSlot.pendingLiquidityDelta += int256(addAmountLeft);
             if (lowerSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.lowerSlotIndex) {
                     lowerSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
@@ -282,8 +284,8 @@ contract Hyper is IHyper {
             upperSlot.pendingLiquidityDelta -= int256(addAmountLeft);
             if (upperSlot.liquidityGross == 0) {
                 // flip slot in bitmap
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
                 // initialize per liquidity outside values
                 if (pool.slotIndex >= position.upperSlotIndex) {
                     upperSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity;
@@ -292,12 +294,12 @@ contract Hyper is IHyper {
                 }
                 upperSlot.liquidityGross += uint256(addAmountLeft);
             }
-            (amountA, amountB) = _calculateLiquidityUnderlying(
+            (amountA, amountB) = BrainMath._calculateLiquidityUnderlying(
                 addAmountLeft,
                 pool.sqrtPrice,
                 position.lowerSlotIndex,
                 position.upperSlotIndex,
-                true
+                BrainMath.Rounding.Up
             );
             if (position.lowerSlotIndex <= pool.slotIndex && position.upperSlotIndex > pool.slotIndex) {
                 pool.swapLiquidity += addAmountLeft;
@@ -332,8 +334,8 @@ contract Hyper is IHyper {
             lowerSlot.liquidityGross -= removedPending;
 
             if (lowerSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.lowerSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.lowerSlotIndex));
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
             }
 
             upperSlot.swapLiquidityDelta += int256(removedPending);
@@ -341,17 +343,17 @@ contract Hyper is IHyper {
             upperSlot.liquidityGross -= removedPending;
 
             if (upperSlot.liquidityGross == 0) {
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(position.upperSlotIndex));
-                chunks[chunk] = flip(chunks[chunk], bit);
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(position.upperSlotIndex));
+                chunks[chunk] = BitMath.flip(chunks[chunk], bit);
             }
 
             // credit tokens owed to the position immediately
-            (amountA, amountB) = _calculateLiquidityUnderlying(
+            (amountA, amountB) = BrainMath._calculateLiquidityUnderlying(
                 removedPending,
                 pool.sqrtPrice,
                 position.lowerSlotIndex,
                 position.upperSlotIndex,
-                false
+                BrainMath.Rounding.Down
             );
 
             if (position.lowerSlotIndex <= pool.slotIndex && position.upperSlotIndex > pool.slotIndex) {
@@ -361,7 +363,8 @@ contract Hyper is IHyper {
 
             removeAmountLeft -= removedPending;
         } else {
-            if (position.swapLiquidity - abs(position.pendingLiquidity) < amount) revert IHyper.RemoveLiquidityError();
+            if (position.swapLiquidity - BrainMath.abs(position.pendingLiquidity) < amount)
+                revert IHyper.RemoveLiquidityError();
         }
 
         // schedule removeAmountLeft to be removed from remaining liquidity
@@ -409,11 +412,11 @@ contract Hyper is IHyper {
 
     function swap(
         PoolId poolId,
+        PoolToken tokenIn,
         uint256 amountIn,
-        bool direction,
         bool transferOut
     ) public {
-        BalanceChange[2] memory balanceChanges = _swap(poolId, amountIn, direction);
+        BalanceChange[2] memory balanceChanges = _swap(poolId, tokenIn, amountIn);
         for (uint256 i = 0; i < balanceChanges.length; ++i) {
             _settleBalanceChange(balanceChanges[i], transferOut);
         }
@@ -421,8 +424,8 @@ contract Hyper is IHyper {
 
     function _swap(
         PoolId poolId,
-        uint256 amountIn,
-        bool direction
+        PoolToken tokenIn,
+        uint256 amountIn
     ) internal started returns (BalanceChange[2] memory balanceChanges) {
         if (amountIn == 0) revert IHyper.AmountZeroError();
 
@@ -448,7 +451,7 @@ contract Hyper is IHyper {
             swapLiquidity: pool.swapLiquidity,
             maturedLiquidity: pool.maturedLiquidity,
             pendingLiquidity: pool.pendingLiquidity,
-            feesPerLiquidity: direction ? pool.feesAPerLiquidity : pool.feesBPerLiquidity,
+            feesPerLiquidity: tokenIn == PoolToken.A ? pool.feesAPerLiquidity : pool.feesBPerLiquidity,
             nextSlotInitialized: false,
             nextSlotIndex: 0,
             nextSqrtPrice: wrapUD60x18(0)
@@ -457,32 +460,32 @@ contract Hyper is IHyper {
         while (swapDetails.remaining > 0) {
             {
                 // Get the next slot or the border of a bitmap
-                (int16 chunk, uint8 bit) = getSlotPositionInBitmap(int24(swapDetails.slotIndex));
-                (bool hasNextSlot, uint8 nextSlotBit) = findNextSlotWithinChunk(
-                    // If direction is true: swapping A for B
-                    // Decreasing the slot index -> going right into the bitmap (reducing the index)
+                (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(swapDetails.slotIndex));
+                (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
+                    // If pool token in is A -> decreasing slot index
+                    // decreasing slot index -> going right into the bitmap (reducing the index)
                     bitmaps[poolId][chunk],
                     bit,
-                    !direction
+                    tokenIn == PoolToken.A ? BitMath.SearchDirection.Right : BitMath.SearchDirection.Left
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
                 swapDetails.nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
-                swapDetails.nextSqrtPrice = _getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
+                swapDetails.nextSqrtPrice = BrainMath._getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
 
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
-            uint256 maxToDelta = direction
-                ? getDeltaXToNextPrice(
+            uint256 maxToDelta = tokenIn == PoolToken.A
+                ? BrainMath.getDeltaAToNextPrice(
                     swapDetails.sqrtPrice,
                     swapDetails.nextSqrtPrice,
                     swapDetails.swapLiquidity,
-                    true
+                    BrainMath.Rounding.Up
                 )
-                : getDeltaYToNextPrice(
+                : BrainMath.getDeltaBToNextPrice(
                     swapDetails.sqrtPrice,
                     swapDetails.nextSqrtPrice,
                     swapDetails.swapLiquidity,
-                    true
+                    BrainMath.Rounding.Up
                 );
             if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
                 // remove fees from remaining amount
@@ -492,19 +495,33 @@ contract Hyper is IHyper {
                     toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                 );
                 // update price and amount out after swapping remaining amount
-                UD60x18 targetPrice = direction
-                    ? getTargetPriceUsingDeltaX(swapDetails.sqrtPrice, swapDetails.swapLiquidity, swapDetails.remaining)
-                    : getTargetPriceUsingDeltaY(
+                UD60x18 targetPrice = tokenIn == PoolToken.A
+                    ? BrainMath.getTargetPriceUsingDeltaA(
+                        swapDetails.sqrtPrice,
+                        swapDetails.swapLiquidity,
+                        swapDetails.remaining
+                    )
+                    : BrainMath.getTargetPriceUsingDeltaB(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
                         swapDetails.remaining
                     );
-                swapDetails.amountOut += direction
-                    ? getDeltaYToNextPrice(swapDetails.sqrtPrice, targetPrice, swapDetails.swapLiquidity, false)
-                    : getDeltaXToNextPrice(swapDetails.sqrtPrice, targetPrice, swapDetails.swapLiquidity, false);
+                swapDetails.amountOut += tokenIn == PoolToken.A
+                    ? BrainMath.getDeltaBToNextPrice(
+                        swapDetails.sqrtPrice,
+                        targetPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Down
+                    )
+                    : BrainMath.getDeltaAToNextPrice(
+                        swapDetails.sqrtPrice,
+                        targetPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Down
+                    );
                 swapDetails.remaining = 0;
                 swapDetails.sqrtPrice = targetPrice;
-                swapDetails.slotIndex = _getSlotAtSqrtPrice(swapDetails.sqrtPrice);
+                swapDetails.slotIndex = BrainMath._getSlotAtSqrtPrice(swapDetails.sqrtPrice);
             } else {
                 // swapping maxToDelta, only take fees on this amount
                 uint256 maxFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxToDelta)).ceil());
@@ -515,18 +532,18 @@ contract Hyper is IHyper {
                     toUD60x18(maxFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                 );
                 // update price and amount out after swapping
-                swapDetails.amountOut += direction
-                    ? getDeltaYToNextPrice(
+                swapDetails.amountOut += tokenIn == PoolToken.A
+                    ? BrainMath.getDeltaBToNextPrice(
                         swapDetails.sqrtPrice,
                         swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity,
-                        false
+                        BrainMath.Rounding.Down
                     )
-                    : getDeltaXToNextPrice(
+                    : BrainMath.getDeltaAToNextPrice(
                         swapDetails.sqrtPrice,
                         swapDetails.nextSqrtPrice,
                         swapDetails.swapLiquidity,
-                        false
+                        BrainMath.Rounding.Down
                     );
                 swapDetails.sqrtPrice = swapDetails.nextSqrtPrice;
                 swapDetails.slotIndex = swapDetails.nextSlotIndex;
@@ -538,27 +555,27 @@ contract Hyper is IHyper {
                     nextSlot.cross(
                         epoch.id,
                         pool.proceedsPerLiquidity,
-                        direction ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity,
-                        direction ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
+                        tokenIn == PoolToken.A ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity,
+                        tokenIn == PoolToken.A ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
                     );
                     // update swap details state (eventually gets saved to pool)
-                    if (direction) {
-                        // crosing slot from right to left? TODO: review swap direction logic
+                    if (tokenIn == PoolToken.A) {
+                        // crosing slot from right to left
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta)
-                            : swapDetails.swapLiquidity + abs(nextSlot.swapLiquidityDelta);
+                            : swapDetails.swapLiquidity + BrainMath.abs(nextSlot.swapLiquidityDelta);
                         swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
                             ? swapDetails.maturedLiquidity - uint256(nextSlot.maturedLiquidityDelta)
-                            : swapDetails.maturedLiquidity + abs(nextSlot.maturedLiquidityDelta);
+                            : swapDetails.maturedLiquidity + BrainMath.abs(nextSlot.maturedLiquidityDelta);
                         swapDetails.pendingLiquidity -= nextSlot.pendingLiquidityDelta;
                     } else {
-                        // crosing slot from left to right? TODO: review swap direction logic
+                        // crosing slot from left to right
                         swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
                             ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta)
-                            : swapDetails.swapLiquidity - abs(nextSlot.swapLiquidityDelta);
+                            : swapDetails.swapLiquidity - BrainMath.abs(nextSlot.swapLiquidityDelta);
                         swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
                             ? swapDetails.maturedLiquidity + uint256(nextSlot.maturedLiquidityDelta)
-                            : swapDetails.maturedLiquidity - abs(nextSlot.maturedLiquidityDelta);
+                            : swapDetails.maturedLiquidity - BrainMath.abs(nextSlot.maturedLiquidityDelta);
                         swapDetails.pendingLiquidity += nextSlot.pendingLiquidityDelta;
                     }
                 }
@@ -570,7 +587,7 @@ contract Hyper is IHyper {
         pool.swapLiquidity = swapDetails.swapLiquidity;
         pool.maturedLiquidity = swapDetails.maturedLiquidity;
         pool.pendingLiquidity = swapDetails.pendingLiquidity;
-        if (direction) {
+        if (tokenIn == PoolToken.A) {
             pool.feesAPerLiquidity = swapDetails.feesPerLiquidity;
 
             balanceChanges[0] = BalanceChange({token: pool.tokenA, amount: -int256(amountIn)});
@@ -645,10 +662,11 @@ contract Hyper is IHyper {
 
     function _settleBalanceChange(BalanceChange memory balanceChange, bool transferOut) internal {
         if (balanceChange.amount < 0) {
-            if (internalBalances[msg.sender][balanceChange.token] >= abs(balanceChange.amount)) {
-                internalBalances[msg.sender][balanceChange.token] -= abs(balanceChange.amount);
+            if (internalBalances[msg.sender][balanceChange.token] >= BrainMath.abs(balanceChange.amount)) {
+                internalBalances[msg.sender][balanceChange.token] -= BrainMath.abs(balanceChange.amount);
             } else {
-                uint256 amountOwed = abs(balanceChange.amount) - internalBalances[msg.sender][balanceChange.token];
+                uint256 amountOwed = BrainMath.abs(balanceChange.amount) -
+                    internalBalances[msg.sender][balanceChange.token];
                 internalBalances[msg.sender][balanceChange.token] = 0;
                 uint256 initBalance = ERC20(balanceChange.token).balanceOf(address(this));
                 SafeTransferLib.safeTransferFrom(ERC20(balanceChange.token), msg.sender, address(this), amountOwed);
@@ -659,7 +677,11 @@ contract Hyper is IHyper {
             }
         } else if (balanceChange.amount > 0) {
             if (transferOut) {
-                SafeTransferLib.safeTransfer(ERC20(balanceChange.token), msg.sender, abs(balanceChange.amount));
+                SafeTransferLib.safeTransfer(
+                    ERC20(balanceChange.token),
+                    msg.sender,
+                    BrainMath.abs(balanceChange.amount)
+                );
             } else {
                 internalBalances[msg.sender][balanceChange.token] += uint256(balanceChange.amount);
             }
