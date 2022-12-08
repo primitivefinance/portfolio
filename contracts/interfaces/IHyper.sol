@@ -84,7 +84,8 @@ interface IHyper {
         returns (
             address refunder,
             address swapper,
-            uint256 amount,
+            uint256 netFeeAmount,
+            uint256 feeAmount,
             UD60x18 proceedsPerSecond
         );
 
@@ -114,15 +115,13 @@ interface IHyper {
         PoolId poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
-        int256 amount,
-        bool transferOut
+        int256 amount
     ) external;
 
     function swap(
         PoolId poolId,
         PoolToken tokenIn,
-        uint256 amountIn,
-        bool transferOut
+        uint256 amountIn
     ) external;
 
     function bid(
