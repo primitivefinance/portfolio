@@ -755,7 +755,7 @@ contract Hyper is IHyper {
         if (epochId != epoch.id + 1) revert IHyper.InvalidBidEpochError();
         if (block.timestamp < epoch.endTime - AUCTION_LENGTH) revert IHyper.AuctionNotStartedError();
 
-        // @dev: pool needs to sync here, assumes no bids otherwise
+        // @dev: pool needs to sync here, assumes no bids otherwise for the next epoch
         syncPool(poolId, pool, epoch);
 
         uint256 fee = fromUD60x18(AUCTION_FEE.mul(toUD60x18(amount)).ceil());
