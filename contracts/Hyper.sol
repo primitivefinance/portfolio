@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "forge-std/Test.sol";
-
+import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 import {ERC20, SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18, ZERO as zeroUD60x18, HALF_UNIT as halfUD60x18} from "@prb/math/UD60x18.sol";
@@ -18,14 +17,12 @@ import {getSlotId, getSlotSnapshot, SlotId, Slot, SlotSnapshot} from "./librarie
 import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInside, Earnings, PositionId, Position} from "./libraries/Position.sol";
 
 // TODO:
-// - Reentrancy guard
-// - ETH / WETH
 // - check the types
 // - price limit on swap
 // - fix amount out
 // - slot index spacing
 
-contract Hyper is IHyper, Test {
+contract Hyper is IHyper, ReentrancyGuard {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
     uint256 public immutable AUCTION_LENGTH;
 
@@ -86,7 +83,7 @@ contract Hyper is IHyper, Test {
         address to,
         address token,
         uint256 amount
-    ) public started {
+    ) public nonReentrant started {
         SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
         internalBalances[to][token] += amount;
         emit Fund(to, token, amount);
@@ -97,7 +94,7 @@ contract Hyper is IHyper, Test {
         address to,
         address token,
         uint256 amount
-    ) public started {
+    ) public nonReentrant started {
         require(internalBalances[msg.sender][token] >= amount);
         internalBalances[msg.sender][token] -= amount;
         SafeTransferLib.safeTransferFrom(ERC20(token), address(this), to, amount);
@@ -286,7 +283,7 @@ contract Hyper is IHyper, Test {
         position.lastUpdatedTimestamp = block.timestamp;
     }
 
-    function start() public {
+    function start() public nonReentrant {
         require(epoch.id == 0 && block.timestamp >= epoch.endTime, "Hyper not started yet.");
         syncEpoch();
     }
@@ -295,7 +292,7 @@ contract Hyper is IHyper, Test {
         address tokenA,
         address tokenB,
         UD60x18 sqrtPrice
-    ) public started {
+    ) public nonReentrant started {
         syncEpoch();
 
         PoolId poolId = getPoolId(tokenA, tokenB);
@@ -315,7 +312,7 @@ contract Hyper is IHyper, Test {
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
         int256 amount
-    ) public started {
+    ) public nonReentrant started {
         if (lowerSlotIndex >= upperSlotIndex) revert IHyper.PositionInvalidRangeError();
         if (amount == 0) revert IHyper.AmountZeroError();
 
@@ -553,7 +550,7 @@ contract Hyper is IHyper, Test {
         PoolId poolId,
         PoolToken tokenIn,
         uint256 amountIn
-    ) public started {
+    ) public nonReentrant started {
         if (amountIn == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
@@ -732,7 +729,7 @@ contract Hyper is IHyper, Test {
         address refunder,
         address swapper,
         uint256 amount
-    ) public started {
+    ) public nonReentrant started {
         if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
