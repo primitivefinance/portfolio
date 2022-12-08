@@ -473,7 +473,7 @@ contract Hyper is IHyper, Test {
                     // Decreasing the slot index -> going right into the bitmap (reducing the index)
                     bitmaps[poolId][chunk],
                     bit,
-                    !direction
+                    direction
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
                 swapDetails.nextSlotIndex = int128(chunk) * 256 + int8(nextSlotBit);
