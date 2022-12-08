@@ -42,7 +42,7 @@ interface IHyper {
             uint256 maturedLiquidity,
             int256 pendingLiquidity,
             UD60x18 sqrtPrice,
-            int128 slotIndex,
+            int24 slotIndex,
             UD60x18 proceedsPerLiquidity,
             UD60x18 feesAPerLiquidity,
             UD60x18 feesBPerLiquidity,
@@ -70,8 +70,8 @@ interface IHyper {
         view
         returns (
             PositionId id,
-            int128 lowerSlotIndex,
-            int128 upperSlotIndex,
+            int24 lowerSlotIndex,
+            int24 upperSlotIndex,
             uint256 swapLiquidity,
             uint256 maturedLiquidity,
             int256 pendingLiquidity,
@@ -116,8 +116,8 @@ interface IHyper {
 
     function updateLiquidity(
         PoolId poolId,
-        int128 lowerSlotIndex,
-        int128 upperSlotIndex,
+        int24 lowerSlotIndex,
+        int24 upperSlotIndex,
         int256 amount
     ) external;
 
@@ -145,7 +145,7 @@ interface IHyper {
 
     event ActivatePool(address tokenA, address tokenB);
 
-    event UpdateLiquidity(PoolId poolId, int128 lowerSlotIndex, int128 upperSlotIndex, int256 amount);
+    event UpdateLiquidity(PoolId poolId, int24 lowerSlotIndex, int24 upperSlotIndex, int256 amount);
 
     event Swap(PoolId poolId, uint256 tendered, bool direction);
 

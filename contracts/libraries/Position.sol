@@ -22,8 +22,8 @@ struct Earnings {
 
 struct Position {
     PositionId id;
-    int128 lowerSlotIndex;
-    int128 upperSlotIndex;
+    int24 lowerSlotIndex;
+    int24 upperSlotIndex;
     uint256 swapLiquidity;
     uint256 maturedLiquidity;
     int256 pendingLiquidity;
@@ -36,8 +36,8 @@ struct Position {
 function getPositionId(
     address owner,
     PoolId poolId,
-    int128 lowerSlotIndex,
-    int128 upperSlotIndex
+    int24 lowerSlotIndex,
+    int24 upperSlotIndex
 ) pure returns (PositionId) {
     return PositionId.wrap(keccak256(abi.encodePacked(owner, poolId, lowerSlotIndex, upperSlotIndex)));
 }

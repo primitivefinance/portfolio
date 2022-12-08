@@ -24,7 +24,7 @@ function abs_(int128 n) pure returns (uint128) {
 
 /// @dev Get the price square root using the slot index
 ///      $$\sqrt_p(i)=sqrt(1.0001)^{i}$$
-function getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) {
+function getSqrtPriceAtSlot(int24 slotIndex) pure returns (UD60x18 sqrtPrice) {
     if (slotIndex == 0) {
         sqrtPrice = toUD60x18(1);
     } else {
@@ -37,20 +37,20 @@ function getSqrtPriceAtSlot(int128 slotIndex) pure returns (UD60x18 sqrtPrice) {
 
 /// @dev Get the slot index using price square root
 ///      $$i = ln(sqrtPrice) / ln(sqrt(1.0001))$$
-function getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) {
+function getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int24 slotIndex) {
     // convert to SD59x18 in order to get signed slot indexes
     SD59x18 _sqrtPrice = wrapSD59x18(int256(unwrapUD60x18(sqrtPrice)));
     SD59x18 _lnSqrtPriceGridBase = wrapSD59x18(int256(LN_SQRT_PRICE_GRID_BASE));
     // if slotIndex is positive like 1.3, we want to round down to 1
     // if slotIndex is negative like -1.3, we want to round down to -2
-    slotIndex = int128(fromSD59x18(_sqrtPrice.ln().div(_lnSqrtPriceGridBase).floor()));
+    slotIndex = int24(fromSD59x18(_sqrtPrice.ln().div(_lnSqrtPriceGridBase).floor()));
 }
 
 function calculateLiquidityUnderlying(
     uint256 liquidity,
     UD60x18 sqrtPriceCurrentSlot,
-    int128 lowerSlotIndex,
-    int128 upperSlotIndex,
+    int24 lowerSlotIndex,
+    int24 upperSlotIndex,
     Rounding rounding
 ) pure returns (uint256 amountA, uint256 amountB) {
     UD60x18 sqrtPriceUpperSlot = getSqrtPriceAtSlot(upperSlotIndex);
@@ -78,7 +78,9 @@ function getDeltaAToNextPrice(
     uint256 liquidity,
     Rounding rounding
 ) pure returns (uint256) {
-    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.lte(sqrtPriceCurrentSlot) ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot) : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
+    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.lte(sqrtPriceCurrentSlot)
+        ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot)
+        : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
     UD60x18 rawDeltaA = toUD60x18(liquidity).div(sqrtPriceNextSlot).sub(toUD60x18(liquidity).div(sqrtPriceCurrentSlot));
     return fromUD60x18(rounding == Rounding.Up ? rawDeltaA.ceil() : rawDeltaA);
 }
@@ -89,7 +91,9 @@ function getDeltaBToNextPrice(
     uint256 liquidity,
     Rounding rounding
 ) pure returns (uint256) {
-    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.gte(sqrtPriceCurrentSlot) ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot) : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
+    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.gte(sqrtPriceCurrentSlot)
+        ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot)
+        : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
     UD60x18 rawDeltaB = toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot));
     return fromUD60x18(rounding == Rounding.Up ? rawDeltaB.ceil() : rawDeltaB);
 }

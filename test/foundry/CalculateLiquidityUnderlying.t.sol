@@ -11,7 +11,7 @@ contract TestCalculateLiquidityUnderlying is Test {
     uint256 constant MAX_PERCENT_DELTA = 0.000000001e18;
 
     function test_calculateLiquidityUnderlying_should_round_up() public {
-        int128 currentSlotIndex = 70904;
+        int24 currentSlotIndex = 70904;
 
         (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
@@ -26,7 +26,7 @@ contract TestCalculateLiquidityUnderlying is Test {
     }
 
     function test_calculateLiquidityUnderlying_should_round_down() public {
-        int128 currentSlotIndex = 70904;
+        int24 currentSlotIndex = 70904;
 
         (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
@@ -41,7 +41,7 @@ contract TestCalculateLiquidityUnderlying is Test {
     }
 
     function test_calculateLiquidityUnderlying_current_slot_equals_lower_slot() public {
-        int128 currentSlotIndex = 10000;
+        int24 currentSlotIndex = 10000;
 
         (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
@@ -56,7 +56,7 @@ contract TestCalculateLiquidityUnderlying is Test {
     }
 
     function test_calculateLiquidityUnderlying_current_slot_between_slots() public {
-        int128 currentSlotIndex = 15000;
+        int24 currentSlotIndex = 15000;
 
         (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
@@ -71,7 +71,7 @@ contract TestCalculateLiquidityUnderlying is Test {
     }
 
     function test_calculateLiquidityUnderlying_current_slot_above_upper_slot() public {
-        int128 currentSlotIndex = 25000;
+        int24 currentSlotIndex = 25000;
 
         (uint256 amountA, uint256 amountB) = calculateLiquidityUnderlying(
             10000,
