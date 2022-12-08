@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "forge-std/Test.sol";
+
 import {ERC20, SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 import {UD60x18, fromUD60x18, toUD60x18, wrap as wrapUD60x18, ZERO as zeroUD60x18, HALF_UNIT as halfUD60x18} from "@prb/math/UD60x18.sol";
@@ -17,7 +19,7 @@ import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInsid
 
 // TODO: Reentrancy guard
 
-contract Hyper is IHyper {
+contract Hyper is IHyper, Test {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
     uint256 public immutable AUCTION_LENGTH;
 
@@ -570,17 +572,14 @@ contract Hyper is IHyper {
                 // Get the next slot or the border of a bitmap
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(int24(swapDetails.slotIndex));
                 (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
-                    // If pool token in is A -> decreasing slot index
-                    // decreasing slot index -> going right into the bitmap (reducing the index)
                     bitmaps[poolId][chunk],
                     bit,
-                    tokenIn == PoolToken.A ? BitMath.SearchDirection.Right : BitMath.SearchDirection.Left
+                    tokenIn == PoolToken.A ? BitMath.SearchDirection.Left : BitMath.SearchDirection.Right
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
-                swapDetails.nextSlotIndex = int128(chunk * 256 + int8(nextSlotBit));
+                swapDetails.nextSlotIndex = int128(chunk) * 256 + int8(nextSlotBit);
                 swapDetails.nextSqrtPrice = BrainMath._getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
-
             uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
             uint256 maxToDelta = tokenIn == PoolToken.A
                 ? BrainMath.getDeltaAToNextPrice(
@@ -595,6 +594,7 @@ contract Hyper is IHyper {
                     swapDetails.swapLiquidity,
                     BrainMath.Rounding.Up
                 );
+
             if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
                 // remove fees from remaining amount
                 swapDetails.remaining -= remainingFeeAmount;

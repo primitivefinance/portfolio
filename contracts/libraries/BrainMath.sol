@@ -78,6 +78,7 @@ function getDeltaAToNextPrice(
     uint256 liquidity,
     Rounding rounding
 ) pure returns (uint256) {
+    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.lte(sqrtPriceCurrentSlot) ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot) : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
     UD60x18 rawDeltaA = toUD60x18(liquidity).div(sqrtPriceNextSlot).sub(toUD60x18(liquidity).div(sqrtPriceCurrentSlot));
     return fromUD60x18(rounding == Rounding.Up ? rawDeltaA.ceil() : rawDeltaA);
 }
@@ -88,6 +89,7 @@ function getDeltaBToNextPrice(
     uint256 liquidity,
     Rounding rounding
 ) pure returns (uint256) {
+    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.gte(sqrtPriceCurrentSlot) ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot) : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
     UD60x18 rawDeltaB = toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot));
     return fromUD60x18(rounding == Rounding.Up ? rawDeltaB.ceil() : rawDeltaB);
 }
