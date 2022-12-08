@@ -8,6 +8,11 @@ uint256 constant PRICE_GRID_BASE = 1000100000000000000; // 1.0001e18
 uint256 constant SQRT_PRICE_GRID_BASE = 1000049998750062496; // 60x18 value for 1.0001.sqrt()
 uint256 constant LN_SQRT_PRICE_GRID_BASE = 49997500166647; // 60x18 value for 1.0001.sqrt().ln()
 
+enum Rounding {
+    Down,
+    Up
+}
+
 // TODO: Solve the overloading issue or delete one of these functions
 function abs(int256 n) pure returns (uint256) {
     return uint256(n > 0 ? n : ~n + 1);
@@ -44,11 +49,9 @@ function _getSlotAtSqrtPrice(UD60x18 sqrtPrice) pure returns (int128 slotIndex) 
 function _calculateLiquidityUnderlying(
     uint256 liquidity,
     UD60x18 sqrtPriceCurrentSlot,
-    // TODO: Do we really need the currentSlotIndex?
-    int128 currentSlotIndex,
     int128 lowerSlotIndex,
     int128 upperSlotIndex,
-    bool shouldRoundUp
+    Rounding rounding
 ) pure returns (uint256 amountA, uint256 amountB) {
     UD60x18 sqrtPriceUpperSlot = _getSqrtPriceAtSlot(upperSlotIndex);
     UD60x18 sqrtPriceLowerSlot = _getSqrtPriceAtSlot(lowerSlotIndex);
@@ -65,45 +68,47 @@ function _calculateLiquidityUnderlying(
         rawAmountB = toUD60x18(liquidity).mul(sqrtPriceUpperSlot.sub(sqrtPriceLowerSlot));
     }
 
-    amountA = fromUD60x18(shouldRoundUp ? rawAmountA.ceil() : rawAmountA);
-    amountB = fromUD60x18(shouldRoundUp ? rawAmountB.ceil() : rawAmountB);
+    amountA = fromUD60x18(rounding == Rounding.Up ? rawAmountA.ceil() : rawAmountA);
+    amountB = fromUD60x18(rounding == Rounding.Up ? rawAmountB.ceil() : rawAmountB);
 }
 
-function getDeltaXToNextPrice(
+function getDeltaAToNextPrice(
     UD60x18 sqrtPriceCurrentSlot,
     UD60x18 sqrtPriceNextSlot,
     uint256 liquidity,
-    bool shouldRoundUp
+    Rounding rounding
 ) pure returns (uint256) {
-    UD60x18 rawDeltaX = toUD60x18(liquidity).div(sqrtPriceNextSlot).sub(toUD60x18(liquidity).div(sqrtPriceCurrentSlot));
-    return fromUD60x18(shouldRoundUp ? rawDeltaX.ceil() : rawDeltaX);
+    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.lte(sqrtPriceCurrentSlot) ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot) : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
+    UD60x18 rawDeltaA = toUD60x18(liquidity).div(sqrtPriceNextSlot).sub(toUD60x18(liquidity).div(sqrtPriceCurrentSlot));
+    return fromUD60x18(rounding == Rounding.Up ? rawDeltaA.ceil() : rawDeltaA);
 }
 
-function getDeltaYToNextPrice(
+function getDeltaBToNextPrice(
     UD60x18 sqrtPriceCurrentSlot,
     UD60x18 sqrtPriceNextSlot,
     uint256 liquidity,
-    bool shouldRoundUp
+    Rounding rounding
 ) pure returns (uint256) {
-    UD60x18 rawDeltaY = toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot));
-    return fromUD60x18(shouldRoundUp ? rawDeltaY.ceil() : rawDeltaY);
+    (sqrtPriceNextSlot, sqrtPriceCurrentSlot) = sqrtPriceNextSlot.gte(sqrtPriceCurrentSlot) ? (sqrtPriceNextSlot, sqrtPriceCurrentSlot) : (sqrtPriceCurrentSlot, sqrtPriceNextSlot);
+    UD60x18 rawDeltaB = toUD60x18(liquidity).mul(sqrtPriceNextSlot.sub(sqrtPriceCurrentSlot));
+    return fromUD60x18(rounding == Rounding.Up ? rawDeltaB.ceil() : rawDeltaB);
 }
 
-function getTargetPriceUsingDeltaX(
+function getTargetPriceUsingDeltaA(
     UD60x18 sqrtPriceCurrentSlot,
     uint256 liquidity,
-    uint256 deltaX
+    uint256 deltaA
 ) pure returns (UD60x18) {
     return
         toUD60x18(liquidity).mul(sqrtPriceCurrentSlot).div(
-            toUD60x18(deltaX).mul(sqrtPriceCurrentSlot).add(toUD60x18(liquidity))
+            toUD60x18(deltaA).mul(sqrtPriceCurrentSlot).add(toUD60x18(liquidity))
         );
 }
 
-function getTargetPriceUsingDeltaY(
+function getTargetPriceUsingDeltaB(
     UD60x18 sqrtPriceCurrentSlot,
     uint256 liquidity,
-    uint256 deltaY
+    uint256 deltaB
 ) pure returns (UD60x18) {
-    return toUD60x18(deltaY).div(toUD60x18(liquidity)).add(sqrtPriceCurrentSlot);
+    return toUD60x18(deltaB).div(toUD60x18(liquidity)).add(sqrtPriceCurrentSlot);
 }

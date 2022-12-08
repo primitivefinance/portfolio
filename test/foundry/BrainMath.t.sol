@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
@@ -28,21 +29,13 @@ contract TestBrainMath is Test {
     function test_getSqrtPriceAtSlot_positive_index() public {
         int128 slotIndex = 1000;
         UD60x18 sqrtPrice = _getSqrtPriceAtSlot(slotIndex);
-        assertApproxEqRel(
-            unwrap(sqrtPrice),
-            1051268468376662000,
-            MAX_PERCENT_DELTA
-        );
+        assertApproxEqRel(unwrap(sqrtPrice), 1051268468376662000, MAX_PERCENT_DELTA);
     }
 
     function test_getSqrtPriceAtSlot_negative_index() public {
         int128 slotIndex = -1000;
         UD60x18 sqrtPrice = _getSqrtPriceAtSlot(slotIndex);
-        assertApproxEqRel(
-            unwrap(sqrtPrice),
-            951231802418815800,
-            MAX_PERCENT_DELTA
-        );
+        assertApproxEqRel(unwrap(sqrtPrice), 951231802418815800, MAX_PERCENT_DELTA);
     }
 
     function test_getSlotAtSqrtPrice_random_price() public {
@@ -51,29 +44,127 @@ contract TestBrainMath is Test {
         assertEq(slotIndex, 70904);
     }
 
-    function test_getDeltaXToNextPrice_should_round_up() public {
+    function test_getDeltaAToNextPrice_should_round_up() public {
         int128 currentSlotIndex = 0;
 
+        uint256 deltaA = getDeltaAToNextPrice(
+            _getSqrtPriceAtSlot(10),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            10,
+            Rounding.Up
+        );
+
+        assertEq(deltaA, 1);
+    }
+
+    function test_getDeltaAToNextPrice_should_round_down() public {
+        int128 currentSlotIndex = 0;
+
+        uint256 deltaA = getDeltaAToNextPrice(
+            _getSqrtPriceAtSlot(10),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            10,
+            Rounding.Down
+        );
+
+        assertEq(deltaA, 0);
+    }
+
+    function test_getDeltaXToNextPrice_higher_next_price() public {
+        int128 currentSlotIndex = 20000;
+
         (uint256 deltaX) = getDeltaXToNextPrice(
+            _getSqrtPriceAtSlot(20100),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            1000000000,
+            true
+        );
+
+        assertEq(deltaX, 1834807);
+    }
+
+    function test_getDeltaXToNextPrice_lower_next_price() public {
+        int128 currentSlotIndex = 20100;
+
+        (uint256 deltaX) = getDeltaXToNextPrice(
+            _getSqrtPriceAtSlot(20000),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            1000000000,
+            true
+        );
+
+        assertEq(deltaX, 1834807);
+    }
+
+    function test_getDeltaYToNextPrice_should_round_up() public {
+        int128 currentSlotIndex = 0;
+
+        (uint256 deltaY) = getDeltaYToNextPrice(
             _getSqrtPriceAtSlot(10),
             _getSqrtPriceAtSlot(currentSlotIndex),
             10,
             true
         );
 
-        assertEq(deltaX, 1);
+        assertEq(deltaY, 1);
     }
 
-    function test_getDeltaXToNextPrice_should_round_down() public {
+    function test_getDeltaYToNextPrice_should_round_down() public {
         int128 currentSlotIndex = 0;
 
-        (uint256 deltaX) = getDeltaXToNextPrice(
+        (uint256 deltaY) = getDeltaYToNextPrice(
             _getSqrtPriceAtSlot(10),
             _getSqrtPriceAtSlot(currentSlotIndex),
             10,
             false
         );
 
-        assertEq(deltaX, 0);
+        assertEq(deltaY, 0);
+    }
+
+    function test_getDeltaYToNextPrice_higher_next_price() public {
+        int128 currentSlotIndex = 20000;
+
+        (uint256 deltaY) = getDeltaYToNextPrice(
+            _getSqrtPriceAtSlot(20100),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            1000000000,
+            true
+        );
+
+        assertEq(deltaY, 13624081);
+    }
+
+    function test_getDeltaYToNextPrice_lower_next_price() public {
+        int128 currentSlotIndex = 20100;
+
+        (uint256 deltaY) = getDeltaYToNextPrice(
+            _getSqrtPriceAtSlot(20000),
+            _getSqrtPriceAtSlot(currentSlotIndex),
+            1000000000,
+            true
+        );
+
+        assertEq(deltaY, 13624081);
+    }
+
+    function test_getTargetPriceUsingDeltaX_should() public {
+        UD60x18 targetPrice = getTargetPriceUsingDeltaX(
+            _getSqrtPriceAtSlot(20000),
+            1000000000000000000000000000,
+            10000000000
+        );
+
+        assertApproxEqRel(unwrap(targetPrice), 2718145926819817600, MAX_PERCENT_DELTA);
+    }
+
+    function test_getTargetPriceUsingDeltaY_should() public {
+        UD60x18 targetPrice = getTargetPriceUsingDeltaY(
+            _getSqrtPriceAtSlot(20000),
+            1000000000000000000000000000,
+            10000000000
+        );
+
+        assertApproxEqRel(unwrap(targetPrice), 2718145926819817600, MAX_PERCENT_DELTA);
     }
 }

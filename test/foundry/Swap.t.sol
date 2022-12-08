@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
+
+import "./PoolDefaults.sol";
 
 import "../../contracts/Hyper.sol";
 import "../../contracts/test/TestERC20.sol";
@@ -9,10 +12,11 @@ import "../../contracts/test/TestERC20.sol";
 contract TestSwap is Test {
     Hyper public hyper;
 
-    bytes32 poolId;
+    PoolId poolId;
 
     TestERC20 public tokenA;
     TestERC20 public tokenB;
+    TestERC20 public auctionToken;
 
     address testUser = vm.addr(0xbeef);
     address auctionCollector = vm.addr(0xbabe);
@@ -30,7 +34,10 @@ contract TestSwap is Test {
         TestERC20 fakeWETH = new TestERC20("Wrapped Ether", "WETH", 18);
         TestERC20 fakeUSDC = new TestERC20("USD Coin", "USDC", 6);
 
-        hyper = new Hyper(1000, auctionCollector, address(fakeWETH));
+        auctionToken = fakeUSDC;
+
+        uint256 startTime = 1000;
+        hyper = new Hyper(startTime, address(auctionToken), EPOCH_LENGTH, AUCTION_LENGTH, PUBLIC_SWAP_FEE, AUCTION_FEE);
 
         (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
         assertTrue(tokenA == fakeUSDC);
@@ -54,6 +61,28 @@ contract TestSwap is Test {
 
     function test_swap_tokenA_liquidity_in_range_succeeds() public mintApproveTokens {
         // fetch slotIndex of pool
+        (, , , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
+
+        int256 liquidity = int256(1e18);
+        int128 lowerSlotIndex = slotIndex - 10;
+        int128 upperSlotIndex = slotIndex + 10;
+
+        // add liquidity around the pool's slot index
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity);
+
+        uint256 tokenAAmountIn = BrainMath.getDeltaAToNextPrice(
+            sqrtPrice,
+            BrainMath._getSqrtPriceAtSlot(lowerSlotIndex),
+            uint256(liquidity / 2),
+            BrainMath.Rounding.Down
+        );
+
+        // perform swap
+        hyper.swap(poolId, PoolToken.A, tokenAAmountIn);
+    }
+
+    function test_swap_tokenB_liquidity_in_range_succeeds() public mintApproveTokens {
+        // fetch slotIndex of pool
         (, , , , , UD60x18 sqrtPrice, int128 slotIndex, , , , ) = hyper.pools(poolId);
 
         int256 liquidity = int256(1e18);
@@ -63,15 +92,15 @@ contract TestSwap is Test {
         // add liquidity around the pool's slot index
         hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, liquidity, false);
 
-        // swapping tokenA, going down the price grid, max down to lowerSlotIndex
-        uint256 tokenAAmountIn = getDeltaXToNextPrice(
+        // swapping tokenB, going down the price grid, max up to upperSlotIndex
+        uint256 tokenBAmountIn = getDeltaYToNextPrice(
             sqrtPrice,
-            _getSqrtPriceAtSlot(lowerSlotIndex),
+            _getSqrtPriceAtSlot(upperSlotIndex),
             uint256(liquidity / 2),
             false
         );
 
         // perform swap
-        hyper.swap(poolId, tokenAAmountIn, true, false);
+        hyper.swap(poolId, tokenBAmountIn, false, false);
     }
 }

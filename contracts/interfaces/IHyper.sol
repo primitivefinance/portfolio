@@ -1,33 +1,41 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "@prb/math/UD60x18.sol";
+import {UD60x18} from "@prb/math/UD60x18.sol";
 
-error HyperNotStartedError();
-error PoolAlreadyInitializedError();
-error AmountZeroError();
-error PoolNotInitializedError();
-error InvalidBidEpochError();
-error AuctionNotStartedError();
-error RemoveLiquidityError();
-error RemovePendingLiquidityError();
-error RemoveLiquidityUninitializedError();
-error PositionInvalidRangeError();
-error PoolUninitializedError();
+import {PoolId, PoolToken} from "../libraries/Pool.sol";
+import {SlotId} from "../libraries/Slot.sol";
+import {PositionId} from "../libraries/Position.sol";
 
 interface IHyper {
     // ===== View =====
 
-    function epoch() external view returns (uint256 id, uint256 endTime);
+    function AUCTION_SETTLEMENT_TOKEN() external view returns (address);
 
-    function internalBalances(address owner, address token) external view returns (uint256);
+    function AUCTION_LENGTH() external view returns (uint256);
 
-    function auctionFeeCollector() external view returns (address);
+    function PUBLIC_SWAP_FEE() external view returns (UD60x18);
 
-    function pools(bytes32 poolId)
+    function AUCTION_FEE() external view returns (UD60x18);
+
+    function epoch()
         external
         view
         returns (
+            uint256 id,
+            uint256 endTime,
+            uint256 length
+        );
+
+    function auctionFeeCollector() external view returns (address);
+
+    function internalBalances(address owner, address token) external view returns (uint256);
+
+    function pools(PoolId poolId)
+        external
+        view
+        returns (
+            PoolId id,
             address tokenA,
             address tokenB,
             uint256 swapLiquidity,
@@ -41,10 +49,11 @@ interface IHyper {
             uint256 lastUpdatedTimestamp
         );
 
-    function slots(bytes32 slotId)
+    function slots(SlotId slotId)
         external
         view
         returns (
+            SlotId id,
             uint256 liquidityGross,
             int256 pendingLiquidityGross,
             int256 swapLiquidityDelta,
@@ -56,10 +65,11 @@ interface IHyper {
             uint256 lastUpdatedTimestamp
         );
 
-    function positions(bytes32 positionId)
+    function positions(PositionId positionId)
         external
         view
         returns (
+            PositionId id,
             int128 lowerSlotIndex,
             int128 upperSlotIndex,
             uint256 swapLiquidity,
@@ -71,24 +81,14 @@ interface IHyper {
             uint256 lastUpdatedTimestamp
         );
 
-    function getGlobalDefaults()
-        external
-        view
-        returns (
-            UD60x18 publicSwapFee,
-            uint256 epochLength,
-            uint256 auctionLength,
-            address auctionSettlementToken,
-            UD60x18 auctionFee
-        );
-
-    function getLeadingBid(bytes32 poolId, uint256 epochId)
+    function bids(PoolId poolId, uint256 epochId)
         external
         view
         returns (
             address refunder,
             address swapper,
-            uint256 amount,
+            uint256 netFeeAmount,
+            uint256 feeAmount,
             UD60x18 proceedsPerSecond
         );
 
@@ -115,22 +115,20 @@ interface IHyper {
     ) external;
 
     function updateLiquidity(
-        bytes32 poolId,
+        PoolId poolId,
         int128 lowerSlotIndex,
         int128 upperSlotIndex,
-        int256 amount,
-        bool transferOut
+        int256 amount
     ) external;
 
     function swap(
-        bytes32 poolId,
-        uint256 amountIn,
-        bool direction,
-        bool transferOut
+        PoolId poolId,
+        PoolToken tokenIn,
+        uint256 amountIn
     ) external;
 
     function bid(
-        bytes32 poolId,
+        PoolId poolId,
         uint256 epochId,
         address refunder,
         address swapper,
@@ -147,9 +145,23 @@ interface IHyper {
 
     event ActivatePool(address tokenA, address tokenB);
 
-    event UpdateLiquidity(bytes32 poolId, int128 lowerSlotIndex, int128 upperSlotIndex, int256 amount);
+    event UpdateLiquidity(PoolId poolId, int128 lowerSlotIndex, int128 upperSlotIndex, int256 amount);
 
-    event Swap(bytes32 poolId, uint256 tendered, bool direction);
+    event Swap(PoolId poolId, uint256 tendered, bool direction);
 
-    event LeadingBid(bytes32 poolId, uint256 epochId, address swapper, uint256 amount, UD60x18 proceedsPerSecond);
+    event LeadingBid(PoolId poolId, uint256 epochId, address swapper, uint256 amount, UD60x18 proceedsPerSecond);
+
+    // ===== Errors =====
+
+    error HyperNotStartedError();
+    error PoolAlreadyInitializedError();
+    error AmountZeroError();
+    error PoolNotInitializedError();
+    error InvalidBidEpochError();
+    error AuctionNotStartedError();
+    error RemoveLiquidityError();
+    error RemovePendingLiquidityError();
+    error RemoveLiquidityUninitializedError();
+    error PositionInvalidRangeError();
+    error PoolUninitializedError();
 }

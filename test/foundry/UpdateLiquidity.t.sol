@@ -1,7 +1,10 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
+
+import "./PoolDefaults.sol";
 
 import "../../contracts/Hyper.sol";
 import "../../contracts/test/TestERC20.sol";
@@ -11,6 +14,7 @@ contract TestUpdateLiquidity is Test {
 
     TestERC20 public tokenA;
     TestERC20 public tokenB;
+    TestERC20 public auctionToken;
 
     address testUser = vm.addr(0xbeef);
     address auctionCollector = vm.addr(0xbabe);
@@ -28,7 +32,10 @@ contract TestUpdateLiquidity is Test {
         TestERC20 fakeWETH = new TestERC20("Wrapped Ether", "WETH", 18);
         TestERC20 fakeUSDC = new TestERC20("USD Coin", "USDC", 6);
 
-        hyper = new Hyper(1000, auctionCollector, address(fakeWETH));
+        auctionToken = fakeUSDC;
+
+        uint256 startTime = 1000;
+        hyper = new Hyper(startTime, address(auctionToken), EPOCH_LENGTH, AUCTION_LENGTH, PUBLIC_SWAP_FEE, AUCTION_FEE);
 
         (tokenA, tokenB) = address(fakeUSDC) < address(fakeWETH) ? (fakeUSDC, fakeWETH) : (fakeWETH, fakeUSDC);
         assertTrue(tokenA == fakeUSDC);
@@ -51,66 +58,42 @@ contract TestUpdateLiquidity is Test {
         // activate pool
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
         // get pool id
-        bytes32 poolId = getPoolId(address(tokenA), address(tokenB));
+        PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex + 10;
         int128 upperSlotIndex = lowerSlotIndex + 10;
-        // don't transfer out (shouldn't matter here)
-        bool transferOut = false;
         // finally, add liquidity
-        hyper.updateLiquidity(
-            getPoolId(address(tokenA), address(tokenB)),
-            lowerSlotIndex,
-            upperSlotIndex,
-            int256(100),
-            transferOut
-        );
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
     }
 
     function test_updateLiquidity_add_including_current_slot_succeeds() public mintApproveTokens {
         // activate pool
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
         // get pool id
-        bytes32 poolId = getPoolId(address(tokenA), address(tokenB));
+        PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex - 10;
         int128 upperSlotIndex = slotIndex + 10;
-        // don't transfer out (shouldn't matter here)
-        bool transferOut = false;
         // finally, add liquidity
-        hyper.updateLiquidity(
-            getPoolId(address(tokenA), address(tokenB)),
-            lowerSlotIndex,
-            upperSlotIndex,
-            int256(100),
-            transferOut
-        );
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
     }
 
     function test_updateLiquidity_add_below_current_slot_succeeds() public mintApproveTokens {
         // activate pool
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
         // get pool id
-        bytes32 poolId = getPoolId(address(tokenA), address(tokenB));
+        PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex - 100;
         int128 upperSlotIndex = slotIndex - 10;
-        // don't transfer out (shouldn't matter here)
-        bool transferOut = false;
         // finally, add liquidity
-        hyper.updateLiquidity(
-            getPoolId(address(tokenA), address(tokenB)),
-            lowerSlotIndex,
-            upperSlotIndex,
-            int256(100),
-            transferOut
-        );
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
     }
 
     function test_updateLiquidity_add_above_current_slot_tokenA_balance_increases() public {
@@ -135,66 +118,38 @@ contract TestUpdateLiquidity is Test {
         // activate pool
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
         // get pool id
-        bytes32 poolId = getPoolId(address(tokenA), address(tokenB));
+        PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex + 10;
         int128 upperSlotIndex = lowerSlotIndex + 10;
-        // don't transfer out (shouldn't matter here)
-        bool transferOut = true;
         // add liquidity
-        hyper.updateLiquidity(
-            getPoolId(address(tokenA), address(tokenB)),
-            lowerSlotIndex,
-            upperSlotIndex,
-            int256(100),
-            transferOut
-        );
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
         // remove liquidity
-        hyper.updateLiquidity(
-            getPoolId(address(tokenA), address(tokenB)),
-            lowerSlotIndex,
-            upperSlotIndex,
-            -int256(100),
-            transferOut
-        );
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, -int256(100));
     }
 
     function test_updateLiquidity_remove_matured_above_current_slot_succeeds() public mintApproveTokens {
         // activate pool
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
         // get pool id
-        bytes32 poolId = getPoolId(address(tokenA), address(tokenB));
+        PoolId poolId = getPoolId(address(tokenA), address(tokenB));
         // fetch activated pool
-        (, , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
+        (, , , , , , , int128 slotIndex, , , , ) = hyper.pools(poolId);
         // set position range params
         int128 lowerSlotIndex = slotIndex + 10;
         int128 upperSlotIndex = lowerSlotIndex + 10;
-        // don't transfer out (shouldn't matter here)
-        bool transferOut = true;
         // add liquidity
-        hyper.updateLiquidity(
-            getPoolId(address(tokenA), address(tokenB)),
-            lowerSlotIndex,
-            upperSlotIndex,
-            int256(100),
-            transferOut
-        );
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, int256(100));
         // get current epoch
-        (uint256 epochId, ) = hyper.epoch();
+        (uint256 epochId, , uint256 epochLength) = hyper.epoch();
         // warp timestamp to next epoch
-        vm.warp(block.timestamp + EPOCH_LENGTH);
+        vm.warp(block.timestamp + epochLength);
         // remove liquidity
-        hyper.updateLiquidity(
-            getPoolId(address(tokenA), address(tokenB)),
-            lowerSlotIndex,
-            upperSlotIndex,
-            -int256(100),
-            transferOut
-        );
+        hyper.updateLiquidity(poolId, lowerSlotIndex, upperSlotIndex, -int256(100));
         // ensure the epoch was increased
-        (uint256 newEpochId, ) = hyper.epoch();
+        (uint256 newEpochId, , ) = hyper.epoch();
         assert(newEpochId > epochId);
     }
 }
