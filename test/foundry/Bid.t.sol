@@ -68,24 +68,24 @@ contract TestBid is Test {
     }
 
     function test_bid_should_succeed() public mintApproveTokens {
-        vm.warp(3600 - 60);
+        (uint256 epochId, , uint256 epochLength) = hyper.epoch();
 
-        (uint256 id, , ) = hyper.epoch();
+        vm.warp(block.timestamp + epochLength - AUCTION_LENGTH);
 
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
 
-        hyper.bid(getPoolId(address(tokenA), address(tokenB)), id + 1, vm.addr(1), vm.addr(1), 1);
+        hyper.bid(getPoolId(address(tokenA), address(tokenB)), epochId + 1, vm.addr(1), vm.addr(1), 1);
     }
 
     function test_bid_should_fail_if_wrong_epoch_id() public {
-        vm.warp(3600 - 30);
+        (uint256 epochId, , uint256 epochLength) = hyper.epoch();
 
-        (uint256 id, , ) = hyper.epoch();
+        vm.warp(block.timestamp + epochLength - AUCTION_LENGTH);
 
         hyper.activatePool(address(tokenA), address(tokenB), getStartSqrtPrice());
 
         vm.expectRevert(IHyper.InvalidBidEpochError.selector);
 
-        hyper.bid(getPoolId(address(tokenA), address(tokenB)), id + 2, vm.addr(1), vm.addr(1), 1);
+        hyper.bid(getPoolId(address(tokenA), address(tokenB)), epochId + 2, vm.addr(1), vm.addr(1), 1);
     }
 }
