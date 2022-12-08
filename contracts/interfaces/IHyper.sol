@@ -145,6 +145,8 @@ interface IHyper {
 
     event Withdraw(address to, address token, uint256 amount);
 
+    event InternalBalanceChange(address to, address token, int256 amount);
+
     event ActivatePool(address tokenA, address tokenB);
 
     event UpdateLiquidity(PoolId poolId, int24 lowerSlotIndex, int24 upperSlotIndex, int256 amount);
