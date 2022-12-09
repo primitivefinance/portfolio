@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "forge-std/Test.sol";
+
 import {ReentrancyGuard} from "solmate/utils/ReentrancyGuard.sol";
 import {ERC20, SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
@@ -20,7 +22,7 @@ import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInsid
 // - check the types on integers
 // - fix amount out
 
-contract Hyper is IHyper, ReentrancyGuard {
+contract Hyper is IHyper, ReentrancyGuard, Test {
     address public immutable AUCTION_SETTLEMENT_TOKEN;
     uint256 public immutable AUCTION_LENGTH;
 
@@ -591,7 +593,7 @@ contract Hyper is IHyper, ReentrancyGuard {
     struct SwapDetails {
         UD60x18 feeTier;
         uint256 remaining;
-        uint256 filled;
+        uint256 computed;
         int24 slotIndex;
         UD60x18 sqrtPrice;
         uint256 swapLiquidity;
@@ -609,6 +611,8 @@ contract Hyper is IHyper, ReentrancyGuard {
         int256 amount,
         UD60x18 sqrtPriceLimit
     ) public nonReentrant started {
+        // amount > 0 = amountIn exact
+        // amount < 0 = amountOut exact
         if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
@@ -623,8 +627,8 @@ contract Hyper is IHyper, ReentrancyGuard {
 
         SwapDetails memory swapDetails = SwapDetails({
             feeTier: msg.sender == bids[poolId][epoch.id].swapper ? wrapUD60x18(0) : PUBLIC_SWAP_FEE,
-            remaining: uint256(-amount),
-            filled: 0,
+            remaining: amount > 0 ? uint256(amount) : uint256(-amount),
+            computed: 0,
             slotIndex: pool.slotIndex,
             sqrtPrice: pool.sqrtPrice,
             swapLiquidity: pool.swapLiquidity,
@@ -636,6 +640,7 @@ contract Hyper is IHyper, ReentrancyGuard {
             nextSqrtPrice: wrapUD60x18(0)
         });
 
+        // Breaks when the specified amount is completely filled or the price limit is reached
         while (swapDetails.remaining != 0 && !swapDetails.sqrtPrice.eq(sqrtPriceLimit)) {
             {
                 // Get the next slot or the border of a bitmap
@@ -650,10 +655,13 @@ contract Hyper is IHyper, ReentrancyGuard {
                 swapDetails.nextSqrtPrice = BrainMath.getSqrtPriceAtSlot(swapDetails.nextSlotIndex);
             }
 
+            // Determines if we should swap up to the nextSqrtPrice or stop at the sqrtPriceLimit
             UD60x18 swapToPrice = tokenIn == PoolToken.A
                 ? (sqrtPriceLimit.gt(swapDetails.nextSqrtPrice) ? sqrtPriceLimit : swapDetails.nextSqrtPrice)
                 : (sqrtPriceLimit.gt(swapDetails.nextSqrtPrice) ? swapDetails.nextSqrtPrice : sqrtPriceLimit);
 
+            // Depending on the exact amount (in / out), we calculate the amount of A or B available up to
+            // swapToPrice OR the amount required to reach that price
             uint256 maxToDelta = amount > 0 ? (
                 tokenIn == PoolToken.A
                     ? BrainMath.getDeltaAToNextPrice(
@@ -681,17 +689,15 @@ contract Hyper is IHyper, ReentrancyGuard {
                     )
                 );
 
-            uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
+            // Temporarily calculates the fees based on the remaining amount
+            uint256 feeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
 
-            if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
+            // If the amount of tokens available / required is enough for this iteration
+            if (swapDetails.remaining < maxToDelta + feeAmount) {
                 // remove fees from remaining amount
-                swapDetails.remaining -= remainingFeeAmount;
-                // save fees per liquidity
-                swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
-                    toUD60x18(remainingFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
-                );
-                // update price and amount out after swapping remaining amount
-                UD60x18 targetPrice = tokenIn == PoolToken.A
+                swapDetails.remaining -= feeAmount;
+                // Using the amount of remaining tokens, we check how far the price will move
+                swapToPrice = tokenIn == PoolToken.A
                     ? BrainMath.getTargetPriceUsingDeltaA(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
@@ -702,108 +708,98 @@ contract Hyper is IHyper, ReentrancyGuard {
                         swapDetails.swapLiquidity,
                         swapDetails.remaining
                     );
-                swapDetails.filled += tokenIn == PoolToken.A
-                    ? BrainMath.getDeltaBToNextPrice(
-                        swapDetails.sqrtPrice,
-                        targetPrice,
-                        swapDetails.swapLiquidity,
-                        BrainMath.Rounding.Down
-                    )
-                    : BrainMath.getDeltaAToNextPrice(
-                        swapDetails.sqrtPrice,
-                        targetPrice,
-                        swapDetails.swapLiquidity,
-                        BrainMath.Rounding.Down
-                    );
                 swapDetails.remaining = 0;
-                swapDetails.sqrtPrice = targetPrice;
-                swapDetails.slotIndex = BrainMath.getSlotAtSqrtPrice(swapDetails.sqrtPrice);
             } else {
                 // swapping maxToDelta, only take fees on this amount
-                uint256 maxFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxToDelta)).ceil());
+                feeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxToDelta)).ceil());
                 // remove fees and swap amount
-                swapDetails.remaining -= maxFeeAmount + maxToDelta;
-                // update fees per liquidity
-                swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
-                    toUD60x18(maxFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
+                swapDetails.remaining -= feeAmount + maxToDelta;
+            }
+
+            swapDetails.computed += tokenIn == PoolToken.A
+                ? BrainMath.getDeltaBToNextPrice(
+                    swapDetails.sqrtPrice,
+                    swapToPrice,
+                    swapDetails.swapLiquidity,
+                    BrainMath.Rounding.Down
+                )
+                : BrainMath.getDeltaAToNextPrice(
+                    swapDetails.sqrtPrice,
+                    swapToPrice,
+                    swapDetails.swapLiquidity,
+                    BrainMath.Rounding.Down
                 );
-                // update price and amount out after swapping
-                swapDetails.filled += tokenIn == PoolToken.A
-                    ? BrainMath.getDeltaBToNextPrice(
-                        swapDetails.sqrtPrice,
-                        swapToPrice,
-                        swapDetails.swapLiquidity,
-                        BrainMath.Rounding.Down
-                    )
-                    : BrainMath.getDeltaAToNextPrice(
-                        swapDetails.sqrtPrice,
-                        swapToPrice,
-                        swapDetails.swapLiquidity,
-                        BrainMath.Rounding.Down
-                    );
-                swapDetails.sqrtPrice = swapToPrice;
-                swapDetails.slotIndex = BrainMath.getSlotAtSqrtPrice(swapToPrice);
-                // cross the next initialized slot if needed
-                if (swapToPrice.eq(swapDetails.nextSqrtPrice) && swapDetails.nextSlotInitialized) {
-                    // sync slot
-                    SlotId nextSlotId = getSlotId(poolId, swapDetails.nextSlotIndex);
-                    Slot storage nextSlot = slots[nextSlotId];
-                    syncSlot(poolId, nextSlot, swapDetails.nextSlotIndex, epoch);
-                    // update per liquidities outside
-                    nextSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity.sub(
-                        nextSlot.proceedsPerLiquidityOutside
-                    );
-                    nextSlot.feesAPerLiquidityOutside = (
-                        tokenIn == PoolToken.A ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity
-                    ).sub(nextSlot.feesAPerLiquidityOutside);
-                    nextSlot.feesBPerLiquidityOutside = (
-                        tokenIn == PoolToken.A ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
-                    ).sub(nextSlot.feesBPerLiquidityOutside);
-                    // save slot snapshot for the current epoch id
-                    slotSnapshots[nextSlotId][epoch.id] = getSlotSnapshot(nextSlot);
-                    // update swap details state (eventually gets saved to pool)
-                    if (tokenIn == PoolToken.A) {
-                        // moving down the grid, from right to left (receiving less tokenB per input tokenA)
-                        swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
-                            ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta)
-                            : swapDetails.swapLiquidity + BrainMath.abs(nextSlot.swapLiquidityDelta);
-                        swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
-                            ? swapDetails.maturedLiquidity - uint256(nextSlot.maturedLiquidityDelta)
-                            : swapDetails.maturedLiquidity + BrainMath.abs(nextSlot.maturedLiquidityDelta);
-                        swapDetails.pendingLiquidity -= nextSlot.pendingLiquidityDelta;
-                    } else {
-                        // moving up the grid, from left to right (receiving less tokenA per input tokenB)
-                        swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
-                            ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta)
-                            : swapDetails.swapLiquidity - BrainMath.abs(nextSlot.swapLiquidityDelta);
-                        swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
-                            ? swapDetails.maturedLiquidity + uint256(nextSlot.maturedLiquidityDelta)
-                            : swapDetails.maturedLiquidity - BrainMath.abs(nextSlot.maturedLiquidityDelta);
-                        swapDetails.pendingLiquidity += nextSlot.pendingLiquidityDelta;
-                    }
+
+            // save fees per liquidity
+            swapDetails.feesPerLiquidity = swapDetails.feesPerLiquidity.add(
+                toUD60x18(feeAmount).div(toUD60x18(swapDetails.swapLiquidity))
+            );
+            swapDetails.sqrtPrice = swapToPrice;
+            swapDetails.slotIndex = BrainMath.getSlotAtSqrtPrice(swapToPrice);
+
+            // cross the next initialized slot if needed
+            if (swapToPrice.eq(swapDetails.nextSqrtPrice) && swapDetails.nextSlotInitialized) {
+                // sync slot
+                SlotId nextSlotId = getSlotId(poolId, swapDetails.nextSlotIndex);
+                Slot storage nextSlot = slots[nextSlotId];
+                syncSlot(poolId, nextSlot, swapDetails.nextSlotIndex, epoch);
+                // update per liquidities outside
+                nextSlot.proceedsPerLiquidityOutside = pool.proceedsPerLiquidity.sub(
+                    nextSlot.proceedsPerLiquidityOutside
+                );
+                nextSlot.feesAPerLiquidityOutside = (
+                    tokenIn == PoolToken.A ? swapDetails.feesPerLiquidity : pool.feesAPerLiquidity
+                ).sub(nextSlot.feesAPerLiquidityOutside);
+                nextSlot.feesBPerLiquidityOutside = (
+                    tokenIn == PoolToken.A ? pool.feesBPerLiquidity : swapDetails.feesPerLiquidity
+                ).sub(nextSlot.feesBPerLiquidityOutside);
+                // save slot snapshot for the current epoch id
+                slotSnapshots[nextSlotId][epoch.id] = getSlotSnapshot(nextSlot);
+                // update swap details state (eventually gets saved to pool)
+
+                if (tokenIn == PoolToken.A) {
+                    // moving down the grid, from right to left (receiving less tokenB per input tokenA)
+                    swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
+                        ? swapDetails.swapLiquidity - uint256(nextSlot.swapLiquidityDelta)
+                        : swapDetails.swapLiquidity + BrainMath.abs(nextSlot.swapLiquidityDelta);
+                    swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
+                        ? swapDetails.maturedLiquidity - uint256(nextSlot.maturedLiquidityDelta)
+                        : swapDetails.maturedLiquidity + BrainMath.abs(nextSlot.maturedLiquidityDelta);
+                    swapDetails.pendingLiquidity -= nextSlot.pendingLiquidityDelta;
+                } else {
+                    // moving up the grid, from left to right (receiving less tokenA per input tokenB)
+                    swapDetails.swapLiquidity = nextSlot.swapLiquidityDelta > 0
+                        ? swapDetails.swapLiquidity + uint256(nextSlot.swapLiquidityDelta)
+                        : swapDetails.swapLiquidity - BrainMath.abs(nextSlot.swapLiquidityDelta);
+                    swapDetails.maturedLiquidity = nextSlot.maturedLiquidityDelta > 0
+                        ? swapDetails.maturedLiquidity + uint256(nextSlot.maturedLiquidityDelta)
+                        : swapDetails.maturedLiquidity - BrainMath.abs(nextSlot.maturedLiquidityDelta);
+                    swapDetails.pendingLiquidity += nextSlot.pendingLiquidityDelta;
                 }
             }
         }
+
         // update pool's state based on swap details
         pool.sqrtPrice = swapDetails.sqrtPrice;
         pool.slotIndex = swapDetails.slotIndex;
         pool.swapLiquidity = swapDetails.swapLiquidity;
         pool.maturedLiquidity = swapDetails.maturedLiquidity;
         pool.pendingLiquidity = swapDetails.pendingLiquidity;
+
         if (tokenIn == PoolToken.A) {
             pool.feesAPerLiquidity = swapDetails.feesPerLiquidity;
 
             // TODO: review order of operations
-            settleToken(pool.tokenA, uint256(-amount));
-            internalBalances[msg.sender][pool.tokenB] += swapDetails.filled;
-            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(swapDetails.filled));
+            settleToken(pool.tokenA, amount > 0 ? uint256(amount) : uint256(-amount));
+            internalBalances[msg.sender][pool.tokenB] += swapDetails.computed;
+            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(swapDetails.computed));
         } else {
             pool.feesBPerLiquidity = swapDetails.feesPerLiquidity;
 
             // TODO: review order of operations
-            settleToken(pool.tokenB, uint256(-amount));
-            internalBalances[msg.sender][pool.tokenA] += swapDetails.filled;
-            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(swapDetails.filled));
+            settleToken(pool.tokenB, amount > 0 ? uint256(amount) : uint256(-amount));
+            internalBalances[msg.sender][pool.tokenA] += swapDetails.computed;
+            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(swapDetails.computed));
         }
     }
 
