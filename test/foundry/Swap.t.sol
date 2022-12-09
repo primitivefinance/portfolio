@@ -91,7 +91,7 @@ contract TestSwap is Test {
         );
 
         // perform swap
-        hyper.swap(poolId, PoolToken.A, tokenAAmountIn, zeroUD60x18);
+        hyper.swap(poolId, PoolToken.A, int256(tokenAAmountIn), zeroUD60x18);
 
         (, , , , , , UD60x18 _sqrtPrice, , , , , ) = hyper.pools(poolId);
 
@@ -121,7 +121,7 @@ contract TestSwap is Test {
         );
 
         // perform swap
-        hyper.swap(poolId, PoolToken.B, tokenBAmountIn, zeroUD60x18);
+        hyper.swap(poolId, PoolToken.B, int256(tokenBAmountIn), zeroUD60x18);
 
         (, , , , , , UD60x18 _sqrtPrice, , , , , ) = hyper.pools(poolId);
 

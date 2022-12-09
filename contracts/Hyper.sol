@@ -591,7 +591,7 @@ contract Hyper is IHyper, ReentrancyGuard {
     struct SwapDetails {
         UD60x18 feeTier;
         uint256 remaining;
-        uint256 amountOut;
+        uint256 filled;
         int24 slotIndex;
         UD60x18 sqrtPrice;
         uint256 swapLiquidity;
@@ -609,7 +609,7 @@ contract Hyper is IHyper, ReentrancyGuard {
         int256 amount,
         UD60x18 sqrtPriceLimit
     ) public nonReentrant started {
-        if (amountIn == 0) revert IHyper.AmountZeroError();
+        if (amount == 0) revert IHyper.AmountZeroError();
 
         Pool storage pool = pools[poolId];
         if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolNotInitializedError();
@@ -623,7 +623,7 @@ contract Hyper is IHyper, ReentrancyGuard {
 
         SwapDetails memory swapDetails = SwapDetails({
             feeTier: msg.sender == bids[poolId][epoch.id].swapper ? wrapUD60x18(0) : PUBLIC_SWAP_FEE,
-            remaining: amount,
+            remaining: uint256(-amount),
             filled: 0,
             slotIndex: pool.slotIndex,
             sqrtPrice: pool.sqrtPrice,
@@ -681,9 +681,9 @@ contract Hyper is IHyper, ReentrancyGuard {
                     )
                 );
 
-            uint256 maxToDeltaFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxInToDeltaFeeAmount)).ceil());
+            uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
 
-            if (swapDetails.remaining < maxInToDelta + remainingFeeAmount) {
+            if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
                 // remove fees from remaining amount
                 swapDetails.remaining -= remainingFeeAmount;
                 // save fees per liquidity
@@ -702,7 +702,7 @@ contract Hyper is IHyper, ReentrancyGuard {
                         swapDetails.swapLiquidity,
                         swapDetails.remaining
                     );
-                swapDetails.amountOut += tokenIn == PoolToken.A
+                swapDetails.filled += tokenIn == PoolToken.A
                     ? BrainMath.getDeltaBToNextPrice(
                         swapDetails.sqrtPrice,
                         targetPrice,
@@ -728,7 +728,7 @@ contract Hyper is IHyper, ReentrancyGuard {
                     toUD60x18(maxFeeAmount).div(toUD60x18(swapDetails.swapLiquidity))
                 );
                 // update price and amount out after swapping
-                swapDetails.amountOut += tokenIn == PoolToken.A
+                swapDetails.filled += tokenIn == PoolToken.A
                     ? BrainMath.getDeltaBToNextPrice(
                         swapDetails.sqrtPrice,
                         swapToPrice,
@@ -794,16 +794,16 @@ contract Hyper is IHyper, ReentrancyGuard {
             pool.feesAPerLiquidity = swapDetails.feesPerLiquidity;
 
             // TODO: review order of operations
-            settleToken(pool.tokenA, amountIn);
-            internalBalances[msg.sender][pool.tokenB] += swapDetails.amountOut;
-            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(swapDetails.amountOut));
+            settleToken(pool.tokenA, uint256(-amount));
+            internalBalances[msg.sender][pool.tokenB] += swapDetails.filled;
+            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(swapDetails.filled));
         } else {
             pool.feesBPerLiquidity = swapDetails.feesPerLiquidity;
 
             // TODO: review order of operations
-            settleToken(pool.tokenB, amountIn);
-            internalBalances[msg.sender][pool.tokenA] += swapDetails.amountOut;
-            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(swapDetails.amountOut));
+            settleToken(pool.tokenB, uint256(-amount));
+            internalBalances[msg.sender][pool.tokenA] += swapDetails.filled;
+            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(swapDetails.filled));
         }
     }
 
