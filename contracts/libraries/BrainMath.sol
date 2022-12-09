@@ -8,6 +8,12 @@ uint256 constant PRICE_GRID_BASE = 1000100000000000000; // 1.0001e18
 uint256 constant SQRT_PRICE_GRID_BASE = 1000049998750062496; // 60x18 value for 1.0001.sqrt()
 uint256 constant LN_SQRT_PRICE_GRID_BASE = 49997500166647; // 60x18 value for 1.0001.sqrt().ln()
 
+int24 constant MIN_SLOT_INDEX = -int24(500000);
+int24 constant MAX_SLOT_INDEX = int24(500000);
+
+UD60x18 constant MIN_SQRT_PRICE = UD60x18.wrap(13905313);
+UD60x18 constant MAX_SQRT_PRICE = UD60x18.wrap(71914955435821785049095979323);
+
 enum Rounding {
     Down,
     Up

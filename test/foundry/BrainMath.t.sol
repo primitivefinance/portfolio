@@ -20,6 +20,16 @@ contract TestBrainMath is Test {
         assertEq(unwrap(lnSqrtPriceGridBase), LN_SQRT_PRICE_GRID_BASE);
     }
 
+    function test_getSqrtPriceAtSlot_min() public {
+        UD60x18 sqrtPrice = getSqrtPriceAtSlot(MIN_SLOT_INDEX);
+        assertEq(unwrap(sqrtPrice), unwrap(MIN_SQRT_PRICE));
+    }
+
+    function test_getSqrtPriceAtSlot_max() public {
+        UD60x18 sqrtPrice = getSqrtPriceAtSlot(MAX_SLOT_INDEX);
+        assertEq(unwrap(sqrtPrice), unwrap(MAX_SQRT_PRICE));
+    }
+
     function test_getSqrtPriceAtSlot_zero() public {
         int24 slotIndex = 0;
         UD60x18 sqrtPrice = getSqrtPriceAtSlot(slotIndex);
