@@ -18,7 +18,6 @@ import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInsid
 
 // TODO:
 // - check the types on integers
-// - price limit on swap
 // - fix amount out
 
 contract Hyper is IHyper, ReentrancyGuard {
