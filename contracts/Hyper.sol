@@ -108,9 +108,9 @@ contract Hyper is IHyper, ReentrancyGuard {
 
     function syncEpoch() internal {
         if (block.timestamp >= epoch.endTime) {
-            uint256 epochsPassed = (block.timestamp - epoch.endTime) / epoch.length;
-            epoch.id += (1 + epochsPassed);
-            epoch.endTime += (epoch.length + (epochsPassed * epoch.length));
+            uint256 epochsSkipped = (block.timestamp - epoch.endTime) / epoch.length;
+            epoch.id += (1 + epochsSkipped);
+            epoch.endTime += (epoch.length + (epochsSkipped * epoch.length));
             emit SetEpoch(epoch.id, epoch.endTime);
         }
     }
