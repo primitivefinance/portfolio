@@ -6,18 +6,15 @@ import {UD60x18, fromUD60x18, toUD60x18} from "@prb/math/UD60x18.sol";
 import {PoolId, PoolSnapshot} from "./Pool.sol";
 import {SlotSnapshot} from "./Slot.sol";
 
+using {updatePerLiquiditiesInside} for Position global;
+using {getPerLiquiditiesInside, getEarnings} for Position;
+
 type PositionId is bytes32;
 
 struct PerLiquiditiesInside {
     UD60x18 proceedsPerLiquidityInside;
     UD60x18 feesAPerLiquidityInside;
     UD60x18 feesBPerLiquidityInside;
-}
-
-struct Earnings {
-    uint256 amountA;
-    uint256 amountB;
-    uint256 amountC;
 }
 
 struct Position {
@@ -40,6 +37,32 @@ function getPositionId(
     int24 upperSlotIndex
 ) pure returns (PositionId) {
     return PositionId.wrap(keccak256(abi.encodePacked(owner, poolId, lowerSlotIndex, upperSlotIndex)));
+}
+
+function updatePerLiquiditiesInside(
+    Position storage position,
+    PoolSnapshot memory poolSnapshot,
+    SlotSnapshot memory lowerSlotSnapshot,
+    SlotSnapshot memory upperSlotSnapshot
+) returns (
+        uint256 amountA,
+        uint256 amountB,
+        uint256 amountC
+    ) {
+    Position memory _position = position;
+    PerLiquiditiesInside memory perLiquiditiesInside = _position.getPerLiquiditiesInside(
+        poolSnapshot,
+        lowerSlotSnapshot,
+        upperSlotSnapshot
+    );
+    (amountA, amountB, amountC) = _position.getEarnings(
+        perLiquiditiesInside.proceedsPerLiquidityInside,
+        perLiquiditiesInside.feesAPerLiquidityInside,
+        perLiquiditiesInside.feesBPerLiquidityInside
+    );
+    position.proceedsPerLiquidityInsideLast = perLiquiditiesInside.proceedsPerLiquidityInside;
+    position.feesAPerLiquidityInsideLast = perLiquiditiesInside.feesAPerLiquidityInside;
+    position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
 }
 
 function getPerLiquiditiesInside(

@@ -14,7 +14,7 @@ import "./libraries/BrainMath.sol" as BrainMath;
 import {Epoch} from "./libraries/Epoch.sol";
 import {getPoolId, getPoolSnapshot, PoolId, Pool, PoolToken, PoolSnapshot, Bid} from "./libraries/Pool.sol";
 import {getSlotId, getSlotSnapshot, SlotId, Slot, SlotSnapshot} from "./libraries/Slot.sol";
-import {getPositionId, getPerLiquiditiesInside, getEarnings, PerLiquiditiesInside, Earnings, PositionId, Position} from "./libraries/Position.sol";
+import {getPositionId, PerLiquiditiesInside, PositionId, Position} from "./libraries/Position.sol";
 
 // TODO:
 // - check the types on integers
@@ -214,6 +214,12 @@ contract Hyper is IHyper, ReentrancyGuard {
         slot.lastUpdatedTimestamp = block.timestamp;
     }
 
+    struct PositionBalanceChange {
+        uint256 amountA;
+        uint256 amountB;
+        uint256 amountC;
+    }
+
     function syncPosition(
         Position storage position,
         Pool memory pool,
@@ -221,33 +227,19 @@ contract Hyper is IHyper, ReentrancyGuard {
         Slot memory upperSlot,
         Epoch memory readEpoch
     ) internal {
-        Earnings memory earnings;
+        PositionBalanceChange memory balanceChange;
 
         uint256 epochsPassed = readEpoch.getEpochsPassed(position.lastUpdatedTimestamp);
         if (epochsPassed > 0) {
             if (position.pendingLiquidity != 0) {
                 uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
                 PoolSnapshot memory poolSnapshot = poolSnapshots[pool.id][lastUpdatedEpochId];
-                {
-                    // get per liquidities inside through end of last update epoch
-                    PerLiquiditiesInside memory perLiquiditiesInside = getPerLiquiditiesInside(
-                        position,
+                (balanceChange.amountA, balanceChange.amountB, balanceChange.amountC) = position
+                    .updatePerLiquiditiesInside(
                         poolSnapshot,
                         slotSnapshots[lowerSlot.id][lastUpdatedEpochId],
                         slotSnapshots[upperSlot.id][lastUpdatedEpochId]
                     );
-                    // get earnings from growth in per liquidities
-                    (earnings.amountA, earnings.amountB, earnings.amountC) = getEarnings(
-                        position,
-                        perLiquiditiesInside.proceedsPerLiquidityInside,
-                        perLiquiditiesInside.feesAPerLiquidityInside,
-                        perLiquiditiesInside.feesBPerLiquidityInside
-                    );
-                    // update per liquidities inside
-                    position.proceedsPerLiquidityInsideLast = perLiquiditiesInside.proceedsPerLiquidityInside;
-                    position.feesAPerLiquidityInsideLast = perLiquiditiesInside.feesAPerLiquidityInside;
-                    position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
-                }
                 // if liquidity was kicked out, add the underlying tokens
                 if (position.pendingLiquidity < 0) {
                     (uint256 kickedOutTokenA, uint256 kickedOutTokenB) = BrainMath.calculateLiquidityUnderlying(
@@ -257,8 +249,8 @@ contract Hyper is IHyper, ReentrancyGuard {
                         position.upperSlotIndex,
                         BrainMath.Rounding.Down
                     );
-                    earnings.amountA += kickedOutTokenA;
-                    earnings.amountB += kickedOutTokenB;
+                    balanceChange.amountA += kickedOutTokenA;
+                    balanceChange.amountB += kickedOutTokenB;
                     // update position matured liquidity
                     position.maturedLiquidity -= BrainMath.abs(position.pendingLiquidity);
                 } else {
@@ -270,39 +262,27 @@ contract Hyper is IHyper, ReentrancyGuard {
             }
         }
         {
-            // get per liquidities inside through end of last update epoch
-            PerLiquiditiesInside memory perLiquiditiesInside = getPerLiquiditiesInside(
-                position,
+            (uint256 amountA, uint256 amountB, uint256 amountC) = position.updatePerLiquiditiesInside(
                 getPoolSnapshot(pool),
                 getSlotSnapshot(lowerSlot),
                 getSlotSnapshot(upperSlot)
             );
-            (uint256 earningsA, uint256 earningsB, uint256 earningsC) = getEarnings(
-                position,
-                perLiquiditiesInside.proceedsPerLiquidityInside,
-                perLiquiditiesInside.feesAPerLiquidityInside,
-                perLiquiditiesInside.feesBPerLiquidityInside
-            );
-            earnings.amountA += earningsA;
-            earnings.amountB += earningsB;
-            earnings.amountC += earningsC;
-            // update per liquidities inside
-            position.proceedsPerLiquidityInsideLast = perLiquiditiesInside.proceedsPerLiquidityInside;
-            position.feesAPerLiquidityInsideLast = perLiquiditiesInside.feesAPerLiquidityInside;
-            position.feesBPerLiquidityInsideLast = perLiquiditiesInside.feesBPerLiquidityInside;
+            balanceChange.amountA += amountA;
+            balanceChange.amountB += amountB;
+            balanceChange.amountC += amountC;
         }
         // update internal balances
-        if (earnings.amountA != 0) {
-            internalBalances[msg.sender][pool.tokenA] += earnings.amountA;
-            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(earnings.amountA));
+        if (balanceChange.amountA != 0) {
+            internalBalances[msg.sender][pool.tokenA] += balanceChange.amountA;
+            emit InternalBalanceChange(msg.sender, pool.tokenA, int256(balanceChange.amountA));
         }
-        if (earnings.amountB != 0) {
-            internalBalances[msg.sender][pool.tokenB] += earnings.amountB;
-            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(earnings.amountB));
+        if (balanceChange.amountB != 0) {
+            internalBalances[msg.sender][pool.tokenB] += balanceChange.amountB;
+            emit InternalBalanceChange(msg.sender, pool.tokenB, int256(balanceChange.amountB));
         }
-        if (earnings.amountC != 0) {
-            internalBalances[msg.sender][AUCTION_SETTLEMENT_TOKEN] += earnings.amountC;
-            emit InternalBalanceChange(msg.sender, AUCTION_SETTLEMENT_TOKEN, int256(earnings.amountC));
+        if (balanceChange.amountC != 0) {
+            internalBalances[msg.sender][AUCTION_SETTLEMENT_TOKEN] += balanceChange.amountC;
+            emit InternalBalanceChange(msg.sender, AUCTION_SETTLEMENT_TOKEN, int256(balanceChange.amountC));
         }
 
         position.lastUpdatedTimestamp = block.timestamp;
