@@ -123,6 +123,12 @@ interface IHyper {
         int256 amount
     ) external;
 
+    function updateEarnings(
+        PoolId poolId,
+        int24 lowerSlotIndex,
+        int24 upperSlotIndex
+    ) external;
+
     function swap(
         PoolId poolId,
         PoolToken tokenIn,

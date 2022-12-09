@@ -564,6 +564,31 @@ contract Hyper is IHyper, ReentrancyGuard {
         }
     }
 
+    function updateEarnings(
+        PoolId poolId,
+        int24 lowerSlotIndex,
+        int24 upperSlotIndex
+    ) public nonReentrant started {
+        Pool storage pool = pools[poolId];
+        if (pool.lastUpdatedTimestamp == 0) revert IHyper.PoolUninitializedError();
+
+        Position storage position = positions[getPositionId(msg.sender, poolId, lowerSlotIndex, upperSlotIndex)];
+        require(position.lastUpdatedTimestamp != 0, "Position not created");
+
+        syncEpoch();
+        syncPool(pool, epoch);
+
+        // @dev: since we are not updating liquidity, we do not need to sync the slots
+
+        syncPosition(
+            position,
+            pool,
+            slots[getSlotId(poolId, lowerSlotIndex)],
+            slots[getSlotId(poolId, upperSlotIndex)],
+            epoch
+        );
+    }
+
     struct SwapDetails {
         UD60x18 feeTier;
         uint256 remaining;
