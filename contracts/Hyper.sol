@@ -606,7 +606,7 @@ contract Hyper is IHyper, ReentrancyGuard {
     function swap(
         PoolId poolId,
         PoolToken tokenIn,
-        uint256 amountIn,
+        int256 amount,
         UD60x18 sqrtPriceLimit
     ) public nonReentrant started {
         if (amountIn == 0) revert IHyper.AmountZeroError();
@@ -623,8 +623,8 @@ contract Hyper is IHyper, ReentrancyGuard {
 
         SwapDetails memory swapDetails = SwapDetails({
             feeTier: msg.sender == bids[poolId][epoch.id].swapper ? wrapUD60x18(0) : PUBLIC_SWAP_FEE,
-            remaining: amountIn,
-            amountOut: 0,
+            remaining: amount,
+            filled: 0,
             slotIndex: pool.slotIndex,
             sqrtPrice: pool.sqrtPrice,
             swapLiquidity: pool.swapLiquidity,
@@ -636,7 +636,7 @@ contract Hyper is IHyper, ReentrancyGuard {
             nextSqrtPrice: wrapUD60x18(0)
         });
 
-        while (swapDetails.remaining > 0 && !swapDetails.sqrtPrice.eq(sqrtPriceLimit)) {
+        while (swapDetails.remaining != 0 && !swapDetails.sqrtPrice.eq(sqrtPriceLimit)) {
             {
                 // Get the next slot or the border of a bitmap
                 (int16 chunk, uint8 bit) = BitMath.getSlotPositionInBitmap(swapDetails.slotIndex);
@@ -654,21 +654,36 @@ contract Hyper is IHyper, ReentrancyGuard {
                 ? (sqrtPriceLimit.gt(swapDetails.nextSqrtPrice) ? sqrtPriceLimit : swapDetails.nextSqrtPrice)
                 : (sqrtPriceLimit.gt(swapDetails.nextSqrtPrice) ? swapDetails.nextSqrtPrice : sqrtPriceLimit);
 
-            uint256 remainingFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(swapDetails.remaining)).ceil());
-            uint256 maxToDelta = tokenIn == PoolToken.A
-                ? BrainMath.getDeltaAToNextPrice(
-                    swapDetails.sqrtPrice,
-                    swapToPrice,
-                    swapDetails.swapLiquidity,
-                    BrainMath.Rounding.Up
-                )
-                : BrainMath.getDeltaBToNextPrice(
-                    swapDetails.sqrtPrice,
-                    swapToPrice,
-                    swapDetails.swapLiquidity,
-                    BrainMath.Rounding.Up
+            uint256 maxToDelta = amount > 0 ? (
+                tokenIn == PoolToken.A
+                    ? BrainMath.getDeltaAToNextPrice(
+                        swapDetails.sqrtPrice,
+                        swapToPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Up
+                    ) : BrainMath.getDeltaBToNextPrice(
+                        swapDetails.sqrtPrice,
+                        swapToPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Up
+                    )
+                ) : (tokenIn == PoolToken.A
+                    ? BrainMath.getDeltaBToNextPrice(
+                        swapDetails.sqrtPrice,
+                        swapToPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Down
+                    ) : BrainMath.getDeltaAToNextPrice(
+                        swapDetails.sqrtPrice,
+                        swapToPrice,
+                        swapDetails.swapLiquidity,
+                        BrainMath.Rounding.Down
+                    )
                 );
-            if (swapDetails.remaining < maxToDelta + remainingFeeAmount) {
+
+            uint256 maxToDeltaFeeAmount = fromUD60x18(swapDetails.feeTier.mul(toUD60x18(maxInToDeltaFeeAmount)).ceil());
+
+            if (swapDetails.remaining < maxInToDelta + remainingFeeAmount) {
                 // remove fees from remaining amount
                 swapDetails.remaining -= remainingFeeAmount;
                 // save fees per liquidity
