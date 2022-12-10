@@ -132,7 +132,8 @@ interface IHyper {
     function swap(
         PoolId poolId,
         PoolToken tokenIn,
-        int256 amount,
+        bool fixedIn,
+        uint256 amount,
         UD60x18 sqrtPriceLimit
     ) external;
 
