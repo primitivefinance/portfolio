@@ -66,10 +66,6 @@ contract Hyper is IHyper {
     mapping(uint16 => Pair) public pairs;
     /// @dev Pool id -> Epoch Data Structure.
     mapping(uint48 => Epoch) public epochs;
-    /// @dev Pool id -> Auction Param Data Structure.
-    mapping(uint48 => AuctionParams) auctionParams;
-    /// @dev Pool id -> Auction Fees
-    mapping(uint48 => uint128) auctionFees;
     /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) public curves;
     /// @dev Pool id -> HyperPool Data Structure.
@@ -134,34 +130,6 @@ contract Hyper is IHyper {
         _applyCredit(token, amount);
         if (token == WETH) _safeWrap();
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-    }
-
-    function setAuctionParams(
-        uint48 poolId,
-        uint256 startPrice,
-        uint256 endPrice,
-        uint256 fee,
-        uint256 length
-    ) external {
-        // todo: access control, add param checks
-        AuctionParams storage params = auctionParams[poolId];
-        if (startPrice != 0) params.startPrice = startPrice;
-        if (endPrice != 0) params.endPrice = endPrice;
-        if (fee != 0) params.fee = fee;
-        if (length != 0) params.length = length;
-
-        emit SetAuctionParams(poolId, params.startPrice, params.endPrice, params.fee, params.length);
-    }
-
-    function collectAuctionFees(uint48 poolId) external {
-        // todo: access control
-        uint128 fees = auctionFees[poolId];
-        if (fees > 0) {
-            auctionFees[poolId] = 0;
-            uint16 pairId = uint16(poolId >> 32);
-            Pair memory pair = pairs[pairId];
-            SafeTransferLib.safeTransfer(ERC20(pair.tokenQuote), msg.sender, fees);
-        }
     }
 
     // Note: Not sure if we should always revert when receiving ETH
@@ -999,63 +967,6 @@ contract Hyper is IHyper {
         else slot.liquidityDelta -= int256(deltaLiquidity);
     }
 
-    // --- Priority Auction --- //
-
-    function _fillPriorityAuction(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId_, address priorityOwner, uint128 limitAmount) = Instructions.decodeFillPriorityAuction(data);
-
-        if (!_doesPoolExist(poolId_)) revert();
-        if (priorityOwner == address(0)) revert();
-
-        // todo: if hyper epoch needs advancing, advance it
-
-        HyperPool storage pool = pools[poolId_];
-        if (pool.prioritySwapper != address(0)) revert();
-
-        Epoch memory epoch = epochs[poolId_];
-        if (epoch.endTime <= _blockTimestamp()) revert();
-
-        AuctionParams memory poolAuctionParams = auctionParams[poolId];
-        uint128 auctionPayment = _calculateAuctionPayment(
-            poolAuctionParams.startPrice,
-            poolAuctionParams.endPrice,
-            0,
-            _blockTimestamp()
-        );
-        require(auctionPayment <= limitAmount);
-
-        uint128 auctionFee = _calculateAuctionFee(auctionPayment, poolAuctionParams.fee);
-        uint128 auctionNet = auctionPayment - auctionFee;
-        uint256 epochTimeRemaining = _blockTimestamp() - epoch.endTime;
-
-        // save pool's priority payment per second
-        pool.priorityPaymentPerSecond = FixedPointMathLib.divWadDown(auctionNet, epochTimeRemaining);
-
-        // set new priority swapper
-        pool.prioritySwapper = priorityOwner;
-
-        // save auction fees
-        auctionFees[poolId_] += auctionFee;
-
-        // add debit payable by auction filler
-        uint16 pairId = uint16(poolId >> 32);
-        Pair memory pair = pairs[pairId];
-        _increaseGlobal(pair.tokenQuote, auctionPayment);
-    }
-
-    function _calculateAuctionPayment(
-        uint256 startPrice,
-        uint256 endPrice,
-        uint256 startTime,
-        uint256 fillTime
-    ) internal returns (uint128 auctionPayment) {
-        return 0;
-    }
-
-    function _calculateAuctionFee(uint128 auctionPayment, uint256 fee) internal returns (uint128 auctionFee) {
-        return 0;
-    }
-
     // --- Creation --- //
 
     /**
@@ -1256,8 +1167,6 @@ contract Hyper is IHyper {
             (poolId, ) = _stakePosition(data);
         } else if (instruction == Instructions.UNSTAKE_POSITION) {
             (poolId, ) = _unstakePosition(data);
-        } else if (instruction == Instructions.FILL_PRIORITY_AUCTION) {
-            (poolId) = _fillPriorityAuction(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {

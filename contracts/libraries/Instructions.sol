@@ -7,11 +7,14 @@ library Instructions {
     // --- Instructions --- //
     bytes1 public constant UNKNOWN = 0x00;
     bytes1 public constant ADD_LIQUIDITY = 0x01;
+    bytes1 public constant UNSET00 = 0x02;
     bytes1 public constant REMOVE_LIQUIDITY = 0x03;
+    bytes1 public constant UNSET01 = 0x04;
     bytes1 public constant SWAP = 0x05;
     bytes1 public constant STAKE_POSITION = 0x06;
     bytes1 public constant UNSTAKE_POSITION = 0x07;
-    bytes1 public constant FILL_PRIORITY_AUCTION = 0x08;
+    bytes1 public constant UNSET02 = 0x08;
+    bytes1 public constant UNSET03 = 0x09;
     bytes1 public constant CREATE_POOL = 0x0B;
     bytes1 public constant CREATE_PAIR = 0x0C;
     bytes1 public constant CREATE_CURVE = 0x0D;
@@ -103,15 +106,6 @@ library Instructions {
 
     function encodeStakePosition(uint96 positionId) internal pure returns (bytes memory data) {
         data = abi.encodePacked(STAKE_POSITION, positionId);
-    }
-
-    function encodeFillPriorityAuction(
-        uint48 poolId,
-        address priorityOwner,
-        uint8 limitPower,
-        uint8 limitAmount
-    ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(FILL_PRIORITY_AUCTION, poolId, priorityOwner, limitPower, limitAmount);
     }
 
     function encodeUnstakePosition(uint96 positionId) internal pure returns (bytes memory data) {
