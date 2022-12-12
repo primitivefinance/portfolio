@@ -102,13 +102,6 @@ contract Hyper is IHyper {
         WETH = weth;
     }
 
-    // --- Temp --- //
-
-    modifier preActionPoolEffects(uint48 poolId) {
-        _syncExpiringPoolTimeAndPrice(poolId);
-        _;
-    }
-
     // --- External --- //
 
     /// @inheritdoc IHyperActions
@@ -664,7 +657,7 @@ contract Hyper is IHyper {
     // --- Liquidity --- //
 
     /**
-     * @notice Enigma method to add liquidity to a range of prices in a pool.
+     * @notice Enigma method to add liquidity to a pool.
      *
      * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      * @custom:reverts If attempting to add zero liquidity.
@@ -685,28 +678,28 @@ contract Hyper is IHyper {
 
         // Get lower price bound using the loTick index.
         uint256 price = HyperSwapLib.computePriceWithTick(0x01);
+
         // Compute the current virtual reserves given the pool's lastPrice.
-        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
+        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(
             pool.lastPrice,
             curve.strike,
             curve.sigma,
             curve.maturity - timestamp
         );
-        // Compute the real reserves given the lower price bound.
-        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
-        // If the real reserves are zero, then the slot is at the bounds and so we should use virtual reserves.
-        if (deltaR2 == 0) deltaR2 = currentR2;
-        else deltaR2 = currentR2.divWadDown(deltaR2);
+
+        // Compute the current virtual reserves of R1
         uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
             deltaR2,
             curve.strike,
             curve.sigma,
             curve.maturity - timestamp,
-            price,
-            0
-        ); // todo: fix with using the hiTick.
+            pool.lastPrice,
+            0 // todo: fix with invariant
+        );
+
         deltaR1 = deltaR1.mulWadDown(delLiquidity);
         deltaR2 = deltaR2.mulWadDown(delLiquidity);
+
         _increaseLiquidity(poolId_, deltaR1, deltaR2, delLiquidity);
     }
 
@@ -730,37 +723,27 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId_];
         uint256 timestamp = _blockTimestamp();
         uint256 price = HyperSwapLib.computePriceWithTick(0x01); // todo: fix
-        uint256 currentR2 = HyperSwapLib.computeR2WithPrice(
+        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(
             pool.lastPrice,
             curve.strike,
             curve.sigma,
             curve.maturity - timestamp
         );
 
-        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(price, curve.strike, curve.sigma, curve.maturity - timestamp); // todo: I don't think this is right since its (1 - (x / x(P_a)))
-        if (deltaR2 == 0) deltaR2 = currentR2;
-        else deltaR2 = currentR2.divWadDown(deltaR2);
-
         uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
             deltaR2,
             curve.strike,
             curve.sigma,
             curve.maturity - timestamp,
-            price,
+            pool.lastPrice,
             0
-        ); // todo: fix with using the hiTick.
+        );
+
         deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
         deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
 
-        // Decrease amount of liquidity in each slot.
-        // todo: decrease pool liquidity
-
         pool.liquidity -= deltaLiquidity;
         pool.blockTimestamp = _blockTimestamp();
-
-        // Todo: delete any slots if uninstantiated.
-
-        // Todo: update bitmap of instantiated/uninstantiated slots.
 
         _decreasePosition(poolId_, deltaLiquidity);
 
@@ -780,15 +763,10 @@ contract Hyper is IHyper {
     ) internal {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
 
-        // Update the slots.
-        // todo: increase liquidity of pool
-
         // Update the pool state
         HyperPool storage pool = pools[poolId];
         pool.liquidity += deltaLiquidity;
         pool.blockTimestamp = _blockTimestamp();
-
-        // Todo: update bitmap of instantiated slots.
 
         _increasePosition(poolId, deltaLiquidity);
 
@@ -800,6 +778,8 @@ contract Hyper is IHyper {
 
         emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
     }
+
+    // --- Staking --- //
 
     function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
         (uint48 poolId_, uint48 positionId) = Instructions.decodeStakePosition(data);
