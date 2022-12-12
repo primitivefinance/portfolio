@@ -83,14 +83,8 @@ struct Epoch {
     uint256 endTime;
     uint256 interval;
 }
-/// @dev Auction parameter information for a pool.
-struct AuctionParams {
-    uint256 startPrice;
-    uint256 endPrice;
-    uint256 fee;
-    uint256 length;
-}
 /// @dev Individual live pool state.
+/// @param epochStakedLiquidityDelta Liquidity to be added to staked liquidity.
 struct HyperPool {
     uint256 lastPrice;
     int24 lastTick;
@@ -112,8 +106,8 @@ struct HyperPosition {
     uint256 stakeEpochId;
     uint256 unstakeEpochId;
     uint256 lastRewardGrowth;
-    uint256 feeGrowthInsideAssetLast;
-    uint256 feeGrowthInsideQuoteLast;
+    uint256 feeGrowthAssetLast;
+    uint256 feeGrowthQuoteLast;
     uint256 tokensOwedAsset;
     uint256 tokensOwedQuote;
 }

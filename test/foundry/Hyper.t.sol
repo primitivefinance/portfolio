@@ -80,7 +80,7 @@ interface IHyperStruct {
 
     function pairs(uint16 pairId) external view returns (Pair memory);
 
-    function positions(address owner, uint96 positionId) external view returns (HyperPosition memory);
+    function positions(address owner, uint48 positionId) external view returns (HyperPosition memory);
 
     function pools(uint48 poolId) external view returns (HyperPool memory);
 
@@ -164,7 +164,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         return IHyperStruct(address(__contractBeingTested)).pairs(pairId);
     }
 
-    function getPosition(address owner, uint96 positionId) public view returns (HyperPosition memory) {
+    function getPosition(address owner, uint48 positionId) public view returns (HyperPosition memory) {
         return IHyperStruct(address(__contractBeingTested)).positions(owner, positionId);
     }
 
@@ -200,8 +200,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
             __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
@@ -227,8 +225,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
             __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
@@ -253,8 +249,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
             __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
@@ -279,8 +273,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
             __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
@@ -304,8 +296,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
             __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
             0x13, // 19 zeroes, so 10e19 liquidity, note: 0x0a amount breaks test? todo: handle case where insufficient liquidity
             0x01
         );
@@ -330,8 +320,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
             __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
@@ -356,8 +344,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
             __poolId,
-            DEFAULT_TICK - 2560,
-            DEFAULT_TICK + 2560,
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
@@ -381,14 +367,14 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailA_LNonExistentPoolIdReverts() public {
         uint48 random = uint48(48);
-        bytes memory data = Instructions.encodeAddLiquidity(0, random, 0, 0, 0x01, 0x01);
+        bytes memory data = Instructions.encodeAddLiquidity(0, random, 0x01, 0x01);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
     }
 
     function testFailA_LZeroLiquidityReverts() public {
         uint8 liquidity = 0;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, 0, 0, 0x00, liquidity);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, 0x00, liquidity);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
     }
@@ -406,7 +392,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 max = -min;
         uint8 power = uint8(0x06); // 6 zeroes
         uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, min, max, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
 
         forwarder.pass(data);
 
@@ -422,7 +408,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -435,7 +421,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -448,7 +434,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -461,7 +447,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -474,7 +460,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool instantiated = getSlot(__poolId, slot).instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, slot, slot + 2, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -487,7 +473,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool instantiated = getSlot(__poolId, slot).instantiated;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, slot - 2, slot, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -498,13 +484,13 @@ contract TestHyperSingle is StandardHelpers, Test {
     function testA_LPositionLowTickUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
+        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
 
         int24 prevPositionLoTick = getPosition(address(forwarder), positionId).loTick;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -517,13 +503,13 @@ contract TestHyperSingle is StandardHelpers, Test {
     function testA_LPositionHighTickUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
+        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
 
         int24 prevPositionHiTick = getPosition(address(forwarder), positionId).hiTick;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -536,13 +522,13 @@ contract TestHyperSingle is StandardHelpers, Test {
     function testA_LPositionTimestampUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
+        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
 
         uint256 prevPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -555,13 +541,13 @@ contract TestHyperSingle is StandardHelpers, Test {
     function testA_LPositionTotalLiquidityIncreases() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
-        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
+        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
 
         uint256 prevPositionTotalLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -577,7 +563,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -592,7 +578,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -604,13 +590,13 @@ contract TestHyperSingle is StandardHelpers, Test {
     // --- Remove Liquidity --- //
 
     function testFailR_LZeroLiquidityReverts() public {
-        bytes memory data = Instructions.encodeRemoveLiquidity(0, __poolId, 1, 1, 0x00, 0x00);
+        bytes memory data = Instructions.encodeRemoveLiquidity(0, __poolId, 0x00, 0x00);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
     function testFailR_LNonExistentPoolReverts() public {
-        bytes memory data = Instructions.encodeRemoveLiquidity(0, 42, 1, 1, 0x01, 0x01);
+        bytes memory data = Instructions.encodeRemoveLiquidity(0, 42, 0x01, 0x01);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
@@ -620,13 +606,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prev = getSlot(__poolId, lo).totalLiquidity;
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 next = getSlot(__poolId, lo).totalLiquidity;
@@ -638,13 +624,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prev = getSlot(__poolId, hi).totalLiquidity;
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 next = getSlot(__poolId, hi).totalLiquidity;
@@ -656,13 +642,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         int256 prev = getSlotLiquidityDelta(lo);
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         int256 next = getSlotLiquidityDelta(lo);
@@ -674,13 +660,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         int256 prev = getSlotLiquidityDelta(hi);
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         int256 next = getSlotLiquidityDelta(hi);
@@ -692,13 +678,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         bool prev = getSlot(__poolId, lo).instantiated;
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         bool next = getSlot(__poolId, lo).instantiated;
@@ -710,13 +696,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         bool prev = getSlot(__poolId, hi).instantiated;
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         bool next = getSlot(__poolId, hi).instantiated;
@@ -728,17 +714,17 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
+        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
         uint256 prevPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
 
         uint256 warpTimestamp = block.timestamp + 1;
         vm.warp(warpTimestamp);
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 nextPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
@@ -751,14 +737,14 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint96 positionId = uint96(bytes12(abi.encodePacked(__poolId, loTick, hiTick)));
+        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
         uint256 prevPositionLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, loTick, hiTick, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 nextPositionLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
@@ -771,13 +757,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prev = __contractBeingTested.globalReserves(address(asset));
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 next = __contractBeingTested.globalReserves(address(asset));
@@ -789,13 +775,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prev = __contractBeingTested.globalReserves(address(quote));
 
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 next = __contractBeingTested.globalReserves(address(quote));
@@ -809,11 +795,11 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
 
         bool prevPositionStaked = getPosition(address(forwarder), positionId).stakeEpochId != 0;
 
@@ -831,13 +817,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
@@ -854,13 +840,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         int256 prevStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
@@ -877,13 +863,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
@@ -910,11 +896,11 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK + 256; // fails if not above current tick
         uint8 amount = 0x01;
         uint8 power = 0x0f;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
@@ -940,17 +926,17 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
         vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
@@ -971,11 +957,11 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
@@ -997,11 +983,11 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
         uint8 amount = 0x01;
         uint8 power = 0x0f;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, lo, hi, power, amount);
+        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint96 positionId = Instructions.encodePositionId(__poolId, lo, hi);
+        uint48 positionId = Instructions.encodePositionId(__poolId);
         data = Instructions.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 

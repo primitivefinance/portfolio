@@ -30,13 +30,9 @@ library Instructions {
         poolId = uint48(bytes6(data));
     }
 
-    function encodePositionId(
-        uint48 poolId,
-        int24 loTick,
-        int24 hiTick
-    ) internal pure returns (uint96 positionId) {
-        bytes memory data = abi.encodePacked(poolId, loTick, hiTick);
-        positionId = uint96(bytes12(data));
+    function encodePositionId(uint48 poolId) internal pure returns (uint48 positionId) {
+        bytes memory data = abi.encodePacked(poolId);
+        positionId = uint48(bytes6(data));
     }
 
     /// @dev Encodes the arugments for the CREATE_CURVE instruction.
@@ -63,23 +59,19 @@ library Instructions {
     function encodeAddLiquidity(
         uint8 useMax,
         uint48 poolId,
-        int24 loTick,
-        int24 hiTick,
         uint8 power,
         uint8 amount
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(Decoder.pack(bytes1(useMax), ADD_LIQUIDITY), poolId, loTick, hiTick, power, amount);
+        data = abi.encodePacked(Decoder.pack(bytes1(useMax), ADD_LIQUIDITY), poolId, power, amount);
     }
 
     function encodeRemoveLiquidity(
         uint8 useMax,
         uint48 poolId,
-        int24 loTick,
-        int24 hiTick,
         uint8 power,
         uint8 amount
     ) internal pure returns (bytes memory data) {
-        data = abi.encodePacked(Decoder.pack(bytes1(useMax), REMOVE_LIQUIDITY), poolId, loTick, hiTick, power, amount);
+        data = abi.encodePacked(Decoder.pack(bytes1(useMax), REMOVE_LIQUIDITY), poolId, power, amount);
     }
 
     function encodeSwap(
@@ -104,11 +96,11 @@ library Instructions {
         );
     }
 
-    function encodeStakePosition(uint96 positionId) internal pure returns (bytes memory data) {
+    function encodeStakePosition(uint48 positionId) internal pure returns (bytes memory data) {
         data = abi.encodePacked(STAKE_POSITION, positionId);
     }
 
-    function encodeUnstakePosition(uint96 positionId) internal pure returns (bytes memory data) {
+    function encodeUnstakePosition(uint48 positionId) internal pure returns (bytes memory data) {
         data = abi.encodePacked(UNSTAKE_POSITION, positionId);
     }
 
@@ -121,17 +113,13 @@ library Instructions {
         returns (
             uint8 useMax,
             uint48 poolId,
-            int24 loTick,
-            int24 hiTick,
             uint128 deltaLiquidity
         )
     {
         (bytes1 maxFlag, ) = Decoder.separate(data[0]);
         useMax = uint8(maxFlag);
         poolId = uint48(bytes6(data[1:7]));
-        loTick = int24(uint24(bytes3(data[7:10])));
-        hiTick = int24(uint24(bytes3(data[10:13])));
-        deltaLiquidity = Decoder.toAmount(data[13:]);
+        deltaLiquidity = Decoder.toAmount(data[7:]);
         //uint8 pointer = uint8(data[13]);
         //deltaBase = Decoder.toAmount(data[14:pointer]);
         //deltaQuote = Decoder.toAmount(data[pointer:]);
@@ -215,17 +203,13 @@ library Instructions {
             uint8 useMax,
             uint48 poolId,
             uint16 pairId,
-            int24 loTick,
-            int24 hiTick,
             uint128 deltaLiquidity
         )
     {
         useMax = uint8(data[0] >> 4);
         pairId = uint16(bytes2(data[1:3]));
         poolId = uint48(bytes6(data[1:7]));
-        loTick = int24(uint24(bytes3(data[7:10])));
-        hiTick = int24(uint24(bytes3(data[10:13])));
-        deltaLiquidity = uint128(Decoder.toAmount(data[13:]));
+        deltaLiquidity = uint128(Decoder.toAmount(data[7:]));
     }
 
     /// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
@@ -254,17 +238,17 @@ library Instructions {
     /// @dev Expects an enigma code and positionId.
     /// @param data Maximum 1 + 12 = 13 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-    function decodeStakePosition(bytes calldata data) internal pure returns (uint48 poolId, uint96 positionId) {
+    function decodeStakePosition(bytes calldata data) internal pure returns (uint48 poolId, uint48 positionId) {
         poolId = uint48(bytes6(data[1:7]));
-        positionId = uint96(bytes12(data[1:13]));
+        positionId = uint48(bytes6(data[1:7]));
     }
 
     /// @dev Expects an enigma code and positionId.
     /// @param data Maximum 1 + 12 = 13 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-    function decodeUnstakePosition(bytes calldata data) internal pure returns (uint48 poolId, uint96 positionId) {
+    function decodeUnstakePosition(bytes calldata data) internal pure returns (uint48 poolId, uint48 positionId) {
         poolId = uint48(bytes6(data[1:7]));
-        positionId = uint96(bytes12(data[1:13]));
+        positionId = uint48(bytes6(data[1:7]));
     }
 
     /// @param data Maximum 1 + 6 + 20 + 8 + 8 = 43 bytes.
