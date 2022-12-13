@@ -38,6 +38,40 @@ function __balanceOf(address token, address account) view returns (uint256) {
     return abi.decode(data, (uint256));
 }
 
+function __updatePosition(
+    HyperPosition storage self,
+    HyperPool storage pool,
+    uint256 timestamp,
+    int256 liquidityDelta
+) {
+    // Syncs the timestamp, used to check if there is time between allocate and unallocate.
+    self.blockTimestamp = timestamp;
+
+    // Applies changes to liquidity.
+    uint256 delta = SafeCast.toUint128(abs(liquidityDelta));
+    if (liquidityDelta > 0) self.totalLiquidity += delta;
+    else if (liquidityDelta < 0) self.totalLiquidity -= delta;
+
+    // Syncs fee growth and fees earned.
+    (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
+        pool.liquidity,
+        pool.feeGrowthGlobalAsset,
+        pool.feeGrowthGlobalQuote
+    );
+
+    uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(feeGrowthAsset - self.feeGrowthAssetLast, liquidity);
+    uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(feeGrowthQuote - self.feeGrowthQuoteLast, liquidity);
+
+    self.feeGrowthAssetLast = feeGrowthAsset;
+    self.feeGrowthQuoteLast = feeGrowthQuote;
+
+    self.tokensOwedAsset += tokensOwedAsset;
+    self.tokensOwedQuote += tokensOwedQuote;
+}
+
+/* using SafeCast for uint256;
+using { __updatePosition } for HyperPosition; */
+
 /// @title Enigma Virtual Machine.
 /// @notice Stores the state of the Enigma with functions to change state.
 /// @dev Implements low-level internal virtual functions, re-entrancy guard and state.
@@ -147,8 +181,7 @@ contract Hyper is IHyper {
         uint256 amount,
         address to
     ) external lock {
-        // note: Would pull tokens without this conditional check.
-        if (balances[msg.sender][token] < amount) revert DrawBalance();
+        if (balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
         _applyDebit(token, amount);
 
         if (token == WETH) __dangerousUnwrapEther(WETH, to, amount);
@@ -187,47 +220,83 @@ contract Hyper is IHyper {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
 
-    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
-    /// @dev Expects a special encoding method for multiple instructions.
-    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
-    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
-    function _jumpProcess(bytes calldata data) internal {
-        uint8 length = uint8(data[1]);
-        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
-        uint256 start;
+    /**
+     * @notice Enigma method to add liquidity to a pool.
+     *
+     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
+     * @custom:reverts If attempting to add zero liquidity.
+     */
+    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+        (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = Instructions.decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
+        poolId = poolId_;
 
-        // For each instruction set...
-        for (uint256 i; i != length; ++i) {
-            // Start at the index of the first byte of the next instruction.
-            start = pointer;
+        if (deltaLiquidity == 0) revert ZeroLiquidityError();
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
-            // Set the new pointer to the next instruction, located at the pointer.
-            pointer = uint8(data[pointer]);
+        _syncExpiringPoolTimeAndPrice(poolId);
 
-            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
-            if (pointer > data.length) revert JumpError(pointer);
-            bytes calldata instruction = data[start:pointer];
+        // Compute amounts of tokens for the real reserves.
+        HyperPool storage pool = pools[poolId_];
+        (uint256 deltaR2, uint256 deltaR1) = getPhysicalReserves(poolId, deltaLiquidity);
 
-            // Process the instruction.
-            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
-        }
+        _increaseLiquidity(poolId_, deltaR1, deltaR2, deltaLiquidity);
     }
 
-    // --- Global --- //
+    function _increaseLiquidity(
+        uint48 poolId,
+        uint256 deltaR1,
+        uint256 deltaR2,
+        uint256 deltaLiquidity
+    ) internal {
+        if (deltaLiquidity == 0) revert ZeroLiquidityError();
 
-    /// @dev Most important function because it manages the solvency of the Engima.
-    /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
-    function _increaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] += amount;
-        emit IncreaseGlobalBalance(token, amount);
+        // Update the pool state
+        HyperPool storage pool = pools[poolId];
+        pool.liquidity += deltaLiquidity;
+        pool.blockTimestamp = _blockTimestamp();
+
+        _increasePosition(poolId, deltaLiquidity);
+
+        // note: Global reserves are used at the end of instruction processing to settle transactions.
+        uint16 pairId = uint16(poolId >> 32);
+        Pair memory pair = pairs[pairId];
+        _increaseGlobal(pair.tokenBase, deltaR2);
+        _increaseGlobal(pair.tokenQuote, deltaR1);
+
+        emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
     }
 
-    /// @dev Equally important to `_increaseGlobal`.
-    /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
-    function _decreaseGlobal(address token, uint256 amount) internal {
-        require(globalReserves[token] >= amount, "Not enough reserves");
-        globalReserves[token] -= amount;
-        emit DecreaseGlobalBalance(token, amount);
+    function _removeLiquidity(bytes calldata data)
+        internal
+        returns (
+            uint48 poolId,
+            uint256 a,
+            uint256 b
+        )
+    {
+        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(
+            data
+        ); // Packs useMax flag into Enigma instruction code byte.
+        poolId = poolId_;
+
+        if (deltaLiquidity == 0) revert ZeroLiquidityError();
+        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+
+        // Compute amounts of tokens for the real reserves.
+        HyperPool storage pool = pools[poolId_];
+        (uint256 deltaR2, uint256 deltaR1) = getPhysicalReserves(poolId_, deltaLiquidity);
+
+        pool.liquidity -= deltaLiquidity;
+        pool.blockTimestamp = _blockTimestamp();
+
+        _decreasePosition(poolId_, deltaLiquidity);
+
+        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
+        Pair memory pair = pairs[pairId];
+        _decreaseGlobal(pair.tokenBase, deltaR2);
+        _decreaseGlobal(pair.tokenQuote, deltaR1);
+
+        emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
     // --- Epochs --- //
@@ -250,74 +319,24 @@ contract Hyper is IHyper {
 
     // --- Positions --- //
 
-    function _updatePositionFees(
-        HyperPosition storage pos,
-        uint48 poolId,
-        uint256 feeGrowthAsset,
-        uint256 feeGrowthQuote
-    ) internal {
-        uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(
-            feeGrowthAsset - pos.feeGrowthAssetLast,
-            pools[poolId].liquidity
-        );
-
-        uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(
-            feeGrowthQuote - pos.feeGrowthQuoteLast,
-            pools[poolId].liquidity
-        );
-
-        pos.feeGrowthAssetLast = feeGrowthAsset;
-        pos.feeGrowthQuoteLast = feeGrowthQuote;
-
-        pos.tokensOwedAsset += tokensOwedAsset;
-        pos.tokensOwedQuote += tokensOwedQuote;
-    }
-
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        uint48 positionId = uint48(bytes6(abi.encodePacked(poolId)));
+        HyperPosition storage pos = positions[msg.sender][poolId];
+        HyperPool storage pool = pools[poolId];
+        __updatePosition(pos, pool, _blockTimestamp(), int256(deltaLiquidity));
 
-        HyperPosition storage pos = positions[msg.sender][positionId];
-
-        if (pos.totalLiquidity == 0) {
-            // todo: init pos
-        }
-
-        // Adds liquidity and syncs to time
-        pos.totalLiquidity += deltaLiquidity.toUint128();
-        pos.blockTimestamp = _blockTimestamp();
-
-        // Gets the pool's current fee growth.
-        (uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
-            pools[poolId].feeGrowthGlobalAsset,
-            pools[poolId].feeGrowthGlobalQuote
-        );
-
-        // Syncs that pool's fee growth to the position and updates the claims for the position.
-        _updatePositionFees(pos, poolId, feeGrowthAsset, feeGrowthQuote);
-
-        emit IncreasePosition(msg.sender, positionId, deltaLiquidity);
+        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
     /// @dev Equally important as `_increasePosition`.
     /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        uint48 positionId = uint48(bytes6(abi.encodePacked(poolId)));
+        HyperPosition storage pos = positions[msg.sender][poolId];
+        HyperPool storage pool = pools[poolId];
+        __updatePosition(pos, pool, _blockTimestamp(), -int256(deltaLiquidity));
 
-        HyperPosition storage pos = positions[msg.sender][positionId];
-
-        pos.totalLiquidity -= deltaLiquidity.toUint128();
-        pos.blockTimestamp = _blockTimestamp();
-
-        (uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
-            pools[poolId].feeGrowthGlobalAsset,
-            pools[poolId].feeGrowthGlobalQuote
-        );
-
-        _updatePositionFees(pos, poolId, feeGrowthAsset, feeGrowthQuote);
-
-        emit DecreasePosition(msg.sender, positionId, deltaLiquidity);
+        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
@@ -332,7 +351,7 @@ contract Hyper is IHyper {
     // --- Swap --- //
 
     /**
-     * @notice Computes the price of the pool, which changes over time and write to the pool if ut of sync.
+     * @notice Computes the price of the pool, which changes over time and write to the pool if out of sync.
      *
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
@@ -629,129 +648,6 @@ contract Hyper is IHyper {
 
     // --- Liquidity --- //
 
-    /**
-     * @notice Enigma method to add liquidity to a pool.
-     *
-     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
-     * @custom:reverts If attempting to add zero liquidity.
-     */
-    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint8 useMax, uint48 poolId_, uint128 delLiquidity) = Instructions.decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
-        poolId = poolId_;
-
-        if (delLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        _syncExpiringPoolTimeAndPrice(poolId);
-
-        // Compute amounts of tokens for the real reserves.
-        Curve memory curve = curves[uint32(poolId_)];
-        HyperPool storage pool = pools[poolId_];
-        uint256 timestamp = _blockTimestamp();
-
-        // Get lower price bound using the loTick index.
-        uint256 price = HyperSwapLib.computePriceWithTick(0x01);
-
-        // Compute the current virtual reserves given the pool's lastPrice.
-        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(
-            pool.lastPrice,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp
-        );
-
-        // Compute the current virtual reserves of R1
-        uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
-            deltaR2,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp,
-            pool.lastPrice,
-            0 // todo: fix with invariant
-        );
-
-        deltaR1 = deltaR1.mulWadDown(delLiquidity);
-        deltaR2 = deltaR2.mulWadDown(delLiquidity);
-
-        _increaseLiquidity(poolId_, deltaR1, deltaR2, delLiquidity);
-    }
-
-    function _removeLiquidity(bytes calldata data)
-        internal
-        returns (
-            uint48 poolId,
-            uint256 a,
-            uint256 b
-        )
-    {
-        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(
-            data
-        ); // Packs useMax flag into Enigma instruction code byte.
-
-        if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
-
-        // Compute amounts of tokens for the real reserves.
-        Curve memory curve = curves[uint32(poolId_)];
-        HyperPool storage pool = pools[poolId_];
-        uint256 timestamp = _blockTimestamp();
-        uint256 price = HyperSwapLib.computePriceWithTick(0x01); // todo: fix
-        uint256 deltaR2 = HyperSwapLib.computeR2WithPrice(
-            pool.lastPrice,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp
-        );
-
-        uint256 deltaR1 = HyperSwapLib.computeR1WithR2(
-            deltaR2,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - timestamp,
-            pool.lastPrice,
-            0
-        );
-
-        deltaR1 = deltaR1.mulWadDown(deltaLiquidity);
-        deltaR2 = deltaR2.mulWadDown(deltaLiquidity);
-
-        pool.liquidity -= deltaLiquidity;
-        pool.blockTimestamp = _blockTimestamp();
-
-        _decreasePosition(poolId_, deltaLiquidity);
-
-        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
-        Pair memory pair = pairs[pairId];
-        _decreaseGlobal(pair.tokenBase, deltaR2);
-        _decreaseGlobal(pair.tokenQuote, deltaR1);
-
-        emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
-    }
-
-    function _increaseLiquidity(
-        uint48 poolId,
-        uint256 deltaR1,
-        uint256 deltaR2,
-        uint256 deltaLiquidity
-    ) internal {
-        if (deltaLiquidity == 0) revert ZeroLiquidityError();
-
-        // Update the pool state
-        HyperPool storage pool = pools[poolId];
-        pool.liquidity += deltaLiquidity;
-        pool.blockTimestamp = _blockTimestamp();
-
-        _increasePosition(poolId, deltaLiquidity);
-
-        // note: Global reserves are used at the end of instruction processing to settle transactions.
-        uint16 pairId = uint16(poolId >> 32);
-        Pair memory pair = pairs[pairId];
-        _increaseGlobal(pair.tokenBase, deltaR2);
-        _increaseGlobal(pair.tokenQuote, deltaR1);
-
-        emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
-    }
-
     // --- Staking --- //
 
     function _stakePosition(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
@@ -937,7 +833,48 @@ contract Hyper is IHyper {
         valid = isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
     }
 
-    // --- Private --- //
+    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
+    /// @dev Expects a special encoding method for multiple instructions.
+    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
+    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
+    function _jumpProcess(bytes calldata data) internal {
+        uint8 length = uint8(data[1]);
+        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
+        uint256 start;
+
+        // For each instruction set...
+        for (uint256 i; i != length; ++i) {
+            // Start at the index of the first byte of the next instruction.
+            start = pointer;
+
+            // Set the new pointer to the next instruction, located at the pointer.
+            pointer = uint8(data[pointer]);
+
+            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
+            if (pointer > data.length) revert JumpError(pointer);
+            bytes calldata instruction = data[start:pointer];
+
+            // Process the instruction.
+            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
+        }
+    }
+
+    // --- Global --- //
+
+    /// @dev Most important function because it manages the solvency of the Engima.
+    /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
+    function _increaseGlobal(address token, uint256 amount) internal {
+        globalReserves[token] += amount;
+        emit IncreaseGlobalBalance(token, amount);
+    }
+
+    /// @dev Equally important to `_increaseGlobal`.
+    /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
+    function _decreaseGlobal(address token, uint256 amount) internal {
+        require(globalReserves[token] >= amount, "Not enough reserves");
+        globalReserves[token] -= amount;
+        emit DecreaseGlobalBalance(token, amount);
+    }
 
     /// @dev Critical array, used in jump process to track the pairs that were interacted with.
     /// @notice Cleared at end and never permanently set.
@@ -952,8 +889,6 @@ contract Hyper is IHyper {
     function _cacheAddress(address token, bool flag) internal {
         _addressCache[token] = flag;
     }
-
-    // --- Internal --- //
 
     /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
     ///      Positive credits are only applied to the internal balance of the account.
@@ -1066,7 +1001,7 @@ contract Hyper is IHyper {
         view
         returns (uint256 distance, uint256 timestamp)
     {
-        uint48 positionId = uint48(bytes6(abi.encodePacked(poolId)));
+        uint48 positionId = poolId;
         uint256 previous = positions[account][positionId].blockTimestamp;
         timestamp = _blockTimestamp();
         distance = timestamp - previous;
@@ -1080,11 +1015,29 @@ contract Hyper is IHyper {
 
     function getInvariant(uint48 poolId) external view returns (int128 invariant) {}
 
+    // TODO: fix this with non-delta liquidity amount
     function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
-        external
+        public
         view
         returns (uint256 deltaBase, uint256 deltaQuote)
-    {}
+    {
+        uint256 timestamp = _blockTimestamp();
+
+        // Compute amounts of tokens for the real reserves.
+        Curve memory curve = curves[uint32(poolId)];
+        HyperPool storage pool = pools[poolId];
+        HyperSwapLib.Expiring memory info = HyperSwapLib.Expiring({
+            strike: curve.strike,
+            sigma: curve.sigma,
+            tau: curve.maturity - timestamp
+        });
+
+        deltaBase = info.computeR2WithPrice(pool.lastPrice);
+        deltaQuote = info.computeR1WithR2(deltaBase, pool.lastPrice, 0);
+
+        deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
+        deltaBase = deltaBase.mulWadDown(deltaLiquidity);
+    }
 
     function updateLastTimestamp(uint48) external override returns (uint128 blockTimestamp) {}
 }
