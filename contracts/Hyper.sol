@@ -13,6 +13,30 @@ import "./libraries/HyperSwapLib.sol";
 import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
 
+using {getStartTime, getEpochsPassed, getLastUpdatedId, getTimeToTransition, getTimePassedInCurrentEpoch} for Epoch;
+
+function getStartTime(Epoch memory epoch) pure returns (uint256 startTime) {
+    startTime = epoch.endTime - epoch.interval;
+}
+
+function getEpochsPassed(Epoch memory epoch, uint256 lastUpdatedTimestamp) pure returns (uint256 epochsPassed) {
+    epochsPassed = (epoch.endTime - (lastUpdatedTimestamp + 1)) / epoch.interval;
+}
+
+function getLastUpdatedId(Epoch memory epoch, uint256 epochsPassed) pure returns (uint256 lastUpdateId) {
+    lastUpdateId = epoch.id - epochsPassed;
+}
+
+function getTimeToTransition(Epoch memory epoch, uint256 epochsPassed, uint256 lastUpdatedTimestamp) pure returns (uint256 timeToTransition) {
+    timeToTransition = epoch.endTime - (epochsPassed * epoch.interval) - lastUpdatedTimestamp;
+}
+
+function getTimePassedInCurrentEpoch(Epoch memory epoch, uint timestamp, uint256 lastUpdatedTimestamp) view returns (uint256 timePassed) {
+    uint256 startTime = epoch.getStartTime();
+    uint256 lastUpdateInCurrentEpoch = lastUpdatedTimestamp > startTime ? lastUpdatedTimestamp : startTime;
+    timePassed = timestamp - lastUpdateInCurrentEpoch;
+}
+
 /** @dev Sends ether in `deposit` function to target address. Must validate `weth`. */
 function __wrapEther(address weth) {
     IWETH(weth).deposit{value: msg.value}();
@@ -95,6 +119,17 @@ function __updatePosition(
 
     self.tokensOwedAsset += feeAssetEarned;
     self.tokensOwedQuote += feeQuoteEarned;
+}
+
+function __checkpoint(uint256 liveCheckpoint, uint256 checkpointChange) pure returns (uint256 nextCheckpoint) {
+    nextCheckpoint = liveCheckpoint;
+
+    if (checkpointChange != 0) {
+        // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+        unchecked {
+            nextCheckpoint = liveCheckpoint + checkpointChange;
+        }
+    }
 }
 
 // note: prettier does not have settings for file level for directives.
@@ -400,9 +435,9 @@ contract Hyper is IHyper {
      * @notice Updates the current epoch.
      */
     function syncEpoch() internal {
-        if (block.timestamp < epoch.endTime) return;
+        if (_blockTimestamp() < epoch.endTime) return;
 
-        uint256 epochsPassed = (block.timestamp - epoch.endTime) / epoch.interval;
+        uint256 epochsPassed = (_blockTimestamp() - epoch.endTime) / epoch.interval;
         epoch.id += (1 + epochsPassed);
         epoch.endTime += (epoch.interval + (epochsPassed * epoch.interval));
         emit SetEpoch(epoch.id, epoch.endTime);
@@ -433,7 +468,7 @@ contract Hyper is IHyper {
         int256 lo = int256(pool.lastTick - TICK_SIZE);
         tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
 
-        _updatePool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
     }
 
     SwapState state;
@@ -620,7 +655,7 @@ contract Hyper is IHyper {
         }
 
         // Update Pool State Effects
-        _updatePool(
+        _syncPool(
             args.poolId,
             HyperSwapLib.computeTickWithPrice(swap.price),
             swap.price,
@@ -647,7 +682,7 @@ contract Hyper is IHyper {
      * @param liquidity Active liquidity available in the slot to sync the pool to.
      * @return timeDelta Amount of time passed since the last update to the pool.
      */
-    function _updatePool(
+    function _syncPool(
         uint48 poolId,
         int24 tick,
         uint256 price,
@@ -655,36 +690,63 @@ contract Hyper is IHyper {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     ) internal returns (uint256 timeDelta) {
+        uint256 timestamp = _blockTimestamp();
+        uint16 pairId = uint16(poolId >> 32);
+        address FEE_SETTLEMENT_TOKEN = pairs[pairId].tokenBase;
+        
+        Epoch memory readEpoch = epochs[poolId];
         HyperPool storage pool = pools[poolId];
+
+        uint256 epochsPassed = readEpoch.getEpochsPassed(pool.blockTimestamp);
+
+        if (epochsPassed > 0) {
+            uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
+            // distribute remaining proceeds in lastUpdatedEpochId
+            if (pool.stakedLiquidity > 0) {
+                // TODO
+            }
+
+            // save pool snapshot for lastUpdatedEpochId
+            //poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
+
+            // update the pool's liquidity due to the transition
+            pool.stakedLiquidity = __computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
+            pool.borrowableLiquidity = pool.stakedLiquidity;
+            pool.epochStakedLiquidityDelta = int256(0);
+
+            // TODO: Pay user
+
+            // check if multiple epochs have passed
+            if (epochsPassed > 1) {
+                // update proceeds per liquidity distributed for next epoch if needed
+                if (pool.stakedLiquidity > 0) {
+                    // TODO
+                }
+                // TODO: pay user
+            }
+        }
+
+        // add proceeds for time passed in the current epoch
+        if (pool.stakedLiquidity > 0) {
+            uint256 timePassedInCurrentEpoch = readEpoch.getTimePassedInCurrentEpoch(pool.blockTimestamp, timestamp);
+            if (timePassedInCurrentEpoch > 0) {
+                // TODO
+            }
+        }
+
         if (pool.lastPrice != price) pool.lastPrice = price;
         if (pool.lastTick != tick) pool.lastTick = tick;
         if (pool.liquidity != liquidity) pool.liquidity = liquidity;
 
         Epoch storage epoch = epochs[poolId];
-        uint256 timestamp = _blockTimestamp();
-        uint256 prevTimestamp = pool.blockTimestamp;
-        if (prevTimestamp < epoch.endTime && timestamp >= epoch.endTime) {
-            // transition epoch
-            epoch.id += 1;
-            epoch.endTime += epoch.interval;
-            // todo: update staking reward growth
-            // update staked liquidity values for new epoch
-            if (pool.epochStakedLiquidityDelta > 0) {
-                pool.stakedLiquidity += uint256(pool.epochStakedLiquidityDelta);
-            } else {
-                require(pool.stakedLiquidity >= abs(pool.epochStakedLiquidityDelta), "not enough liquidity");
-                pool.stakedLiquidity -= abs(pool.epochStakedLiquidityDelta);
-            }
-            pool.epochStakedLiquidityDelta = 0;
-            // reset priority swapper since epoch ended
-            pool.prioritySwapper = address(0);
-            // todo: kickoff new priority auction
-        }
-        timeDelta = timestamp - prevTimestamp;
+        
+        uint256 lastUpdateTime = pool.blockTimestamp;
+
+        timeDelta = timestamp - lastUpdateTime;
         pool.blockTimestamp = timestamp;
 
-        if (feeGrowthGlobalAsset > 0) pool.feeGrowthGlobalAsset += feeGrowthGlobalAsset;
-        if (feeGrowthGlobalQuote > 0) pool.feeGrowthGlobalQuote += feeGrowthGlobalQuote;
+        pool.feeGrowthGlobalAsset = __checkpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
+        pool.feeGrowthGlobalQuote = __checkpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
 
         emit PoolUpdate(
             poolId,

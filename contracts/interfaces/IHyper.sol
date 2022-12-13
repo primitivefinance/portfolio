@@ -103,37 +103,19 @@ interface IHyperEvents {
 /// @dev Public view functions exposed by the Enigma's higher level contracts.
 interface IHyperGetters {
     // --- Enigma --- //
-    function pairs(uint16 pairId)
-        external
-        view
-        returns (
-            address tokenasset,
-            uint8 decimalsasset,
-            address tokenQuote,
-            uint8 decimalsQuote
-        );
+    function pairs(
+        uint16 pairId
+    ) external view returns (address tokenasset, uint8 decimalsasset, address tokenQuote, uint8 decimalsQuote);
 
-    function curves(uint32 curveId)
-        external
-        view
-        returns (
-            uint128 strike,
-            uint24 sigma,
-            uint32 maturity,
-            uint32 gamma,
-            uint32 priorityGamma
-        );
+    function curves(
+        uint32 curveId
+    ) external view returns (uint128 strike, uint24 sigma, uint32 maturity, uint32 gamma, uint32 priorityGamma);
 
-    function epochs(uint48 poolId)
-        external
-        view
-        returns (
-            uint256 id,
-            uint256 endTime,
-            uint256 interval
-        );
+    function epochs(uint48 poolId) external view returns (uint256 id, uint256 endTime, uint256 interval);
 
-    function pools(uint48 poolId)
+    function pools(
+        uint48 poolId
+    )
         external
         view
         returns (
@@ -142,6 +124,7 @@ interface IHyperGetters {
             uint256 blockTimestamp,
             uint256 liquidity,
             uint256 stakedLiquidity,
+            uint256 borrowableLiquidity,
             int256 epochStakedLiquidityDelta,
             address prioritySwapper,
             uint256 priorityPaymentPerSecond,
@@ -165,10 +148,10 @@ interface IHyperGetters {
     /// If the distance is non-zero, it means liquidity was allocated and removed in different blocks.
     /// @custom:security High. An incorrectly computed distance could lead to possible
     /// negative (or positive) effects to accounts interacting with the Enigma.
-    function checkJitLiquidity(address account, uint48 poolId)
-        external
-        view
-        returns (uint256 distance, uint256 timestamp);
+    function checkJitLiquidity(
+        address account,
+        uint48 poolId
+    ) external view returns (uint256 distance, uint256 timestamp);
 
     /// @notice Computes the pro-rata amount of liquidity minted from allocating `deltaAsset` and `deltaQuote` amounts.
     /// @dev Designed to round in a direction disadvantageous to the account minting liquidity.
@@ -190,10 +173,10 @@ interface IHyperGetters {
     /// @notice Computes amount of asset and quote tokens entitled to `liquidity` amount.
     /// @dev Can be used to fetch the expected amount of tokens withdrawn from removing `liquidity`.
     /// @custom:security Medium. Designed to round in a direction disadvantageous to the liquidity owner.
-    function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
-        external
-        view
-        returns (uint256 deltaAsset, uint256 deltaQuote);
+    function getPhysicalReserves(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) external view returns (uint256 deltaAsset, uint256 deltaQuote);
 }
 
 interface IHyperActions {
@@ -214,11 +197,7 @@ interface IHyperActions {
     /// @notice Transfers `amount` of `token` to the `to` account.
     /// @dev Decreases the `msg.sender` account's internal balance of `token`.
     /// @custom:security High. Calls the `token` external contract.
-    function draw(
-        address token,
-        uint256 amount,
-        address to
-    ) external;
+    function draw(address token, uint256 amount, address to) external;
 
     /// @notice Syncs a pool with `poolId` to the current `block.timestamp`.
     /// @dev Use this method after the pool is expired or else the invariant method will revert.
