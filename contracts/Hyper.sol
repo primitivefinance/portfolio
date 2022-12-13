@@ -647,7 +647,7 @@ contract Hyper is IHyper, ReentrancyGuard, Test {
                 (bool hasNextSlot, uint8 nextSlotBit) = BitMath.findNextSlotWithinChunk(
                     bitmaps[poolId][chunk],
                     bit,
-                    tokenIn == PoolToken.A ? BitMath.SearchDirection.Left : BitMath.SearchDirection.Right
+                    tokenIn == PoolToken.A ? BitMath.SearchDirection.Right : BitMath.SearchDirection.Left
                 );
                 swapDetails.nextSlotInitialized = hasNextSlot;
                 swapDetails.nextSlotIndex = int24(chunk) * 256 + int8(nextSlotBit);
@@ -680,13 +680,16 @@ contract Hyper is IHyper, ReentrancyGuard, Test {
                     ? BrainMath.getTargetPriceUsingDeltaA(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
-                        swapDetails.remaining
+                        swapDetails.remaining,
+                        fixedIn
                     )
                     : BrainMath.getTargetPriceUsingDeltaB(
                         swapDetails.sqrtPrice,
                         swapDetails.swapLiquidity,
-                        swapDetails.remaining
+                        swapDetails.remaining,
+                        fixedIn
                     );
+                emit log_uint(UD60x18.unwrap(swapToPrice));
                 swapDetails.remaining = 0;
             } else {
                 if (fixedIn) swapDetails.remaining -= fromUD60x18(swapDetails.feeTier.mul(toUD60x18(fillable)).ceil());
