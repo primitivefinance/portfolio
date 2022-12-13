@@ -255,7 +255,7 @@ contract Hyper is IHyper {
      * @custom:reverts If attempting to add zero liquidity.
      */
     function _allocate(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = Instructions.decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
+        (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = Instructions.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
@@ -286,7 +286,7 @@ contract Hyper is IHyper {
         _increaseGlobal(pair.tokenBase, deltaR2);
         _increaseGlobal(pair.tokenQuote, deltaR1);
 
-        emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
+        emit Allocate(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
     }
 
     function _unallocate(bytes calldata data)
@@ -297,9 +297,7 @@ contract Hyper is IHyper {
             uint256 b
         )
     {
-        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeRemoveLiquidity(
-            data
-        ); // Packs useMax flag into Enigma instruction code byte.
+        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
         poolId = poolId_;
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
@@ -319,7 +317,7 @@ contract Hyper is IHyper {
         _decreaseGlobal(pair.tokenBase, deltaR2);
         _decreaseGlobal(pair.tokenQuote, deltaR1);
 
-        emit RemoveLiquidity(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
+        emit Unallocate(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
     }
 
     // --- Epochs --- //
@@ -921,9 +919,9 @@ contract Hyper is IHyper {
         bytes1 instruction = bytes1(data[0] & 0x0f);
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
-        if (instruction == Instructions.ADD_LIQUIDITY) {
+        if (instruction == Instructions.ALLOCATE) {
             (poolId, ) = _allocate(data);
-        } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
+        } else if (instruction == Instructions.UNALLOCATE) {
             (poolId, , ) = _unallocate(data);
         } else if (instruction == Instructions.SWAP) {
             (poolId, , , ) = _swapExactIn(data);

@@ -129,10 +129,10 @@ contract HyperCaller is StandardHelpers {
         return (curve, curveId);
     }
 
-    function addLiquidity(uint256 amount) external {
+    function allocate(uint256 amount) external {
         uint8 useMax = 0;
         bytes memory data = abi.encodePacked(
-            Decoder.pack(bytes1(useMax), Instructions.ADD_LIQUIDITY),
+            Decoder.pack(bytes1(useMax), Instructions.ALLOCATE),
             loaded.poolId,
             uint8(0),
             uint128(amount)
@@ -140,10 +140,10 @@ contract HyperCaller is StandardHelpers {
         send(data);
     }
 
-    function removeLiquidity(uint256 amount) external {
+    function unallocate(uint256 amount) external {
         uint8 useMax = 0;
         bytes memory data = abi.encodePacked(
-            Decoder.pack(bytes1(useMax), Instructions.REMOVE_LIQUIDITY),
+            Decoder.pack(bytes1(useMax), Instructions.UNALLOCATE),
             loaded.poolId,
             uint8(0),
             uint128(amount)

@@ -175,8 +175,8 @@ describe('HyperPrototype', function () {
     it('adds liquidity', async function () {
       const hiTick = params.tick + 256
       const loTick = params.tick - 256
-      const call = sdk.addLiquidity(poolId, loTick, hiTick, params.liquidity)
-      await expect(call).to.emit(sdk.instance, 'AddLiquidity')
+      const call = sdk.allocate(poolId, loTick, hiTick, params.liquidity)
+      await expect(call).to.emit(sdk.instance, 'Allocate')
       expect(await this.tokens[0].balanceOf(sdk.instance?.address)).to.be.greaterThan(0)
       expect(await this.tokens[1].balanceOf(sdk.instance?.address)).to.be.greaterThan(0)
     })
@@ -184,10 +184,10 @@ describe('HyperPrototype', function () {
     it('removes liquidity after adding it', async function () {
       const hiTick = params.tick + 256
       const loTick = params.tick - 256
-      let call = sdk.addLiquidity(poolId, loTick, hiTick, params.liquidity)
+      let call = sdk.allocate(poolId, loTick, hiTick, params.liquidity)
       await call
-      call = sdk.removeLiquidity(false, poolId, loTick, hiTick, params.liquidity)
-      await expect(call).to.emit(sdk.instance, 'RemoveLiquidity')
+      call = sdk.unallocate(false, poolId, loTick, hiTick, params.liquidity)
+      await expect(call).to.emit(sdk.instance, 'Unallocate')
     })
   })
 
@@ -215,7 +215,7 @@ describe('HyperPrototype', function () {
     it('swaps asset to quote', async function () {
       const hiTick = params.tick + 256
       const loTick = params.tick - 256
-      let call = sdk.addLiquidity(poolId, loTick, hiTick, params.liquidity)
+      let call = sdk.allocate(poolId, loTick, hiTick, params.liquidity)
       await call
 
       call = sdk.swapAssetToQuote(false, poolId, parseEther('1'), ethers.constants.MaxUint256)

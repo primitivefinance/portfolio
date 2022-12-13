@@ -50,7 +50,7 @@ interface IHyperEvents {
         uint256 feeGrowthGlobalQuote
     );
     /// @dev Emitted on increasing the internal reserves of a pool.
-    event AddLiquidity(
+    event Allocate(
         uint48 indexed poolId,
         address indexed asset,
         address indexed quote,
@@ -59,7 +59,7 @@ interface IHyperEvents {
         uint256 deltaLiquidity
     );
     /// @dev Emitted on decreasing the internal reserves of a pool.
-    event RemoveLiquidity(
+    event Unallocate(
         uint48 indexed poolId,
         address indexed asset,
         address indexed quote,
@@ -97,10 +97,6 @@ interface IHyperEvents {
     // - Sync pool - //
     /// @dev Emitted on external calls to `updateLastTimestamp` or `swap`. Syncs a pool's timestamp to block.timestamp.
     event UpdateLastTimestamp(uint48 indexed poolId);
-
-    // - Slots - //
-    /// @dev Emitted when entering or exiting a slot when swapping.
-    event SlotTransition(uint48 indexed poolId, int24 indexed tick, int256 liquidityDelta);
 }
 
 /// @title IHyperGetters

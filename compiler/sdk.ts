@@ -58,14 +58,14 @@ export default class HyperSDK {
   }
 
   /** Adds liquidity to a range of ranges to a pool. */
-  async addLiquidity(poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
-    let { hex: data } = instructions.encodeAddLiquidity(false, poolId, loTick, hiTick, amount)
+  async allocate(poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
+    let { hex: data } = instructions.encodeAllocate(false, poolId, loTick, hiTick, amount)
     return this.forward(data)
   }
 
   /** Removes liquidity from a range of prices. */
-  async removeLiquidity(useMax: boolean, poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
-    let { hex: data } = instructions.encodeRemoveLiquidity(useMax, poolId, loTick, hiTick, amount)
+  async unallocate(useMax: boolean, poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
+    let { hex: data } = instructions.encodeUnallocate(useMax, poolId, loTick, hiTick, amount)
     return this.forward(data)
   }
 

@@ -8,10 +8,10 @@ import { bytesToHex, hexToBytes } from './units'
  */
 export enum Instructions {
   UNKNOWN = 0x00,
-  ADD_LIQUIDITY = 0x01,
-  ADD_LIQUIDITY_ETH = 0x02,
-  REMOVE_LIQUIDITY = 0x03,
-  REMOVE_LIQUIDITY_ETH = 0x04,
+  ALLOCATE = 0x01,
+  ALLOCATE_ETH = 0x02,
+  UNALLOCATE = 0x03,
+  UNALLOCATE_ETH = 0x04,
   SWAP = 0x05,
   SWAP_TOKENS_FOR_EXACT_TOKENS,
   SWAP_EXACT_ETH_FOR_TOKENS,
@@ -187,14 +187,14 @@ export function encodeCreatePool(pairId: number, curveId: number, price: BigNumb
   return { bytes, hex: bytesToHex(bytes) }
 }
 
-export function encodeRemoveLiquidity(
+export function encodeUnallocate(
   useMax: boolean,
   poolId: number,
   loTick: number,
   hiTick: number,
   liquidity: BigNumber
 ): { bytes: number[]; hex: string } {
-  const opcode = Instructions.REMOVE_LIQUIDITY
+  const opcode = Instructions.UNALLOCATE
   const firstByte = encodeFirstByte(useMax, opcode)
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
@@ -218,14 +218,14 @@ export function encodeRemoveLiquidity(
   return { bytes, hex: bytesToHex(bytes) }
 }
 
-export function encodeAddLiquidity(
+export function encodeAllocate(
   useMax: boolean,
   poolId: number,
   loTick: number,
   hiTick: number,
   liquidity: BigNumber
 ): { bytes: number[]; hex: string } {
-  const opcode = Instructions.ADD_LIQUIDITY
+  const opcode = Instructions.ALLOCATE
   const firstByte = encodeFirstByte(useMax, opcode)
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
