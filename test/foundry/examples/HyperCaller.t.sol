@@ -47,7 +47,7 @@ contract TestHyperCaller is Test, StandardHelpers {
         (uint48 poolId, , ) = __caller.loaded();
         assertTrue(poolId != 0);
 
-        __caller.addLiquidity(1000, 23027 - 500, 23027 + 500);
+        __caller.addLiquidity(1000);
     }
 
     function testRemoveLiquidity() public {
@@ -55,9 +55,9 @@ contract TestHyperCaller is Test, StandardHelpers {
         (uint48 poolId, , ) = __caller.loaded();
         assertTrue(poolId != 0);
 
-        __caller.addLiquidity(1000, 23027 - 500, 23027 + 500);
+        __caller.addLiquidity(1000);
 
-        __caller.removeLiquidity(500, 23027 - 500, 23027 + 500);
+        __caller.removeLiquidity(500);
     }
 
     /* function testSwapInWETH() public {
@@ -65,7 +65,7 @@ contract TestHyperCaller is Test, StandardHelpers {
         (uint48 poolId, , ) = __caller.loaded();
         assertTrue(poolId != 0);
 
-        __caller.addLiquidity(10e18, 23027 - 500, 23027 + 500);
+        __caller.addLiquidity(10e18);
 
         __caller.swapExactIn(address(__weth), 10, 1e22);
     } */

@@ -84,8 +84,6 @@ interface IHyperStruct {
 
     function pools(uint48 poolId) external view returns (HyperPool memory);
 
-    function slots(uint48 poolId, int24 hi) external view returns (HyperSlot memory);
-
     function globalReserves(address token) external view returns (uint256);
 }
 
@@ -168,18 +166,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         return IHyperStruct(address(__contractBeingTested)).positions(owner, positionId);
     }
 
-    function getSlot(uint48 poolId, int24 slot) public view returns (HyperSlot memory) {
-        return IHyperStruct(address(__contractBeingTested)).slots(poolId, slot);
-    }
-
-    function getSlotLiquidity(int24 slot) public view returns (uint256) {
-        return getSlot(__poolId, slot).totalLiquidity;
-    }
-
-    function getSlotLiquidityDelta(int24 slot) public view returns (int256) {
-        return getSlot(__poolId, slot).liquidityDelta;
-    }
-
     // --- Swap --- //
 
     function testFailS_wNonExistentPoolIdReverts() public {
@@ -192,32 +178,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeSwap(0, __poolId, 0x01, 0x00, 0x01, 0x01, 0);
         bool success = forwarder.pass(data);
         assertTrue(!success);
-    }
-
-    /// @dev this ones tough... how do we know what slot was swapped in?
-    function testS_wSlotTimestampUpdatedWithSlotTransition() public {
-        // Add liquidity first
-        bytes memory data = Instructions.encodeAddLiquidity(
-            0,
-            __poolId,
-            0x13, // 19 zeroes, so 10e19 liquidity
-            0x01
-        );
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        // move some time
-        vm.warp(block.timestamp + 1);
-
-        uint256 prev = getSlot(__poolId, 23028).timestamp; // todo: fix, I know this slot from console.log.
-
-        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint256 next = getSlot(__poolId, 23028).timestamp;
-        assertTrue(next != prev);
     }
 
     function testSwapPoolPriceUpdated() public {
@@ -427,122 +387,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
-    function testA_LLowSlotLiquidityDeltaIncrease() public {
-        int24 loTick = DEFAULT_TICK;
-        int24 hiTick = DEFAULT_TICK + 2;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        int256 liquidityDelta = getSlotLiquidityDelta(loTick);
-        assertTrue(liquidityDelta > 0);
-    }
-
-    function testA_LHighSlotLiquidityDeltaDecrease() public {
-        int24 loTick = DEFAULT_TICK;
-        int24 hiTick = DEFAULT_TICK + 2;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        int256 liquidityDelta = getSlotLiquidityDelta(hiTick);
-        assertTrue(liquidityDelta < 0);
-    }
-
-    function testA_LLowSlotLiquidityIncrease() public {
-        int24 loTick = DEFAULT_TICK;
-        int24 hiTick = DEFAULT_TICK + 2;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        uint256 liquidity = getSlotLiquidity(loTick);
-        assertEq(liquidity, 10);
-    }
-
-    function testA_LHighSlotLiquidityIncrease() public {
-        int24 loTick = DEFAULT_TICK;
-        int24 hiTick = DEFAULT_TICK + 2;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        uint256 liquidity = getSlotLiquidity(hiTick);
-        assertEq(liquidity, 10);
-    }
-
-    function testA_LLowSlotInstantiatedChange() public {
-        int24 slot = DEFAULT_TICK;
-        bool instantiated = getSlot(__poolId, slot).instantiated;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        bool change = getSlot(__poolId, slot).instantiated;
-        assertTrue(instantiated != change);
-    }
-
-    function testA_LHighSlotInstantiatedChange() public {
-        int24 slot = DEFAULT_TICK;
-        bool instantiated = getSlot(__poolId, slot).instantiated;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        bool change = getSlot(__poolId, slot).instantiated;
-        assertTrue(instantiated != change);
-    }
-
-    function testA_LPositionLowTickUpdated() public {
-        int24 hiTick = DEFAULT_TICK;
-        int24 loTick = hiTick - 2;
-        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
-
-        int24 prevPositionLoTick = getPosition(address(forwarder), positionId).loTick;
-
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        int24 nextPositionLoTick = getPosition(address(forwarder), positionId).loTick;
-
-        assertTrue(prevPositionLoTick == 0);
-        assertTrue(nextPositionLoTick == loTick);
-    }
-
-    function testA_LPositionHighTickUpdated() public {
-        int24 hiTick = DEFAULT_TICK;
-        int24 loTick = hiTick - 2;
-        uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
-
-        int24 prevPositionHiTick = getPosition(address(forwarder), positionId).hiTick;
-
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success, "forwarder call failed");
-
-        int24 nextPositionHiTick = getPosition(address(forwarder), positionId).hiTick;
-
-        assertTrue(prevPositionHiTick == 0);
-        assertTrue(nextPositionHiTick == hiTick);
-    }
-
     function testA_LPositionTimestampUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
@@ -623,114 +467,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         bytes memory data = Instructions.encodeRemoveLiquidity(0, 42, 0x01, 0x01);
         bool success = forwarder.pass(data);
         assertTrue(!success);
-    }
-
-    function testR_LLowSlotLiquidityDecreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint256 prev = getSlot(__poolId, lo).totalLiquidity;
-
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
-        success = forwarder.pass(data);
-
-        uint256 next = getSlot(__poolId, lo).totalLiquidity;
-        assertTrue(next < prev);
-    }
-
-    function testR_LHighSlotLiquidityDecreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint256 prev = getSlot(__poolId, hi).totalLiquidity;
-
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
-        success = forwarder.pass(data);
-
-        uint256 next = getSlot(__poolId, hi).totalLiquidity;
-        assertTrue(next < prev);
-    }
-
-    function testR_LLowSlotLiquidityDeltaDecreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        int256 prev = getSlotLiquidityDelta(lo);
-
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
-        success = forwarder.pass(data);
-
-        int256 next = getSlotLiquidityDelta(lo);
-        assertTrue(next < prev);
-    }
-
-    function testR_LHighSlotLiquidityDeltaIncreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        int256 prev = getSlotLiquidityDelta(hi);
-
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
-        success = forwarder.pass(data);
-
-        int256 next = getSlotLiquidityDelta(hi);
-        assertTrue(next > prev);
-    }
-
-    function testR_LLowSlotInstantiatedChanges() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        bool prev = getSlot(__poolId, lo).instantiated;
-
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
-        success = forwarder.pass(data);
-
-        bool next = getSlot(__poolId, lo).instantiated;
-        assertTrue(next != prev);
-    }
-
-    function testR_LHighSlotInstantiatedChanges() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        bool prev = getSlot(__poolId, hi).instantiated;
-
-        data = Instructions.encodeRemoveLiquidity(0, __poolId, power, amount);
-        success = forwarder.pass(data);
-
-        bool next = getSlot(__poolId, hi).instantiated;
-        assertTrue(next != prev);
     }
 
     function testR_LPositionTimestampUpdated() public {
@@ -836,52 +572,6 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionStaked, "Position staked is not true.");
     }
 
-    function testS_PSlotLowTickStakedLiquidityDeltaIncreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
-
-        uint48 positionId = Instructions.encodePositionId(__poolId);
-        data = Instructions.encodeStakePosition(positionId);
-        success = forwarder.pass(data);
-
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
-
-        assertTrue(
-            nextStakedLiquidityDelta > prevStakedLiquidityDelta,
-            "Lo tick staked liquidity delta did not increase."
-        );
-    }
-
-    function testS_PSlotHiTickStakedLiquidityDeltaDecreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
-
-        uint48 positionId = Instructions.encodePositionId(__poolId);
-        data = Instructions.encodeStakePosition(positionId);
-        success = forwarder.pass(data);
-
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
-
-        assertTrue(
-            nextStakedLiquidityDelta < prevStakedLiquidityDelta,
-            "Hi tick staked liquidity delta did not decrease."
-        );
-    }
-
     function testS_PPoolStakedLiquidityUpdated() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
@@ -943,63 +633,6 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked != 0, "Position staked is true.");
-    }
-
-    function testU_PSlotLowTickStakedLiquidityDeltaDecreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint48 positionId = Instructions.encodePositionId(__poolId);
-        data = Instructions.encodeStakePosition(positionId);
-        success = forwarder.pass(data);
-        vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
-
-        // touch pool to update it so we know how much staked liquidity the position has
-        data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        success = forwarder.pass(data);
-
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
-
-        data = Instructions.encodeUnstakePosition(positionId);
-        success = forwarder.pass(data);
-
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, lo).epochStakedLiquidityDelta;
-
-        assertTrue(
-            nextStakedLiquidityDelta < prevStakedLiquidityDelta,
-            "Lo tick staked liquidity delta did not decrease."
-        );
-    }
-
-    function testU_PSlotHiTickStakedLiquidityDeltaIncreases() public {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
-        uint8 amount = 0x01;
-        uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, power, amount);
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint48 positionId = Instructions.encodePositionId(__poolId);
-        data = Instructions.encodeStakePosition(positionId);
-        success = forwarder.pass(data);
-
-        int256 prevStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
-
-        data = Instructions.encodeUnstakePosition(positionId);
-        success = forwarder.pass(data);
-
-        int256 nextStakedLiquidityDelta = getSlot(__poolId, hi).epochStakedLiquidityDelta;
-
-        assertTrue(
-            nextStakedLiquidityDelta > prevStakedLiquidityDelta,
-            "Hi tick staked liquidity delta did not increase."
-        );
     }
 
     function testU_PPoolStakedLiquidityUpdated() public {

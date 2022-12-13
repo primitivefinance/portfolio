@@ -74,8 +74,6 @@ contract Hyper is IHyper {
     mapping(bytes32 => uint32) public getCurveId;
     /// @dev Token -> Physical Reserves.
     mapping(address => uint256) public globalReserves;
-    /// @dev Pool id -> Tick -> Slot has liquidity at a price.
-    mapping(uint48 => mapping(int24 => HyperSlot)) public slots;
     /// @dev Base Token -> Quote Token -> Pair id
     mapping(address => mapping(address => uint16)) public getPairId;
     /// @dev User -> Token -> Internal Balance.
@@ -352,16 +350,7 @@ contract Hyper is IHyper {
             int24 index = tick;
             uint256 price0 = price;
             (uint256 fee0, uint256 fee1) = (pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
-            (int256 liquidityDelta, int256 stakedLiquidityDelta, int256 epochStakedLiquidityDelta) = _transitionSlot(
-                id,
-                index,
-                fee0,
-                fee1
-            );
-
             uint256 liquidity = pool.liquidity;
-            if (liquidityDelta > 0) liquidity += uint256(liquidityDelta);
-            else liquidity -= uint256(liquidityDelta);
 
             _updatePool(id, index, price0, liquidity, fee0, fee1);
         }
@@ -625,50 +614,6 @@ contract Hyper is IHyper {
             feeGrowthGlobalAsset,
             feeGrowthGlobalQuote
         );
-    }
-
-    /**
-     * @notice Syncs a slot to a new timestamp and returns its liqudityDelta to update the pool's liquidity.
-     * @dev Effects on a slot after its been transitioned to another slot.
-     * @param poolId Identifier of the pool.
-     * @param tick Key of the slot specified to be transitioned.
-     * @return liquidityDelta Difference in amount of liquidity available before or after this slot.
-     */
-    function _transitionSlot(
-        uint48 poolId,
-        int24 tick,
-        uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote
-    )
-        internal
-        returns (
-            int256 liquidityDelta,
-            int256 stakedLiquidityDelta,
-            int256 epochStakedLiquidityDelta
-        )
-    {
-        HyperSlot storage slot = slots[poolId][tick];
-        Epoch storage epoch = epochs[poolId];
-        uint256 timestamp = _blockTimestamp();
-        uint256 prevTimestamp = slot.timestamp;
-        // note: assumes epoch would have already been transitioned
-        if (prevTimestamp < epoch.endTime - epoch.interval) {
-            // if prevTimestamp was before start of current epoch, update staked liquidity values
-            slot.stakedLiquidityDelta += slot.epochStakedLiquidityDelta;
-            slot.epochStakedLiquidityDelta = 0;
-        }
-        slot.timestamp = timestamp;
-
-        liquidityDelta = slot.liquidityDelta;
-        stakedLiquidityDelta = slot.stakedLiquidityDelta;
-        epochStakedLiquidityDelta = slot.epochStakedLiquidityDelta;
-
-        // todo: update transition event
-
-        slot.feeGrowthOutsideAsset = feeGrowthGlobalAsset - slot.feeGrowthOutsideAsset;
-        slot.feeGrowthOutsideQuote = feeGrowthGlobalQuote - slot.feeGrowthOutsideQuote;
-
-        emit SlotTransition(poolId, tick, slot.liquidityDelta);
     }
 
     // --- Liquidity --- //

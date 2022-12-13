@@ -111,18 +111,6 @@ struct HyperPosition {
     uint256 tokensOwedAsset;
     uint256 tokensOwedQuote;
 }
-/// @dev Liquidity information indexed by tick (a price).
-struct HyperSlot {
-    int256 liquidityDelta;
-    int256 stakedLiquidityDelta;
-    int256 epochStakedLiquidityDelta;
-    uint256 totalLiquidity;
-    uint256 feeGrowthOutsideAsset;
-    uint256 feeGrowthOutsideQuote;
-    uint256 rewardGrowthOutside;
-    bool instantiated;
-    uint256 timestamp;
-}
 
 // --- Swap --- //
 

@@ -33,8 +33,6 @@ interface IHyperStruct {
 
     function pools(uint48 poolId) external view returns (HyperPool memory);
 
-    function slots(uint48 poolId, int24 hi) external view returns (HyperSlot memory);
-
     function globalReserves(address token) external view returns (uint256);
 }
 
@@ -131,34 +129,22 @@ contract HyperCaller is StandardHelpers {
         return (curve, curveId);
     }
 
-    function addLiquidity(
-        uint256 amount,
-        int24 loTick,
-        int24 hiTick
-    ) external {
+    function addLiquidity(uint256 amount) external {
         uint8 useMax = 0;
         bytes memory data = abi.encodePacked(
             Decoder.pack(bytes1(useMax), Instructions.ADD_LIQUIDITY),
             loaded.poolId,
-            loTick,
-            hiTick,
             uint8(0),
             uint128(amount)
         );
         send(data);
     }
 
-    function removeLiquidity(
-        uint256 amount,
-        int24 loTick,
-        int24 hiTick
-    ) external {
+    function removeLiquidity(uint256 amount) external {
         uint8 useMax = 0;
         bytes memory data = abi.encodePacked(
             Decoder.pack(bytes1(useMax), Instructions.REMOVE_LIQUIDITY),
             loaded.poolId,
-            loTick,
-            hiTick,
             uint8(0),
             uint128(amount)
         );

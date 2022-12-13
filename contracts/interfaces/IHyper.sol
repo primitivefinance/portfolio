@@ -151,21 +151,6 @@ interface IHyperGetters {
             uint256 feeGrowthGlobalQuote
         );
 
-    function slots(uint48 poolId, int24 slot)
-        external
-        view
-        returns (
-            int256 liquidityDelta,
-            int256 stakedLiquidityDelta,
-            int256 epochStakedLiquidityDelta,
-            uint256 totalLiquidity,
-            uint256 feeGrowthOutsideAsset,
-            uint256 feeGrowthOutsideQuote,
-            uint256 rewardGrowthOutside,
-            bool instantiated,
-            uint256 timestamp
-        );
-
     function globalReserves(address asset) external view returns (uint256);
 
     function getCurveId(bytes32) external view returns (uint32);
