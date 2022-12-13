@@ -39,6 +39,34 @@ function __balanceOf(address token, address account) view returns (uint256) {
 }
 
 /**
+ * todo: verify this is good to go
+ */
+function __computeDelta(uint256 input, int256 delta) pure returns (uint256 output) {
+    uint256 value = abs(delta);
+    assembly {
+        switch slt(input, 0) // input < 0 ? 1 : 0
+        case 0 {
+            output := add(input, delta)
+        }
+        case 1 {
+            output := sub(input, delta)
+        }
+    }
+}
+
+/**
+ * @notice Syncs a pool's liquidity and last updated timestamp.
+ */
+function __updatePool(
+    HyperPool storage self,
+    uint256 timestamp,
+    int256 liquidityDelta
+) {
+    self.blockTimestamp = timestamp;
+    self.liquidity = SafeCast.toUint128(__computeDelta(self.liquidity, liquidityDelta));
+}
+
+/**
  * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
  */
 function __updatePosition(
@@ -47,13 +75,8 @@ function __updatePosition(
     uint256 timestamp,
     int256 liquidityDelta
 ) returns (uint256 feeAssetEarned, uint256 feeQuoteEarned) {
-    // Syncs the timestamp, used to check if there is time between allocate and unallocate.
     self.blockTimestamp = timestamp;
-
-    // Applies changes to liquidity.
-    uint256 delta = SafeCast.toUint128(abs(liquidityDelta));
-    if (liquidityDelta > 0) self.totalLiquidity += delta;
-    else if (liquidityDelta < 0) self.totalLiquidity -= delta;
+    self.totalLiquidity = SafeCast.toUint128(__computeDelta(self.totalLiquidity, liquidityDelta));
 
     // Syncs fee growth and fees earned.
     (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
@@ -240,8 +263,8 @@ contract Hyper is IHyper {
 
         _syncPoolPriceAndEpoch(poolId);
 
-        // Compute amounts of tokens for the real reserves.
         (uint256 deltaR2, uint256 deltaR1) = getPhysicalReserves(poolId, deltaLiquidity);
+
         _increaseLiquidity(poolId_, deltaR1, deltaR2, deltaLiquidity);
     }
 
@@ -251,9 +274,6 @@ contract Hyper is IHyper {
         uint256 deltaR2,
         uint256 deltaLiquidity
     ) internal {
-        if (deltaLiquidity == 0) revert ZeroLiquidityError();
-
-        // Update the pool state
         HyperPool storage pool = pools[poolId];
         pool.liquidity += deltaLiquidity;
         pool.blockTimestamp = _blockTimestamp();
