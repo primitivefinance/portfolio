@@ -199,6 +199,16 @@ interface IHyperGetters {
 }
 
 interface IHyperActions {
+    function allocate() external;
+
+    function unallocate() external;
+
+    function stake() external;
+
+    function unstake() external;
+
+    function swap() external;
+
     /// @dev Increases the `msg.sender` account's internal balance of `token`.
     /// @custom:security High. Calls the `token` external contract.
     function fund(address token, uint256 amount) external payable;

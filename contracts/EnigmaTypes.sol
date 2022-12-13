@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+// --- Pure --- //
+error EtherTransferFail();
 // --- Decompiler --- //
 /// @dev Thrown when attempting to remove more internal token balance than owned by `msg.sender`.
 error DrawBalance();
@@ -62,6 +64,7 @@ error PositionStakedError(uint96 positionId);
 error PositionZeroLiquidityError(uint96 positionId);
 /// @dev Thrown if position is not staked and trying to unstake.
 error PositionNotStakedError(uint96 positionId);
+
 /// @dev Parameters of the Primitive RMM trading function.
 struct Curve {
     uint128 strike;

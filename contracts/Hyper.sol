@@ -13,9 +13,29 @@ import "./libraries/HyperSwapLib.sol";
 import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
 
-function dangerousTransferETH(address to, uint256 value) {
+function __wrapEther(address weth) {
+    IWETH(weth).deposit{value: msg.value}();
+}
+
+function __dangerousUnwrapEther(
+    address weth,
+    address to,
+    uint256 amount
+) {
+    IWETH(weth).withdraw(amount);
+    __dangerousTransferEther(to, amount);
+}
+
+function __dangerousTransferEther(address to, uint256 value) {
     (bool success, ) = to.call{value: value}(new bytes(0));
-    require(success, "ETH transfer error");
+    if (!success) revert EtherTransferFail();
+}
+
+/// @dev Gas optimized `balanceOf` method.
+function __balanceOf(address token, address account) view returns (uint256) {
+    (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
+    if (!success || data.length != 32) revert BalanceError();
+    return abi.decode(data, (uint256));
 }
 
 /// @title Enigma Virtual Machine.
@@ -95,12 +115,31 @@ contract Hyper is IHyper {
     }
 
     // --- Constructor --- //
-
     constructor(address weth) {
         WETH = weth;
     }
 
     // --- External --- //
+
+    // Note: Not sure if we should always revert when receiving ETH
+    receive() external payable {
+        if (msg.sender != WETH) revert();
+    }
+
+    /// @inheritdoc IHyperActions
+    function allocate() external lock {}
+
+    /// @inheritdoc IHyperActions
+    function unallocate() external lock {}
+
+    /// @inheritdoc IHyperActions
+    function stake() external lock {}
+
+    /// @inheritdoc IHyperActions
+    function unstake() external lock {}
+
+    /// @inheritdoc IHyperActions
+    function swap() external lock {}
 
     /// @inheritdoc IHyperActions
     function draw(
@@ -112,20 +151,16 @@ contract Hyper is IHyper {
         if (balances[msg.sender][token] < amount) revert DrawBalance();
         _applyDebit(token, amount);
 
-        if (token == WETH) _dangerousUnwrap(to, amount);
+        if (token == WETH) __dangerousUnwrapEther(WETH, to, amount);
         else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
     }
 
     /// @inheritdoc IHyperActions
     function fund(address token, uint256 amount) external payable override lock {
         _applyCredit(token, amount);
-        if (token == WETH) _safeWrap();
-        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
-    }
 
-    // Note: Not sure if we should always revert when receiving ETH
-    receive() external payable {
-        revert();
+        if (token == WETH) __wrapEther(WETH);
+        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
 
     // --- Fallback --- //
@@ -151,30 +186,6 @@ contract Hyper is IHyper {
     function _liquidityPolicy() internal view virtual returns (uint256) {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
-
-    /// @dev Gas optimized `balanceOf` method.
-    function _balanceOf(address token, address account) internal view returns (uint256) {
-        (bool success, bytes memory data) = token.staticcall(
-            abi.encodeWithSelector(IERC20.balanceOf.selector, account)
-        );
-        if (!success || data.length != 32) revert BalanceError();
-        return abi.decode(data, (uint256));
-    }
-
-    function _safeWrap() internal {
-        IWETH(WETH).deposit{value: msg.value}();
-    }
-
-    function _dangerousUnwrap(address to, uint256 amount) internal {
-        IWETH(WETH).withdraw(amount);
-
-        // Marked as dangerous because it makes an external call to the `to` address.
-        dangerousTransferETH(to, amount);
-    }
-
-    /// @dev Must be implemented by the highest level contract.
-    /// @notice Processing logic for instructions.
-    /* function _process(bytes calldata data) internal virtual; */
 
     /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
     /// @dev Expects a special encoding method for multiple instructions.
@@ -399,7 +410,7 @@ contract Hyper is IHyper {
             // Writes the pool after computing its updated price with respect to time elapsed since last update.
             (uint256 price, int24 tick) = _syncExpiringPoolTimeAndPrice(args.poolId);
             // Expect the caller to exhaust their entire balance of the input token.
-            remainder = args.useMax == 1 ? _balanceOf(pair.tokenBase, msg.sender) : args.input;
+            remainder = args.useMax == 1 ? __balanceOf(pair.tokenBase, msg.sender) : args.input;
             // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
             swap = Iteration({
                 price: price,
@@ -1031,10 +1042,10 @@ contract Hyper is IHyper {
         if (!_addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
 
         // If the token is WETH, make sure to wrap any ETH sent to the contract.
-        if (token == WETH && msg.value > 0) _safeWrap();
+        if (token == WETH && msg.value > 0) __wrapEther(WETH);
 
         uint256 global = globalReserves[token];
-        uint256 actual = _balanceOf(token, address(this));
+        uint256 actual = __balanceOf(token, address(this));
         if (global > actual) {
             uint256 deficit = global - actual;
             _applyDebit(token, deficit);

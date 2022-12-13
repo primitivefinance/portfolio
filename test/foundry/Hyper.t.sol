@@ -15,7 +15,7 @@ contract HyperTester is Hyper {
 
     // --- Implemented --- //
 
-    function process(bytes calldata data) external {
+    function process(bytes calldata data) external payable {
         uint48 poolId_;
         bytes1 instruction = bytes1(data[0] & 0x0f);
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
@@ -50,9 +50,16 @@ contract Forwarder is Test {
         hyper = HyperTester(payable(prototype));
     }
 
+    receive() external payable {}
+
+    function freeWrapEther(address weth) external payable {
+        __wrapEther(weth);
+        __dangerousUnwrapEther(weth, msg.sender, 1e18);
+    }
+
     // Assumes Hyper calls this, for testing only.
-    function pass(bytes calldata data) external returns (bool) {
-        try hyper.process(data) {} catch (bytes memory reason) {
+    function pass(bytes calldata data) external payable returns (bool) {
+        try hyper.process{value: msg.value}(data) {} catch (bytes memory reason) {
             assembly {
                 revert(add(32, reason), mload(reason))
             }
@@ -87,9 +94,16 @@ interface IHyperStruct {
     function globalReserves(address token) external view returns (uint256);
 }
 
+function testMyMsgSender() view returns (address) {
+    console.log(msg.sender);
+    return msg.sender;
+}
+
 contract TestHyperSingle is StandardHelpers, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+
+    receive() external payable {}
 
     HyperTester public __contractBeingTested;
     WETH public weth;
@@ -164,6 +178,39 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function getPosition(address owner, uint48 positionId) public view returns (HyperPosition memory) {
         return IHyperStruct(address(__contractBeingTested)).positions(owner, positionId);
+    }
+
+    function testFreeFunctionContext() public {
+        console.log(address(this));
+        console.log(msg.sender);
+        testMyMsgSender();
+    }
+
+    // --- Ether --- //
+
+    function testAllocateWETH() public {
+        forwarder.freeWrapEther{value: 4e18}(address(weth));
+        /*  // 2. Create pair
+        bytes memory data = Instructions.encodeCreatePair(address(weth), address(quote));
+        bool success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+        uint16 pairId = uint16(__contractBeingTested.getPairNonce());
+        uint32 curveId = uint32(__contractBeingTested.getCurveNonce());
+        uint48 wethPoolId = Instructions.encodePoolId(pairId, curveId);
+
+        // 4. Create pool
+        data = Instructions.encodeCreatePool(wethPoolId, DEFAULT_PRICE);
+        success = forwarder.pass(data);
+        assertTrue(success, "forwarder call failed");
+
+        data = Instructions.encodeAddLiquidity(
+            0,
+            wethPoolId,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        success = forwarder.pass{value: 10e18}(data);
+        assertTrue(success); */
     }
 
     // --- Swap --- //
