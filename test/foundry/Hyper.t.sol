@@ -27,9 +27,9 @@ contract HyperTester is Hyper {
         } else if (instruction == Instructions.SWAP) {
             (poolId_, , , ) = _swapExactIn(data);
         } else if (instruction == Instructions.STAKE_POSITION) {
-            (poolId_, ) = _stakePosition(data);
+            (poolId_, ) = _stake(data);
         } else if (instruction == Instructions.UNSTAKE_POSITION) {
-            (poolId_, ) = _unstakePosition(data);
+            (poolId_, ) = _unstake(data);
         } else if (instruction == Instructions.CREATE_POOL) {
             (poolId_) = _createPool(data);
         } else if (instruction == Instructions.CREATE_CURVE) {
