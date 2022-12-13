@@ -21,9 +21,9 @@ contract HyperTester is Hyper {
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
         if (instruction == Instructions.ADD_LIQUIDITY) {
-            (poolId_, ) = _addLiquidity(data);
+            (poolId_, ) = _allocate(data);
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            (poolId_, , ) = _removeLiquidity(data);
+            (poolId_, , ) = _unallocate(data);
         } else if (instruction == Instructions.SWAP) {
             (poolId_, , , ) = _swapExactIn(data);
         } else if (instruction == Instructions.STAKE_POSITION) {
@@ -215,19 +215,19 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Swap --- //
 
-    function testFailS_wNonExistentPoolIdReverts() public {
+    function testFailSwapExactInNonExistentPoolIdReverts() public {
         bytes memory data = Instructions.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
-    function testFailS_wZeroSwapAmountReverts() public {
+    function testFailSwapExactInZeroSwapAmountReverts() public {
         bytes memory data = Instructions.encodeSwap(0, __poolId, 0x01, 0x00, 0x01, 0x01, 0);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
-    function testSwapPoolPriceUpdated() public {
+    function testSwapExactInPoolPriceUpdated() public {
         // Add liquidity first
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
@@ -251,31 +251,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(next != prev);
     }
 
-    function testS_wPoolPriceUpdated() public {
-        // Add liquidity first
-        bytes memory data = Instructions.encodeAddLiquidity(
-            0,
-            __poolId,
-            0x13, // 19 zeroes, so 10e19 liquidity
-            0x01
-        );
-        bool success = forwarder.pass(data);
-        assertTrue(success);
-        // move some time
-        vm.warp(block.timestamp + 1);
-
-        uint256 prev = getPool(__poolId).lastPrice; // todo: fix, I know this slot from console.log.
-
-        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.pass(data);
-        assertTrue(success);
-
-        uint256 next = getPool(__poolId).lastPrice;
-        assertTrue(next != prev);
-    }
-
-    function testS_wPoolSlotIndexUpdated() public {
+    function testSwapExactInPoolSlotIndexUpdated() public {
         // Add liquidity first
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
@@ -299,7 +275,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(next != prev);
     }
 
-    function testS_wPoolLiquidityUnchanged() public {
+    function testSwapExactInPoolLiquidityUnchanged() public {
         // Add liquidity first
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
@@ -322,7 +298,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(next == prev);
     }
 
-    function testS_wPoolTimestampUpdated() public {
+    function testSwapExactInPoolTimestampUpdated() public {
         // Add liquidity first
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
@@ -346,7 +322,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(next != prev);
     }
 
-    function testS_wGlobalAssetBalanceIncreases() public {
+    function testSwapExactInGlobalAssetBalanceIncreases() public {
         // Add liquidity first
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
@@ -370,7 +346,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(next > prev);
     }
 
-    function testS_wGlobalQuoteBalanceDecreases() public {
+    function testSwapExactInGlobalQuoteBalanceDecreases() public {
         // Add liquidity first
         bytes memory data = Instructions.encodeAddLiquidity(
             0,
@@ -396,21 +372,21 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Add liquidity --- //
 
-    function testFailA_LNonExistentPoolIdReverts() public {
+    function testFailAllocateNonExistentPoolIdReverts() public {
         uint48 random = uint48(48);
         bytes memory data = Instructions.encodeAddLiquidity(0, random, 0x01, 0x01);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
     }
 
-    function testFailA_LZeroLiquidityReverts() public {
+    function testFailAllocateZeroLiquidityReverts() public {
         uint8 liquidity = 0;
         bytes memory data = Instructions.encodeAddLiquidity(0, __poolId, 0x00, liquidity);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
     }
 
-    function testA_LFullAddLiquidity() public {
+    function testAllocateFullAddLiquidity() public {
         uint256 price = getPool(__poolId).lastPrice;
         Curve memory curve = getCurve(uint32(__poolId));
         uint256 theoreticalR2 = HyperSwapLib.computeR2WithPrice(
@@ -434,7 +410,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
-    function testA_LPositionTimestampUpdated() public {
+    function testAllocatePositionTimestampUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
         uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
@@ -453,7 +429,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
     }
 
-    function testA_LPositionTotalLiquidityIncreases() public {
+    function testAllocatePositionTotalLiquidityIncreases() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = hiTick - 2;
         uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
@@ -472,7 +448,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionTotalLiquidity > prevPositionTotalLiquidity);
     }
 
-    function testA_LGlobalAssetIncreases() public {
+    function testAllocateGlobalAssetIncreases() public {
         uint256 prevGlobal = __contractBeingTested.globalReserves(address(asset));
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
@@ -487,7 +463,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextGlobal > prevGlobal, "globalReserves did not change");
     }
 
-    function testA_LGlobalQuoteIncreases() public {
+    function testAllocateGlobalQuoteIncreases() public {
         uint256 prevGlobal = __contractBeingTested.globalReserves(address(quote));
         int24 loTick = DEFAULT_TICK - 256; // Enough below to have quote.
         int24 hiTick = DEFAULT_TICK + 2;
@@ -504,19 +480,19 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Remove Liquidity --- //
 
-    function testFailR_LZeroLiquidityReverts() public {
+    function testFailUnallocateZeroLiquidityReverts() public {
         bytes memory data = Instructions.encodeRemoveLiquidity(0, __poolId, 0x00, 0x00);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
-    function testFailR_LNonExistentPoolReverts() public {
+    function testFailUnallocateNonExistentPoolReverts() public {
         bytes memory data = Instructions.encodeRemoveLiquidity(0, 42, 0x01, 0x01);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
-    function testR_LPositionTimestampUpdated() public {
+    function testUnallocatePositionTimestampUpdated() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
@@ -539,7 +515,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
     }
 
-    function testR_LPositionTotalLiquidityDecreases() public {
+    function testUnallocatePositionTotalLiquidityDecreases() public {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
@@ -559,7 +535,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionLiquidity < prevPositionLiquidity);
     }
 
-    function testR_LGlobalAssetDecreases() public {
+    function testUnallocateGlobalAssetDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -577,7 +553,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(next < prev, "globalReserves did not change");
     }
 
-    function testR_LGlobalQuoteDecreases() public {
+    function testUnallocateGlobalQuoteDecreases() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -597,7 +573,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Stake Position --- //
 
-    function testS_PPositionStakedUpdated() public {
+    function testStakePositionStakedUpdated() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -619,7 +595,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionStaked, "Position staked is not true.");
     }
 
-    function testS_PPoolStakedLiquidityUpdated() public {
+    function testStakePoolStakedLiquidityUpdated() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -652,7 +628,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Unstake Position --- //
 
-    function testU_PPositionStakedUpdated() public {
+    function testUnstakePositionStakedUpdated() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK + 256; // fails if not above current tick
         uint8 amount = 0x01;
@@ -682,7 +658,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(nextPositionStaked != 0, "Position staked is true.");
     }
 
-    function testU_PPoolStakedLiquidityUpdated() public {
+    function testUnstakePoolStakedLiquidityUpdated() public {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
         uint8 amount = 0x01;
@@ -728,33 +704,33 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Create Pair --- //
 
-    function testFailC_PrSameTokensReverts() public {
+    function testFailCreatePairSameTokensReverts() public {
         address token = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(token, token);
         bool success = forwarder.pass(data);
         assertTrue(!success, "forwarder call failed");
     }
 
-    function testFailC_PrPairExistsReverts() public {
+    function testFailCreatePairPairExistsReverts() public {
         bytes memory data = Instructions.encodeCreatePair(address(asset), address(quote));
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_PrLowerDecimalBoundsReverts() public {
+    function testFailCreatePairLowerDecimalBoundsReverts() public {
         address token0 = address(new TestERC20("t", "t", 5));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_PrUpperDecimalBoundsReverts() public {
+    function testFailCreatePairUpperDecimalBoundsReverts() public {
         address token0 = address(new TestERC20("t", "t", 24));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
     }
 
-    function testC_PrPairNonceIncrementedReturnsOneAdded() public {
+    function testCreatePairPairNonceIncrementedReturnsOneAdded() public {
         uint256 prevNonce = __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
@@ -764,7 +740,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertEq(nonce, prevNonce + 1);
     }
 
-    function testC_PrFetchesPairIdReturnsNonZero() public {
+    function testCreatePairFetchesPairIdReturnsNonZero() public {
         uint256 prevNonce = __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
@@ -774,7 +750,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(pairId != 0);
     }
 
-    function testC_PrFetchesPairDataReturnsAddresses() public {
+    function testCreatePairFetchesPairDataReturnsAddresses() public {
         uint256 prevNonce = __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
@@ -790,7 +766,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Create Curve --- //
 
-    function testFailC_CuCurveExistsReverts() public {
+    function testFailCreateCurveCurveExistsReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
@@ -802,7 +778,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_CuFeeParameterOutsideBoundsReverts() public {
+    function testFailCreateCurveFeeParameterOutsideBoundsReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
@@ -814,7 +790,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_CuPriorityFeeParameterOutsideBoundsReverts() public {
+    function testFailCreateCurvePriorityFeeParameterOutsideBoundsReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
@@ -826,7 +802,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_CuExpiringPoolZeroSigmaReverts() public {
+    function testFailCreateCurveExpiringPoolZeroSigmaReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             0,
@@ -838,7 +814,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_CuExpiringPoolZeroStrikeReverts() public {
+    function testFailCreateCurveExpiringPoolZeroStrikeReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma,
@@ -850,7 +826,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
     }
 
-    function testC_CuCurveNonceIncrementReturnsOne() public {
+    function testCreateCurveCurveNonceIncrementReturnsOne() public {
         uint256 prevNonce = __contractBeingTested.getCurveNonce();
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
@@ -865,7 +841,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertEq(prevNonce, nextNonce - 1);
     }
 
-    function testC_CuFetchesCurveIdReturnsNonZero() public {
+    function testCreateCurveFetchesCurveIdReturnsNonZero() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
@@ -888,7 +864,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(curveId != 0);
     }
 
-    function testC_CuFetchesCurveDataReturnsParametersSet() public {
+    function testCreateCurveFetchesCurveDataReturnsParametersSet() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = Instructions.encodeCreateCurve(
             curve.sigma + 1,
@@ -918,22 +894,22 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     // --- Create Pool --- //
 
-    function testFailC_PoZeroPriceParameterReverts() public {
+    function testFailCreatePoolZeroPriceParameterReverts() public {
         bytes memory data = Instructions.encodeCreatePool(1, 0);
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_PoExistentPoolReverts() public {
+    function testFailCreatePoolExistentPoolReverts() public {
         bytes memory data = Instructions.encodeCreatePool(__poolId, 1);
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_PoZeroPairIdReverts() public {
+    function testFailCreatePoolZeroPairIdReverts() public {
         bytes memory data = Instructions.encodeCreatePool(0x000001, 1);
         bool success = forwarder.pass(data);
     }
 
-    function testFailC_PoExpiringPoolExpiredReverts() public {
+    function testFailCreatePoolExpiringPoolExpiredReverts() public {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
@@ -959,7 +935,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         success = forwarder.pass(data);
     }
 
-    function testC_PoFetchesPoolDataReturnsNonZeroBlockTimestamp() public {
+    function testCreatePoolFetchesPoolDataReturnsNonZeroBlockTimestamp() public {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));

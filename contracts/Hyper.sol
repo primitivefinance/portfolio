@@ -254,7 +254,7 @@ contract Hyper is IHyper {
      * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      * @custom:reverts If attempting to add zero liquidity.
      */
-    function _addLiquidity(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
+    function _allocate(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
         (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = Instructions.decodeAddLiquidity(data); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
 
@@ -289,7 +289,7 @@ contract Hyper is IHyper {
         emit AddLiquidity(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
     }
 
-    function _removeLiquidity(bytes calldata data)
+    function _unallocate(bytes calldata data)
         internal
         returns (
             uint48 poolId,
@@ -922,9 +922,9 @@ contract Hyper is IHyper {
         if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
 
         if (instruction == Instructions.ADD_LIQUIDITY) {
-            (poolId, ) = _addLiquidity(data);
+            (poolId, ) = _allocate(data);
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
-            (poolId, , ) = _removeLiquidity(data);
+            (poolId, , ) = _unallocate(data);
         } else if (instruction == Instructions.SWAP) {
             (poolId, , , ) = _swapExactIn(data);
         } else if (instruction == Instructions.STAKE_POSITION) {
