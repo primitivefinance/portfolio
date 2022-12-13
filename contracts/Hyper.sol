@@ -69,6 +69,7 @@ function __updatePosition(
     self.tokensOwedQuote += tokensOwedQuote;
 }
 
+// note: prettier does not have settings for file level for directives.
 /* using SafeCast for uint256;
 using { __updatePosition } for HyperPosition; */
 
@@ -221,7 +222,7 @@ contract Hyper is IHyper {
     }
 
     /**
-     * @notice Enigma method to add liquidity to a pool.
+     * @notice Allocates liquidity to a pool.
      *
      * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      * @custom:reverts If attempting to add zero liquidity.
@@ -236,9 +237,7 @@ contract Hyper is IHyper {
         _syncExpiringPoolTimeAndPrice(poolId);
 
         // Compute amounts of tokens for the real reserves.
-        HyperPool storage pool = pools[poolId_];
         (uint256 deltaR2, uint256 deltaR1) = getPhysicalReserves(poolId, deltaLiquidity);
-
         _increaseLiquidity(poolId_, deltaR1, deltaR2, deltaLiquidity);
     }
 
@@ -322,18 +321,17 @@ contract Hyper is IHyper {
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
     function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        HyperPosition storage pos = positions[msg.sender][poolId];
         HyperPool storage pool = pools[poolId];
+        HyperPosition storage pos = positions[msg.sender][poolId];
         __updatePosition(pos, pool, _blockTimestamp(), int256(deltaLiquidity));
 
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
-    /// @dev Equally important as `_increasePosition`.
-    /// @custom:security Critical. Includes the JIT liquidity check. Implicitly reverts on liquidity underflow.
+    /// @dev Syncs a position's fee growth, fees earned, liquidity, and timestamp.
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
-        HyperPosition storage pos = positions[msg.sender][poolId];
         HyperPool storage pool = pools[poolId];
+        HyperPosition storage pos = positions[msg.sender][poolId];
         __updatePosition(pos, pool, _blockTimestamp(), -int256(deltaLiquidity));
 
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
@@ -716,13 +714,8 @@ contract Hyper is IHyper {
         Curve memory curve = curves[curveId];
         (uint128 strike, uint48 maturity, uint24 sigma) = (curve.strike, curve.maturity, curve.sigma);
 
-        bool perpetual;
-        assembly {
-            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
-        }
-
         uint128 timestamp = _blockTimestamp();
-        if (!perpetual && timestamp > curve.maturity) revert PoolExpiredError();
+        if (timestamp > curve.maturity) revert PoolExpiredError();
 
         // Write the epoch data
         epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
@@ -738,7 +731,6 @@ contract Hyper is IHyper {
     /**
      * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
      * @dev Curves are used to create pools.
-     * It's possible to make a perpetual pool, by only specifying the fee parameters.
      *
      * @custom:reverts If set parameters have already been used to create a curve.
      * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
@@ -756,14 +748,8 @@ contract Hyper is IHyper {
 
         if (!isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
         if (!isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
-
-        bool perpetual;
-        assembly {
-            perpetual := iszero(or(strike, or(maturity, sigma))) // Equal to (strike | maturity | sigma) == 0, which returns true if all three values are zero.
-        }
-
-        if (!perpetual && sigma == 0) revert MinSigma(sigma);
-        if (!perpetual && strike == 0) revert MinStrike(strike);
+        if (sigma == 0) revert MinSigma(sigma);
+        if (strike == 0) revert MinStrike(strike);
 
         unchecked {
             curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
