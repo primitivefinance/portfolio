@@ -25,7 +25,7 @@ contract HyperTester is Hyper {
         } else if (instruction == Instructions.REMOVE_LIQUIDITY) {
             (poolId_, , ) = _removeLiquidity(data);
         } else if (instruction == Instructions.SWAP) {
-            (poolId_, , , ) = _swapExactForExact(data);
+            (poolId_, , , ) = _swapExactIn(data);
         } else if (instruction == Instructions.STAKE_POSITION) {
             (poolId_, ) = _stakePosition(data);
         } else if (instruction == Instructions.UNSTAKE_POSITION) {
@@ -217,6 +217,30 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(success);
 
         uint256 next = getSlot(__poolId, 23028).timestamp;
+        assertTrue(next != prev);
+    }
+
+    function testSwapPoolPriceUpdated() public {
+        // Add liquidity first
+        bytes memory data = Instructions.encodeAddLiquidity(
+            0,
+            __poolId,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.pass(data);
+        assertTrue(success);
+        // move some time
+        vm.warp(block.timestamp + 1);
+
+        uint256 prev = getPool(__poolId).lastPrice; // todo: fix, I know this slot from console.log.
+
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        success = forwarder.pass(data);
+        assertTrue(success);
+
+        uint256 next = getPool(__poolId).lastPrice;
         assertTrue(next != prev);
     }
 

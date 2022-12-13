@@ -60,7 +60,7 @@ contract TestHyperCaller is Test, StandardHelpers {
         __caller.removeLiquidity(500, 23027 - 500, 23027 + 500);
     }
 
-    function testSwapInWETH() public {
+    /* function testSwapInWETH() public {
         loadDefaultPool();
         (uint48 poolId, , ) = __caller.loaded();
         assertTrue(poolId != 0);
@@ -68,5 +68,5 @@ contract TestHyperCaller is Test, StandardHelpers {
         __caller.addLiquidity(10e18, 23027 - 500, 23027 + 500);
 
         __caller.swapExactIn(address(__weth), 10, 1e22);
-    }
+    } */
 }
