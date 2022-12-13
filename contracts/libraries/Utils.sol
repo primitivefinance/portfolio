@@ -23,7 +23,7 @@ function _between(
     int256 upper
 ) pure returns (bool valid) {
     assembly {
-        // Is `val` btwn lo and hi?
+        // Is `val` btwn lo and hi, inclusive?
         function isValid(val, lo, hi) -> btwn {
             btwn := iszero(sgt(mul(sub(val, lo), sub(val, hi)), 0)) // iszero(x > amount ? 1 : 0) ? true : false, (n - a) * (n - b) <= 0, n = amount, a = lower, b = upper
         }

@@ -73,14 +73,16 @@ interface IHyperEvents {
     event SetAuctionParams(uint48 indexed poolId, uint256 startPrice, uint256 endPrice, uint256 fee, uint256 length);
 
     // -- Positions -- //
-    /// @dev Emitted on increasing liquidity or creating a pool.
-    event IncreasePosition(address indexed account, uint96 indexed positionId, uint256 deltaLiquidity);
-    /// @dev Emitted on removing liquidity only.
-    event DecreasePosition(address indexed account, uint96 indexed positionId, uint256 deltaLiquidity);
+    /// @dev Emitted on increasing liquidity.
+    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+    /// @dev Emitted on removing liquidity.
+    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+    /// @dev Emitted on syncing earned fees to a position's claimable balance.
+    event FeesEarned(address indexed account, uint48 indexed poolId, uint256 feeAsset, uint256 feeQuote);
 
     // - Fees - //
     event Collect(
-        uint96 indexed positionId,
+        uint48 indexed poolId,
         address indexed to,
         uint256 tokensCollectedAsset,
         address asset,

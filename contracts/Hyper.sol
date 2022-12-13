@@ -38,12 +38,15 @@ function __balanceOf(address token, address account) view returns (uint256) {
     return abi.decode(data, (uint256));
 }
 
+/**
+ * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
+ */
 function __updatePosition(
     HyperPosition storage self,
     HyperPool storage pool,
     uint256 timestamp,
     int256 liquidityDelta
-) {
+) returns (uint256 feeAssetEarned, uint256 feeQuoteEarned) {
     // Syncs the timestamp, used to check if there is time between allocate and unallocate.
     self.blockTimestamp = timestamp;
 
@@ -59,14 +62,14 @@ function __updatePosition(
         pool.feeGrowthGlobalQuote
     );
 
-    uint256 tokensOwedAsset = FixedPointMathLib.mulWadDown(feeGrowthAsset - self.feeGrowthAssetLast, liquidity);
-    uint256 tokensOwedQuote = FixedPointMathLib.mulWadDown(feeGrowthQuote - self.feeGrowthQuoteLast, liquidity);
+    feeAssetEarned = FixedPointMathLib.mulWadDown(feeGrowthAsset - self.feeGrowthAssetLast, liquidity);
+    feeQuoteEarned = FixedPointMathLib.mulWadDown(feeGrowthQuote - self.feeGrowthQuoteLast, liquidity);
 
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;
 
-    self.tokensOwedAsset += tokensOwedAsset;
-    self.tokensOwedQuote += tokensOwedQuote;
+    self.tokensOwedAsset += feeAssetEarned;
+    self.tokensOwedQuote += feeQuoteEarned;
 }
 
 // note: prettier does not have settings for file level for directives.
@@ -154,6 +157,18 @@ contract Hyper is IHyper {
         WETH = weth;
     }
 
+    // --- Fallback --- //
+
+    /// @notice Main touchpoint for receiving calls.
+    /// @dev Critical: data must be encoded properly to be processed.
+    /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
+    /// @custom:mev Higher level security checks must be implemented by calling contract.
+    fallback() external payable lock {
+        if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
+        else _jumpProcess(msg.data);
+        _settleBalances();
+    }
+
     // --- External --- //
 
     // Note: Not sure if we should always revert when receiving ETH
@@ -197,18 +212,6 @@ contract Hyper is IHyper {
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
 
-    // --- Fallback --- //
-
-    /// @notice Main touchpoint for receiving calls.
-    /// @dev Critical: data must be encoded properly to be processed.
-    /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
-    /// @custom:mev Higher level security checks must be implemented by calling contract.
-    fallback() external payable lock {
-        if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
-        else _jumpProcess(msg.data);
-        _settleBalances();
-    }
-
     // --- Internal --- //
 
     /// @dev Overridable in tests.
@@ -217,6 +220,7 @@ contract Hyper is IHyper {
     }
 
     /// @dev Overridable in tests.
+    /// @custom:mev Prevents liquidity from being added and immediately removed until policy time (seconds) has elapsed.
     function _liquidityPolicy() internal view virtual returns (uint256) {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
@@ -234,7 +238,7 @@ contract Hyper is IHyper {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
-        _syncExpiringPoolTimeAndPrice(poolId);
+        _syncPoolPriceAndEpoch(poolId);
 
         // Compute amounts of tokens for the real reserves.
         (uint256 deltaR2, uint256 deltaR1) = getPhysicalReserves(poolId, deltaLiquidity);
@@ -323,8 +327,8 @@ contract Hyper is IHyper {
     function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
         HyperPool storage pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
-        __updatePosition(pos, pool, _blockTimestamp(), int256(deltaLiquidity));
-
+        (uint256 feeAsset, uint256 feeQuote) = __updatePosition(pos, pool, _blockTimestamp(), int256(deltaLiquidity));
+        emit FeesEarned(msg.sender, poolId, feeAsset, feeQuote);
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
@@ -332,8 +336,8 @@ contract Hyper is IHyper {
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
         HyperPool storage pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
-        __updatePosition(pos, pool, _blockTimestamp(), -int256(deltaLiquidity));
-
+        (uint256 feeAsset, uint256 feeQuote) = __updatePosition(pos, pool, _blockTimestamp(), -int256(deltaLiquidity));
+        emit FeesEarned(msg.sender, poolId, feeAsset, feeQuote);
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
@@ -349,39 +353,29 @@ contract Hyper is IHyper {
     // --- Swap --- //
 
     /**
-     * @notice Computes the price of the pool, which changes over time and write to the pool if out of sync.
+     * @notice Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.
      *
+     * @custom:reverts If pool does not exist.
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _syncExpiringPoolTimeAndPrice(uint48 poolId) internal returns (uint256 price, int24 tick) {
-        // Read the pool's info.
+    function _syncPoolPriceAndEpoch(uint48 poolId) internal returns (uint256 price, int24 tick) {
+        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
+
         HyperPool storage pool = pools[poolId];
-        // Use curve parameters to compute time remaining.
         Curve memory curve = curves[uint32(poolId)];
-        // 1. Compute previous time until maturity.
-        uint256 tau = curve.maturity - pool.blockTimestamp;
-        // 2. Compute time elapsed since last update.
-        uint256 delta = _blockTimestamp() - pool.blockTimestamp;
-        // 3. Compute price using previous tau and time elapsed.
+        uint256 tau;
+        if (curve.maturity > pool.blockTimestamp) tau = curve.maturity - pool.blockTimestamp; // Keeps tau at zero if pool expired.
+        uint256 elapsed = _blockTimestamp() - pool.blockTimestamp;
         HyperSwapLib.Expiring memory expiring = HyperSwapLib.Expiring(curve.strike, curve.sigma, tau);
-        price = expiring.computePriceWithChangeInTau(pool.lastPrice, delta);
-        // 4. Compute nearest tick with price.
+
+        price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsed);
         tick = HyperSwapLib.computeTickWithPrice(price);
-        // 5. Verify tick is within tick size.
         int256 hi = int256(pool.lastTick + TICK_SIZE);
         int256 lo = int256(pool.lastTick - TICK_SIZE);
         tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
-        // 6. Write changes to the pool.
-        {
-            uint48 id = poolId;
-            int24 index = tick;
-            uint256 price0 = price;
-            (uint256 fee0, uint256 fee1) = (pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
-            uint256 liquidity = pool.liquidity;
 
-            _updatePool(id, index, price0, liquidity, fee0, fee1);
-        }
+        _updatePool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
     }
 
     SwapState state;
@@ -425,7 +419,7 @@ contract Hyper is IHyper {
         Iteration memory swap;
         {
             // Writes the pool after computing its updated price with respect to time elapsed since last update.
-            (uint256 price, int24 tick) = _syncExpiringPoolTimeAndPrice(args.poolId);
+            (uint256 price, int24 tick) = _syncPoolPriceAndEpoch(args.poolId);
             // Expect the caller to exhaust their entire balance of the input token.
             remainder = args.useMax == 1 ? __balanceOf(pair.tokenBase, msg.sender) : args.input;
             // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
@@ -673,7 +667,7 @@ contract Hyper is IHyper {
         (uint48 poolId_, uint48 positionId) = Instructions.decodeUnstakePosition(data);
         poolId = poolId_;
 
-        _syncExpiringPoolTimeAndPrice(poolId);
+        _syncPoolPriceAndEpoch(poolId);
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
 
@@ -696,6 +690,8 @@ contract Hyper is IHyper {
     /**
      * @notice Uses a pair and curve to instantiate a pool at a price.
      *
+     * @custom:magic If pairId is 0, uses current pair nonce.
+     * @custom:magic If curveId is 0, uses current curve nonce.
      * @custom:reverts If price is 0.
      * @custom:reverts If pool with pair and curve has already been created.
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
@@ -704,25 +700,22 @@ contract Hyper is IHyper {
         (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Instructions.decodeCreatePool(data);
 
         if (price == 0) revert ZeroPrice();
+        if (pairId == 0) pairId = uint16(getPairNonce); // magic variable
+        if (curveId == 0) curveId = uint32(getCurveNonce); // magic variable
 
-        // Zero id values are magic variables, since no curve or pair can have an id of zero.
-        if (pairId == 0) pairId = uint16(getPairNonce);
-        if (curveId == 0) curveId = uint32(getCurveNonce);
         poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
         if (_doesPoolExist(poolId)) revert PoolExists();
 
         Curve memory curve = curves[curveId];
-        (uint128 strike, uint48 maturity, uint24 sigma) = (curve.strike, curve.maturity, curve.sigma);
-
         uint128 timestamp = _blockTimestamp();
         if (timestamp > curve.maturity) revert PoolExpiredError();
 
-        // Write the epoch data
+        // Write the epoch data.
         epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
 
         // Write the pool to state with the desired price.
         pools[poolId].lastPrice = price;
-        pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price); // todo: implement slot and price grid.
+        pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price);
         pools[poolId].blockTimestamp = timestamp;
 
         emit CreatePool(poolId, pairId, curveId, price);
