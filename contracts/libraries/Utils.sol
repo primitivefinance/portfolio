@@ -1,27 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-function isBetween(
-    int256 value,
-    int256 lower,
-    int256 upper
-) pure returns (bool valid) {
+function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     return _between(value, lower, upper);
 }
 
-function isBetween(
-    uint256 value,
-    uint256 lower,
-    uint256 upper
-) pure returns (bool valid) {
+function isBetween(uint256 value, uint256 lower, uint256 upper) pure returns (bool valid) {
     return _between(int256(value), int256(lower), int256(upper));
 }
 
-function _between(
-    int256 value,
-    int256 lower,
-    int256 upper
-) pure returns (bool valid) {
+function _between(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     assembly {
         // Is `val` btwn lo and hi, inclusive?
         function isValid(val, lo, hi) -> btwn {
@@ -31,3 +19,19 @@ function _between(
         valid := isValid(value, lower, upper)
     }
 }
+
+/// @notice reverts if x > type(uint128).max
+function toUint128(uint256 x) pure returns (uint128 z) {
+    uint128 max = type(uint128).max;
+    assembly {
+        switch iszero(gt(x, max))
+        case 0 {
+            revert(0, 0)
+        }
+        case 1 {
+            z := x
+        }
+    }
+}
+
+using {toUint128} for uint;

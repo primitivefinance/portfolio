@@ -9,9 +9,8 @@ import "./EnigmaTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
-import "./libraries/Utils.sol";
+import "./libraries/Utils.sol" as UTILS;
 import "./libraries/HyperSwapLib.sol";
-import "./libraries/SafeCast.sol";
 
 using {getStartTime, getEpochsPassed, getLastUpdatedId, getTimeToTransition, getTimePassedInCurrentEpoch} for Epoch;
 
@@ -71,7 +70,7 @@ function __computeDelta(uint256 input, int256 delta) pure returns (uint256 outpu
  */
 function __updatePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
     self.blockTimestamp = timestamp;
-    self.liquidity = SafeCast.toUint128(__computeDelta(self.liquidity, liquidityDelta));
+    self.liquidity = UTILS.toUint128(__computeDelta(self.liquidity, liquidityDelta));
 }
 
 /**
@@ -84,7 +83,7 @@ function __updatePosition(
     int256 liquidityDelta
 ) returns (uint256 feeAssetEarned, uint256 feeQuoteEarned) {
     self.blockTimestamp = timestamp;
-    self.totalLiquidity = SafeCast.toUint128(__computeDelta(self.totalLiquidity, liquidityDelta));
+    self.totalLiquidity = UTILS.toUint128(__computeDelta(self.totalLiquidity, liquidityDelta));
 
     // Syncs fee growth and fees earned.
     (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
@@ -122,7 +121,6 @@ using { __updatePosition } for HyperPosition; */
 /// @notice Stores the state of the Enigma with functions to change state.
 /// @dev Implements low-level internal virtual functions, re-entrancy guard and state.
 contract Hyper is IHyper {
-    using SafeCast for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using HyperSwapLib for HyperSwapLib.Expiring;
@@ -474,7 +472,7 @@ contract Hyper is IHyper {
         tick = HyperSwapLib.computeTickWithPrice(price);
         int256 hi = int256(pool.lastTick + TICK_SIZE);
         int256 lo = int256(pool.lastTick - TICK_SIZE);
-        tick = isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
+        tick = UTILS.isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
 
         _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
     }
@@ -819,8 +817,8 @@ contract Hyper is IHyper {
         curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
         if (curveId != 0) revert CurveExists(curveId);
 
-        if (!isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
-        if (!isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
+        if (!UTILS.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
+        if (!UTILS.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
         if (sigma == 0) revert MinSigma(sigma);
         if (strike == 0) revert MinStrike(strike);
 
@@ -882,14 +880,14 @@ contract Hyper is IHyper {
         emit CreatePair(pairId, asset, quote, assetDecimals, quoteDecimals);
     }
 
-    // --- General Utils --- //
+    // --- General UTILS --- //
 
     function _doesPoolExist(uint48 poolId) internal view returns (bool exists) {
         exists = pools[poolId].blockTimestamp != 0;
     }
 
     function _isValidDecimals(uint8 decimals) internal pure returns (bool valid) {
-        valid = isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
+        valid = UTILS.isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
     }
 
     // ===== Accounting System ===== //
