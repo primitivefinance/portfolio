@@ -15,6 +15,10 @@ contract HyperTester is Hyper {
 
     // --- Implemented --- //
 
+    function jumpProcess(bytes calldata data) external payable {
+        _jumpProcess(data, _process);
+    }
+
     function process(bytes calldata data) external payable {
         uint48 poolId_;
         bytes1 instruction = bytes1(data[0] & 0x0f);
@@ -79,6 +83,15 @@ contract Forwarder is Test {
         }
         return true;
     }
+
+    function jumpProcess(bytes calldata data) external payable returns (bool) {
+        try hyper.jumpProcess{value: msg.value}(data) {} catch (bytes memory reason) {
+            assembly {
+                revert(add(32, reason), mload(reason))
+            }
+        }
+        return true;
+    }
 }
 
 contract StandardHelpers {
@@ -118,23 +131,25 @@ contract TestHyperSingle is StandardHelpers, Test {
     Forwarder public forwarder;
     TestERC20 public asset;
     TestERC20 public quote;
+    TestERC20 public fakeToken0;
     uint48 __poolId;
 
     function setUp() public {
         weth = new WETH();
         __contractBeingTested = new HyperTester(address(weth));
-        (asset, quote) = handlePrerequesites();
+        (asset, quote, fakeToken0) = handlePrerequesites();
     }
 
     function testHyper() public {
         HyperPool memory p = IHyperStruct(address(__contractBeingTested)).pools(1);
     }
 
-    function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1) {
+    function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1, TestERC20 fakeToken0) {
         // Set the forwarder.
         forwarder = new Forwarder(address(__contractBeingTested));
 
         // 1. Two token contracts, minted and approved to spend.
+        fakeToken0 = new TestERC20("fakeToken0", "fakeToken0 name", 18);
         token0 = new TestERC20("token0", "token0 name", 18);
         token1 = new TestERC20("token1", "token1 name", 18);
         token0.approve(address(__contractBeingTested), type(uint256).max);
@@ -200,6 +215,22 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function getBalances(address owner, address token) public view returns (uint) {
         return __contractBeingTested.__balances__(owner, token);
+    }
+
+    // --- Jump --- //
+    bytes[] public instructions;
+
+    function testJumpProcess() public {
+        instructions.push(Instructions.encodeCreatePair(address(fakeToken0), address(quote)));
+        console.log(instructions.length);
+        bytes memory data = Instructions.encodeJumpInstruction(instructions);
+        console.log(data.length);
+        console.logBytes(instructions[0]);
+        console.logBytes(data);
+        bool success = forwarder.jumpProcess(data);
+        assertTrue(success);
+
+        delete instructions;
     }
 
     // --- Ether --- //

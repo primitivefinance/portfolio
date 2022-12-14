@@ -141,6 +141,16 @@ describe('HyperPrototype', function () {
         .withArgs(1, tokens[0].address, tokens[1].address)
     })
 
+    it.only('Creates a pair with jump process', async function () {
+      const { bytes: data, hex: instructionData } = instructions.encodeCreatePair(tokens[0].address, tokens[1].address)
+      const { hex: jumpData } = instructions.encodeJumpInstruction([data])
+      console.log(instructionData)
+      console.log(jumpData)
+      await expect(deployer.sendTransaction({ to: sdk.instance?.address, data: jumpData, value: BigInt(0) }))
+        .to.emit(sdk.instance, 'CreatePair')
+        .withArgs(1, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
+    })
+
     it('Creates a curve directly', async function () {
       const { hex: data } = instructions.encodeCreatePair(tokens[0].address, tokens[1].address)
 

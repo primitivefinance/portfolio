@@ -25,6 +25,31 @@ library Instructions {
 
     // --- Encoding & Decoding --- //
 
+    function encodeJumpInstruction(bytes[] memory instructions) internal pure returns (bytes memory) {
+        uint8 len = uint8(instructions.length);
+
+        uint8 nextPointer;
+        bytes memory payload = bytes.concat(INSTRUCTION_JUMP, bytes1(len));
+
+        // for each instruction set...
+        for (uint i; i != len; ++i) {
+            bytes memory instruction = instructions[i];
+            uint8 size = uint8(instruction.length);
+
+            // Using instruction and index of instruction in list, we create a new array with a pointer to the next instruction in front of the instruction payload.
+            if (i == 0) {
+                nextPointer = size + 3; // [added0, instruction, added1, nextPointer]
+            } else {
+                nextPointer = nextPointer + size + 1; // [currentPointer, instruction, nextPointer]
+            }
+
+            bytes memory edited = bytes.concat(bytes1(nextPointer), instruction);
+            payload = bytes.concat(payload, edited);
+        }
+
+        return payload;
+    }
+
     function encodePoolId(uint16 pairId, uint32 curveId) internal pure returns (uint48 poolId) {
         bytes memory data = abi.encodePacked(pairId, curveId);
         poolId = uint48(bytes6(data));
@@ -33,15 +58,7 @@ library Instructions {
     /// @dev Expects a 6 byte left-pad `poolId`.
     /// @param data Maximum 6 bytes. | 0x | left-pad 6 bytes poolId |
     /// Pool id is a packed pair and curve id: | 0x | left-pad 2 bytes pairId | left-pad 4 bytes curveId |
-    function decodePoolId(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint48 poolId,
-            uint16 pairId,
-            uint32 curveId
-        )
-    {
+    function decodePoolId(bytes calldata data) internal pure returns (uint48 poolId, uint16 pairId, uint32 curveId) {
         poolId = uint48(bytes6(data));
         pairId = uint16(bytes2(data[:2]));
         curveId = uint32(bytes4(data[2:]));
@@ -62,17 +79,9 @@ library Instructions {
     /// @dev Expects a 27 length byte array of left padded parameters.
     /// @param data Maximum 1 + 3 + 4 + 2 + 2 + 16 = 28 bytes.
     /// | 0x | 1 byte enigma code | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 2 bytes priority fee | 16 bytes strike |
-    function decodeCreateCurve(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint24 sigma,
-            uint32 maturity,
-            uint16 fee,
-            uint16 priorityFee,
-            uint128 strike
-        )
-    {
+    function decodeCreateCurve(
+        bytes calldata data
+    ) internal pure returns (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) {
         require(data.length < 32, "Curve data too long");
         sigma = uint24(bytes3(data[1:4])); // note: First byte is the create pair ecode.
         maturity = uint32(bytes4(data[4:8]));
@@ -103,16 +112,9 @@ library Instructions {
     /// @dev Expects a poolId and one left zero padded amount for `price`.
     /// @param data Maximum 1 + 6 + 16 = 23 bytes.
     /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes |
-    function decodeCreatePool(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint48 poolId,
-            uint16 pairId,
-            uint32 curveId,
-            uint128 price
-        )
-    {
+    function decodeCreatePool(
+        bytes calldata data
+    ) internal pure returns (uint48 poolId, uint16 pairId, uint32 curveId, uint128 price) {
         poolId = uint48(bytes6(data[1:7])); // note: First byte is the create pool ecode.
         pairId = uint16(bytes2(data[1:3]));
         curveId = uint32(bytes4(data[3:7]));
@@ -131,15 +133,9 @@ library Instructions {
     /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
     /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
-    function decodeAllocate(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint8 useMax,
-            uint48 poolId,
-            uint128 deltaLiquidity
-        )
-    {
+    function decodeAllocate(
+        bytes calldata data
+    ) internal pure returns (uint8 useMax, uint48 poolId, uint128 deltaLiquidity) {
         (bytes1 maxFlag, ) = Decoder.separate(data[0]);
         useMax = uint8(maxFlag);
         poolId = uint48(bytes6(data[1:7]));
@@ -161,16 +157,9 @@ library Instructions {
     /// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
     /// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
     /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
-    function decodeUnallocate(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint8 useMax,
-            uint48 poolId,
-            uint16 pairId,
-            uint128 deltaLiquidity
-        )
-    {
+    function decodeUnallocate(
+        bytes calldata data
+    ) internal pure returns (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) {
         useMax = uint8(data[0] >> 4);
         pairId = uint16(bytes2(data[1:3]));
         poolId = uint48(bytes6(data[1:7]));
@@ -203,17 +192,9 @@ library Instructions {
     /// @dev Expects standard instructions with the end byte specifying swap direction.
     /// @param data Maximum 1 + 6 + 16 + 1 = 24 bytes.
     /// | 0x | 1 byte packed flag-enigma code | 6 byte poolId | up to 16 byte TRLE amount | 1 byte direction |.
-    function decodeSwap(bytes calldata data)
-        internal
-        pure
-        returns (
-            uint8 useMax,
-            uint48 poolId,
-            uint128 input,
-            uint128 limit,
-            uint8 direction
-        )
-    {
+    function decodeSwap(
+        bytes calldata data
+    ) internal pure returns (uint8 useMax, uint48 poolId, uint128 input, uint128 limit, uint8 direction) {
         useMax = uint8(data[0] >> 4);
         poolId = uint48(bytes6(data[1:7]));
         uint8 pointer = uint8(data[7]);

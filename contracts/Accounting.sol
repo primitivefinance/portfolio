@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
-import "../interfaces/IERC20.sol";
+import "./interfaces/IERC20.sol";
+import {BalanceError} from "./EnigmaTypes.sol";
 
 using {cache, deposit, withdraw, credit, debit, prepare, settle, multiSettle, clearTransient, computeNetReserves, warmToken} for AccountSystem global;
 
@@ -15,12 +16,11 @@ struct AccountSystem {
 }
 
 error InsufficientBalance(uint amount, uint delta);
-error BalanceError1();
 
 /** @dev Gas optimized. */
 function __balanceOf__(address token, address account) view returns (uint256) {
     (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
-    if (!success || data.length != 32) revert BalanceError1();
+    if (!success || data.length != 32) revert BalanceError();
     return abi.decode(data, (uint256));
 }
 

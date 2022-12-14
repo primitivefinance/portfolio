@@ -3,6 +3,8 @@ pragma solidity 0.8.13;
 
 import "solmate/utils/SafeTransferLib.sol";
 
+import "./Accounting.sol";
+import "./CPU.sol";
 import "./EnigmaTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
@@ -12,7 +14,6 @@ import "./libraries/Decoder.sol";
 import "./libraries/HyperSwapLib.sol";
 import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
-import "./libraries/Accounting.sol";
 
 using {getStartTime, getEpochsPassed, getLastUpdatedId, getTimeToTransition, getTimePassedInCurrentEpoch} for Epoch;
 
@@ -230,20 +231,22 @@ contract Hyper is IHyper {
 
     // --- Fallback --- //
 
+    modifier settle() {
+        _;
+        __account__.prepare();
+        __account__.multiSettle(pay, address(this));
+
+        if (!__account__.settled) revert InvalidSettlement();
+    }
+
     error InvalidSettlement();
 
     /// @notice Main touchpoint for receiving calls.
     /// @dev Critical: data must be encoded properly to be processed.
     /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
     /// @custom:mev Higher level security checks must be implemented by calling contract.
-    fallback() external payable lock {
-        if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
-        else _jumpProcess(msg.data);
-
-        __account__.prepare();
-        __account__.multiSettle(pay, address(this));
-
-        if (!__account__.settled) revert InvalidSettlement();
+    fallback() external payable lock settle {
+        __startProcess__(_process);
     }
 
     function pay(address token, address to, uint amount) private {
@@ -258,15 +261,15 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function allocate(uint48 poolId, uint amount) external lock {
-        /*   bool useMax = amount == type(uint256).max; // magic variable.
+    function allocate(uint48 poolId, uint amount) external lock settle {
+        /* bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
         data = Instructions.encodeAllocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
-        _process(data);  */
+        _allocate(data); */
     }
 
     /// @inheritdoc IHyperActions
-    function unallocate(uint48 poolId, uint amount) external lock {
+    function unallocate(uint48 poolId, uint amount) external lock settle {
         /*    bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
         data = Instructions.encodeUnallocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
@@ -274,19 +277,19 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function stake(uint48 poolId) external lock {
+    function stake(uint48 poolId) external lock settle {
         /*   data = Instructions.encodeStakePosition(poolId);
         _process(data); */
     }
 
     /// @inheritdoc IHyperActions
-    function unstake(uint48 poolId) external lock {
+    function unstake(uint48 poolId) external lock settle {
         /*  data = Instructions.encodeUnstakePosition(poolId);
         _process(data); */
     }
 
     /// @inheritdoc IHyperActions
-    function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external lock {
+    function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external lock settle {
         /*  bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
         data = Instructions.encodeSwap(useMax, poolId, 0x0, input, 0x0, limit, uint8(sellAsset)); // Used as an input multiplier: 10^(0x0) = 1.
@@ -294,7 +297,7 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function draw(address token, uint256 amount, address to) external lock {
+    function draw(address token, uint256 amount, address to) external lock settle {
         if (balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
         _applyDebit(token, amount);
 
@@ -303,7 +306,7 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function fund(address token, uint256 amount) external payable override lock {
+    function fund(address token, uint256 amount) external payable override lock settle {
         _applyCredit(token, amount);
 
         if (token == WETH) __wrapEther(WETH);
@@ -909,32 +912,6 @@ contract Hyper is IHyper {
 
     function _isValidDecimals(uint8 decimals) internal pure returns (bool valid) {
         valid = isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
-    }
-
-    /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
-    /// @dev Expects a special encoding method for multiple instructions.
-    /// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
-    /// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly.
-    function _jumpProcess(bytes calldata data) internal {
-        uint8 length = uint8(data[1]);
-        uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
-        uint256 start;
-
-        // For each instruction set...
-        for (uint256 i; i != length; ++i) {
-            // Start at the index of the first byte of the next instruction.
-            start = pointer;
-
-            // Set the new pointer to the next instruction, located at the pointer.
-            pointer = uint8(data[pointer]);
-
-            // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
-            if (pointer > data.length) revert JumpError(pointer);
-            bytes calldata instruction = data[start:pointer];
-
-            // Process the instruction.
-            _process(instruction[1:]); // note: Removes the pointer to the next instruction.
-        }
     }
 
     // ===== Accounting System ===== //
