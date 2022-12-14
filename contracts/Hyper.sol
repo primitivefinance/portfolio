@@ -5,72 +5,20 @@ import "solmate/utils/SafeTransferLib.sol";
 
 import "./OS.sol";
 import "./CPU.sol" as CPU;
+import "./Clock.sol";
+import "./Assembly.sol" as utils;
 import "./EnigmaTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
-import "./libraries/Utils.sol" as UTILS;
 import "./libraries/HyperSwapLib.sol";
-
-using {getStartTime, getEpochsPassed, getLastUpdatedId, getTimeToTransition, getTimePassedInCurrentEpoch} for Epoch;
-
-function getStartTime(Epoch memory epoch) pure returns (uint256 startTime) {
-    if (epoch.endTime < epoch.interval)
-        startTime = 0; // todo: fix, avoids underflow
-    else startTime = epoch.endTime - epoch.interval;
-}
-
-function getEpochsPassed(Epoch memory epoch, uint256 lastUpdatedTimestamp) pure returns (uint256 epochsPassed) {
-    if (epoch.endTime < (lastUpdatedTimestamp + 1))
-        epochsPassed = 1; // todo: fix this, avoids the arthimetic undeflow
-    else epochsPassed = (epoch.endTime - (lastUpdatedTimestamp + 1)) / epoch.interval;
-}
-
-function getLastUpdatedId(Epoch memory epoch, uint256 epochsPassed) pure returns (uint256 lastUpdateId) {
-    if (epoch.id < epochsPassed)
-        lastUpdateId = 0; // todo: fix, avoids underflow
-    else lastUpdateId = epoch.id - epochsPassed;
-}
-
-function getTimeToTransition(
-    Epoch memory epoch,
-    uint256 epochsPassed,
-    uint256 lastUpdatedTimestamp
-) pure returns (uint256 timeToTransition) {
-    timeToTransition = epoch.endTime - (epochsPassed * epoch.interval) - lastUpdatedTimestamp;
-}
-
-function getTimePassedInCurrentEpoch(
-    Epoch memory epoch,
-    uint timestamp,
-    uint256 lastUpdatedTimestamp
-) view returns (uint256 timePassed) {
-    uint256 startTime = epoch.getStartTime();
-    uint256 lastUpdateInCurrentEpoch = lastUpdatedTimestamp > startTime ? lastUpdatedTimestamp : startTime;
-    timePassed = timestamp - lastUpdateInCurrentEpoch;
-}
-
-/**
- * todo: verify this is good to go
- */
-function __computeDelta(uint256 input, int256 delta) pure returns (uint256 output) {
-    assembly {
-        switch slt(input, 0) // input < 0 ? 1 : 0
-        case 0 {
-            output := add(input, delta)
-        }
-        case 1 {
-            output := sub(input, delta)
-        }
-    }
-}
 
 /**
  * @notice Syncs a pool's liquidity and last updated timestamp.
  */
 function __updatePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
     self.blockTimestamp = timestamp;
-    self.liquidity = UTILS.toUint128(__computeDelta(self.liquidity, liquidityDelta));
+    self.liquidity = utils.toUint128(utils.__computeDelta(self.liquidity, liquidityDelta));
 }
 
 /**
@@ -83,7 +31,7 @@ function __updatePosition(
     int256 liquidityDelta
 ) returns (uint256 feeAssetEarned, uint256 feeQuoteEarned) {
     self.blockTimestamp = timestamp;
-    self.totalLiquidity = UTILS.toUint128(__computeDelta(self.totalLiquidity, liquidityDelta));
+    self.totalLiquidity = utils.toUint128(utils.__computeDelta(self.totalLiquidity, liquidityDelta));
 
     // Syncs fee growth and fees earned.
     (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
@@ -240,14 +188,14 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function allocate(uint48 poolId, uint amount) external lock settle {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = UTILS.toUint128(useMax ? 0 : amount);
+        uint128 input = utils.toUint128(useMax ? 0 : amount);
         _allocate(useMax ? 1 : 0, poolId, input);
     }
 
     /// @inheritdoc IHyperActions
     function unallocate(uint48 poolId, uint amount) external lock settle {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = UTILS.toUint128(useMax ? 0 : amount);
+        uint128 input = utils.toUint128(useMax ? 0 : amount);
         _unallocate(useMax ? 1 : 0, poolId, uint16(poolId >> 32), input);
     }
 
@@ -263,10 +211,16 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external lock settle {
-        /*  bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = UTILS.toUint128(useMax ? 0 : amount);
-        data = CPU.encodeSwap(useMax, poolId, 0x0, input, 0x0, limit, uint8(sellAsset)); // Used as an input multiplier: 10^(0x0) = 1.
-        _process(data); */
+        bool useMax = amount == type(uint256).max; // magic variable.
+        uint128 input = utils.toUint128(useMax ? 0 : amount);
+        Order memory args = Order({
+            useMax: useMax ? 1 : 0,
+            poolId: poolId,
+            input: input,
+            limit: utils.toUint128(limit),
+            direction: sellAsset ? 0 : 1
+        });
+        _swapExactIn(args);
     }
 
     /// @inheritdoc IHyperActions
@@ -473,7 +427,7 @@ contract Hyper is IHyper {
         tick = HyperSwapLib.computeTickWithPrice(price);
         int256 hi = int256(pool.lastTick + TICK_SIZE);
         int256 lo = int256(pool.lastTick - TICK_SIZE);
-        tick = UTILS.isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
+        tick = utils.isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
 
         _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
     }
@@ -716,7 +670,7 @@ contract Hyper is IHyper {
             //poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
 
             // update the pool's liquidity due to the transition
-            pool.stakedLiquidity = __computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
+            pool.stakedLiquidity = utils.__computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
             pool.borrowableLiquidity = pool.stakedLiquidity;
             pool.epochStakedLiquidityDelta = int256(0);
 
@@ -819,8 +773,8 @@ contract Hyper is IHyper {
         curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
         if (curveId != 0) revert CurveExists(curveId);
 
-        if (!UTILS.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
-        if (!UTILS.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
+        if (!utils.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
+        if (!utils.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
         if (sigma == 0) revert MinSigma(sigma);
         if (strike == 0) revert MinStrike(strike);
 
@@ -881,14 +835,14 @@ contract Hyper is IHyper {
         emit CreatePair(pairId, asset, quote, assetDecimals, quoteDecimals);
     }
 
-    // --- General UTILS --- //
+    // --- General utils --- //
 
     function _doesPoolExist(uint48 poolId) internal view returns (bool exists) {
         exists = pools[poolId].blockTimestamp != 0;
     }
 
     function _isValidDecimals(uint8 decimals) internal pure returns (bool valid) {
-        valid = UTILS.isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
+        valid = utils.isBetween(decimals, MIN_DECIMALS, MAX_DECIMALS);
     }
 
     // ===== Accounting System ===== //

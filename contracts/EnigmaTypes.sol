@@ -80,12 +80,7 @@ struct Pair {
     address tokenQuote;
     uint8 decimalsQuote;
 }
-/// @dev Time interval information for liquidity staking.
-struct Epoch {
-    uint256 id;
-    uint256 endTime;
-    uint256 interval;
-}
+
 /// @dev Individual live pool state.
 /// @param epochStakedLiquidityDelta Liquidity to be added to staked liquidity.
 struct HyperPool {

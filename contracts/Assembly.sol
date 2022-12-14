@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
 function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
@@ -30,6 +30,21 @@ function toUint128(uint256 x) pure returns (uint128 z) {
         }
         case 1 {
             z := x
+        }
+    }
+}
+
+/**
+ * todo: verify this is good to go
+ */
+function __computeDelta(uint256 input, int256 delta) pure returns (uint256 output) {
+    assembly {
+        switch slt(input, 0) // input < 0 ? 1 : 0
+        case 0 {
+            output := add(input, delta)
+        }
+        case 1 {
+            output := sub(input, delta)
         }
     }
 }
