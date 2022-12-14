@@ -16,29 +16,29 @@ contract HyperTester is Hyper {
     // --- Implemented --- //
 
     function jumpProcess(bytes calldata data) external payable {
-        _jumpProcess(data, _process);
+        CPU._jumpProcess(data, _process);
     }
 
     function process(bytes calldata data) external payable {
         uint48 poolId_;
         bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
+        if (instruction == CPU.UNKNOWN) revert UnknownInstruction();
 
-        if (instruction == Instructions.ALLOCATE) {
+        if (instruction == CPU.ALLOCATE) {
             (poolId_, ) = _allocate(data);
-        } else if (instruction == Instructions.UNALLOCATE) {
+        } else if (instruction == CPU.UNALLOCATE) {
             (poolId_, , ) = _unallocate(data);
-        } else if (instruction == Instructions.SWAP) {
+        } else if (instruction == CPU.SWAP) {
             (poolId_, , , ) = _swapExactIn(data);
-        } else if (instruction == Instructions.STAKE_POSITION) {
+        } else if (instruction == CPU.STAKE_POSITION) {
             (poolId_, ) = _stake(data);
-        } else if (instruction == Instructions.UNSTAKE_POSITION) {
+        } else if (instruction == CPU.UNSTAKE_POSITION) {
             (poolId_, ) = _unstake(data);
-        } else if (instruction == Instructions.CREATE_POOL) {
+        } else if (instruction == CPU.CREATE_POOL) {
             (poolId_) = _createPool(data);
-        } else if (instruction == Instructions.CREATE_CURVE) {
+        } else if (instruction == CPU.CREATE_CURVE) {
             _createCurve(data);
-        } else if (instruction == Instructions.CREATE_PAIR) {
+        } else if (instruction == CPU.CREATE_PAIR) {
             _createPair(data);
         } else {
             revert UnknownInstruction();
@@ -66,8 +66,8 @@ contract Forwarder is Test {
     receive() external payable {}
 
     function freeWrapEther(address weth) external payable {
-        __wrapEther(weth);
-        __dangerousUnwrapEther(weth, msg.sender, 1e18);
+        __wrapEther__(weth);
+        __dangerousUnwrapEther__(weth, msg.sender, 1e18);
     }
 
     function approve(address token, address spender) public {
@@ -160,14 +160,14 @@ contract TestHyperSingle is StandardHelpers, Test {
         forwarder.approve(address(token1), address(__contractBeingTested));
 
         // 2. Create pair
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
         uint16 pairId = uint16(__contractBeingTested.getPairNonce());
 
         // 3. Create curve
-        data = Instructions.encodeCreateCurve(
+        data = CPU.encodeCreateCurve(
             DEFAULT_SIGMA,
             DEFAULT_MATURITY,
             uint16(1e4 - DEFAULT_GAMMA),
@@ -179,10 +179,10 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         uint32 curveId = uint32(__contractBeingTested.getCurveNonce());
 
-        __poolId = Instructions.encodePoolId(pairId, curveId);
+        __poolId = CPU.encodePoolId(pairId, curveId);
 
         // 4. Create pool
-        data = Instructions.encodeCreatePool(__poolId, DEFAULT_PRICE);
+        data = CPU.encodeCreatePool(__poolId, DEFAULT_PRICE);
         success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -221,9 +221,9 @@ contract TestHyperSingle is StandardHelpers, Test {
     bytes[] public instructions;
 
     function testJumpProcess() public {
-        instructions.push(Instructions.encodeCreatePair(address(fakeToken0), address(quote)));
+        instructions.push(CPU.encodeCreatePair(address(fakeToken0), address(quote)));
         console.log(instructions.length);
-        bytes memory data = Instructions.encodeJumpInstruction(instructions);
+        bytes memory data = CPU.encodeJumpInstruction(instructions);
         console.log(data.length);
         console.logBytes(instructions[0]);
         console.logBytes(data);
@@ -238,19 +238,19 @@ contract TestHyperSingle is StandardHelpers, Test {
     function testAllocateWETH() public {
         forwarder.freeWrapEther{value: 4e18}(address(weth));
         /*  // 2. Create pair
-        bytes memory data = Instructions.encodeCreatePair(address(weth), address(quote));
+        bytes memory data = CPU.encodeCreatePair(address(weth), address(quote));
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
         uint16 pairId = uint16(__contractBeingTested.getPairNonce());
         uint32 curveId = uint32(__contractBeingTested.getCurveNonce());
-        uint48 wethPoolId = Instructions.encodePoolId(pairId, curveId);
+        uint48 wethPoolId = CPU.encodePoolId(pairId, curveId);
 
         // 4. Create pool
-        data = Instructions.encodeCreatePool(wethPoolId, DEFAULT_PRICE);
+        data = CPU.encodeCreatePool(wethPoolId, DEFAULT_PRICE);
         success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        data = Instructions.encodeAllocate(
+        data = CPU.encodeAllocate(
             0,
             wethPoolId,
             0x13, // 19 zeroes, so 10e19 liquidity
@@ -263,20 +263,20 @@ contract TestHyperSingle is StandardHelpers, Test {
     // --- Swap --- //
 
     function testFailSwapExactInNonExistentPoolIdReverts() public {
-        bytes memory data = Instructions.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
+        bytes memory data = CPU.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
     function testFailSwapExactInZeroSwapAmountReverts() public {
-        bytes memory data = Instructions.encodeSwap(0, __poolId, 0x01, 0x00, 0x01, 0x01, 0);
+        bytes memory data = CPU.encodeSwap(0, __poolId, 0x01, 0x00, 0x01, 0x01, 0);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
     function testSwapExactInPoolPriceUpdated() public {
         // Add liquidity first
-        bytes memory data = Instructions.encodeAllocate(
+        bytes memory data = CPU.encodeAllocate(
             0,
             __poolId,
             0x13, // 19 zeroes, so 10e19 liquidity
@@ -290,7 +290,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prev = getPool(__poolId).lastPrice; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
@@ -300,7 +300,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     /* function testSwapExactInPoolSlotIndexUpdated() public {
         // Add liquidity first
-        bytes memory data = Instructions.encodeAllocate(
+        bytes memory data = CPU.encodeAllocate(
             0,
             __poolId,
             0x13, // 19 zeroes, so 10e19 liquidity
@@ -314,7 +314,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int256 prev = getPool(__poolId).lastTick; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
@@ -324,7 +324,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testSwapExactInPoolLiquidityUnchanged() public {
         // Add liquidity first
-        bytes memory data = Instructions.encodeAllocate(
+        bytes memory data = CPU.encodeAllocate(
             0,
             __poolId,
             0x13, // 19 zeroes, so 10e19 liquidity
@@ -337,7 +337,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prev = getPool(__poolId).liquidity; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
@@ -347,7 +347,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testSwapExactInPoolTimestampUpdated() public {
         // Add liquidity first
-        bytes memory data = Instructions.encodeAllocate(
+        bytes memory data = CPU.encodeAllocate(
             0,
             __poolId,
             0x13, // 19 zeroes, so 10e19 liquidity, note: 0x0a amount breaks test? todo: handle case where insufficient liquidity
@@ -361,7 +361,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prev = getPool(__poolId).blockTimestamp; // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
@@ -371,7 +371,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testSwapExactInGlobalAssetBalanceIncreases() public {
         // Add liquidity first
-        bytes memory data = Instructions.encodeAllocate(
+        bytes memory data = CPU.encodeAllocate(
             0,
             __poolId,
             0x13, // 19 zeroes, so 10e19 liquidity
@@ -385,7 +385,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prev = getReserves(address(asset)); // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
@@ -395,7 +395,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testSwapExactInGlobalQuoteBalanceDecreases() public {
         // Add liquidity first
-        bytes memory data = Instructions.encodeAllocate(
+        bytes memory data = CPU.encodeAllocate(
             0,
             __poolId,
             0x13, // 19 zeroes, so 10e19 liquidity
@@ -409,7 +409,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prev = getReserves(address(quote)); // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
@@ -421,14 +421,14 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailAllocateNonExistentPoolIdReverts() public {
         uint48 random = uint48(48);
-        bytes memory data = Instructions.encodeAllocate(0, random, 0x01, 0x01);
+        bytes memory data = CPU.encodeAllocate(0, random, 0x01, 0x01);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
     }
 
     function testFailAllocateZeroLiquidityReverts() public {
         uint8 liquidity = 0;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, 0x00, liquidity);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, 0x00, liquidity);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
     }
@@ -446,7 +446,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 max = -min;
         uint8 power = uint8(0x06); // 6 zeroes
         uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
 
         forwarder.pass(data);
 
@@ -466,7 +466,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -485,7 +485,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -501,7 +501,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -516,7 +516,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -528,13 +528,13 @@ contract TestHyperSingle is StandardHelpers, Test {
     // --- Remove Liquidity --- //
 
     function testFailUnallocateZeroLiquidityReverts() public {
-        bytes memory data = Instructions.encodeUnallocate(0, __poolId, 0x00, 0x00);
+        bytes memory data = CPU.encodeUnallocate(0, __poolId, 0x00, 0x00);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
 
     function testFailUnallocateNonExistentPoolReverts() public {
-        bytes memory data = Instructions.encodeUnallocate(0, 42, 0x01, 0x01);
+        bytes memory data = CPU.encodeUnallocate(0, 42, 0x01, 0x01);
         bool success = forwarder.pass(data);
         assertTrue(!success);
     }
@@ -544,7 +544,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
@@ -554,7 +554,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 warpTimestamp = block.timestamp + 1;
         vm.warp(warpTimestamp);
 
-        data = Instructions.encodeUnallocate(0, __poolId, power, amount);
+        data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 nextPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
@@ -567,14 +567,14 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
         uint48 positionId = uint48(bytes6(abi.encodePacked(__poolId)));
         uint256 prevPositionLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
 
-        data = Instructions.encodeUnallocate(0, __poolId, power, amount);
+        data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 nextPositionLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
@@ -587,13 +587,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prev = getReserves(address(asset));
 
-        data = Instructions.encodeUnallocate(0, __poolId, power, amount);
+        data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 next = getReserves(address(asset));
@@ -605,13 +605,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prev = getReserves(address(quote));
 
-        data = Instructions.encodeUnallocate(0, __poolId, power, amount);
+        data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
         uint256 next = getReserves(address(quote));
@@ -625,7 +625,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
@@ -633,7 +633,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         bool prevPositionStaked = getPosition(address(forwarder), positionId).stakeEpochId != 0;
 
-        data = Instructions.encodeStakePosition(positionId);
+        data = CPU.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
         bool nextPositionStaked = getPosition(address(forwarder), positionId).stakeEpochId != 0;
@@ -647,14 +647,14 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
 
         uint48 positionId = __poolId;
-        data = Instructions.encodeStakePosition(positionId);
+        data = CPU.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
         uint256 nextPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
@@ -680,23 +680,23 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK + 256; // fails if not above current tick
         uint8 amount = 0x01;
         uint8 power = 0x0f;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint48 positionId = __poolId;
-        data = Instructions.encodeStakePosition(positionId);
+        data = CPU.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
         vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = Instructions.encodeSwap(0, __poolId, 0x09, 0x01, 0x10, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x10, 0x01, 0);
         success = forwarder.pass(data);
 
         uint256 prevPositionStaked = getPosition(address(forwarder), positionId).unstakeEpochId;
 
-        data = Instructions.encodeUnstakePosition(positionId);
+        data = CPU.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
         uint256 nextPositionStaked = getPosition(address(forwarder), positionId).unstakeEpochId;
@@ -710,29 +710,29 @@ contract TestHyperSingle is StandardHelpers, Test {
         int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
         uint8 amount = 0x01;
         uint8 power = 0x0f;
-        bytes memory data = Instructions.encodeAllocate(0, __poolId, power, amount);
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
         bool success = forwarder.pass(data);
         assertTrue(success);
 
         uint48 positionId = __poolId;
-        data = Instructions.encodeStakePosition(positionId);
+        data = CPU.encodeStakePosition(positionId);
         success = forwarder.pass(data);
 
         vm.warp(__contractBeingTested.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = Instructions.encodeSwap(0, __poolId, 0x09, 0x01, 0x10, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x10, 0x01, 0);
         success = forwarder.pass(data);
 
         uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
 
-        data = Instructions.encodeUnstakePosition(positionId);
+        data = CPU.encodeUnstakePosition(positionId);
         success = forwarder.pass(data);
 
         vm.warp((__contractBeingTested.EPOCH_INTERVAL() + 1) * 2);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = Instructions.encodeSwap(0, __poolId, 0x01, 0x01, 0x10, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x01, 0x01, 0x10, 0x01, 0);
         success = forwarder.pass(data);
 
         // todo: currently fails because unstaking does not change staked liquidity.
@@ -753,27 +753,27 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailCreatePairSameTokensReverts() public {
         address token = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(token, token);
+        bytes memory data = CPU.encodeCreatePair(token, token);
         bool success = forwarder.pass(data);
         assertTrue(!success, "forwarder call failed");
     }
 
     function testFailCreatePairPairExistsReverts() public {
-        bytes memory data = Instructions.encodeCreatePair(address(asset), address(quote));
+        bytes memory data = CPU.encodeCreatePair(address(asset), address(quote));
         bool success = forwarder.pass(data);
     }
 
     function testFailCreatePairLowerDecimalBoundsReverts() public {
         address token0 = address(new TestERC20("t", "t", 5));
         address token1 = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
     }
 
     function testFailCreatePairUpperDecimalBoundsReverts() public {
         address token0 = address(new TestERC20("t", "t", 24));
         address token1 = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
     }
 
@@ -781,7 +781,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prevNonce = __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         uint256 nonce = __contractBeingTested.getPairNonce();
         assertEq(nonce, prevNonce + 1);
@@ -791,7 +791,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prevNonce = __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         uint256 pairId = __contractBeingTested.getPairId(token0, token1);
         assertTrue(pairId != 0);
@@ -801,7 +801,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         uint256 prevNonce = __contractBeingTested.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         uint16 pairId = __contractBeingTested.getPairId(token0, token1);
         Pair memory pair = getPair(pairId);
@@ -815,7 +815,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailCreateCurveCurveExistsReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
             uint16(1e4 - curve.gamma),
@@ -827,7 +827,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailCreateCurveFeeParameterOutsideBoundsReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
             5e4,
@@ -839,7 +839,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailCreateCurvePriorityFeeParameterOutsideBoundsReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
             uint16(1e4 - curve.gamma),
@@ -851,7 +851,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailCreateCurveExpiringPoolZeroSigmaReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             0,
             curve.maturity,
             uint16(1e4 - curve.gamma),
@@ -863,7 +863,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testFailCreateCurveExpiringPoolZeroStrikeReverts() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
             uint16(1e4 - curve.gamma),
@@ -876,7 +876,7 @@ contract TestHyperSingle is StandardHelpers, Test {
     function testCreateCurveCurveNonceIncrementReturnsOne() public {
         uint256 prevNonce = __contractBeingTested.getCurveNonce();
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
             uint16(1e4 - curve.gamma),
@@ -890,14 +890,14 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testCreateCurveFetchesCurveIdReturnsNonZero() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
             uint16(1e4 - curve.gamma),
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bytes32 rawCurveId = Decoder.toBytes32(
+        bytes32 rawCurveId = CPU.toBytes32(
             abi.encodePacked(
                 curve.sigma + 1,
                 curve.maturity,
@@ -913,14 +913,14 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function testCreateCurveFetchesCurveDataReturnsParametersSet() public {
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        bytes memory data = Instructions.encodeCreateCurve(
+        bytes memory data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
             uint16(1e4 - curve.gamma),
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bytes32 rawCurveId = Decoder.toBytes32(
+        bytes32 rawCurveId = CPU.toBytes32(
             abi.encodePacked(
                 curve.sigma + 1,
                 curve.maturity,
@@ -942,62 +942,62 @@ contract TestHyperSingle is StandardHelpers, Test {
     // --- Create Pool --- //
 
     function testFailCreatePoolZeroPriceParameterReverts() public {
-        bytes memory data = Instructions.encodeCreatePool(1, 0);
+        bytes memory data = CPU.encodeCreatePool(1, 0);
         bool success = forwarder.pass(data);
     }
 
     function testFailCreatePoolExistentPoolReverts() public {
-        bytes memory data = Instructions.encodeCreatePool(__poolId, 1);
+        bytes memory data = CPU.encodeCreatePool(__poolId, 1);
         bool success = forwarder.pass(data);
     }
 
     function testFailCreatePoolZeroPairIdReverts() public {
-        bytes memory data = Instructions.encodeCreatePool(0x000001, 1);
+        bytes memory data = CPU.encodeCreatePool(0x000001, 1);
         bool success = forwarder.pass(data);
     }
 
     function testFailCreatePoolExpiringPoolExpiredReverts() public {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         uint16 pairId = __contractBeingTested.getPairId(token0, token1);
 
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        data = Instructions.encodeCreateCurve(
+        data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             uint32(0),
             uint16(1e4 - curve.gamma),
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bytes32 rawCurveId = Decoder.toBytes32(
+        bytes32 rawCurveId = CPU.toBytes32(
             abi.encodePacked(curve.sigma + 1, uint32(0), uint16(1e4 - curve.gamma), curve.strike)
         );
         success = forwarder.pass(data);
 
         uint32 curveId = __contractBeingTested.getCurveId(rawCurveId);
-        uint48 id = Instructions.encodePoolId(pairId, curveId);
-        data = Instructions.encodeCreatePool(id, 1_000);
+        uint48 id = CPU.encodePoolId(pairId, curveId);
+        data = CPU.encodeCreatePool(id, 1_000);
         success = forwarder.pass(data);
     }
 
     function testCreatePoolFetchesPoolDataReturnsNonZeroBlockTimestamp() public {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
-        bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = forwarder.pass(data);
         uint16 pairId = __contractBeingTested.getPairId(token0, token1);
 
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
-        data = Instructions.encodeCreateCurve(
+        data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
             uint16(1e4 - curve.gamma),
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bytes32 rawCurveId = Decoder.toBytes32(
+        bytes32 rawCurveId = CPU.toBytes32(
             abi.encodePacked(
                 curve.sigma + 1,
                 curve.maturity,
@@ -1009,8 +1009,8 @@ contract TestHyperSingle is StandardHelpers, Test {
         success = forwarder.pass(data);
 
         uint32 curveId = __contractBeingTested.getCurveId(rawCurveId);
-        uint48 id = Instructions.encodePoolId(pairId, curveId);
-        data = Instructions.encodeCreatePool(id, 1_000);
+        uint48 id = CPU.encodePoolId(pairId, curveId);
+        data = CPU.encodeCreatePool(id, 1_000);
         success = forwarder.pass(data);
 
         uint256 time = getPool(id).blockTimestamp;

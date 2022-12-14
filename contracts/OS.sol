@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
-import {BalanceError} from "./EnigmaTypes.sol";
+import {BalanceError, EtherTransferFail} from "./EnigmaTypes.sol";
 
 using {cache, deposit, withdraw, credit, debit, prepare, settle, multiSettle, clearTransient, computeNetReserves, warmToken} for AccountSystem global;
 
@@ -22,6 +23,23 @@ function __balanceOf__(address token, address account) view returns (uint256) {
     (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
     if (!success || data.length != 32) revert BalanceError();
     return abi.decode(data, (uint256));
+}
+
+/** @dev Sends ether in `deposit` function to target address. Must validate `weth`. */
+function __wrapEther__(address weth) {
+    IWETH(weth).deposit{value: msg.value}();
+}
+
+/** @dev Dangerously sends ether to `to` in a low-level call. */
+function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
+    IWETH(weth).withdraw(amount);
+    __dangerousTransferEther__(to, amount);
+}
+
+/** @dev Dangerously sends ether to `to` in a low-level call. */
+function __dangerousTransferEther__(address to, uint256 value) {
+    (bool success, ) = to.call{value: value}(new bytes(0));
+    if (!success) revert EtherTransferFail();
 }
 
 function credit(AccountSystem storage self, address owner, address token, uint amount) {

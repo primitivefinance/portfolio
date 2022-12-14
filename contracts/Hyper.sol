@@ -3,16 +3,14 @@ pragma solidity 0.8.13;
 
 import "solmate/utils/SafeTransferLib.sol";
 
-import "./Accounting.sol";
-import "./CPU.sol";
+import "./OS.sol";
+import "./CPU.sol" as CPU;
 import "./EnigmaTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
 import "./libraries/Utils.sol";
-import "./libraries/Decoder.sol";
 import "./libraries/HyperSwapLib.sol";
-import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
 
 using {getStartTime, getEpochsPassed, getLastUpdatedId, getTimeToTransition, getTimePassedInCurrentEpoch} for Epoch;
@@ -51,23 +49,6 @@ function getTimePassedInCurrentEpoch(
     uint256 startTime = epoch.getStartTime();
     uint256 lastUpdateInCurrentEpoch = lastUpdatedTimestamp > startTime ? lastUpdatedTimestamp : startTime;
     timePassed = timestamp - lastUpdateInCurrentEpoch;
-}
-
-/** @dev Sends ether in `deposit` function to target address. Must validate `weth`. */
-function __wrapEther(address weth) {
-    IWETH(weth).deposit{value: msg.value}();
-}
-
-/** @dev Dangerously sends ether to `to` in a low-level call. */
-function __dangerousUnwrapEther(address weth, address to, uint256 amount) {
-    IWETH(weth).withdraw(amount);
-    __dangerousTransferEther(to, amount);
-}
-
-/** @dev Dangerously sends ether to `to` in a low-level call. */
-function __dangerousTransferEther(address to, uint256 value) {
-    (bool success, ) = to.call{value: value}(new bytes(0));
-    if (!success) revert EtherTransferFail();
 }
 
 /**
@@ -152,8 +133,6 @@ contract Hyper is IHyper {
     address public immutable WETH;
     /// @dev Distance between the location of prices on the price grid, so distance between price.
     int24 public constant TICK_SIZE = 256;
-    /// @dev Used as the first pointer for the jump process.
-    uint8 public constant JUMP_PROCESS_START_POINTER = 2;
     /// @dev Minimum amount of decimals supported for ERC20 tokens.
     uint8 public constant MIN_DECIMALS = 6;
     /// @dev Maximum amount of decimals supported for ERC20 tokens.
@@ -246,7 +225,7 @@ contract Hyper is IHyper {
     /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
     /// @custom:mev Higher level security checks must be implemented by calling contract.
     fallback() external payable lock settle {
-        __startProcess__(_process);
+        CPU.__startProcess__(_process);
     }
 
     function pay(address token, address to, uint amount) private {
@@ -264,7 +243,7 @@ contract Hyper is IHyper {
     function allocate(uint48 poolId, uint amount) external lock settle {
         /* bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
-        data = Instructions.encodeAllocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
+        data = CPU.encodeAllocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
         _allocate(data); */
     }
 
@@ -272,19 +251,19 @@ contract Hyper is IHyper {
     function unallocate(uint48 poolId, uint amount) external lock settle {
         /*    bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
-        data = Instructions.encodeUnallocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
+        data = CPU.encodeUnallocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
         _process(data);  */
     }
 
     /// @inheritdoc IHyperActions
     function stake(uint48 poolId) external lock settle {
-        /*   data = Instructions.encodeStakePosition(poolId);
+        /*   data = CPU.encodeStakePosition(poolId);
         _process(data); */
     }
 
     /// @inheritdoc IHyperActions
     function unstake(uint48 poolId) external lock settle {
-        /*  data = Instructions.encodeUnstakePosition(poolId);
+        /*  data = CPU.encodeUnstakePosition(poolId);
         _process(data); */
     }
 
@@ -292,7 +271,7 @@ contract Hyper is IHyper {
     function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external lock settle {
         /*  bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
-        data = Instructions.encodeSwap(useMax, poolId, 0x0, input, 0x0, limit, uint8(sellAsset)); // Used as an input multiplier: 10^(0x0) = 1.
+        data = CPU.encodeSwap(useMax, poolId, 0x0, input, 0x0, limit, uint8(sellAsset)); // Used as an input multiplier: 10^(0x0) = 1.
         _process(data); */
     }
 
@@ -301,7 +280,7 @@ contract Hyper is IHyper {
         if (balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
         _applyDebit(token, amount);
 
-        if (token == WETH) __dangerousUnwrapEther(WETH, to, amount);
+        if (token == WETH) __dangerousUnwrapEther__(WETH, to, amount);
         else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
     }
 
@@ -309,7 +288,7 @@ contract Hyper is IHyper {
     function fund(address token, uint256 amount) external payable override lock settle {
         _applyCredit(token, amount);
 
-        if (token == WETH) __wrapEther(WETH);
+        if (token == WETH) __wrapEther__(WETH);
         else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
     }
 
@@ -335,7 +314,7 @@ contract Hyper is IHyper {
      * @custom:reverts If attempting to add zero liquidity.
      */
     function _allocate(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = Instructions.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
+        (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
         poolId = poolId_;
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
@@ -373,7 +352,7 @@ contract Hyper is IHyper {
     }
 
     function _unallocate(bytes calldata data) internal returns (uint48 poolId, uint256 a, uint256 b) {
-        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
+        (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
         poolId = poolId_;
 
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
@@ -412,7 +391,7 @@ contract Hyper is IHyper {
     }
 
     function _stake(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint48 positionId) = Instructions.decodeStakePosition(data);
+        (uint48 poolId_, uint48 positionId) = CPU.decodeStakePosition(data);
         poolId = poolId_;
 
         if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
@@ -433,7 +412,7 @@ contract Hyper is IHyper {
     }
 
     function _unstake(bytes calldata data) internal returns (uint48 poolId, uint256 a) {
-        (uint48 poolId_, uint48 positionId) = Instructions.decodeUnstakePosition(data);
+        (uint48 poolId_, uint48 positionId) = CPU.decodeUnstakePosition(data);
         poolId = poolId_;
 
         _syncPoolPriceAndEpoch(poolId);
@@ -519,7 +498,7 @@ contract Hyper is IHyper {
         // SwapState memory state;
 
         Order memory args;
-        (args.useMax, args.poolId, args.input, args.limit, args.direction) = Instructions.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
+        (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
 
         if (args.input == 0) revert ZeroInput();
         if (!_doesPoolExist(args.poolId)) revert NonExistentPool(args.poolId);
@@ -799,7 +778,7 @@ contract Hyper is IHyper {
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
     function _createPool(bytes calldata data) internal returns (uint48 poolId) {
-        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = Instructions.decodeCreatePool(data);
+        (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = CPU.decodeCreatePool(data);
 
         if (price == 0) revert ZeroPrice();
         if (pairId == 0) pairId = uint16(getPairNonce); // magic variable
@@ -833,10 +812,9 @@ contract Hyper is IHyper {
      * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
      */
     function _createCurve(bytes calldata data) internal returns (uint32 curveId) {
-        (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = Instructions
-            .decodeCreateCurve(data); // Expects Enigma encoded data.
+        (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = CPU.decodeCreateCurve(data); // Expects Enigma encoded data.
 
-        bytes32 rawCurveId = Decoder.toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
+        bytes32 rawCurveId = CPU.toBytes32(data[1:]); // note: Trims the single byte Enigma instruction code.
 
         curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
         if (curveId != 0) revert CurveExists(curveId);
@@ -875,7 +853,7 @@ contract Hyper is IHyper {
      * @custom:reverts If decimals of either token are not between 6 and 18, inclusive.
      */
     function _createPair(bytes calldata data) internal returns (uint16 pairId) {
-        (address asset, address quote) = Instructions.decodeCreatePair(data); // Expects Engima encoded data.
+        (address asset, address quote) = CPU.decodeCreatePair(data); // Expects Engima encoded data.
         if (asset == quote) revert SameTokenError();
 
         pairId = getPairId[asset][quote];
@@ -951,27 +929,27 @@ contract Hyper is IHyper {
     /// @notice Single instruction processor that will forward instruction to appropriate function.
     /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
     /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
-    /// @custom:security Critical. Directly sends instructions to be executed.
+    /// @custom:security Critical. Directly sends CPU to be executed.
     function _process(bytes calldata data) internal {
         uint48 poolId;
         bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == Instructions.UNKNOWN) revert UnknownInstruction();
+        if (instruction == CPU.UNKNOWN) revert UnknownInstruction();
 
-        if (instruction == Instructions.ALLOCATE) {
+        if (instruction == CPU.ALLOCATE) {
             (poolId, ) = _allocate(data);
-        } else if (instruction == Instructions.UNALLOCATE) {
+        } else if (instruction == CPU.UNALLOCATE) {
             (poolId, , ) = _unallocate(data);
-        } else if (instruction == Instructions.SWAP) {
+        } else if (instruction == CPU.SWAP) {
             (poolId, , , ) = _swapExactIn(data);
-        } else if (instruction == Instructions.STAKE_POSITION) {
+        } else if (instruction == CPU.STAKE_POSITION) {
             (poolId, ) = _stake(data);
-        } else if (instruction == Instructions.UNSTAKE_POSITION) {
+        } else if (instruction == CPU.UNSTAKE_POSITION) {
             (poolId, ) = _unstake(data);
-        } else if (instruction == Instructions.CREATE_POOL) {
+        } else if (instruction == CPU.CREATE_POOL) {
             (poolId) = _createPool(data);
-        } else if (instruction == Instructions.CREATE_CURVE) {
+        } else if (instruction == CPU.CREATE_CURVE) {
             _createCurve(data);
-        } else if (instruction == Instructions.CREATE_PAIR) {
+        } else if (instruction == CPU.CREATE_PAIR) {
             _createPair(data);
         } else {
             revert UnknownInstruction();
