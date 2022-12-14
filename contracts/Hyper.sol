@@ -186,31 +186,36 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function allocate(uint48 poolId, uint amount) external lock settle {
+    function allocate(uint48 poolId, uint amount) external lock settle returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = utils.toUint128(useMax ? 0 : amount);
-        _allocate(useMax ? 1 : 0, poolId, input);
+        (deltaAsset, deltaQuote) = _allocate(useMax ? 1 : 0, poolId, input);
     }
 
     /// @inheritdoc IHyperActions
-    function unallocate(uint48 poolId, uint amount) external lock settle {
+    function unallocate(uint48 poolId, uint amount) external lock settle returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = utils.toUint128(useMax ? 0 : amount);
-        _unallocate(useMax ? 1 : 0, poolId, uint16(poolId >> 32), input);
+        (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint16(poolId >> 32), input);
     }
 
     /// @inheritdoc IHyperActions
     function stake(uint48 poolId) external lock settle {
-        _stake(poolId, poolId);
+        _stake(poolId);
     }
 
     /// @inheritdoc IHyperActions
     function unstake(uint48 poolId) external lock settle {
-        _unstake(poolId, poolId);
+        _unstake(poolId);
     }
 
     /// @inheritdoc IHyperActions
-    function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external lock settle {
+    function swap(
+        uint48 poolId,
+        bool sellAsset,
+        uint amount,
+        uint limit
+    ) external lock settle returns (uint output, uint remainder) {
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = utils.toUint128(useMax ? 0 : amount);
         Order memory args = Order({
@@ -220,7 +225,7 @@ contract Hyper is IHyper {
             limit: utils.toUint128(limit),
             direction: sellAsset ? 0 : 1
         });
-        _swapExactIn(args);
+        (, remainder, , output) = _swapExactIn(args);
     }
 
     /// @inheritdoc IHyperActions
@@ -263,22 +268,25 @@ contract Hyper is IHyper {
      */
     function _allocate(
         uint8 useMax,
-        uint48 poolId_,
+        uint48 poolId,
         uint128 deltaLiquidity
-    ) internal returns (uint48 poolId, uint256 a) {
-        poolId = poolId_;
-
+    ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
         _syncPoolPriceAndEpoch(poolId);
 
-        (uint256 deltaR2, uint256 deltaR1) = getPhysicalReserves(poolId, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity);
 
-        _increaseLiquidity(poolId_, deltaR1, deltaR2, deltaLiquidity);
+        _increaseLiquidity(poolId, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
-    function _increaseLiquidity(uint48 poolId, uint256 deltaR1, uint256 deltaR2, uint128 deltaLiquidity) internal {
+    function _increaseLiquidity(
+        uint48 poolId,
+        uint256 deltaAsset,
+        uint256 deltaQuote,
+        uint128 deltaLiquidity
+    ) internal {
         HyperPool storage pool = pools[poolId];
         __updatePoolLiquidity(pool, _blockTimestamp(), int128(deltaLiquidity));
         _increasePosition(poolId, deltaLiquidity);
@@ -286,10 +294,10 @@ contract Hyper is IHyper {
         // note: Global reserves are used at the end of instruction processing to settle transactions.
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = pairs[pairId];
-        _increaseGlobal(pair.tokenBase, deltaR2);
-        _increaseGlobal(pair.tokenQuote, deltaR1);
+        _increaseGlobal(pair.tokenBase, deltaAsset);
+        _increaseGlobal(pair.tokenQuote, deltaQuote);
 
-        emit Allocate(poolId, pair.tokenBase, pair.tokenQuote, deltaR2, deltaR1, deltaLiquidity);
+        emit Allocate(poolId, pair.tokenBase, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
@@ -304,27 +312,25 @@ contract Hyper is IHyper {
 
     function _unallocate(
         uint8 useMax,
-        uint48 poolId_,
+        uint48 poolId,
         uint16 pairId,
         uint128 deltaLiquidity
-    ) internal returns (uint48 poolId, uint256 a, uint256 b) {
-        poolId = poolId_;
-
+    ) internal returns (uint deltaAsset, uint deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
         // Compute amounts of tokens for the real reserves.
-        HyperPool storage pool = pools[poolId_];
+        HyperPool storage pool = pools[poolId];
         __updatePoolLiquidity(pool, _blockTimestamp(), -int128(deltaLiquidity));
-        _decreasePosition(poolId_, deltaLiquidity);
+        _decreasePosition(poolId, deltaLiquidity);
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
-        (uint256 deltaR2, uint256 deltaR1) = getPhysicalReserves(poolId_, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity);
         Pair memory pair = pairs[pairId];
-        _decreaseGlobal(pair.tokenBase, deltaR2);
-        _decreaseGlobal(pair.tokenQuote, deltaR1);
+        _decreaseGlobal(pair.tokenBase, deltaAsset);
+        _decreaseGlobal(pair.tokenQuote, deltaQuote);
 
-        emit Unallocate(poolId_, pair.tokenBase, pair.tokenQuote, deltaR1, deltaR2, deltaLiquidity);
+        emit Unallocate(poolId, pair.tokenBase, pair.tokenQuote, deltaQuote, deltaAsset, deltaLiquidity);
     }
 
     /// @dev Syncs a position's fee growth, fees earned, liquidity, and timestamp.
@@ -345,19 +351,17 @@ contract Hyper is IHyper {
         _decreasePosition(poolId, deltaLiquidity);
     }
 
-    function _stake(uint48 poolId_, uint48 positionId) internal returns (uint48 poolId, uint256 a) {
-        poolId = poolId_;
+    function _stake(uint48 poolId) internal {
+        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+        HyperPosition storage pos = positions[msg.sender][poolId];
+        if (pos.stakeEpochId != 0) revert PositionStakedError(poolId);
+        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(poolId);
 
-        HyperPosition storage pos = positions[msg.sender][positionId];
-        if (pos.stakeEpochId != 0) revert PositionStakedError(positionId);
-        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(positionId);
-
-        HyperPool storage pool = pools[poolId_];
+        HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
 
-        Epoch storage epoch = epochs[poolId_];
+        Epoch storage epoch = epochs[poolId];
         pos.stakeEpochId = epoch.id + 1;
 
         // note: do we need to update position blockTimestamp?
@@ -365,20 +369,18 @@ contract Hyper is IHyper {
         // emit Stake Position
     }
 
-    function _unstake(uint48 poolId_, uint48 positionId) internal returns (uint48 poolId, uint256 a) {
-        poolId = poolId_;
-
+    function _unstake(uint48 poolId) internal {
         _syncPoolPriceAndEpoch(poolId);
 
-        if (!_doesPoolExist(poolId_)) revert NonExistentPool(poolId_);
+        if (!_doesPoolExist(poolId)) revert NonExistentPool(poolId);
 
-        HyperPosition storage pos = positions[msg.sender][positionId];
-        if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(positionId);
+        HyperPosition storage pos = positions[msg.sender][poolId];
+        if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(poolId);
 
-        HyperPool storage pool = pools[poolId_];
+        HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
 
-        Epoch storage epoch = epochs[poolId_];
+        Epoch storage epoch = epochs[poolId];
         pos.unstakeEpochId = epoch.id + 1;
 
         // note: do we need to update position blockTimestamp?
@@ -890,20 +892,20 @@ contract Hyper is IHyper {
 
         if (instruction == CPU.ALLOCATE) {
             (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
-            (poolId, ) = _allocate(useMax, poolId_, deltaLiquidity);
+            _allocate(useMax, poolId_, deltaLiquidity);
         } else if (instruction == CPU.UNALLOCATE) {
             (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
-            (poolId, , ) = _unallocate(useMax, poolId_, pairId, deltaLiquidity);
+            _unallocate(useMax, poolId_, pairId, deltaLiquidity);
         } else if (instruction == CPU.SWAP) {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
             (poolId, , , ) = _swapExactIn(args);
         } else if (instruction == CPU.STAKE_POSITION) {
-            (uint48 poolId_, uint48 positionId) = CPU.decodeStakePosition(data);
-            (poolId, ) = _stake(poolId_, positionId);
+            uint48 poolId_ = CPU.decodeStakePosition(data);
+            _stake(poolId_);
         } else if (instruction == CPU.UNSTAKE_POSITION) {
-            (uint48 poolId_, uint48 positionId) = CPU.decodeUnstakePosition(data);
-            (poolId, ) = _unstake(poolId_, positionId);
+            uint48 poolId_ = CPU.decodeUnstakePosition(data);
+            _unstake(poolId_);
         } else if (instruction == CPU.CREATE_POOL) {
             (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = CPU.decodeCreatePool(data);
             _createPool(poolId_, pairId, curveId, price);

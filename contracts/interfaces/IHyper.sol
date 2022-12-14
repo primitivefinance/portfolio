@@ -180,31 +180,26 @@ interface IHyperGetters {
 }
 
 interface IHyperActions {
-    function allocate(uint48 poolId, uint amount) external;
+    function allocate(uint48 poolId, uint deltaLiquidity) external returns (uint deltaAsset, uint deltaQuote);
 
-    function unallocate(uint48 poolId, uint amount) external;
+    function unallocate(uint48 poolId, uint amount) external returns (uint deltaAsset, uint deltaQuote);
 
     function stake(uint48 poolId) external;
 
     function unstake(uint48 poolId) external;
 
-    function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external;
+    function swap(
+        uint48 poolId,
+        bool sellAsset,
+        uint amount,
+        uint limit
+    ) external returns (uint output, uint remainder);
 
-    /// @dev Increases the `msg.sender` account's internal balance of `token`.
-    /// @custom:security High. Calls the `token` external contract.
     function fund(address token, uint256 amount) external payable;
 
-    /// @notice Transfers `amount` of `token` to the `to` account.
-    /// @dev Decreases the `msg.sender` account's internal balance of `token`.
-    /// @custom:security High. Calls the `token` external contract.
     function draw(address token, uint256 amount, address to) external;
 
-    /// @notice Syncs a pool with `poolId` to the current `block.timestamp`.
-    /// @dev Use this method after the pool is expired or else the invariant method will revert.
-    /// @custom:security Medium. Alternative method (instead of swapping) of syncing pools to the current timestamp.
     function updateLastTimestamp(uint48 poolId) external returns (uint128 blockTimestamp);
-
-    // TODO: add collect function to collect swap fees
 }
 
 /// @title IHyper

@@ -224,9 +224,8 @@ function encodeStakePosition(uint48 positionId) pure returns (bytes memory data)
 /// @dev Expects an enigma code and positionId.
 /// @param data Maximum 1 + 12 = 13 bytes.
 /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-function decodeStakePosition(bytes calldata data) pure returns (uint48 poolId, uint48 positionId) {
+function decodeStakePosition(bytes calldata data) pure returns (uint48 poolId) {
     poolId = uint48(bytes6(data[1:7]));
-    positionId = uint48(bytes6(data[1:7]));
 }
 
 function encodeUnstakePosition(uint48 positionId) pure returns (bytes memory data) {
@@ -236,9 +235,8 @@ function encodeUnstakePosition(uint48 positionId) pure returns (bytes memory dat
 /// @dev Expects an enigma code and positionId.
 /// @param data Maximum 1 + 12 = 13 bytes.
 /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-function decodeUnstakePosition(bytes calldata data) pure returns (uint48 poolId, uint48 positionId) {
+function decodeUnstakePosition(bytes calldata data) pure returns (uint48 poolId) {
     poolId = uint48(bytes6(data[1:7]));
-    positionId = uint48(bytes6(data[1:7]));
 }
 
 // --- Utility --- //
