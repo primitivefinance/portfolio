@@ -29,10 +29,10 @@ error DecimalsError(uint8 decimals);
 /// @dev Thrown if creating a pair with the same token.
 error SameTokenError();
 /// @dev Thrown if the amount of base tokens per liquidity is outside of the bounds 0 < x < 1.
-error PerLiquidityError(uint256 deltaBase);
+error PerLiquidityError(uint256 deltaAsset);
 // --- Validation --- //
 /// @dev Thrown when creating a pool that has one side of the pool have zero tokens.
-error CalibrationError(uint256 deltaBase, uint256 deltaQuote);
+error CalibrationError(uint256 deltaAsset, uint256 deltaQuote);
 /// @dev Thrown if the fee used in pool creation is more than 1000.
 error MaxFee(uint16 fee);
 /// @dev Thrown if the sigma used in pool creation is zero.
@@ -77,7 +77,7 @@ struct Curve {
 }
 /// @dev Token information of each two token pool.
 struct Pair {
-    address tokenBase;
+    address tokenAsset;
     uint8 decimalsBase;
     address tokenQuote;
     uint8 decimalsQuote;

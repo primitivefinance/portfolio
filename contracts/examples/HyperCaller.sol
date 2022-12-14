@@ -149,7 +149,7 @@ contract HyperCaller is StandardHelpers {
 
     function swapExactIn(address token, uint256 amountIn, uint256 limitPrice) external {
         Pair memory pair = loaded.pair;
-        uint8 direction = pair.tokenBase == token ? 0 : pair.tokenQuote == token ? 1 : type(uint8).max;
+        uint8 direction = pair.tokenAsset == token ? 0 : pair.tokenQuote == token ? 1 : type(uint8).max;
         if (direction == type(uint8).max) revert InvalidToken(token);
 
         _swap(0, loaded.poolId, amountIn, limitPrice, direction);

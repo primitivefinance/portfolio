@@ -55,27 +55,25 @@ interface IHyperEvents {
     // --- Reserves --- //
     /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
     /// @custom:security High. Use these to track the total value locked of a token.
-    event IncreaseGlobalBalance(address indexed token, uint256 amount);
+    event IncreaseReserveBalance(address indexed token, uint256 amount);
     /// @dev Emitted on any pool interaction which decreases one of the pool's reserves.
     /// @custom:security High.
-    event DecreaseGlobalBalance(address indexed token, uint256 amount);
+    event DecreaseReserveBalance(address indexed token, uint256 amount);
     // -- Positions -- //
     /// @dev Emitted on increasing liquidity.
     event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
     /// @dev Emitted on removing liquidity.
     event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
     /// @dev Emitted on syncing earned fees to a position's claimable balance.
-    event FeesEarned(address indexed account, uint48 indexed poolId, uint256 feeAsset, uint256 feeQuote);
-
-    // - Fees - //
-    event Collect(
+    event FeesEarned(
+        address indexed account,
         uint48 indexed poolId,
-        address indexed to,
-        uint256 tokensCollectedAsset,
+        uint256 feeAsset,
         address asset,
-        uint256 tokensCollectedQuote,
+        uint256 feeQuote,
         address quote
     );
+
     // - Sync pool - //
 
     event PoolUpdate(

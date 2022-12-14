@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 import {JumpError} from "./EnigmaTypes.sol";
+import "./Assembly.sol";
 
 // --- Instructions --- //
 bytes1 constant UNKNOWN = 0x00;
@@ -133,9 +134,9 @@ function encodeCreatePair(address token0, address token1) pure returns (bytes me
 /// @dev Expects a 41-byte length array with two addresses packed into it.
 /// @param data Maximum 1 + 20 + 20 = 41 bytes.
 /// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
-function decodeCreatePair(bytes calldata data) pure returns (address tokenBase, address tokenQuote) {
+function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
     if (data.length != 41) revert DecodePairBytesLength(41, data.length);
-    tokenBase = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
+    tokenAsset = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
     tokenQuote = address(bytes20(data[21:]));
 }
 
@@ -169,7 +170,7 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint48 
     poolId = uint48(bytes6(data[1:7]));
     deltaLiquidity = toAmount(data[7:]);
     //uint8 pointer = uint8(data[13]);
-    //deltaBase = toAmount(data[14:pointer]);
+    //deltaAsset = toAmount(data[14:pointer]);
     //deltaQuote = toAmount(data[pointer:]);
 }
 
@@ -248,28 +249,6 @@ function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
 
 function pack(bytes1 upper, bytes1 lower) pure returns (bytes1 data) {
     data = (upper << 4) | lower;
-}
-
-/// @dev           Converts an array of bytes into a byte32
-/// @param raw     Array of bytes to convert
-/// @return data   Converted data
-function toBytes32(bytes memory raw) pure returns (bytes32 data) {
-    assembly {
-        data := mload(add(raw, 32))
-        let shift := mul(sub(32, mload(raw)), 8)
-        data := shr(shift, data)
-    }
-}
-
-/// @dev           Converts an array of bytes into a bytes16.
-/// @param raw     Array of bytes to convert.
-/// @return data   Converted data.
-function toBytes16(bytes memory raw) pure returns (bytes16 data) {
-    assembly {
-        data := mload(add(raw, 32))
-        let shift := mul(sub(16, mload(raw)), 8)
-        data := shr(shift, data)
-    }
 }
 
 /// @dev             Converts an array of bytes into an uint128, the array must adhere

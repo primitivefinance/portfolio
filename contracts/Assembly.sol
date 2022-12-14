@@ -60,4 +60,36 @@ function __computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) p
     }
 }
 
+function __computeCheckpointDistance(
+    uint256 currentCheckpoint,
+    uint256 prevCheckpoint
+) pure returns (uint256 distance) {
+    // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+    assembly {
+        distance := sub(currentCheckpoint, prevCheckpoint)
+    }
+}
+
+/// @dev           Converts an array of bytes into a byte32
+/// @param raw     Array of bytes to convert
+/// @return data   Converted data
+function toBytes32(bytes memory raw) pure returns (bytes32 data) {
+    assembly {
+        data := mload(add(raw, 32))
+        let shift := mul(sub(32, mload(raw)), 8)
+        data := shr(shift, data)
+    }
+}
+
+/// @dev           Converts an array of bytes into a bytes16.
+/// @param raw     Array of bytes to convert.
+/// @return data   Converted data.
+function toBytes16(bytes memory raw) pure returns (bytes16 data) {
+    assembly {
+        data := mload(add(raw, 32))
+        let shift := mul(sub(16, mload(raw)), 8)
+        data := shr(shift, data)
+    }
+}
+
 using {toUint128} for uint;

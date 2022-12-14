@@ -779,7 +779,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
         uint16 pairId = __contractBeingTested.getPairId(token0, token1);
         Pair memory pair = getPair(pairId);
-        assertEq(pair.tokenBase, token0);
+        assertEq(pair.tokenAsset, token0);
         assertEq(pair.tokenQuote, token1);
         assertEq(pair.decimalsBase, 18);
         assertEq(pair.decimalsQuote, 18);

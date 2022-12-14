@@ -16,7 +16,7 @@ import "./libraries/HyperSwapLib.sol";
 /**
  * @notice Syncs a pool's liquidity and last updated timestamp.
  */
-function __updatePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
+function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
     self.blockTimestamp = timestamp;
     self.liquidity = asm.toUint128(asm.__computeDelta(self.liquidity, liquidityDelta));
 }
@@ -24,7 +24,7 @@ function __updatePoolLiquidity(HyperPool storage self, uint256 timestamp, int128
 /**
  * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
  */
-function __updatePosition(
+function changePositionLiquidity(
     HyperPosition storage self,
     HyperPool storage pool,
     uint256 timestamp,
@@ -33,12 +33,23 @@ function __updatePosition(
     self.blockTimestamp = timestamp;
     self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
 
-    // Syncs fee growth and fees earned.
     (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
         pool.liquidity,
         pool.feeGrowthGlobalAsset,
         pool.feeGrowthGlobalQuote
     );
+
+    (feeAssetEarned, feeQuoteEarned) = self.syncPositionFees(liquidity, feeGrowthAsset, feeGrowthQuote);
+}
+
+function syncPositionFees(
+    HyperPosition storage self,
+    uint liquidity,
+    uint feeGrowthAsset,
+    uint feeGrowthQuote
+) returns (uint feeAssetEarned, uint feeQuoteEarned) {
+    uint checkpointAsset = asm.__computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
+    uint checkpointQuote = asm.__computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
 
     feeAssetEarned = FixedPointMathLib.mulWadDown(feeGrowthAsset - self.feeGrowthAssetLast, liquidity);
     feeQuoteEarned = FixedPointMathLib.mulWadDown(feeGrowthQuote - self.feeGrowthQuoteLast, liquidity);
@@ -54,7 +65,9 @@ function exists(mapping(uint48 => HyperPool) storage pools, uint48 poolId) view 
     return pools[poolId].blockTimestamp != 0;
 }
 
+using {changePoolLiquidity} for HyperPool;
 using {exists} for mapping(uint48 => HyperPool);
+using {changePositionLiquidity, syncPositionFees} for HyperPosition;
 
 /// @title Enigma Virtual Machine.
 /// @notice Stores the state of the Enigma with functions to change state.
@@ -63,6 +76,9 @@ contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using HyperSwapLib for HyperSwapLib.Expiring;
+
+    // ===== Account ===== //
+    AccountSystem public __account__;
 
     // ===== Constants ===== //
     string public constant VERSION = "prototype-v0.0.1";
@@ -117,9 +133,6 @@ contract Hyper is IHyper {
     /// @dev Individual rewards of a position.
     mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
 
-    // ===== Account ===== //
-    AccountSystem public __account__;
-
     // ===== Reentrancy ===== //
     modifier lock() {
         if (locked != 1) revert LockedError();
@@ -158,7 +171,7 @@ contract Hyper is IHyper {
     function getPhysicalReserves(
         uint48 poolId,
         uint256 deltaLiquidity
-    ) public view returns (uint256 deltaBase, uint256 deltaQuote) {
+    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
         uint256 timestamp = _blockTimestamp();
 
         // Compute amounts of tokens for the real reserves.
@@ -170,11 +183,11 @@ contract Hyper is IHyper {
             tau: curve.maturity - timestamp
         });
 
-        deltaBase = info.computeR2WithPrice(pool.lastPrice);
-        deltaQuote = info.computeR1WithR2(deltaBase, pool.lastPrice, 0);
+        deltaAsset = info.computeR2WithPrice(pool.lastPrice);
+        deltaQuote = info.computeR1WithR2(deltaAsset, pool.lastPrice, 0);
 
         deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
-        deltaBase = deltaBase.mulWadDown(deltaLiquidity);
+        deltaAsset = deltaAsset.mulWadDown(deltaLiquidity);
     }
 
     function getSecondsSincePositionUpdate(
@@ -289,8 +302,8 @@ contract Hyper is IHyper {
     /**
      * @notice Allocates liquidity to a pool.
      *
-     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      * @custom:reverts If attempting to add zero liquidity.
+     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      */
     function _allocate(
         uint8 useMax,
@@ -307,32 +320,44 @@ contract Hyper is IHyper {
         _increaseLiquidity(poolId, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
+    /**
+     * @notice Increases liquidity in position, which increases liquidity in pool, which increases reserve balances.
+     */
     function _increaseLiquidity(
         uint48 poolId,
         uint256 deltaAsset,
         uint256 deltaQuote,
         uint128 deltaLiquidity
     ) internal {
+        uint timestamp = _blockTimestamp();
         HyperPool storage pool = pools[poolId];
-        __updatePoolLiquidity(pool, _blockTimestamp(), int128(deltaLiquidity));
-        _increasePosition(poolId, deltaLiquidity);
+        pool.changePoolLiquidity(timestamp, int128(deltaLiquidity));
 
-        // note: Global reserves are used at the end of instruction processing to settle transactions.
+        HyperPosition storage pos = positions[msg.sender][poolId];
+        (uint feeAsset, uint feeQuote) = pos.changePositionLiquidity(pool, timestamp, int128(deltaLiquidity));
+
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = pairs[pairId];
-        _increaseGlobal(pair.tokenBase, deltaAsset);
-        _increaseGlobal(pair.tokenQuote, deltaQuote);
+        // note: Global reserves are used at the end of instruction processing to settle transactions.
+        _increaseReserves(pair.tokenAsset, deltaAsset);
+        _increaseReserves(pair.tokenQuote, deltaQuote);
 
-        emit Allocate(poolId, pair.tokenBase, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
+        emit FeesEarned(msg.sender, poolId, feeAsset, pair.tokenAsset, feeQuote, pair.tokenQuote);
+        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
+        emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
     /// @custom:security High. Only method of increasing the liquidity held by accounts.
-    function _increasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+    function _increasePositionLiquidity(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) internal returns (uint256 feeAsset, uint256 feeQuote) {
         HyperPool storage pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
-        (uint256 feeAsset, uint256 feeQuote) = __updatePosition(pos, pool, _blockTimestamp(), int256(deltaLiquidity));
-        emit FeesEarned(msg.sender, poolId, feeAsset, feeQuote);
+
+        (feeAsset, feeQuote) = pos.changePositionLiquidity(pool, _blockTimestamp(), int256(deltaLiquidity));
+
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
@@ -347,34 +372,41 @@ contract Hyper is IHyper {
 
         // Compute amounts of tokens for the real reserves.
         HyperPool storage pool = pools[poolId];
-        __updatePoolLiquidity(pool, _blockTimestamp(), -int128(deltaLiquidity));
-        _decreasePosition(poolId, deltaLiquidity);
+        changePoolLiquidity(pool, _blockTimestamp(), -int128(deltaLiquidity));
+        (uint feeAsset, uint feeQuote) = _decreasePosition(poolId, deltaLiquidity);
 
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity);
         Pair memory pair = pairs[pairId];
-        _decreaseGlobal(pair.tokenBase, deltaAsset);
-        _decreaseGlobal(pair.tokenQuote, deltaQuote);
+        _decreaseReserves(pair.tokenAsset, deltaAsset);
+        _decreaseReserves(pair.tokenQuote, deltaQuote);
 
-        emit Unallocate(poolId, pair.tokenBase, pair.tokenQuote, deltaQuote, deltaAsset, deltaLiquidity);
+        emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaQuote, deltaAsset, deltaLiquidity);
     }
 
     /// @dev Syncs a position's fee growth, fees earned, liquidity, and timestamp.
-    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal {
+    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal returns (uint feeAsset, uint feeQuote) {
         HyperPool storage pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
-        (uint256 feeAsset, uint256 feeQuote) = __updatePosition(pos, pool, _blockTimestamp(), -int256(deltaLiquidity));
-        emit FeesEarned(msg.sender, poolId, feeAsset, feeQuote);
+
+        (feeAsset, feeQuote) = changePositionLiquidity(pos, pool, _blockTimestamp(), -int256(deltaLiquidity));
+
+        uint16 pairId = uint16(poolId >> 32);
+        Pair memory pair = pairs[pairId];
+        emit FeesEarned(msg.sender, poolId, feeAsset, pair.tokenAsset, feeQuote, pair.tokenQuote);
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
     /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
-    function _decreasePositionCheckJit(uint48 poolId, uint256 deltaLiquidity) internal {
+    function _decreasePositionCheckJit(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) internal returns (uint feeAsset, uint feeQuote) {
         (uint256 distance, uint256 timestamp) = getSecondsSincePositionUpdate(msg.sender, poolId);
         if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
 
-        _decreasePosition(poolId, deltaLiquidity);
+        (feeAsset, feeQuote) = _decreasePosition(poolId, deltaLiquidity);
     }
 
     function _stake(uint48 poolId) internal {
@@ -454,10 +486,6 @@ contract Hyper is IHyper {
     function _swapExactIn(
         Order memory args
     ) internal returns (uint48 poolId, uint256 remainder, uint256 input, uint256 output) {
-        // SwapState memory state;
-
-        /* Order memory args; */
-
         if (args.input == 0) revert ZeroInput();
         if (!pools.exists(args.poolId)) revert NonExistentPool(args.poolId);
 
@@ -476,7 +504,7 @@ contract Hyper is IHyper {
             // Writes the pool after computing its updated price with respect to time elapsed since last update.
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
             // Expect the caller to exhaust their entire balance of the input token.
-            remainder = args.useMax == 1 ? __balanceOf__(pair.tokenBase, msg.sender) : args.input;
+            remainder = args.useMax == 1 ? __balanceOf__(pair.tokenAsset, msg.sender) : args.input;
             // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
             swap = Iteration({
                 price: price,
@@ -630,10 +658,10 @@ contract Hyper is IHyper {
         // Update Global Balance Effects
         // Return variables and swap event.
         //(poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
-        emit Swap(args.poolId, swap.input, swap.output, pair.tokenBase, pair.tokenQuote);
+        emit Swap(args.poolId, swap.input, swap.output, pair.tokenAsset, pair.tokenQuote);
 
-        _increaseGlobal(pair.tokenBase, swap.input);
-        _decreaseGlobal(pair.tokenQuote, swap.output);
+        _increaseReserves(pair.tokenAsset, swap.input);
+        _decreaseReserves(pair.tokenQuote, swap.output);
     }
 
     /**
@@ -655,7 +683,7 @@ contract Hyper is IHyper {
     ) internal returns (uint256 timeDelta) {
         uint256 timestamp = _blockTimestamp();
         uint16 pairId = uint16(poolId >> 32);
-        address FEE_SETTLEMENT_TOKEN = pairs[pairId].tokenBase;
+        address FEE_SETTLEMENT_TOKEN = pairs[pairId].tokenAsset;
 
         Epoch memory readEpoch = epochs[poolId];
         HyperPool storage pool = pools[poolId];
@@ -829,7 +857,7 @@ contract Hyper is IHyper {
 
         // Writes the pair into Enigma state.
         pairs[pairId] = Pair({
-            tokenBase: asset,
+            tokenAsset: asset,
             decimalsBase: decimalsAsset,
             tokenQuote: quote,
             decimalsQuote: decimalsQuote
@@ -842,16 +870,16 @@ contract Hyper is IHyper {
 
     /// @dev Most important function because it manages the solvency of the Engima.
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
-    function _increaseGlobal(address token, uint256 amount) internal {
+    function _increaseReserves(address token, uint256 amount) internal {
         __account__.deposit(token, amount);
-        emit IncreaseGlobalBalance(token, amount);
+        emit IncreaseReserveBalance(token, amount);
     }
 
-    /// @dev Equally important to `_increaseGlobal`.
+    /// @dev Equally important to `_increaseReserves`.
     /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
-    function _decreaseGlobal(address token, uint256 amount) internal {
+    function _decreaseReserves(address token, uint256 amount) internal {
         __account__.withdraw(token, amount);
-        emit DecreaseGlobalBalance(token, amount);
+        emit DecreaseReserveBalance(token, amount);
     }
 
     /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
