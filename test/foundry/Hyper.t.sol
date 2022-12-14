@@ -20,22 +20,24 @@ contract HyperTester is Hyper {
     }
 
     function process(bytes calldata data) external payable {
-        uint48 poolId_;
+        _process(data);
+        /* uint48 poolId;
         bytes1 instruction = bytes1(data[0] & 0x0f);
         if (instruction == CPU.UNKNOWN) revert UnknownInstruction();
 
         if (instruction == CPU.ALLOCATE) {
-            (poolId_, ) = _allocate(data);
+            (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
+            (poolId, ) = _allocate(useMax, poolId_, deltaLiquidity);
         } else if (instruction == CPU.UNALLOCATE) {
-            (poolId_, , ) = _unallocate(data);
+            (poolId, , ) = _unallocate(data);
         } else if (instruction == CPU.SWAP) {
-            (poolId_, , , ) = _swapExactIn(data);
+            (poolId, , , ) = _swapExactIn(data);
         } else if (instruction == CPU.STAKE_POSITION) {
-            (poolId_, ) = _stake(data);
+            (poolId, ) = _stake(data);
         } else if (instruction == CPU.UNSTAKE_POSITION) {
-            (poolId_, ) = _unstake(data);
+            (poolId, ) = _unstake(data);
         } else if (instruction == CPU.CREATE_POOL) {
-            (poolId_) = _createPool(data);
+            (poolId) = _createPool(data);
         } else if (instruction == CPU.CREATE_CURVE) {
             _createCurve(data);
         } else if (instruction == CPU.CREATE_PAIR) {
@@ -47,7 +49,7 @@ contract HyperTester is Hyper {
         __account__.prepare();
         __account__.multiSettle(_pay, address(this));
 
-        if (!__account__.settled) revert InvalidSettlement();
+        if (!__account__.settled) revert InvalidSettlement(); */
     }
 
     function _pay(address token, address to, uint amount) private {
