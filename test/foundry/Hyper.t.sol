@@ -10,7 +10,7 @@ contract HyperTester is Hyper {
     constructor(address weth) Hyper(weth) {}
 
     function doesPoolExist(uint48 poolId) external view returns (bool) {
-        return _doesPoolExist(poolId);
+        return exists(pools, poolId);
     }
 
     // --- Implemented --- //
@@ -184,11 +184,11 @@ contract TestHyperSingle is StandardHelpers, Test {
     }
 
     function getReserves(address token) public view returns (uint) {
-        return __contractBeingTested.__reserves__(token);
+        return __contractBeingTested.getReserves(token);
     }
 
     function getBalances(address owner, address token) public view returns (uint) {
-        return __contractBeingTested.__balances__(owner, token);
+        return __contractBeingTested.getBalances(owner, token);
     }
 
     // --- Jump --- //

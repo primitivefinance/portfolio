@@ -65,6 +65,8 @@ error PositionZeroLiquidityError(uint96 positionId);
 /// @dev Thrown if position is not staked and trying to unstake.
 error PositionNotStakedError(uint96 positionId);
 
+error InvalidSettlement();
+
 /// @dev Parameters of the Primitive RMM trading function.
 struct Curve {
     uint128 strike;
@@ -96,10 +98,9 @@ struct HyperPool {
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
 }
+
 /// @dev Individual position state.
 struct HyperPosition {
-    int24 loTick;
-    int24 hiTick;
     uint256 totalLiquidity;
     uint256 blockTimestamp;
     uint256 stakeEpochId;

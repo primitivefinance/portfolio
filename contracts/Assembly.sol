@@ -2,14 +2,14 @@
 pragma solidity 0.8.13;
 
 function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
-    return _between(value, lower, upper);
+    return __between(value, lower, upper);
 }
 
 function isBetween(uint256 value, uint256 lower, uint256 upper) pure returns (bool valid) {
-    return _between(int256(value), int256(lower), int256(upper));
+    return __between(int256(value), int256(lower), int256(upper));
 }
 
-function _between(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
+function __between(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     assembly {
         // Is `val` btwn lo and hi, inclusive?
         function isValid(val, lo, hi) -> btwn {
@@ -45,6 +45,17 @@ function __computeDelta(uint256 input, int256 delta) pure returns (uint256 outpu
         }
         case 1 {
             output := sub(input, delta)
+        }
+    }
+}
+
+function __computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) pure returns (uint256 nextCheckpoint) {
+    nextCheckpoint = liveCheckpoint;
+
+    if (checkpointChange != 0) {
+        // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+        assembly {
+            nextCheckpoint := add(liveCheckpoint, checkpointChange)
         }
     }
 }
