@@ -2,78 +2,82 @@
 pragma solidity 0.8.13;
 
 import "../interfaces/IERC20.sol";
-import "solmate/utils/SafeTransferLib.sol";
 
-using SafeTransferLib for ERC20;
-
-using {cache, computeNetReserves, increaseBalance, decreaseBalance, settle, clearTransient} for AccountSystem global;
+using {cache, deposit, withdraw, credit, debit, prepare, settle, multiSettle, clearTransient, computeNetReserves, warmToken} for AccountSystem global;
 
 struct AccountSystem {
     mapping(address => mapping(address => uint)) balances;
     mapping(address => uint) reserves;
     mapping(address => bool) cached;
     address[] warm; // Transiently stored, should always be length zero outside of execution.
-    bool locked;
+    bool prepared;
+    bool settled;
 }
 
 error InsufficientBalance(uint amount, uint delta);
 error BalanceError1();
 
-function fetchBalance(address token, address account) view returns (uint256) {
+/** @dev Gas optimized. */
+function __balanceOf__(address token, address account) view returns (uint256) {
     (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
     if (!success || data.length != 32) revert BalanceError1();
     return abi.decode(data, (uint256));
 }
 
-function increaseBalance(AccountSystem storage self, address owner, address token, uint amount) {
+function credit(AccountSystem storage self, address owner, address token, uint amount) {
     self.balances[owner][token] += amount;
 }
 
-function decreaseBalance(AccountSystem storage self, address owner, address token, uint amount) {
+// todo: deposit in here is a little dangerous, because we usually do debit to pay for deposit.
+function debit(AccountSystem storage self, address owner, address token, uint amount) returns(bool paid) {
     uint balance = self.balances[owner][token];
-    if (amount > balance) revert InsufficientBalance(balance, amount);
-    self.balances[owner][token] -= amount;
+    if (balance >= amount) {
+        self.balances[owner][token] -= amount;
+        paid = true;
+    }
 }
 
 function computeNetReserves(AccountSystem storage self, address token, address account) view returns (int256 net) {
     uint internalBalance = self.reserves[token];
-    uint physicalBalance = fetchBalance(token, account);
+    uint physicalBalance = __balanceOf__(token, account);
     net = int256(physicalBalance) - int256(internalBalance);
 }
 
-function increaseReserve(AccountSystem storage self, address token, uint amount) {
+function deposit(AccountSystem storage self, address token, uint amount) {
+    self.warmToken(token);
     self.reserves[token] += amount;
 }
 
-function decreaseReserve(AccountSystem storage self, address token, uint amount) {
+function withdraw(AccountSystem storage self, address token, uint amount) {
     uint balance = self.reserves[token];
     if (amount > balance) revert InsufficientBalance(balance, amount);
+    self.warmToken(token);
     self.reserves[token] -= amount;
 }
 
 function prepare(AccountSystem storage self) {
-    self.locked = true;
+    self.prepared = true;
 }
 
 /** @notice Settles the difference in balance between tracked tokens and physically held tokens. */
 function settle(AccountSystem storage self, function (address token, address to, uint amount) pay, address token, address account) {
-    if(!self.locked) revert NotPreparedToSettle();
+    if(!self.prepared) revert NotPreparedToSettle();
 
     int net = self.computeNetReserves(token, account);
     if (net == 0) return;
-    if (net > 0) return self.increaseBalance(msg.sender, token, uint(net));
+    if (net > 0) return self.credit(msg.sender, token, uint(net));
 
     uint amount = uint(-net);
-    self.decreaseBalance(msg.sender, token, amount);
-    pay(token, account, amount); // todo: fix this, seems dangerous.
+    bool paid = self.debit(msg.sender, token, amount);
     delete self.cached[token];
+    if(!paid) pay(token, account, amount); // todo: fix this, seems dangerous.
     /* ERC20(token).safeTransferFrom(msg.sender, account, amount); */
 }
 
 error NotPreparedToSettle();
 
 function multiSettle(AccountSystem storage self, function (address token, address to, uint amount) pay, address account) {
-    if(!self.locked) revert NotPreparedToSettle();
+    if(!self.prepared) revert NotPreparedToSettle();
 
     address[] memory tokens = self.warm;
     if(tokens.length == 0) return;
@@ -88,14 +92,16 @@ function multiSettle(AccountSystem storage self, function (address token, addres
 }
 
 function warmToken(AccountSystem storage self, address token) {
+    if (self.settled) self.settled = false; // If tokens are warm, they are not settled.
     if (self.cached[token]) return;
     self.warm.push(token);
     self.cache(token, true);
 }
 
 function clearTransient(AccountSystem storage self) {
+    self.settled = true;
     delete self.warm;
-    delete self.locked;
+    delete self.prepared;
 }
 
 function cache(AccountSystem storage self, address token, bool status) {

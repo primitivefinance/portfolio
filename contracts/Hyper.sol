@@ -17,25 +17,36 @@ import "./libraries/Accounting.sol";
 using {getStartTime, getEpochsPassed, getLastUpdatedId, getTimeToTransition, getTimePassedInCurrentEpoch} for Epoch;
 
 function getStartTime(Epoch memory epoch) pure returns (uint256 startTime) {
-    if(epoch.endTime < epoch.interval) startTime = 0; // todo: fix, avoids underflow
+    if (epoch.endTime < epoch.interval)
+        startTime = 0; // todo: fix, avoids underflow
     else startTime = epoch.endTime - epoch.interval;
 }
 
 function getEpochsPassed(Epoch memory epoch, uint256 lastUpdatedTimestamp) pure returns (uint256 epochsPassed) {
-    if(epoch.endTime < (lastUpdatedTimestamp + 1)) epochsPassed = 1; // todo: fix this, avoids the arthimetic undeflow
+    if (epoch.endTime < (lastUpdatedTimestamp + 1))
+        epochsPassed = 1; // todo: fix this, avoids the arthimetic undeflow
     else epochsPassed = (epoch.endTime - (lastUpdatedTimestamp + 1)) / epoch.interval;
 }
 
 function getLastUpdatedId(Epoch memory epoch, uint256 epochsPassed) pure returns (uint256 lastUpdateId) {
-    if(epoch.id < epochsPassed) lastUpdateId = 0; // todo: fix, avoids underflow
+    if (epoch.id < epochsPassed)
+        lastUpdateId = 0; // todo: fix, avoids underflow
     else lastUpdateId = epoch.id - epochsPassed;
 }
 
-function getTimeToTransition(Epoch memory epoch, uint256 epochsPassed, uint256 lastUpdatedTimestamp) pure returns (uint256 timeToTransition) {
+function getTimeToTransition(
+    Epoch memory epoch,
+    uint256 epochsPassed,
+    uint256 lastUpdatedTimestamp
+) pure returns (uint256 timeToTransition) {
     timeToTransition = epoch.endTime - (epochsPassed * epoch.interval) - lastUpdatedTimestamp;
 }
 
-function getTimePassedInCurrentEpoch(Epoch memory epoch, uint timestamp, uint256 lastUpdatedTimestamp) view returns (uint256 timePassed) {
+function getTimePassedInCurrentEpoch(
+    Epoch memory epoch,
+    uint timestamp,
+    uint256 lastUpdatedTimestamp
+) view returns (uint256 timePassed) {
     uint256 startTime = epoch.getStartTime();
     uint256 lastUpdateInCurrentEpoch = lastUpdatedTimestamp > startTime ? lastUpdatedTimestamp : startTime;
     timePassed = timestamp - lastUpdateInCurrentEpoch;
@@ -47,11 +58,7 @@ function __wrapEther(address weth) {
 }
 
 /** @dev Dangerously sends ether to `to` in a low-level call. */
-function __dangerousUnwrapEther(
-    address weth,
-    address to,
-    uint256 amount
-) {
+function __dangerousUnwrapEther(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
     __dangerousTransferEther(to, amount);
 }
@@ -60,13 +67,6 @@ function __dangerousUnwrapEther(
 function __dangerousTransferEther(address to, uint256 value) {
     (bool success, ) = to.call{value: value}(new bytes(0));
     if (!success) revert EtherTransferFail();
-}
-
-/** @dev Gas optimized. */
-function __balanceOf(address token, address account) view returns (uint256) {
-    (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
-    if (!success || data.length != 32) revert BalanceError();
-    return abi.decode(data, (uint256));
 }
 
 /**
@@ -87,11 +87,7 @@ function __computeDelta(uint256 input, int256 delta) pure returns (uint256 outpu
 /**
  * @notice Syncs a pool's liquidity and last updated timestamp.
  */
-function __updatePoolLiquidity(
-    HyperPool storage self,
-    uint256 timestamp,
-    int128 liquidityDelta
-) {
+function __updatePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
     self.blockTimestamp = timestamp;
     self.liquidity = SafeCast.toUint128(__computeDelta(self.liquidity, liquidityDelta));
 }
@@ -207,6 +203,8 @@ contract Hyper is IHyper {
     /// @dev Individual rewards of a position.
     mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
 
+    AccountSystem public __account__;
+
     // --- Reentrancy --- //
     modifier lock() {
         if (locked != 1) revert LockedError();
@@ -219,9 +217,20 @@ contract Hyper is IHyper {
     // --- Constructor --- //
     constructor(address weth) {
         WETH = weth;
+        __account__.settled = true;
+    }
+
+    function __reserves__(address token) public view returns (uint) {
+        return __account__.reserves[token];
+    }
+
+    function __balances__(address owner, address token) public view returns (uint) {
+        return __account__.balances[owner][token];
     }
 
     // --- Fallback --- //
+
+    error InvalidSettlement();
 
     /// @notice Main touchpoint for receiving calls.
     /// @dev Critical: data must be encoded properly to be processed.
@@ -230,7 +239,15 @@ contract Hyper is IHyper {
     fallback() external payable lock {
         if (msg.data[0] != Instructions.INSTRUCTION_JUMP) _process(msg.data);
         else _jumpProcess(msg.data);
-        _settleBalances();
+
+        __account__.prepare();
+        __account__.multiSettle(pay, address(this));
+
+        if (!__account__.settled) revert InvalidSettlement();
+    }
+
+    function pay(address token, address to, uint amount) private {
+        SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
     }
 
     // --- External --- //
@@ -242,7 +259,7 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function allocate(uint48 poolId, uint amount) external lock {
-      /*   bool useMax = amount == type(uint256).max; // magic variable.
+        /*   bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
         data = Instructions.encodeAllocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
         _process(data);  */
@@ -250,7 +267,7 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function unallocate(uint48 poolId, uint amount) external lock {
-     /*    bool useMax = amount == type(uint256).max; // magic variable.
+        /*    bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
         data = Instructions.encodeUnallocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
         _process(data);  */
@@ -258,30 +275,26 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function stake(uint48 poolId) external lock {
-      /*   data = Instructions.encodeStakePosition(poolId);
+        /*   data = Instructions.encodeStakePosition(poolId);
         _process(data); */
     }
 
     /// @inheritdoc IHyperActions
     function unstake(uint48 poolId) external lock {
-       /*  data = Instructions.encodeUnstakePosition(poolId);
+        /*  data = Instructions.encodeUnstakePosition(poolId);
         _process(data); */
     }
 
     /// @inheritdoc IHyperActions
     function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external lock {
-       /*  bool useMax = amount == type(uint256).max; // magic variable.
+        /*  bool useMax = amount == type(uint256).max; // magic variable.
         uint input = useMax ? 0 : amount;
         data = Instructions.encodeSwap(useMax, poolId, 0x0, input, 0x0, limit, uint8(sellAsset)); // Used as an input multiplier: 10^(0x0) = 1.
         _process(data); */
     }
 
     /// @inheritdoc IHyperActions
-    function draw(
-        address token,
-        uint256 amount,
-        address to
-    ) external lock {
+    function draw(address token, uint256 amount, address to) external lock {
         if (balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
         _applyDebit(token, amount);
 
@@ -332,12 +345,7 @@ contract Hyper is IHyper {
         _increaseLiquidity(poolId_, deltaR1, deltaR2, deltaLiquidity);
     }
 
-    function _increaseLiquidity(
-        uint48 poolId,
-        uint256 deltaR1,
-        uint256 deltaR2,
-        uint128 deltaLiquidity
-    ) internal {
+    function _increaseLiquidity(uint48 poolId, uint256 deltaR1, uint256 deltaR2, uint128 deltaLiquidity) internal {
         HyperPool storage pool = pools[poolId];
         __updatePoolLiquidity(pool, _blockTimestamp(), int128(deltaLiquidity));
         _increasePosition(poolId, deltaLiquidity);
@@ -361,14 +369,7 @@ contract Hyper is IHyper {
         emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
-    function _unallocate(bytes calldata data)
-        internal
-        returns (
-            uint48 poolId,
-            uint256 a,
-            uint256 b
-        )
-    {
+    function _unallocate(bytes calldata data) internal returns (uint48 poolId, uint256 a, uint256 b) {
         (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = Instructions.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
         poolId = poolId_;
 
@@ -509,15 +510,9 @@ contract Hyper is IHyper {
      * @custom:reverts If pool is not initialized with a price.
      * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
      */
-    function _swapExactIn(bytes calldata data)
-        internal
-        returns (
-            uint48 poolId,
-            uint256 remainder,
-            uint256 input,
-            uint256 output
-        )
-    {
+    function _swapExactIn(
+        bytes calldata data
+    ) internal returns (uint48 poolId, uint256 remainder, uint256 input, uint256 output) {
         // SwapState memory state;
 
         Order memory args;
@@ -541,7 +536,7 @@ contract Hyper is IHyper {
             // Writes the pool after computing its updated price with respect to time elapsed since last update.
             (uint256 price, int24 tick) = _syncPoolPriceAndEpoch(args.poolId);
             // Expect the caller to exhaust their entire balance of the input token.
-            remainder = args.useMax == 1 ? __balanceOf(pair.tokenBase, msg.sender) : args.input;
+            remainder = args.useMax == 1 ? __balanceOf__(pair.tokenBase, msg.sender) : args.input;
             // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
             swap = Iteration({
                 price: price,
@@ -559,7 +554,7 @@ contract Hyper is IHyper {
         {
             // Curve stores the parameters of the trading function.
             Curve memory curve = curves[uint32(args.poolId)];
-            if(_blockTimestamp() > curve.maturity) revert PoolExpiredError();
+            if (_blockTimestamp() > curve.maturity) revert PoolExpiredError();
 
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
@@ -723,7 +718,7 @@ contract Hyper is IHyper {
         uint256 timestamp = _blockTimestamp();
         uint16 pairId = uint16(poolId >> 32);
         address FEE_SETTLEMENT_TOKEN = pairs[pairId].tokenBase;
-        
+
         Epoch memory readEpoch = epochs[poolId];
         HyperPool storage pool = pools[poolId];
 
@@ -731,7 +726,7 @@ contract Hyper is IHyper {
 
         if (epochsPassed > 0) {
             uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
-        emit log(5);
+            emit log(5);
             // distribute remaining proceeds in lastUpdatedEpochId
             if (pool.stakedLiquidity > 0) {
                 // TODO
@@ -739,7 +734,7 @@ contract Hyper is IHyper {
 
             // save pool snapshot for lastUpdatedEpochId
             //poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
-             
+
             // update the pool's liquidity due to the transition
             pool.stakedLiquidity = __computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
             pool.borrowableLiquidity = pool.stakedLiquidity;
@@ -757,8 +752,6 @@ contract Hyper is IHyper {
             }
         }
 
-       
-
         // add proceeds for time passed in the current epoch
         if (pool.stakedLiquidity > 0) {
             uint256 timePassedInCurrentEpoch = readEpoch.getTimePassedInCurrentEpoch(pool.blockTimestamp, timestamp);
@@ -772,7 +765,7 @@ contract Hyper is IHyper {
         if (pool.liquidity != liquidity) pool.liquidity = liquidity;
 
         Epoch storage epoch = epochs[poolId];
-        
+
         uint256 lastUpdateTime = pool.blockTimestamp;
 
         timeDelta = timestamp - lastUpdateTime;
@@ -949,30 +942,15 @@ contract Hyper is IHyper {
     /// @dev Most important function because it manages the solvency of the Engima.
     /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
     function _increaseGlobal(address token, uint256 amount) internal {
-        globalReserves[token] += amount;
+        __account__.deposit(token, amount);
         emit IncreaseGlobalBalance(token, amount);
     }
 
     /// @dev Equally important to `_increaseGlobal`.
     /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
     function _decreaseGlobal(address token, uint256 amount) internal {
-        require(globalReserves[token] >= amount, "Not enough reserves");
-        globalReserves[token] -= amount;
+        __account__.withdraw(token, amount);
         emit DecreaseGlobalBalance(token, amount);
-    }
-
-    /// @dev Critical array, used in jump process to track the pairs that were interacted with.
-    /// @notice Cleared at end and never permanently set.
-    /// @custom:security High. Without pairIds to loop through, no token amounts are settled.
-    uint16[] internal _tempPairIds;
-
-    /// @dev Token -> Touched Flag. Stored temporary to signal which token reserves were tapped.
-    mapping(address => bool) internal _addressCache;
-
-    /// @dev Flag set to `true` during `_process`. Set to `false` during `_settleToken`.
-    /// @custom:security High. Referenced in settlement to pay for tokens due.
-    function _cacheAddress(address token, bool flag) internal {
-        _addressCache[token] = flag;
     }
 
     /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
@@ -980,21 +958,16 @@ contract Hyper is IHyper {
     ///      Therefore, it does not require a state change for the global reserves.
     /// @custom:security Critical. Only method which credits accounts with tokens.
     function _applyCredit(address token, uint256 amount) internal {
-        balances[msg.sender][token] += amount;
+        __account__.credit(msg.sender, token, amount);
         emit IncreaseUserBalance(token, amount);
     }
 
-    /// @dev Dangerous! Calls to external contract with an inline assembly `safeTransferFrom`.
-    ///      A positive debit is a cost that must be paid for a transaction to be processed.
+    /// @dev A positive debit is a cost that must be paid for a transaction to be processed.
     ///      If a balance exists for the token for the internal balance of `msg.sender`,
-    ///      it will be used to pay the debit.
-    ///      Else, tokens are expected to be transferred into this contract using `transferFrom`.
-    ///      Externally paid debits increase the balance of the contract, so the global
-    ///      reserves must be increased.
+    ///      it will be used to pay the debit. Else, the contract expects tokens to be transferred in.
     /// @custom:security Critical. Handles the payment of tokens for all pool actions.
     function _applyDebit(address token, uint256 amount) internal {
-        if (balances[msg.sender][token] >= amount) balances[msg.sender][token] -= amount;
-        else SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, address(this), amount);
+        __account__.debit(msg.sender, token, amount);
         emit DecreaseUserBalance(token, amount);
     }
 
@@ -1026,66 +999,16 @@ contract Hyper is IHyper {
         } else {
             revert UnknownInstruction();
         }
-
-        // note: Only pool interactions have a non-zero poolId.
-        if (poolId != 0) {
-            uint16 pairId = uint16(poolId >> 32);
-            // Add the pair to the array to track all the pairs that have been interacted with.
-            _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
-            // Caching the addresses to settle the pools interacted with in the fallback function.
-            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
-            if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
-            if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
-        }
-    }
-
-    /// @dev Critical level function that is responsible for handling tokens, debits and credits.
-    /// @custom:security Critical. Handles token payments with `_settleToken`.
-    function _settleBalances() internal {
-        uint256 len = _tempPairIds.length;
-        uint16[] memory ids = _tempPairIds;
-        if (len == 0) return; // note: Dangerous! If pools were interacted with, this return being trigerred would be a failure.
-        for (uint256 i; i != len; ++i) {
-            uint16 pairId = ids[i];
-            Pair memory pair = pairs[pairId];
-            _settleToken(pair.tokenBase);
-            _settleToken(pair.tokenQuote);
-        }
-
-        delete _tempPairIds;
-    }
-
-    /// @dev Increases the `msg.sender` internal balance of a token, or requests payment from them.
-    /// @param token Target token to pay or credit.
-    /// @custom:security Critical. Handles crediting accounts or requesting payment for debits.
-    function _settleToken(address token) internal {
-        if (!_addressCache[token]) return; // note: Early short circuit, since attempting to settle twice is common for big orders.
-
-        // If the token is WETH, make sure to wrap any ETH sent to the contract.
-        if (token == WETH && msg.value > 0) __wrapEther(WETH);
-
-        uint256 global = globalReserves[token];
-        uint256 actual = __balanceOf(token, address(this));
-        if (global > actual) {
-            uint256 deficit = global - actual;
-            _applyDebit(token, deficit);
-        } else {
-            uint256 surplus = actual - global;
-            _applyCredit(token, surplus);
-        }
-
-        _cacheAddress(token, false); // note: Effectively saying "any pool with this token was paid for in full".
     }
 
     // ===== Helpers ===== //
 
     // todo: check for hash collisions with instruction calldata and fix.
 
-    function checkJitLiquidity(address account, uint48 poolId)
-        public
-        view
-        returns (uint256 distance, uint256 timestamp)
-    {
+    function checkJitLiquidity(
+        address account,
+        uint48 poolId
+    ) public view returns (uint256 distance, uint256 timestamp) {
         uint48 positionId = poolId;
         uint256 previous = positions[account][positionId].blockTimestamp;
         timestamp = _blockTimestamp();
@@ -1101,11 +1024,10 @@ contract Hyper is IHyper {
     function getInvariant(uint48 poolId) external view returns (int128 invariant) {}
 
     // TODO: fix this with non-delta liquidity amount
-    function getPhysicalReserves(uint48 poolId, uint256 deltaLiquidity)
-        public
-        view
-        returns (uint256 deltaBase, uint256 deltaQuote)
-    {
+    function getPhysicalReserves(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) public view returns (uint256 deltaBase, uint256 deltaQuote) {
         uint256 timestamp = _blockTimestamp();
 
         // Compute amounts of tokens for the real reserves.

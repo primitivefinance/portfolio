@@ -40,19 +40,14 @@ contract HyperTester is Hyper {
             revert UnknownInstruction();
         }
 
-        // note: Only pool interactions have a non-zero poolId.
-        if (poolId_ != 0) {
-            console.log("entered settlement");
-            uint16 pairId = uint16(poolId_ >> 32);
-            // Add the pair to the array to track all the pairs that have been interacted with.
-            _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
-            // Caching the addresses to settle the pools interacted with in the fallback function.
-            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
-            if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
-            if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
-        }
+        __account__.prepare();
+        __account__.multiSettle(_pay, address(this));
 
-        _settleBalances();
+        if (!__account__.settled) revert InvalidSettlement();
+    }
+
+    function _pay(address token, address to, uint amount) private {
+        SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
     }
 }
 
@@ -197,6 +192,14 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function getPosition(address owner, uint48 positionId) public view returns (HyperPosition memory) {
         return IHyperStruct(address(__contractBeingTested)).positions(owner, positionId);
+    }
+
+    function getReserves(address token) public view returns (uint) {
+        return __contractBeingTested.__reserves__(token);
+    }
+
+    function getBalances(address owner, address token) public view returns (uint) {
+        return __contractBeingTested.__balances__(owner, token);
     }
 
     // --- Ether --- //
@@ -348,14 +351,14 @@ contract TestHyperSingle is StandardHelpers, Test {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = __contractBeingTested.globalReserves(address(asset)); // todo: fix, I know this slot from console.log.
+        uint256 prev = getReserves(address(asset)); // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = __contractBeingTested.globalReserves(address(asset));
+        uint256 next = getReserves(address(asset));
         assertTrue(next > prev);
     }
 
@@ -372,14 +375,14 @@ contract TestHyperSingle is StandardHelpers, Test {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = __contractBeingTested.globalReserves(address(quote)); // todo: fix, I know this slot from console.log.
+        uint256 prev = getReserves(address(quote)); // todo: fix, I know this slot from console.log.
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = Instructions.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 next = __contractBeingTested.globalReserves(address(quote));
+        uint256 next = getReserves(address(quote));
         assertTrue(next < prev);
     }
 
@@ -416,8 +419,8 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         forwarder.pass(data);
 
-        uint256 globalR1 = __contractBeingTested.globalReserves(address(quote));
-        uint256 globalR2 = __contractBeingTested.globalReserves(address(asset));
+        uint256 globalR1 = getReserves(address(quote));
+        uint256 globalR2 = getReserves(address(asset));
         assertTrue(globalR1 > 0);
         assertTrue(globalR2 > 0);
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
@@ -462,7 +465,7 @@ contract TestHyperSingle is StandardHelpers, Test {
     }
 
     function testAllocateGlobalAssetIncreases() public {
-        uint256 prevGlobal = __contractBeingTested.globalReserves(address(asset));
+        uint256 prevGlobal = getReserves(address(asset));
         int24 loTick = DEFAULT_TICK;
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -471,13 +474,13 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextGlobal = __contractBeingTested.globalReserves(address(asset));
+        uint256 nextGlobal = getReserves(address(asset));
         assertTrue(nextGlobal != 0, "next globalReserves is zero");
         assertTrue(nextGlobal > prevGlobal, "globalReserves did not change");
     }
 
     function testAllocateGlobalQuoteIncreases() public {
-        uint256 prevGlobal = __contractBeingTested.globalReserves(address(quote));
+        uint256 prevGlobal = getReserves(address(quote));
         int24 loTick = DEFAULT_TICK - 256; // Enough below to have quote.
         int24 hiTick = DEFAULT_TICK + 2;
         uint8 amount = 0x01;
@@ -486,7 +489,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextGlobal = __contractBeingTested.globalReserves(address(quote));
+        uint256 nextGlobal = getReserves(address(quote));
         assertTrue(nextGlobal != 0, "next globalReserves is zero");
         assertTrue(nextGlobal > prevGlobal, "globalReserves did not change");
     }
@@ -557,12 +560,12 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = __contractBeingTested.globalReserves(address(asset));
+        uint256 prev = getReserves(address(asset));
 
         data = Instructions.encodeUnallocate(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = __contractBeingTested.globalReserves(address(asset));
+        uint256 next = getReserves(address(asset));
         assertTrue(next < prev, "globalReserves did not change");
     }
 
@@ -575,12 +578,12 @@ contract TestHyperSingle is StandardHelpers, Test {
         bool success = forwarder.pass(data);
         assertTrue(success);
 
-        uint256 prev = __contractBeingTested.globalReserves(address(quote));
+        uint256 prev = getReserves(address(quote));
 
         data = Instructions.encodeUnallocate(0, __poolId, power, amount);
         success = forwarder.pass(data);
 
-        uint256 next = __contractBeingTested.globalReserves(address(quote));
+        uint256 next = getReserves(address(quote));
         assertTrue(next < prev, "globalReserves did not change");
     }
 
