@@ -12,19 +12,23 @@ import "./libraries/Decoder.sol";
 import "./libraries/HyperSwapLib.sol";
 import "./libraries/Instructions.sol";
 import "./libraries/SafeCast.sol";
+import "./libraries/Accounting.sol";
 
 using {getStartTime, getEpochsPassed, getLastUpdatedId, getTimeToTransition, getTimePassedInCurrentEpoch} for Epoch;
 
 function getStartTime(Epoch memory epoch) pure returns (uint256 startTime) {
-    startTime = epoch.endTime - epoch.interval;
+    if(epoch.endTime < epoch.interval) startTime = 0; // todo: fix, avoids underflow
+    else startTime = epoch.endTime - epoch.interval;
 }
 
 function getEpochsPassed(Epoch memory epoch, uint256 lastUpdatedTimestamp) pure returns (uint256 epochsPassed) {
-    epochsPassed = (epoch.endTime - (lastUpdatedTimestamp + 1)) / epoch.interval;
+    if(epoch.endTime < (lastUpdatedTimestamp + 1)) epochsPassed = 1; // todo: fix this, avoids the arthimetic undeflow
+    else epochsPassed = (epoch.endTime - (lastUpdatedTimestamp + 1)) / epoch.interval;
 }
 
 function getLastUpdatedId(Epoch memory epoch, uint256 epochsPassed) pure returns (uint256 lastUpdateId) {
-    lastUpdateId = epoch.id - epochsPassed;
+    if(epoch.id < epochsPassed) lastUpdateId = 0; // todo: fix, avoids underflow
+    else lastUpdateId = epoch.id - epochsPassed;
 }
 
 function getTimeToTransition(Epoch memory epoch, uint256 epochsPassed, uint256 lastUpdatedTimestamp) pure returns (uint256 timeToTransition) {
@@ -237,19 +241,40 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function allocate() external lock {}
+    function allocate(uint48 poolId, uint amount) external lock {
+      /*   bool useMax = amount == type(uint256).max; // magic variable.
+        uint input = useMax ? 0 : amount;
+        data = Instructions.encodeAllocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
+        _process(data);  */
+    }
 
     /// @inheritdoc IHyperActions
-    function unallocate() external lock {}
+    function unallocate(uint48 poolId, uint amount) external lock {
+     /*    bool useMax = amount == type(uint256).max; // magic variable.
+        uint input = useMax ? 0 : amount;
+        data = Instructions.encodeUnallocate(useMax, poolId, 0x0, input); // Used as an input multiplier: 10^(0x0) = 1.
+        _process(data);  */
+    }
 
     /// @inheritdoc IHyperActions
-    function stake() external lock {}
+    function stake(uint48 poolId) external lock {
+      /*   data = Instructions.encodeStakePosition(poolId);
+        _process(data); */
+    }
 
     /// @inheritdoc IHyperActions
-    function unstake() external lock {}
+    function unstake(uint48 poolId) external lock {
+       /*  data = Instructions.encodeUnstakePosition(poolId);
+        _process(data); */
+    }
 
     /// @inheritdoc IHyperActions
-    function swap() external lock {}
+    function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external lock {
+       /*  bool useMax = amount == type(uint256).max; // magic variable.
+        uint input = useMax ? 0 : amount;
+        data = Instructions.encodeSwap(useMax, poolId, 0x0, input, 0x0, limit, uint8(sellAsset)); // Used as an input multiplier: 10^(0x0) = 1.
+        _process(data); */
+    }
 
     /// @inheritdoc IHyperActions
     function draw(
@@ -474,6 +499,8 @@ contract Hyper is IHyper {
     SwapState state;
 
     error InvariantError(int256 prev, int256 aftr);
+    event log(uint, uint);
+    event log(uint);
 
     /**
      * @dev Swaps exact input of tokens for an output of tokens in the specified direction.
@@ -532,6 +559,7 @@ contract Hyper is IHyper {
         {
             // Curve stores the parameters of the trading function.
             Curve memory curve = curves[uint32(args.poolId)];
+            if(_blockTimestamp() > curve.maturity) revert PoolExpiredError();
 
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
@@ -568,9 +596,9 @@ contract Hyper is IHyper {
             // Get the max amount that can be filled for a max distance swap.
             uint256 maxInput;
             if (state.sell) {
-                maxInput = swap.liquidity - liveIndependent; // There can be maximum 1:1 ratio between assets and liqudiity.
+                maxInput = (PRECISION - liveIndependent).mulWadDown(swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
             } else {
-                maxInput = swap.liquidity.mulWadDown(expiring.strike) - liveIndependent; // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+                maxInput = (expiring.strike - liveIndependent).mulWadDown(swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
             // Calculate the amount of fees paid at this tick.
@@ -654,6 +682,8 @@ contract Hyper is IHyper {
             //if (nextInvariant < liveInvariant) revert InvariantError(liveInvariant, nextInvariant);
         }
 
+        emit log(4);
+
         // Update Pool State Effects
         _syncPool(
             args.poolId,
@@ -701,6 +731,7 @@ contract Hyper is IHyper {
 
         if (epochsPassed > 0) {
             uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
+        emit log(5);
             // distribute remaining proceeds in lastUpdatedEpochId
             if (pool.stakedLiquidity > 0) {
                 // TODO
@@ -708,7 +739,7 @@ contract Hyper is IHyper {
 
             // save pool snapshot for lastUpdatedEpochId
             //poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
-
+             
             // update the pool's liquidity due to the transition
             pool.stakedLiquidity = __computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
             pool.borrowableLiquidity = pool.stakedLiquidity;
@@ -725,6 +756,8 @@ contract Hyper is IHyper {
                 // TODO: pay user
             }
         }
+
+       
 
         // add proceeds for time passed in the current epoch
         if (pool.stakedLiquidity > 0) {

@@ -180,15 +180,15 @@ interface IHyperGetters {
 }
 
 interface IHyperActions {
-    function allocate() external;
+    function allocate(uint48 poolId, uint amount) external;
 
-    function unallocate() external;
+    function unallocate(uint48 poolId, uint amount) external;
 
-    function stake() external;
+    function stake(uint48 poolId) external;
 
-    function unstake() external;
+    function unstake(uint48 poolId) external;
 
-    function swap() external;
+    function swap(uint48 poolId, bool sellAsset, uint amount, uint limit) external;
 
     /// @dev Increases the `msg.sender` account's internal balance of `token`.
     /// @custom:security High. Calls the `token` external contract.

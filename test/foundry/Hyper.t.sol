@@ -39,6 +39,20 @@ contract HyperTester is Hyper {
         } else {
             revert UnknownInstruction();
         }
+
+        // note: Only pool interactions have a non-zero poolId.
+        if (poolId_ != 0) {
+            console.log("entered settlement");
+            uint16 pairId = uint16(poolId_ >> 32);
+            // Add the pair to the array to track all the pairs that have been interacted with.
+            _tempPairIds.push(pairId); // note: critical to push the tokens interacted with.
+            // Caching the addresses to settle the pools interacted with in the fallback function.
+            Pair memory pair = pairs[pairId]; // note: pairIds start at 1 because nonce is incremented first.
+            if (!_addressCache[pair.tokenBase]) _cacheAddress(pair.tokenBase, true);
+            if (!_addressCache[pair.tokenQuote]) _cacheAddress(pair.tokenQuote, true);
+        }
+
+        _settleBalances();
     }
 }
 
@@ -55,6 +69,10 @@ contract Forwarder is Test {
     function freeWrapEther(address weth) external payable {
         __wrapEther(weth);
         __dangerousUnwrapEther(weth, msg.sender, 1e18);
+    }
+
+    function approve(address token, address spender) public {
+        TestERC20(token).approve(spender, type(uint256).max);
     }
 
     // Assumes Hyper calls this, for testing only.
@@ -94,11 +112,6 @@ interface IHyperStruct {
     function globalReserves(address token) external view returns (uint256);
 }
 
-function testMyMsgSender() view returns (address) {
-    console.log(msg.sender);
-    return msg.sender;
-}
-
 contract TestHyperSingle is StandardHelpers, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
@@ -126,9 +139,15 @@ contract TestHyperSingle is StandardHelpers, Test {
         // Set the forwarder.
         forwarder = new Forwarder(address(__contractBeingTested));
 
-        // 1. Two token contracts.
+        // 1. Two token contracts, minted and approved to spend.
         token0 = new TestERC20("token0", "token0 name", 18);
         token1 = new TestERC20("token1", "token1 name", 18);
+        token0.approve(address(__contractBeingTested), type(uint256).max);
+        token1.approve(address(__contractBeingTested), type(uint256).max);
+        token0.mint(address(forwarder), 440e18);
+        token1.mint(address(forwarder), 440e18);
+        forwarder.approve(address(token0), address(__contractBeingTested));
+        forwarder.approve(address(token1), address(__contractBeingTested));
 
         // 2. Create pair
         bytes memory data = Instructions.encodeCreatePair(address(token0), address(token1));
@@ -178,12 +197,6 @@ contract TestHyperSingle is StandardHelpers, Test {
 
     function getPosition(address owner, uint48 positionId) public view returns (HyperPosition memory) {
         return IHyperStruct(address(__contractBeingTested)).positions(owner, positionId);
-    }
-
-    function testFreeFunctionContext() public {
-        console.log(address(this));
-        console.log(msg.sender);
-        testMyMsgSender();
     }
 
     // --- Ether --- //
@@ -251,7 +264,7 @@ contract TestHyperSingle is StandardHelpers, Test {
         assertTrue(next != prev);
     }
 
-    function testSwapExactInPoolSlotIndexUpdated() public {
+    /* function testSwapExactInPoolSlotIndexUpdated() public {
         // Add liquidity first
         bytes memory data = Instructions.encodeAllocate(
             0,
@@ -273,7 +286,7 @@ contract TestHyperSingle is StandardHelpers, Test {
 
         int256 next = getPool(__poolId).lastTick;
         assertTrue(next != prev);
-    }
+    } */
 
     function testSwapExactInPoolLiquidityUnchanged() public {
         // Add liquidity first
