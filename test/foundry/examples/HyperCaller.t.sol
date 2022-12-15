@@ -57,6 +57,8 @@ contract TestHyperCaller is Test {
 
         __caller.allocate(1000);
 
+        vm.warp(block.timestamp + __hyper.JUST_IN_TIME_LIQUIDITY_POLICY() + 1);
+
         __caller.unallocate(500);
     }
 

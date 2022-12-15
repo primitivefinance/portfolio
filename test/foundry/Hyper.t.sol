@@ -10,6 +10,16 @@ import "../../contracts/Hyper.sol";
 contract HyperTester is Hyper {
     constructor(address weth) Hyper(weth) {}
 
+    uint public TEST_JIT_POLICY;
+
+    function setJitPolicy(uint policy) public {
+        TEST_JIT_POLICY = policy;
+    }
+
+    function _liquidityPolicy() internal view override returns (uint) {
+        return TEST_JIT_POLICY;
+    }
+
     function assertSettlementInvariant(address token, address[] memory accounts) public {
         uint reserve = getReserves(token);
         uint physical = TestERC20(token).balanceOf(address(this));
@@ -221,6 +231,12 @@ contract TestHyperSingle is Test {
         return __contractBeingTested__.getBalances(owner, token);
     }
 
+    // ===== Getters ===== //
+
+    function testGetLiquidityMinted() public {
+        (uint a, uint b, uint c) = __contractBeingTested__.getLiquidityMinted(__poolId, 1, 1e19);
+    }
+
     // ===== CPU ===== //
 
     function testJumpProcessCreatesPair() public {
@@ -367,6 +383,72 @@ contract TestHyperSingle is Test {
         int256 next = getPool(__poolId).lastTick;
         assertTrue(next != prev);
     } */
+
+    function testSwapUseMax() public checkSettlementInvariant {
+        uint amount = type(uint256).max;
+        uint limit = amount;
+        // Add liquidity first
+        bytes memory data = CPU.encodeAllocate(
+            0,
+            __poolId,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.process(data);
+        assertTrue(success);
+
+        // move some time
+        vm.warp(block.timestamp + 1);
+        uint256 prev = getPool(__poolId).liquidity; // todo: fix, I know this slot from console.log.
+
+        __contractBeingTested__.swap(__poolId, true, amount, limit);
+
+        uint256 next = getPool(__poolId).liquidity;
+        assertTrue(next == prev);
+    }
+
+    function testSwapInQuote() public checkSettlementInvariant {
+        uint limit = type(uint256).max;
+        uint amount = 2222;
+        // Add liquidity first
+        bytes memory data = CPU.encodeAllocate(
+            0,
+            __poolId,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.process(data);
+        assertTrue(success);
+
+        // move some time
+        vm.warp(block.timestamp + 1);
+        uint256 prev = getPool(__poolId).liquidity; // todo: fix, I know this slot from console.log.
+
+        __contractBeingTested__.swap(__poolId, false, amount, limit);
+
+        uint256 next = getPool(__poolId).liquidity;
+        assertTrue(next == prev);
+    }
+
+    function testSwapExpiredPoolReverts() public {
+        uint limit = type(uint256).max;
+        uint amount = 2222;
+        // Add liquidity first
+        bytes memory data = CPU.encodeAllocate(
+            0,
+            __poolId,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.process(data);
+        assertTrue(success);
+
+        // move some time beyond maturity
+        vm.warp(getCurve(uint32(__poolId)).maturity + 1);
+
+        vm.expectRevert(PoolExpiredError.selector);
+        __contractBeingTested__.swap(__poolId, false, amount, limit);
+    }
 
     function testSwapExactInPoolLiquidityUnchanged() public checkSettlementInvariant {
         // Add liquidity first
@@ -624,6 +706,28 @@ contract TestHyperSingle is Test {
         assertTrue(!success);
     }
 
+    function testUnallocatePositionJitPolicyReverts() public checkSettlementInvariant {
+        uint8 amount = 0x01;
+        uint8 power = 0x01;
+        bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
+        bool success = forwarder.process(data);
+        assertTrue(success, "forwarder call failed");
+
+        // Set the distance for the position by warping in time.
+        uint256 distance = 22;
+        uint256 warpTimestamp = block.timestamp + distance;
+        vm.warp(warpTimestamp);
+
+        // Set the policy from 0 (default 0 in test contract).
+        __contractBeingTested__.setJitPolicy(999999999999);
+
+        data = CPU.encodeUnallocate(0, __poolId, power, amount);
+
+        vm.expectRevert(abi.encodeWithSelector(JitLiquidity.selector, distance));
+        success = forwarder.process(data);
+        assertTrue(!success, "Should not suceed in testUnllocatePositionJit");
+    }
+
     function testUnallocatePositionTimestampUpdated() public checkSettlementInvariant {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = DEFAULT_TICK - 256;
@@ -705,6 +809,17 @@ contract TestHyperSingle is Test {
 
     // --- Stake Position --- //
 
+    function testStakeExternalEpochIncrements() public {
+        uint8 amount = 0x05;
+        __contractBeingTested__.allocate(__poolId, amount);
+
+        uint prevId = getPosition(address(this), __poolId).stakeEpochId;
+        __contractBeingTested__.stake(__poolId);
+        uint nextId = getPosition(address(this), __poolId).stakeEpochId;
+
+        assertTrue(nextId != prevId);
+    }
+
     function testStakePositionStakedUpdated() public checkSettlementInvariant {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
@@ -758,7 +873,38 @@ contract TestHyperSingle is Test {
         }
     }
 
+    function testStakeNonExistentPoolIdReverts() public {
+        uint48 failureArg = 3214;
+        vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
+        __contractBeingTested__.stake(failureArg);
+    }
+
+    function testStakeNonZeroStakeEpochIdReverts() public {
+        __contractBeingTested__.allocate(__poolId, 4355);
+        __contractBeingTested__.stake(__poolId); // Increments stake epoch id
+
+        vm.expectRevert(abi.encodeWithSelector(PositionStakedError.selector, __poolId));
+        __contractBeingTested__.stake(__poolId);
+    }
+
+    function testStakePositionZeroLiquidityReverts() public {
+        vm.expectRevert(abi.encodeWithSelector(PositionZeroLiquidityError.selector, __poolId));
+        __contractBeingTested__.stake(__poolId);
+    }
+
     // --- Unstake Position --- //
+
+    function testUnstakeExternalEpochIncrements() public {
+        uint8 amount = 0x05;
+        __contractBeingTested__.allocate(__poolId, amount);
+        __contractBeingTested__.stake(__poolId);
+
+        uint prevId = getPosition(address(this), __poolId).unstakeEpochId;
+        __contractBeingTested__.unstake(__poolId);
+        uint nextId = getPosition(address(this), __poolId).unstakeEpochId;
+
+        assertTrue(nextId != prevId);
+    }
 
     function testUnstakePositionStakedUpdated() public checkSettlementInvariant {
         int24 lo = DEFAULT_TICK - 256;
@@ -835,6 +981,17 @@ contract TestHyperSingle is Test {
                 "Pool staked liquidity changed even though position staked out of range."
             );
         }
+    }
+
+    function testUnstakeNonExistentPoolIdReverts() public {
+        uint48 failureArg = 1224;
+        vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
+        __contractBeingTested__.unstake(failureArg);
+    }
+
+    function testUnstakeNotStakedReverts() public {
+        vm.expectRevert(abi.encodeWithSelector(PositionNotStakedError.selector, __poolId));
+        __contractBeingTested__.unstake(__poolId);
     }
 
     // --- Create Pair --- //

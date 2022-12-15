@@ -39,7 +39,9 @@ function getTimeToTransition(
     uint256 epochsPassed,
     uint256 lastUpdatedTimestamp
 ) pure returns (uint256 timeToTransition) {
-    timeToTransition = epoch.endTime - (epochsPassed * epoch.interval) - lastUpdatedTimestamp;
+    if (epoch.endTime < (epochsPassed * epoch.interval) || epoch.endTime < lastUpdatedTimestamp)
+        timeToTransition = 1; // todo: fix this, avoids the arthimetic undeflow
+    else timeToTransition = epoch.endTime - (epochsPassed * epoch.interval) - lastUpdatedTimestamp;
 }
 
 function getTimePassedInCurrentEpoch(

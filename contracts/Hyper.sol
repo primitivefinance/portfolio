@@ -28,7 +28,7 @@ function changePositionLiquidity(
     HyperPosition storage self,
     HyperPool storage pool,
     uint256 timestamp,
-    int256 liquidityDelta
+    int128 liquidityDelta
 ) returns (uint256 feeAssetEarned, uint256 feeQuoteEarned) {
     self.blockTimestamp = timestamp;
     self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
@@ -282,7 +282,8 @@ contract Hyper is IHyper {
         uint limit
     ) external lock settle returns (uint output, uint remainder) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = asm.toUint128(useMax ? 0 : amount);
+        uint128 input = useMax ? type(uint128).max : asm.toUint128(amount);
+        if (limit == type(uint256).max) limit = type(uint128).max;
         Order memory args = Order({
             useMax: useMax ? 1 : 0,
             poolId: poolId,
@@ -386,20 +387,6 @@ contract Hyper is IHyper {
         emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
-    /// @dev Assumes the position is properly allocated to an account by the end of the transaction.
-    /// @custom:security High. Only method of increasing the liquidity held by accounts.
-    function _increasePositionLiquidity(
-        uint48 poolId,
-        uint256 deltaLiquidity
-    ) internal returns (uint256 feeAsset, uint256 feeQuote) {
-        HyperPool storage pool = pools[poolId];
-        HyperPosition storage pos = positions[msg.sender][poolId];
-
-        (feeAsset, feeQuote) = pos.changePositionLiquidity(pool, _blockTimestamp(), int256(deltaLiquidity));
-
-        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
-    }
-
     function _unallocate(
         uint8 useMax,
         uint48 poolId,
@@ -427,10 +414,13 @@ contract Hyper is IHyper {
 
     /// @dev Syncs a position's fee growth, fees earned, liquidity, and timestamp.
     function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal returns (uint feeAsset, uint feeQuote) {
+        (uint256 distance, uint256 timestamp) = getSecondsSincePositionUpdate(msg.sender, poolId);
+        if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
+
         HyperPool storage pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
 
-        (feeAsset, feeQuote) = pos.changePositionLiquidity(pool, _blockTimestamp(), -int256(deltaLiquidity));
+        (feeAsset, feeQuote) = pos.changePositionLiquidity(pool, _blockTimestamp(), -int128(int(deltaLiquidity)));
 
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = pairs[pairId];
@@ -440,15 +430,12 @@ contract Hyper is IHyper {
 
     /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
     /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
-    function _decreasePositionCheckJit(
+    /* function _decreasePositionCheckJit(
         uint48 poolId,
         uint256 deltaLiquidity
     ) internal returns (uint feeAsset, uint feeQuote) {
-        (uint256 distance, uint256 timestamp) = getSecondsSincePositionUpdate(msg.sender, poolId);
-        if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
-
         (feeAsset, feeQuote) = _decreasePosition(poolId, deltaLiquidity);
-    }
+    } */
 
     function _stake(uint48 poolId) internal {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
@@ -469,9 +456,7 @@ contract Hyper is IHyper {
     }
 
     function _unstake(uint48 poolId) internal {
-        _syncPoolPrice(poolId);
-
-        if (!pools.exists(poolId)) revert NonExistentPool(poolId);
+        _syncPoolPrice(poolId); // Reverts if pool does not exist.
 
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(poolId);
@@ -501,21 +486,26 @@ contract Hyper is IHyper {
 
         HyperPool storage pool = pools[poolId];
         Curve memory curve = curves[uint32(poolId)];
-        uint256 tau;
-        if (curve.maturity > pool.blockTimestamp) tau = curve.maturity - pool.blockTimestamp; // Keeps tau at zero if pool expired.
-        uint256 elapsed = _blockTimestamp() - pool.blockTimestamp;
-        HyperSwapLib.Expiring memory expiring = HyperSwapLib.Expiring(curve.strike, curve.sigma, tau);
 
-        price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsed);
-        tick = HyperSwapLib.computeTickWithPrice(price);
-        int256 hi = int256(pool.lastTick + TICK_SIZE);
-        int256 lo = int256(pool.lastTick - TICK_SIZE);
-        tick = asm.isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
+        if (_blockTimestamp() <= curve.maturity) {
+            uint256 tau;
+            if (curve.maturity > pool.blockTimestamp) tau = curve.maturity - pool.blockTimestamp; // Keeps tau at zero if pool expired.
+            uint256 elapsed = _blockTimestamp() - pool.blockTimestamp;
+            HyperSwapLib.Expiring memory expiring = HyperSwapLib.Expiring(curve.strike, curve.sigma, tau);
 
-        _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+            price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsed);
+            tick = HyperSwapLib.computeTickWithPrice(price);
+            int256 hi = int256(pool.lastTick + TICK_SIZE);
+            int256 lo = int256(pool.lastTick - TICK_SIZE);
+            tick = asm.isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
+
+            _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        }
     }
 
     SwapState state;
+
+    event log(string);
 
     /**
      * @dev Swaps exact input of tokens for an output of tokens in the specified direction.
@@ -545,7 +535,9 @@ contract Hyper is IHyper {
             // Writes the pool after computing its updated price with respect to time elapsed since last update.
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
             // Expect the caller to exhaust their entire balance of the input token.
-            remainder = args.useMax == 1 ? __balanceOf__(pair.tokenAsset, msg.sender) : args.input;
+            remainder = args.useMax == 1
+                ? __balanceOf__(state.sell ? pair.tokenAsset : pair.tokenQuote, msg.sender)
+                : args.input;
             // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
             swap = Iteration({
                 price: price,
@@ -563,7 +555,7 @@ contract Hyper is IHyper {
         {
             // Curve stores the parameters of the trading function.
             Curve memory curve = curves[uint32(args.poolId)];
-            if (_blockTimestamp() > curve.maturity) revert PoolExpiredError();
+            if (_blockTimestamp() > curve.maturity) revert PoolExpiredError(); // todo: add buffer
 
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
@@ -734,9 +726,9 @@ contract Hyper is IHyper {
         if (epochsPassed > 0) {
             uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
             // distribute remaining proceeds in lastUpdatedEpochId
-            if (pool.stakedLiquidity > 0) {
+            /* if (pool.stakedLiquidity > 0) {
                 // TODO
-            }
+            } */
 
             // save pool snapshot for lastUpdatedEpochId
             //poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
@@ -749,13 +741,13 @@ contract Hyper is IHyper {
             // TODO: Pay user
 
             // check if multiple epochs have passed
-            if (epochsPassed > 1) {
+            /* if (epochsPassed > 1) {
                 // update proceeds per liquidity distributed for next epoch if needed
                 if (pool.stakedLiquidity > 0) {
                     // TODO
                 }
                 // TODO: pay user
-            }
+            } */
         }
 
         // add proceeds for time passed in the current epoch

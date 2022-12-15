@@ -20,13 +20,17 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
     }
 }
 
+error CastOverflow(uint);
+
 /// @notice reverts if x > type(uint128).max
 function toUint128(uint256 x) pure returns (uint128 z) {
+    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
     uint128 max = type(uint128).max;
     assembly {
         switch iszero(gt(x, max))
         case 0 {
-            revert(0, 0)
+            let revertDataSize := mload(revertData)
+            revert(add(32, revertData), revertDataSize)
         }
         case 1 {
             z := x
