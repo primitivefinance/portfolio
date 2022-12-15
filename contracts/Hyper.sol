@@ -1,7 +1,27 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "solmate/utils/SafeTransferLib.sol";
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                  //
+//    Here be dragons!                                       __----~~~~~~~~~~~------___             //
+//                                                .  .   ~~//====......          __--~ ~~           //
+//                                -.            \_|//     |||\\  ~~~~~~::::... /~                   //
+//                             ___-==_       _-~o~  \/    |||  \\            _/~~-                  //
+//                     __---~~~.==~||\=_    -_--~/_-~|-   |\\   \\        _/~                       //
+//                 _-~~     .=~    |  \\-_    '-~7  /-   /  ||    \      /                          //
+//               .~       .~       |   \\ -_    /  /-   /   ||      \   /                           //
+//              /  ____  /         |     \\ ~-_/  /|- _/   .||       \ /                            //
+//              |~~    ~~|--~~~~--_ \     ~==-/   | \~--===~~        .\                             //
+//                       '         ~-|      /|    |-~\~~       __--~~                               //
+//                                   |-~~-_/ |    |   ~\_   _-~            /\                       //
+//                                        /  \     \__   \/~                \__                     //
+//                                    _--~ _/ | .-~~____--~-/                  ~~==.                //
+//                                   ((->/~   '.|||' -_|    ~~-/ ,              . _||               //
+//                                              -_     ~\      ~~---l__i__i__i--~~_/                //
+//                                              _-~-__   ~)  \--______________--~~                  //
+//                                            //.-~~~-~_--~- |-------~~~~~~~~                       //
+//                                                   //.-~~~--\                                     //
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 
 import "./OS.sol";
 import "./CPU.sol" as CPU;
@@ -14,51 +34,10 @@ import "./interfaces/IERC20.sol";
 import "./libraries/HyperSwapLib.sol";
 
 /**
- * @notice Syncs a pool's liquidity and last updated timestamp.
+ * @title   Enigma Virtual Machine.
+ * @notice  Exposes an external api and an alternative multi-operation api that uses compressed data inputs.
+ * @dev     Implements low-level internal functions, re-entrancy guard and state.
  */
-function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp;
-    self.liquidity = asm.toUint128(asm.__computeDelta(self.liquidity, liquidityDelta));
-}
-
-/**
- * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
- */
-function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp;
-    self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
-}
-
-function syncPositionFees(
-    HyperPosition storage self,
-    uint liquidity,
-    uint feeGrowthAsset,
-    uint feeGrowthQuote
-) returns (uint feeAssetEarned, uint feeQuoteEarned) {
-    uint checkpointAsset = asm.__computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
-    uint checkpointQuote = asm.__computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
-
-    feeAssetEarned = FixedPointMathLib.mulWadDown(feeGrowthAsset - self.feeGrowthAssetLast, liquidity);
-    feeQuoteEarned = FixedPointMathLib.mulWadDown(feeGrowthQuote - self.feeGrowthQuoteLast, liquidity);
-
-    self.feeGrowthAssetLast = feeGrowthAsset;
-    self.feeGrowthQuoteLast = feeGrowthQuote;
-
-    self.tokensOwedAsset += feeAssetEarned;
-    self.tokensOwedQuote += feeQuoteEarned;
-}
-
-function exists(mapping(uint48 => HyperPool) storage pools, uint48 poolId) view returns (bool) {
-    return pools[poolId].blockTimestamp != 0;
-}
-
-using {changePoolLiquidity} for HyperPool;
-using {exists} for mapping(uint48 => HyperPool);
-using {changePositionLiquidity, syncPositionFees} for HyperPosition;
-
-/// @title Enigma Virtual Machine.
-/// @notice Stores the state of the Enigma with functions to change state.
-/// @dev Implements low-level internal virtual functions, re-entrancy guard and state.
 contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -121,6 +100,8 @@ contract Hyper is IHyper {
     mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
 
     // ===== Reentrancy ===== //
+
+    /** @dev Used on every external function and external entrypoint. */
     modifier lock() {
         if (locked != 1) revert LockedError();
 
@@ -129,6 +110,7 @@ contract Hyper is IHyper {
         locked = 1;
     }
 
+    /** @dev Used on every external operation that touches tokens. */
     modifier settle() {
         _;
         __account__.prepare();
@@ -145,83 +127,30 @@ contract Hyper is IHyper {
 
     // ===== Getters ===== //
 
+    /** @dev Fetches internally tracked amount of `token` owned by this contract. */
     function getReserves(address token) public view returns (uint) {
         return __account__.reserves[token];
     }
 
+    /** @dev Fetches internally tracked amount of `token` owned by `owner`. */
     function getBalances(address owner, address token) public view returns (uint) {
         return __account__.balances[owner][token];
     }
 
-    function getLiquidityMinted(
-        uint48 poolId,
-        uint deltaAsset,
-        uint deltaQuote
-    ) public view returns (uint deltaLiquidity) {
-        (uint amount0, uint amount1) = _getAmounts(poolId);
-        uint liquidity0 = deltaAsset.divWadDown(amount0); // If `deltaAsset` is twice as much as assets per liquidity in pool, we can mint 2 liquidity.
-        uint liquidity1 = deltaQuote.divWadDown(amount1); // If this liquidity amount is lower, it means we don't have enough tokens to mint the above amount.
-        deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-    }
-
-    /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
-    function getVirtualReserves(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
-        uint deltaLiquidity = pools[poolId].liquidity;
-        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity);
-    }
-
-    // TODO: fix this with non-delta liquidity amount
-    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
-    function getReservesDelta(
-        uint48 poolId,
-        uint256 deltaLiquidity
-    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
-        (deltaAsset, deltaQuote) = _getAmounts(poolId);
-
-        deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
-        deltaAsset = deltaAsset.mulWadDown(deltaLiquidity);
-    }
-
-    function _getAmounts(uint48 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
-        uint256 timestamp = _blockTimestamp();
-
-        Curve memory curve = curves[uint32(poolId)];
-        HyperPool storage pool = pools[poolId];
-        HyperSwapLib.Expiring memory info = HyperSwapLib.Expiring({
-            strike: curve.strike,
-            sigma: curve.sigma,
-            tau: curve.maturity - timestamp
-        });
-
-        deltaAsset = info.computeR2WithPrice(pool.lastPrice);
-        deltaQuote = info.computeR1WithR2(deltaAsset);
-    }
-
-    function getSecondsSincePositionUpdate(
-        address account,
-        uint48 poolId
-    ) public view returns (uint256 distance, uint256 timestamp) {
-        uint256 previous = positions[account][poolId].blockTimestamp;
-        timestamp = _blockTimestamp();
-        distance = timestamp - previous;
-    }
-
     // ===== CPU Entrypoint ===== //
 
-    /// @notice Main touchpoint for receiving calls.
-    /// @dev Critical: data must be encoded properly to be processed.
-    /// @custom:security Critical. Guarded against re-entrancy. This is like the bank vault door.
-    /// @custom:mev Higher level security checks must be implemented by calling contract.
+    /**
+     * @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`.
+     *
+     * @custom:security Guarded against re-entrancy externally and when settling. This is the vault door, is it `locked`?.
+     */
     fallback() external payable lock settle {
         CPU.__startProcess__(_process);
     }
 
+    /** @dev Only accepts Ether from Wrapped Ether contract. */
     receive() external payable {
         if (msg.sender != WETH) revert();
-    }
-
-    function __dangerousTransferFrom__(address token, address to, uint amount) private {
-        SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
     }
 
     // ===== Actions ===== //
@@ -294,13 +223,12 @@ contract Hyper is IHyper {
 
     // ===== Internal ===== //
 
-    /// @dev Overridable in tests.
+    /** @dev Overridable in tests.  */
     function _blockTimestamp() internal view virtual returns (uint128) {
         return uint128(block.timestamp);
     }
 
-    /// @dev Overridable in tests.
-    /// @custom:mev Prevents liquidity from being added and immediately removed until policy time (seconds) has elapsed.
+    /** @dev Overridable in tests.  */
     function _liquidityPolicy() internal view virtual returns (uint256) {
         return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
@@ -308,7 +236,7 @@ contract Hyper is IHyper {
     // ===== Effects ===== //
 
     /**
-     * @notice Allocates liquidity to a pool.
+     * @dev Adds liquidity to a position, therefore increasing liquidity in the pool and creating a "debit" balance in settlement.
      *
      * @custom:reverts If attempting to add zero liquidity.
      * @custom:reverts If attempting to add liquidity to a pool that has not been created.
@@ -378,6 +306,9 @@ contract Hyper is IHyper {
         _changePosition(args);
     }
 
+    /**
+     * @dev Syncs timestamp and liquidity for a position before triggering pool updates.
+     */
     function _changePosition(ChangeLiquidityParams memory args) internal {
         if (args.deltaLiquidity < 0) {
             (uint256 distance, uint256 timestamp) = getSecondsSincePositionUpdate(args.owner, args.poolId);
@@ -391,6 +322,9 @@ contract Hyper is IHyper {
         _changePool(args);
     }
 
+    /**
+     * @dev Syncs timestamp and liquidity for a pool before adding debits (increase reserve) or credits (decrease reserve) to settlement.
+     */
     function _changePool(ChangeLiquidityParams memory args) internal {
         pools[args.poolId].changePoolLiquidity(args.timestamp, args.deltaLiquidity);
 
@@ -406,6 +340,9 @@ contract Hyper is IHyper {
         }
     }
 
+    /**
+     * @dev Subtracts liquidity from a position, therefore reducing liquidity in the pool and creating a "credit" balance in settlement.
+     */
     function _unallocate(
         uint8 useMax,
         uint48 poolId,
@@ -435,6 +372,9 @@ contract Hyper is IHyper {
         emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaQuote, deltaAsset, deltaLiquidity);
     }
 
+    /**
+     * @dev Adds desired amount of liquidity to pending staked liquidity changes of a pool.
+     */
     function _stake(uint48 poolId) internal {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
 
@@ -453,6 +393,9 @@ contract Hyper is IHyper {
         // emit Stake Position
     }
 
+    /**
+     * @dev Subtracts desired amount of liquidity from pending staked liquidity changes of a pool.
+     */
     function _unstake(uint48 poolId) internal {
         _syncPoolPrice(poolId); // Reverts if pool does not exist.
 
@@ -473,7 +416,7 @@ contract Hyper is IHyper {
     // ===== Swaps ===== //
 
     /**
-     * @notice Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.
+     * @dev Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.
      *
      * @custom:reverts If pool does not exist.
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
@@ -504,10 +447,10 @@ contract Hyper is IHyper {
     /**
      * @dev Swaps exact input of tokens for an output of tokens in the specified direction.
      *
+     * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
      * @custom:reverts If input swap amount is zero.
      * @custom:reverts If pool is not initialized with a price.
      * @custom:security Updates the pool's price in _syncPoolPrice before the swap happens.
-     * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
      */
     function _swapExactIn(
         Order memory args
@@ -641,6 +584,7 @@ contract Hyper is IHyper {
 
     /**
      * @dev Effects on a Pool after a successful swap order condition has been met.
+     *
      * @return timeDelta Amount of time passed since the last update to the pool.
      */
     function _syncPool(
@@ -689,7 +633,7 @@ contract Hyper is IHyper {
     // ===== Initializing Pools ===== //
 
     /**
-     * @notice Uses a pair and curve to instantiate a pool at a price.
+     * @dev Uses a pair and curve to instantiate a pool at a price.
      *
      * @custom:magic If pairId is 0, uses current pair nonce.
      * @custom:magic If curveId is 0, uses current curve nonce.
@@ -718,8 +662,7 @@ contract Hyper is IHyper {
     }
 
     /**
-     * @notice Maps a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
-     * @dev Curves are used to create pools.
+     * @dev Curves are used to create pools by mapping a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
      *
      * @custom:reverts If set parameters have already been used to create a curve.
      * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
@@ -762,7 +705,6 @@ contract Hyper is IHyper {
     }
 
     /**
-     * @notice Maps a nonce to a pair of token addresses and their decimal places.
      * @dev Pairs are used in pool creation to determine the pool's underlying tokens.
      *
      * @custom:reverts If decoded addresses are the same.
@@ -795,43 +737,58 @@ contract Hyper is IHyper {
     }
 
     // ===== Accounting System ===== //
-
-    /// @dev Most important function because it manages the solvency of the Engima.
-    /// @custom:security Critical. Global balances of tokens are compared with the actual `balanceOf`.
+    /**
+     * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
+     *
+     * @custom:security Directly manipulates reserves.
+     */
     function _increaseReserves(address token, uint256 amount) internal {
         __account__.deposit(token, amount);
         emit IncreaseReserveBalance(token, amount);
     }
 
-    /// @dev Equally important to `_increaseReserves`.
-    /// @custom:security Critical. Same as above. Implicitly reverts on underflow.
+    /**
+     * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
+     *
+     * @custom:security Directly manipulates reserves.
+     * @custom:reverts With `InsufficientBalance` if current reserve balance for `token` iss less than `amount`.
+     */
     function _decreaseReserves(address token, uint256 amount) internal {
         __account__.withdraw(token, amount);
         emit DecreaseReserveBalance(token, amount);
     }
 
-    /// @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
-    ///      Positive credits are only applied to the internal balance of the account.
-    ///      Therefore, it does not require a state change for the global reserves.
-    /// @custom:security Critical. Only method which credits accounts with tokens.
+    /**
+     * @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
+     *      Positive credits are only applied to the internal balance of the account.
+     *      Therefore, it does not require a state change for the global reserves.
+     *
+     * @custom:security Directly manipulates intrernal balances.
+     */
     function _applyCredit(address token, uint256 amount) internal {
         __account__.credit(msg.sender, token, amount);
         emit IncreaseUserBalance(token, amount);
     }
 
-    /// @dev A positive debit is a cost that must be paid for a transaction to be processed.
-    ///      If a balance exists for the token for the internal balance of `msg.sender`,
-    ///      it will be used to pay the debit. Else, the contract expects tokens to be transferred in.
-    /// @custom:security Critical. Handles the payment of tokens for all pool actions.
+    /**
+     * @dev A positive debit is a cost that must be paid for a transaction to be processed.
+     *      If a balance exists for the token for the internal balance of `msg.sender`,
+     *      it will be used to pay the debit. Else, the contract expects tokens to be transferred in.
+     *
+     * @custom:security Directly manipulates intrernal balances.
+     */
     function _applyDebit(address token, uint256 amount) internal {
         __account__.debit(msg.sender, token, amount);
         emit DecreaseUserBalance(token, amount);
     }
 
-    /// @notice Single instruction processor that will forward instruction to appropriate function.
-    /// @dev Critical: Every token of every pair interacted with is cached to be settled later.
-    /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
-    /// @custom:security Critical. Directly sends CPU to be executed.
+    /**
+     * @dev Alternative entrypoint to execute functions.
+     *
+     * @param data Encoded Enigma data. First byte must be an Enigma instruction.
+     *
+     * @custom:reverts If encoded data does not match the decoding format for the instruction specified.
+     */
     function _process(bytes calldata data) internal {
         (, bytes1 instruction) = CPU.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
@@ -866,4 +823,104 @@ contract Hyper is IHyper {
             revert UnknownInstruction();
         }
     }
+
+    // ===== View ===== //
+
+    /** @dev Computes amount of liquidity added to position and pool if token amounts were provided. */
+    function getLiquidityMinted(
+        uint48 poolId,
+        uint deltaAsset,
+        uint deltaQuote
+    ) public view returns (uint deltaLiquidity) {
+        (uint amount0, uint amount1) = _getAmounts(poolId);
+        uint liquidity0 = deltaAsset.divWadDown(amount0); // If `deltaAsset` is twice as much as assets per liquidity in pool, we can mint 2 liquidity.
+        uint liquidity1 = deltaQuote.divWadDown(amount1); // If this liquidity amount is lower, it means we don't have enough tokens to mint the above amount.
+        deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+    }
+
+    /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
+    function getVirtualReserves(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        uint deltaLiquidity = pools[poolId].liquidity;
+        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity);
+    }
+
+    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
+    function getReservesDelta(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        (deltaAsset, deltaQuote) = _getAmounts(poolId);
+
+        deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
+        deltaAsset = deltaAsset.mulWadDown(deltaLiquidity);
+    }
+
+    /** @dev Computes each side of a pool's reserves __per one unit of liquidity__. */
+    function _getAmounts(uint48 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        uint256 timestamp = _blockTimestamp();
+
+        Curve memory curve = curves[uint32(poolId)];
+        HyperPool storage pool = pools[poolId];
+        HyperSwapLib.Expiring memory info = HyperSwapLib.Expiring({
+            strike: curve.strike,
+            sigma: curve.sigma,
+            tau: curve.maturity - timestamp
+        });
+
+        deltaAsset = info.computeR2WithPrice(pool.lastPrice);
+        deltaQuote = info.computeR1WithR2(deltaAsset);
+    }
+
+    /** @dev Computes the time elapsed since position of `account` was last updated. */
+    function getSecondsSincePositionUpdate(
+        address account,
+        uint48 poolId
+    ) public view returns (uint256 distance, uint256 timestamp) {
+        uint256 previous = positions[account][poolId].blockTimestamp;
+        timestamp = _blockTimestamp();
+        distance = timestamp - previous;
+    }
+}
+
+using {changePoolLiquidity} for HyperPool;
+using {exists} for mapping(uint48 => HyperPool);
+using {changePositionLiquidity, syncPositionFees} for HyperPosition;
+
+/**
+ * @notice Syncs a pool's liquidity and last updated timestamp.
+ */
+function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
+    self.blockTimestamp = timestamp;
+    self.liquidity = asm.toUint128(asm.__computeDelta(self.liquidity, liquidityDelta));
+}
+
+/**
+ * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
+ */
+function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
+    self.blockTimestamp = timestamp;
+    self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
+}
+
+function syncPositionFees(
+    HyperPosition storage self,
+    uint liquidity,
+    uint feeGrowthAsset,
+    uint feeGrowthQuote
+) returns (uint feeAssetEarned, uint feeQuoteEarned) {
+    uint checkpointAsset = asm.__computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
+    uint checkpointQuote = asm.__computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
+
+    feeAssetEarned = FixedPointMathLib.mulWadDown(feeGrowthAsset - self.feeGrowthAssetLast, liquidity);
+    feeQuoteEarned = FixedPointMathLib.mulWadDown(feeGrowthQuote - self.feeGrowthQuoteLast, liquidity);
+
+    self.feeGrowthAssetLast = feeGrowthAsset;
+    self.feeGrowthQuoteLast = feeGrowthQuote;
+
+    self.tokensOwedAsset += feeAssetEarned;
+    self.tokensOwedQuote += feeQuoteEarned;
+}
+
+function exists(mapping(uint48 => HyperPool) storage pools, uint48 poolId) view returns (bool) {
+    return pools[poolId].blockTimestamp != 0;
 }

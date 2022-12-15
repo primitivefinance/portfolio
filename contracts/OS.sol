@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+import "solmate/utils/SafeTransferLib.sol";
+
 import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
 import {BalanceError, EtherTransferFail} from "./EnigmaTypes.sol";
@@ -40,6 +42,11 @@ function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
 function __dangerousTransferEther__(address to, uint256 value) {
     (bool success, ) = to.call{value: value}(new bytes(0));
     if (!success) revert EtherTransferFail();
+}
+
+/** @dev Used in a for loop in the `multiSetle` function. */
+function __dangerousTransferFrom__(address token, address to, uint amount) {
+    SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
 }
 
 function credit(AccountSystem storage self, address owner, address token, uint amount) {

@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+/**
+ * @title IHyperEvents
+ * @dev Events emitted in the Hyper contract.
+ */
 interface IHyperEvents {
-    /// @dev Emitted on increasing the internal reserves of a pool.
+    /**  @dev Emitted on increasing the internal reserves of a pool. */
     event Allocate(
         uint48 indexed poolId,
         address indexed asset,
@@ -12,7 +16,7 @@ interface IHyperEvents {
         uint256 deltaLiquidity
     );
 
-    /// @dev Emitted on decreasing the internal reserves of a pool.
+    /**  @dev Emitted on decreasing the internal reserves of a pool. */
     event Unallocate(
         uint48 indexed poolId,
         address indexed asset,
@@ -22,10 +26,10 @@ interface IHyperEvents {
         uint256 deltaLiquidity
     );
 
-    /// @dev Emitted on a token swap in a single virtual pool.
+    /**  @dev Emitted on a token swap in a single virtual pool. */
     event Swap(uint48 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
 
-    /// @dev Emitted on setting a new token pair in state with the key `pairId`.
+    /**  @dev Emitted on setting a new token pair in state with the key `pairId`. */
     event CreatePair(
         uint16 indexed pairId,
         address indexed asset,
@@ -34,7 +38,7 @@ interface IHyperEvents {
         uint8 decimalsQuote
     );
 
-    /// @dev Emitted on setting a new curve parameter set in state with key `curveId`.
+    /**  @dev Emitted on setting a new curve parameter set in state with key `curveId`. */
     event CreateCurve(
         uint32 indexed curveId,
         uint128 strike,
@@ -44,27 +48,21 @@ interface IHyperEvents {
         uint32 priorityGamma
     );
 
-    /// @dev Emitted on creating a pool for a pair and curve.
+    /**  @dev Emitted on creating a pool for a pair and curve. */
     event CreatePool(uint48 indexed poolId, uint16 indexed pairId, uint32 indexed curveId, uint256 price);
-
-    // --- Balances --- //
-    /// @dev A payment requested by this contract that must be paid by the `msg.sender` account.
+    /**  @dev A payment requested by this contract that must be paid by the `msg.sender` account. */
     event DecreaseUserBalance(address indexed token, uint256 amount);
-    /// @dev A payment that is paid out to the `msg.sender` account from this contract.
+    /**  @dev A payment that is paid out to the `msg.sender` account from this contract. */
     event IncreaseUserBalance(address indexed token, uint256 amount);
-    // --- Reserves --- //
-    /// @dev Emitted on any pool interaction which increases one of the pool's reserves.
-    /// @custom:security High. Use these to track the total value locked of a token.
+    /**  @dev Emitted on any pool interaction which increases one of the pool's reserves. */
     event IncreaseReserveBalance(address indexed token, uint256 amount);
-    /// @dev Emitted on any pool interaction which decreases one of the pool's reserves.
-    /// @custom:security High.
+    /**  @dev Emitted on any pool interaction which decreases one of the pool's reserves. */
     event DecreaseReserveBalance(address indexed token, uint256 amount);
-    // -- Positions -- //
-    /// @dev Emitted on increasing liquidity.
+    /**  @dev Emitted on increasing liquidity. */
     event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-    /// @dev Emitted on removing liquidity.
+    /**  @dev Emitted on removing liquidity. */
     event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
-    /// @dev Emitted on syncing earned fees to a position's claimable balance.
+    /**  @dev Emitted on syncing earned fees to a position's claimable balance. */
     event FeesEarned(
         address indexed account,
         uint48 indexed poolId,
@@ -74,8 +72,7 @@ interface IHyperEvents {
         address quote
     );
 
-    // - Sync pool - //
-
+    /** @dev Emitted on changes to a pool's state. */
     event PoolUpdate(
         uint48 indexed poolId,
         uint256 price,
@@ -87,12 +84,14 @@ interface IHyperEvents {
         uint256 feeGrowthGlobalQuote
     );
 
-    /// @dev Emitted on external calls to `updateLastTimestamp` or `swap`. Syncs a pool's timestamp to block.timestamp.
+    /**  @dev Emitted on external calls to `syncPool` or `swap`. Syncs a pool's timestamp to block.timestamp. */
     event UpdateLastTimestamp(uint48 indexed poolId);
 }
 
-/// @title IHyperGetters
-/// @dev Public view functions exposed by the Enigma's higher level contracts.
+/**
+ * @title IHyperGetters
+ * @dev Public view functions exposed by the Enigma's higher level contracts.
+ */
 interface IHyperGetters {
     /** @dev Contract's internally tracked balance of tokens. Includes balances and positions. */
     function getReserves(address token) external view returns (uint);
@@ -153,20 +152,11 @@ interface IHyperGetters {
 
     function getPairNonce() external view returns (uint256);
 
-    /// @notice Computes the amount of time passed since the Position's liquidity was updated.
-    /// @custom:mev Just In Time (JIT) liquidity is adding and removing liquidity as a sandwich around a transaction.
-    /// It's mitigated with a distance calculated between the time it was added and removed.
-    /// If the distance is non-zero, it means liquidity was allocated and removed in different blocks.
-    /// @custom:security High. An incorrectly computed distance could lead to possible
-    /// negative (or positive) effects to accounts interacting with the Enigma.
     function getSecondsSincePositionUpdate(
         address account,
         uint48 poolId
     ) external view returns (uint256 distance, uint256 timestamp);
 
-    /// @notice Computes amount of asset and quote tokens entitled to `liquidity` amount.
-    /// @dev Can be used to fetch the expected amount of tokens withdrawn from removing `liquidity`.
-    /// @custom:security Medium. Designed to round in a direction disadvantageous to the liquidity owner.
     function getReservesDelta(
         uint48 poolId,
         uint256 deltaLiquidity
@@ -181,6 +171,10 @@ interface IHyperGetters {
     ) external view returns (uint deltaLiquidity);
 }
 
+/**
+ * @title IHyperActions
+ * @dev External api for interacting with the contract's state.
+ */
 interface IHyperActions {
     function allocate(uint48 poolId, uint deltaLiquidity) external returns (uint deltaAsset, uint deltaQuote);
 
@@ -204,8 +198,10 @@ interface IHyperActions {
     function syncPool(uint48 poolId) external returns (uint128 blockTimestamp);
 }
 
-/// @title IHyper
-/// @dev All the interfaces of the Enigma, so it can be imported with ease.
+/**
+ * @title IHyper
+ * @dev All the interfaces of the Enigma, so it can be imported with ease.
+ */
 interface IHyper is IHyperActions, IHyperEvents, IHyperGetters {
 
 }
