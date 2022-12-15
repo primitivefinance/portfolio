@@ -24,22 +24,17 @@ function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 l
 /**
  * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
  */
-function changePositionLiquidity(
-    HyperPosition storage self,
-    HyperPool storage pool,
-    uint256 timestamp,
-    int128 liquidityDelta
-) returns (uint256 feeAssetEarned, uint256 feeQuoteEarned) {
+function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
     self.blockTimestamp = timestamp;
     self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
 
-    (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
+    /* (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
         pool.liquidity,
         pool.feeGrowthGlobalAsset,
         pool.feeGrowthGlobalQuote
     );
 
-    (feeAssetEarned, feeQuoteEarned) = self.syncPositionFees(liquidity, feeGrowthAsset, feeGrowthQuote);
+    (feeAssetEarned, feeQuoteEarned) = self.syncPositionFees(liquidity, feeGrowthAsset, feeGrowthQuote); */
 }
 
 function syncPositionFees(
@@ -170,24 +165,34 @@ contract Hyper is IHyper {
         uint48 poolId,
         uint deltaAsset,
         uint deltaQuote
-    ) public view returns (uint deltaLiquidity, uint optimizedAsset, uint optimizedQuote) {
+    ) public view returns (uint deltaLiquidity) {
         (uint amount0, uint amount1) = _getAmounts(poolId);
         uint liquidity0 = deltaAsset.divWadDown(amount0); // If `deltaAsset` is twice as much as assets per liquidity in pool, we can mint 2 liquidity.
         uint liquidity1 = deltaQuote.divWadDown(amount1); // If this liquidity amount is lower, it means we don't have enough tokens to mint the above amount.
         deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
-        if (deltaLiquidity == liquidity0) {
-            optimizedAsset = deltaAsset;
-            optimizedQuote = amount1.mulWadDown(deltaLiquidity); // Gets optimal amount of other token based on liquidity.
-        } else {
-            optimizedAsset = amount0.mulWadDown(deltaLiquidity);
-            optimizedQuote = deltaQuote;
-        }
+    }
+
+    /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
+    function getVirtualReserves(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        uint deltaLiquidity = pools[poolId].liquidity;
+        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity);
+    }
+
+    // TODO: fix this with non-delta liquidity amount
+    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
+    function getReservesDelta(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        (deltaAsset, deltaQuote) = _getAmounts(poolId);
+
+        deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
+        deltaAsset = deltaAsset.mulWadDown(deltaLiquidity);
     }
 
     function _getAmounts(uint48 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
         uint256 timestamp = _blockTimestamp();
 
-        // Compute amounts of tokens for the real reserves.
         Curve memory curve = curves[uint32(poolId)];
         HyperPool storage pool = pools[poolId];
         HyperSwapLib.Expiring memory info = HyperSwapLib.Expiring({
@@ -198,18 +203,6 @@ contract Hyper is IHyper {
 
         deltaAsset = info.computeR2WithPrice(pool.lastPrice);
         deltaQuote = info.computeR1WithR2(deltaAsset, pool.lastPrice, 0);
-    }
-
-    // TODO: fix this with non-delta liquidity amount
-    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
-    function getVirtualReserves(
-        uint48 poolId,
-        uint256 deltaLiquidity
-    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
-        (deltaAsset, deltaQuote) = _getAmounts(poolId);
-
-        deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
-        deltaAsset = deltaAsset.mulWadDown(deltaLiquidity);
     }
 
     function getSecondsSincePositionUpdate(
@@ -335,52 +328,90 @@ contract Hyper is IHyper {
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
-        _syncPoolPrice(poolId);
 
         Pair memory pair = pairs[uint16(poolId >> 32)];
         if (useMax == 1) {
-            uint liquidity;
-            // todo: consider using internal balances too, or in place of
-            (liquidity, deltaAsset, deltaQuote) = getLiquidityMinted(
-                poolId,
-                __balanceOf__(pair.tokenAsset, msg.sender),
-                __balanceOf__(pair.tokenQuote, msg.sender)
+            // todo: consider using internal balances too, or in place of real balances.
+            deltaLiquidity = (
+                asm.toUint128(
+                    getLiquidityMinted(
+                        poolId,
+                        __balanceOf__(pair.tokenAsset, msg.sender),
+                        __balanceOf__(pair.tokenQuote, msg.sender)
+                    )
+                )
             );
-
-            deltaLiquidity = asm.toUint128(liquidity);
-        } else {
-            // todo: investigate how to fix this, leads to expected reserves being less in useMax case
-            (deltaAsset, deltaQuote) = getVirtualReserves(poolId, deltaLiquidity);
         }
 
-        _increaseLiquidity(poolId, deltaAsset, deltaQuote, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity);
+
+        ChangeLiquidityParams memory args = ChangeLiquidityParams(
+            msg.sender,
+            poolId,
+            _blockTimestamp(),
+            deltaAsset,
+            deltaQuote,
+            pair.tokenAsset,
+            pair.tokenQuote,
+            int128(deltaLiquidity)
+        );
+
+        _changeLiquidity(args);
+
+        emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     /**
-     * @notice Increases liquidity in position, which increases liquidity in pool, which increases reserve balances.
+     * @dev Changing liquidity has cascading effects that alter critical state.
+     *
+     *  changeLiquidity
+     *      syncPositionFees
+     *      changePositionLiquidity
+     *        syncPositionTimestamp
+     *          changePoolLiquidity
+     *            syncPoolTimestamp
+     *              changeReserves
+     *
      */
-    function _increaseLiquidity(
-        uint48 poolId,
-        uint256 deltaAsset,
-        uint256 deltaQuote,
-        uint128 deltaLiquidity
-    ) internal {
-        uint timestamp = _blockTimestamp();
-        HyperPool storage pool = pools[poolId];
-        pool.changePoolLiquidity(timestamp, int128(deltaLiquidity));
+    function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint feeAsset, uint feeQuote) {
+        (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
-        HyperPosition storage pos = positions[msg.sender][poolId];
-        (uint feeAsset, uint feeQuote) = pos.changePositionLiquidity(pool, timestamp, int128(deltaLiquidity));
+        (feeAsset, feeQuote) = pos.syncPositionFees(
+            pool.liquidity,
+            pool.feeGrowthGlobalAsset,
+            pool.feeGrowthGlobalQuote
+        );
+        emit FeesEarned(args.owner, args.poolId, feeAsset, args.tokenAsset, feeQuote, args.tokenQuote);
 
-        uint16 pairId = uint16(poolId >> 32);
-        Pair memory pair = pairs[pairId];
-        // note: Reserves are used at the end of instruction processing to settle transactions.
-        _increaseReserves(pair.tokenAsset, deltaAsset);
-        _increaseReserves(pair.tokenQuote, deltaQuote);
+        _changePosition(args);
+    }
 
-        emit FeesEarned(msg.sender, poolId, feeAsset, pair.tokenAsset, feeQuote, pair.tokenQuote);
-        emit IncreasePosition(msg.sender, poolId, deltaLiquidity);
-        emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
+    function _changePosition(ChangeLiquidityParams memory args) internal {
+        if (args.deltaLiquidity < 0) {
+            (uint256 distance, uint256 timestamp) = getSecondsSincePositionUpdate(args.owner, args.poolId);
+            if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
+            emit DecreasePosition(args.owner, args.poolId, uint128(args.deltaLiquidity));
+        } else {
+            emit IncreasePosition(args.owner, args.poolId, uint128(args.deltaLiquidity));
+        }
+
+        positions[args.owner][args.poolId].changePositionLiquidity(args.timestamp, args.deltaLiquidity);
+        _changePool(args);
+    }
+
+    function _changePool(ChangeLiquidityParams memory args) internal {
+        pools[args.poolId].changePoolLiquidity(args.timestamp, args.deltaLiquidity);
+
+        (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
+
+        if (args.deltaLiquidity < 0) {
+            _decreaseReserves(asset, args.deltaAsset);
+            _decreaseReserves(quote, args.deltaQuote);
+        } else {
+            // note: Reserves are used at the end of instruction processing to settle transactions.
+            _increaseReserves(asset, args.deltaAsset);
+            _increaseReserves(quote, args.deltaQuote);
+        }
     }
 
     function _unallocate(
@@ -394,34 +425,22 @@ contract Hyper is IHyper {
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
-        (deltaAsset, deltaQuote) = getVirtualReserves(poolId, deltaLiquidity); // computed before changing liquidity
+        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity); // computed before changing liquidity
 
-        // Compute amounts of tokens for the real reserves.
-        HyperPool storage pool = pools[poolId];
-        pool.changePoolLiquidity(_blockTimestamp(), -int128(deltaLiquidity));
-        (uint feeAsset, uint feeQuote) = _decreasePosition(poolId, deltaLiquidity);
+        Pair memory pair = pairs[uint16(poolId >> 32)];
+        ChangeLiquidityParams memory args = ChangeLiquidityParams(
+            msg.sender,
+            poolId,
+            _blockTimestamp(),
+            deltaAsset,
+            deltaQuote,
+            pair.tokenAsset,
+            pair.tokenQuote,
+            -int128(deltaLiquidity)
+        );
 
-        Pair memory pair = pairs[pairId];
-        _decreaseReserves(pair.tokenAsset, deltaAsset);
-        _decreaseReserves(pair.tokenQuote, deltaQuote);
-
+        _changeLiquidity(args);
         emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaQuote, deltaAsset, deltaLiquidity);
-    }
-
-    /// @dev Syncs a position's fee growth, fees earned, liquidity, and timestamp.
-    function _decreasePosition(uint48 poolId, uint256 deltaLiquidity) internal returns (uint feeAsset, uint feeQuote) {
-        (uint256 distance, uint256 timestamp) = getSecondsSincePositionUpdate(msg.sender, poolId);
-        if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
-
-        HyperPool storage pool = pools[poolId];
-        HyperPosition storage pos = positions[msg.sender][poolId];
-
-        (feeAsset, feeQuote) = pos.changePositionLiquidity(pool, _blockTimestamp(), -int128(int(deltaLiquidity)));
-
-        uint16 pairId = uint16(poolId >> 32);
-        Pair memory pair = pairs[pairId];
-        emit FeesEarned(msg.sender, poolId, feeAsset, pair.tokenAsset, feeQuote, pair.tokenQuote);
-        emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
 
     function _stake(uint48 poolId) internal {

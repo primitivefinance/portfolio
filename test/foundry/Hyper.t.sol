@@ -246,7 +246,7 @@ contract TestHyperSingle is Test {
     }
 
     function testGetLiquidityMinted() public {
-        (uint a, uint b, uint c) = __contractBeingTested__.getLiquidityMinted(__poolId, 1, 1e19);
+        uint deltaLiquidity = __contractBeingTested__.getLiquidityMinted(__poolId, 1, 1e19);
     }
 
     // ===== CPU ===== //
@@ -643,11 +643,13 @@ contract TestHyperSingle is Test {
     }
 
     function testAllocateUseMax() public checkSettlementInvariant {
-        (uint maxLiquidity, uint deltaAsset, uint deltaQuote) = __contractBeingTested__.getLiquidityMinted(
+        uint maxLiquidity = __contractBeingTested__.getLiquidityMinted(
             __poolId,
             asset.balanceOf(address(this)),
             quote.balanceOf(address(this))
         );
+
+        (uint deltaAsset, uint deltaQuote) = __contractBeingTested__.getReservesDelta(__poolId, maxLiquidity);
 
         __contractBeingTested__.allocate(__poolId, type(uint256).max);
 

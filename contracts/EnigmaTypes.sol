@@ -112,7 +112,18 @@ struct HyperPosition {
     uint256 tokensOwedQuote;
 }
 
-// --- Swap --- //
+// --- Parameter Structs --- //
+
+struct ChangeLiquidityParams {
+    address owner;
+    uint48 poolId;
+    uint256 timestamp;
+    uint256 deltaAsset;
+    uint256 deltaQuote;
+    address tokenAsset;
+    address tokenQuote;
+    int128 deltaLiquidity;
+}
 
 /**
  * @notice Parameters used to submit a swap order.
