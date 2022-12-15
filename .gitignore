@@ -25,3 +25,5 @@ optimized-out
 # Differential testing
 test/differential/data
 test/differential/scripts/node_modules
+
+lcov.info

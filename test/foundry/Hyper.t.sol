@@ -117,7 +117,7 @@ function createPool(
     uint128 price
 ) returns (bytes memory data) {
     bytes[] memory instructions = new bytes[](3);
-    uint48 magicPoolId = 0x0000000000;
+    uint48 magicPoolId = 0x000000000000;
     instructions[0] = (CPU.encodeCreatePair(token0, token1));
     instructions[1] = (CPU.encodeCreateCurve(sigma, maturity, fee, priorityFee, strike));
     instructions[2] = (CPU.encodeCreatePool(magicPoolId, price));
@@ -248,6 +248,11 @@ contract TestHyperSingle is Test {
 
     // ===== Effects ===== //
 
+    function testSyncPool() public {
+        vm.warp(1);
+        __contractBeingTested__.syncPool(__poolId);
+    }
+
     function testDrawReducesBalance() public checkSettlementInvariant {
         // First fund the account
         __contractBeingTested__.fund(address(asset), 4000);
@@ -299,14 +304,18 @@ contract TestHyperSingle is Test {
 
     // --- Swap --- //
 
-    function testFailSwapExactInNonExistentPoolIdReverts() public {
+    function testSwapExactInNonExistentPoolIdReverts() public {
+        uint48 failureArg = 0x0001030;
         bytes memory data = CPU.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
+        vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
         bool success = forwarder.process(data);
         assertTrue(!success);
     }
 
-    function testFailSwapExactInZeroSwapAmountReverts() public {
-        bytes memory data = CPU.encodeSwap(0, __poolId, 0x01, 0x00, 0x01, 0x01, 0);
+    function testSwapExactInZeroSwapAmountReverts() public {
+        uint128 failureArg = 0;
+        bytes memory data = CPU.encodeSwap(0, __poolId, 0x01, failureArg, 0x01, 0x01, 0);
+        vm.expectRevert(ZeroInput.selector);
         bool success = forwarder.process(data);
         assertTrue(!success);
     }
@@ -456,18 +465,20 @@ contract TestHyperSingle is Test {
 
     // --- Allocate --- //
 
-    function testFailAllocateNonExistentPoolIdReverts() public {
-        uint48 random = uint48(48);
-        bytes memory data = CPU.encodeAllocate(0, random, 0x01, 0x01);
+    function testAllocateNonExistentPoolIdReverts() public {
+        uint48 failureArg = uint48(48);
+        bytes memory data = CPU.encodeAllocate(0, failureArg, 0x01, 0x01);
+        vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
         bool success = forwarder.process(data);
-        assertTrue(success, "forwarder call failed");
+        assertTrue(!success, "forwarder call failed");
     }
 
-    function testFailAllocateZeroLiquidityReverts() public {
-        uint8 liquidity = 0;
-        bytes memory data = CPU.encodeAllocate(0, __poolId, 0x00, liquidity);
+    function testAllocateZeroLiquidityReverts() public {
+        uint8 failureArg = 0;
+        bytes memory data = CPU.encodeAllocate(0, __poolId, 0x00, failureArg);
+        vm.expectRevert(ZeroLiquidityError.selector);
         bool success = forwarder.process(data);
-        assertTrue(success, "forwarder call failed");
+        assertTrue(!success, "forwarder call failed");
     }
 
     function testProcessAllocateFull() public checkSettlementInvariant {
@@ -590,14 +601,25 @@ contract TestHyperSingle is Test {
 
     // --- Remove Liquidity --- //
 
-    function testFailUnallocateZeroLiquidityReverts() public {
+    function testUnallocateUseMax() public {
+        uint maxLiquidity = getPosition(msg.sender, __poolId).totalLiquidity;
+
+        __contractBeingTested__.unallocate(__poolId, type(uint256).max);
+
+        assertEq(0, getPool(__poolId).liquidity);
+    }
+
+    function testUnallocateZeroLiquidityReverts() public {
         bytes memory data = CPU.encodeUnallocate(0, __poolId, 0x00, 0x00);
+        vm.expectRevert(ZeroLiquidityError.selector);
         bool success = forwarder.process(data);
         assertTrue(!success);
     }
 
-    function testFailUnallocateNonExistentPoolReverts() public {
+    function testUnallocateNonExistentPoolReverts() public {
+        uint48 failureArg = 42;
         bytes memory data = CPU.encodeUnallocate(0, 42, 0x01, 0x01);
+        vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
         bool success = forwarder.process(data);
         assertTrue(!success);
     }
@@ -773,7 +795,7 @@ contract TestHyperSingle is Test {
     // of all claims is entitled to.
     function testUnstakePoolStakedLiquidityUpdated() public checkSettlementInvariant {
         int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK + 256; // note: Fails if pool.lastTick <= hi
+        int24 hi = DEFAULT_TICK + 256; // note: fails if pool.lastTick <= hi
         uint8 amount = 0x01;
         uint8 power = 0x0f;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
@@ -831,7 +853,7 @@ contract TestHyperSingle is Test {
         bool success = forwarder.process(data);
     }
 
-    function testCreatePairLowerDecimalBoundsReverts() public {
+    function testCreatePairLowerDecimalBoundsAssetReverts() public {
         address token0 = address(new TestERC20("t", "t", 5));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
@@ -839,9 +861,25 @@ contract TestHyperSingle is Test {
         bool success = forwarder.process(data);
     }
 
-    function testCreatePairUpperDecimalBoundsReverts() public {
+    function testCreatePairLowerDecimalBoundsQuoteReverts() public {
+        address token0 = address(new TestERC20("t", "t", 18));
+        address token1 = address(new TestERC20("t", "t", 5));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
+        vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 5));
+        bool success = forwarder.process(data);
+    }
+
+    function testCreatePairUpperDecimalBoundsAssetReverts() public {
         address token0 = address(new TestERC20("t", "t", 24));
         address token1 = address(new TestERC20("t", "t", 18));
+        bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
+        vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 24));
+        bool success = forwarder.process(data);
+    }
+
+    function testCreatePairUpperDecimalBoundsQuoteReverts() public {
+        address token0 = address(new TestERC20("t", "t", 18));
+        address token1 = address(new TestERC20("t", "t", 24));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 24));
         bool success = forwarder.process(data);

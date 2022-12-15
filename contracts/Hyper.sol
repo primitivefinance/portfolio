@@ -260,7 +260,7 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function unallocate(uint48 poolId, uint amount) external lock settle returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = asm.toUint128(useMax ? 0 : amount);
+        uint128 input = asm.toUint128(useMax ? type(uint128).max : amount);
         (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint16(poolId >> 32), input);
     }
 
@@ -408,6 +408,8 @@ contract Hyper is IHyper {
     ) internal returns (uint deltaAsset, uint deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
+        if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
+
         // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
         (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity); // computed before changing liquidity
 
