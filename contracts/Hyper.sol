@@ -166,12 +166,29 @@ contract Hyper is IHyper {
         return __account__.balances[owner][token];
     }
 
-    // TODO: fix this with non-delta liquidity amount
-    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
-    function getPhysicalReserves(
+    function getLiquidityMinted(
         uint48 poolId,
-        uint256 deltaLiquidity
-    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        uint deltaAsset,
+        uint deltaQuote
+    ) public view returns (uint deltaLiquidity, uint optimizedAsset, uint optimizedQuote) {
+        (uint amount0, uint amount1) = _getAmounts(poolId);
+        uint liquidity0 = deltaAsset.divWadDown(amount0); // If `deltaAsset` is twice as much as assets per liquidity in pool, we can mint 2 liquidity.
+        uint liquidity1 = deltaQuote.divWadDown(amount1); // If this liquidity amount is lower, it means we don't have enough tokens to mint the above amount.
+        deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        if (deltaLiquidity == liquidity0) {
+            optimizedAsset = deltaAsset;
+            optimizedQuote = amount1.mulWadDown(deltaLiquidity); // Gets optimal amount of other token based on liquidity.
+        } else {
+            optimizedAsset = amount0.mulWadDown(deltaLiquidity);
+            optimizedQuote = deltaQuote;
+        }
+    }
+
+    function _maxLiquidityMinted() public view returns (uint maxLiquidity) {
+        // todo: compute based on price that is updated over time
+    }
+
+    function _getAmounts(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
         uint256 timestamp = _blockTimestamp();
 
         // Compute amounts of tokens for the real reserves.
@@ -185,6 +202,15 @@ contract Hyper is IHyper {
 
         deltaAsset = info.computeR2WithPrice(pool.lastPrice);
         deltaQuote = info.computeR1WithR2(deltaAsset, pool.lastPrice, 0);
+    }
+
+    // TODO: fix this with non-delta liquidity amount
+    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
+    function getPhysicalReserves(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        (deltaAsset, deltaQuote) = _getAmounts(poolId);
 
         deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
         deltaAsset = deltaAsset.mulWadDown(deltaLiquidity);
@@ -227,7 +253,7 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function allocate(uint48 poolId, uint amount) external lock settle returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = asm.toUint128(useMax ? 0 : amount);
+        uint128 input = asm.toUint128(useMax ? type(uint128).max : amount);
         (deltaAsset, deltaQuote) = _allocate(useMax ? 1 : 0, poolId, input);
     }
 
@@ -312,10 +338,23 @@ contract Hyper is IHyper {
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
-
         _syncPoolPrice(poolId);
 
-        (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity);
+        Pair memory pair = pairs[uint16(poolId >> 32)];
+        if (useMax == 1) {
+            uint liquidity;
+            // todo: consider using internal balances too, or in place of
+            (liquidity, deltaAsset, deltaQuote) = getLiquidityMinted(
+                poolId,
+                __balanceOf__(pair.tokenAsset, msg.sender),
+                __balanceOf__(pair.tokenQuote, msg.sender)
+            );
+
+            deltaLiquidity = asm.toUint128(liquidity);
+        } else {
+            // todo: investigate how to fix this, leads to expected reserves being less in useMax case
+            (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity);
+        }
 
         _increaseLiquidity(poolId, deltaAsset, deltaQuote, deltaLiquidity);
     }
@@ -369,14 +408,14 @@ contract Hyper is IHyper {
     ) internal returns (uint deltaAsset, uint deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
+        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
+        (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity); // computed before changing liquidity
 
         // Compute amounts of tokens for the real reserves.
         HyperPool storage pool = pools[poolId];
         changePoolLiquidity(pool, _blockTimestamp(), -int128(deltaLiquidity));
         (uint feeAsset, uint feeQuote) = _decreasePosition(poolId, deltaLiquidity);
 
-        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
-        (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity);
         Pair memory pair = pairs[pairId];
         _decreaseReserves(pair.tokenAsset, deltaAsset);
         _decreaseReserves(pair.tokenQuote, deltaQuote);
@@ -389,7 +428,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
 
-        (feeAsset, feeQuote) = changePositionLiquidity(pos, pool, _blockTimestamp(), -int256(deltaLiquidity));
+        (feeAsset, feeQuote) = pos.changePositionLiquidity(pool, _blockTimestamp(), -int256(deltaLiquidity));
 
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = pairs[pairId];

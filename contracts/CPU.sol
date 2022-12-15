@@ -157,7 +157,7 @@ function decodeCreatePool(
     price = uint128(bytes16(data[7:23]));
 }
 
-function encodeAllocate(uint8 useMax, uint48 poolId, uint8 power, uint8 amount) pure returns (bytes memory data) {
+function encodeAllocate(uint8 useMax, uint48 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
     data = abi.encodePacked(pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
 }
 
@@ -174,7 +174,7 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint48 
     //deltaQuote = toAmount(data[pointer:]);
 }
 
-function encodeUnallocate(uint8 useMax, uint48 poolId, uint8 power, uint8 amount) pure returns (bytes memory data) {
+function encodeUnallocate(uint8 useMax, uint48 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
     data = abi.encodePacked(pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
 }
 
@@ -194,12 +194,12 @@ function encodeSwap(
     uint8 useMax,
     uint48 poolId,
     uint8 power0,
-    uint8 amount0,
+    uint128 amount0,
     uint8 power1,
-    uint8 amount1,
+    uint128 amount1,
     uint8 direction
 ) returns (bytes memory data) {
-    uint8 pointer = 0x0a;
+    uint8 pointer = 0x0a + 0x0f; // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
     data = abi.encodePacked(pack(bytes1(useMax), SWAP), poolId, pointer, power0, amount0, power1, amount1, direction);
 }
 
@@ -260,5 +260,5 @@ function pack(bytes1 upper, bytes1 lower) pure returns (bytes1 data) {
 function toAmount(bytes calldata raw) pure returns (uint128 amount) {
     uint8 power = uint8(raw[0]);
     amount = uint128(toBytes16(raw[1:raw.length]));
-    amount = amount * uint128(10 ** power);
+    if (power != 0) amount = amount * uint128(10 ** power);
 }

@@ -7,7 +7,7 @@ import "../../../contracts/Hyper.sol";
 import "../../../contracts/test/TestERC20.sol";
 import "../../../contracts/examples/HyperCaller.sol";
 
-contract TestHyperCaller is Test, StandardHelpers {
+contract TestHyperCaller is Test {
     Hyper public __hyper;
     WETH public __weth;
     HyperCaller public __caller;

@@ -10,19 +10,17 @@ struct LoadedParameters {
     Pair pair;
 }
 
-contract StandardHelpers {
-    uint128 public constant DEFAULT_STRIKE = 1e19;
-    uint24 public constant DEFAULT_SIGMA = 1e4;
-    uint32 public constant DEFAULT_MATURITY = 31556953; // adds 1
-    uint16 public constant DEFAULT_FEE = 100;
-    uint32 public constant DEFAULT_GAMMA = 9900;
-    uint32 public constant DEFAULT_PRIORITY_GAMMA = 9950;
-    uint128 public constant DEFAULT_R1_QUOTE = 3085375387260000000;
-    uint128 public constant DEFAULT_R2_ASSET = 308537538726000000;
-    uint128 public constant DEFAULT_LIQUIDITY = 1e18;
-    uint128 public constant DEFAULT_PRICE = 10e18;
-    int24 public constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
-}
+uint128 constant DEFAULT_STRIKE = 1e19;
+uint24 constant DEFAULT_SIGMA = 1e4;
+uint32 constant DEFAULT_MATURITY = 31556953; // adds 1
+uint16 constant DEFAULT_FEE = 100;
+uint32 constant DEFAULT_GAMMA = 9900;
+uint32 constant DEFAULT_PRIORITY_GAMMA = 9950;
+uint128 constant DEFAULT_R1_QUOTE = 3085375387260000000;
+uint128 constant DEFAULT_R2_ASSET = 308537538726000000;
+uint128 constant DEFAULT_LIQUIDITY = 1e18;
+uint128 constant DEFAULT_PRICE = 10e18;
+int24 constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
 
 interface IHyperStruct {
     function curves(uint32 curveId) external view returns (Curve memory);
@@ -36,7 +34,7 @@ interface IHyperStruct {
     function globalReserves(address token) external view returns (uint256);
 }
 
-contract HyperCaller is StandardHelpers {
+contract HyperCaller {
     error InvalidToken(address);
 
     Hyper public hyper;
@@ -127,12 +125,17 @@ contract HyperCaller is StandardHelpers {
 
     function allocate(uint256 amount) external {
         uint8 useMax = 0;
-        bytes memory data = abi.encodePacked(
+        bytes memory data = CPU.encodeAllocate(
+            useMax,
+            loaded.poolId,
+            uint8(0),
+            asm.toUint128(amount)
+        ); /* abi.encodePacked(
             CPU.pack(bytes1(useMax), CPU.ALLOCATE),
             loaded.poolId,
             uint8(0),
             uint128(amount)
-        );
+        ); */
         send(data);
     }
 

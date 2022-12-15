@@ -169,6 +169,12 @@ interface IHyperGetters {
         uint48 poolId,
         uint256 deltaLiquidity
     ) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    function getLiquidityMinted(
+        uint48 poolId,
+        uint deltaAsset,
+        uint deltaQuote
+    ) external view returns (uint deltaLiquidity, uint optimizedAsset, uint optimizedQuote);
 }
 
 interface IHyperActions {
