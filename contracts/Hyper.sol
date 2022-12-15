@@ -2,9 +2,8 @@
 pragma solidity 0.8.13;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                                  //
-//    Here be dragons!                                       __----~~~~~~~~~~~------___             //
-//                                                .  .   ~~//====......          __--~ ~~           //
+//                                                           __----~~~~~~~~~~~------___             //
+//       It's a dragon!                           .  .   ~~//====......          __--~ ~~           //
 //                                -.            \_|//     |||\\  ~~~~~~::::... /~                   //
 //                             ___-==_       _-~o~  \/    |||  \\            _/~~-                  //
 //                     __---~~~.==~||\=_    -_--~/_-~|-   |\\   \\        _/~                       //
@@ -128,12 +127,12 @@ contract Hyper is IHyper {
     // ===== Getters ===== //
 
     /** @dev Fetches internally tracked amount of `token` owned by this contract. */
-    function getReserves(address token) public view returns (uint) {
+    function getReserve(address token) public view returns (uint) {
         return __account__.reserves[token];
     }
 
     /** @dev Fetches internally tracked amount of `token` owned by `owner`. */
-    function getBalances(address owner, address token) public view returns (uint) {
+    function getBalance(address owner, address token) public view returns (uint) {
         return __account__.balances[owner][token];
     }
 
@@ -263,7 +262,7 @@ contract Hyper is IHyper {
             );
         }
 
-        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity);
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
@@ -354,7 +353,7 @@ contract Hyper is IHyper {
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
-        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity); // computed before changing liquidity
+        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity); // computed before changing liquidity
 
         Pair memory pair = pairs[uint16(poolId >> 32)];
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
@@ -470,7 +469,7 @@ contract Hyper is IHyper {
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
             // Assumes useMax flag will be used with caller's internal balance to execute multiple operations.
             remainder = args.useMax == 1
-                ? getBalances(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote)
+                ? getBalance(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote)
                 : args.input;
             // Begin the iteration at the live price, using the total swap input amount as the remainder to fill.
             swap = Iteration({
@@ -841,11 +840,11 @@ contract Hyper is IHyper {
     /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
     function getVirtualReserves(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
         uint deltaLiquidity = pools[poolId].liquidity;
-        (deltaAsset, deltaQuote) = getReservesDelta(poolId, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity);
     }
 
     /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
-    function getReservesDelta(
+    function getReserveDelta(
         uint48 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {

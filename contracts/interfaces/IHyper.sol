@@ -94,10 +94,10 @@ interface IHyperEvents {
  */
 interface IHyperGetters {
     /** @dev Contract's internally tracked balance of tokens. Includes balances and positions. */
-    function getReserves(address token) external view returns (uint);
+    function getReserve(address token) external view returns (uint);
 
     /** @dev Internal balance of a `token` for an account `owner`. Not allocated to a position. */
-    function getBalances(address owner, address token) external view returns (uint);
+    function getBalance(address owner, address token) external view returns (uint);
 
     function pairs(
         uint16 pairId
@@ -157,7 +157,7 @@ interface IHyperGetters {
         uint48 poolId
     ) external view returns (uint256 distance, uint256 timestamp);
 
-    function getReservesDelta(
+    function getReserveDelta(
         uint48 poolId,
         uint256 deltaLiquidity
     ) external view returns (uint256 deltaAsset, uint256 deltaQuote);
