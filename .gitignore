@@ -27,3 +27,5 @@ test/differential/data
 test/differential/scripts/node_modules
 
 lcov.info
+
+broadcast

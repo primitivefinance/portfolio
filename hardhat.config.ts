@@ -12,6 +12,8 @@ import 'hardhat-preprocessor'
 
 dotenv.config()
 
+const PRIMITIVE_RPC = process.env.PRIMTIIVE_RPC ?? ''
+
 subtask(TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS).setAction(async (_, __, runSuper) => {
   const paths = await runSuper()
 
@@ -48,6 +50,10 @@ const config: HardhatUserConfig = {
     hardhat: {
       allowUnlimitedContractSize: true,
       blockGasLimit: 30_000_000,
+    },
+    primitive: {
+      url: `http://${PRIMITIVE_RPC}:8545`,
+      chainId: 1337,
     },
   },
   gasReporter: {

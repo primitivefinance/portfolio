@@ -14,7 +14,8 @@
     "lint:fix": "prettier --write **.sol && prettier --write **.js && prettier --write **.ts",
     "prepare": "husky install",
     "generate": "cd ./test/differential/scripts/ && npm run compile && npm run generate",
-    "sync-deps": "forge remappings > remappings.txt"
+    "sync-deps": "forge remappings > remappings.txt",
+    "deploy": "forge script scripts/Deploy.s.sol:Deploy --rpc-url $PRIMITIVE_RPC --fork-url $FORK_URL --broadcast"
   },
   "repository": {
     "type": "git",

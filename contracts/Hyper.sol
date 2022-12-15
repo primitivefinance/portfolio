@@ -113,7 +113,7 @@ contract Hyper is IHyper {
     modifier settle() {
         _;
         __account__.prepare();
-        __account__.multiSettle(__dangerousTransferFrom__, address(this));
+        __account__.settlement(__dangerousTransferFrom__, address(this));
 
         if (!__account__.settled) revert InvalidSettlement();
     }

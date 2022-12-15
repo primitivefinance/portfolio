@@ -39,5 +39,8 @@ via_ir = false
 fuzz_runs = 1000
 
 
+[rpc_endpoints]
+primitive = "http://${PRIMITIVE_RPC}:8545"
+
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
