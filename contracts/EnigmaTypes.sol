@@ -54,9 +54,11 @@ error ZeroPrice();
 error JitLiquidity(uint256 distance);
 // --- Swap --- //
 /// @dev Thrown if the effects of a swap put the pool in an invalid state according the the trading function.
-error InvariantError(int128 prev, int128 post);
+error InvariantError(int256 prev, int256 next);
 /// @dev Thrown if zero swap amount in arguments.
 error ZeroInput();
+
+error SwapLimitReached();
 // --- Staking --- //
 /// @dev Thrown if position is already staked and trying to stake again.
 error PositionStakedError(uint96 positionId);

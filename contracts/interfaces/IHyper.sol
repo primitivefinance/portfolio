@@ -81,6 +81,8 @@ interface IHyperEvents {
         uint256 price,
         int24 indexed tick,
         uint256 liquidity,
+        address tokenAsset,
+        address tokenQuote,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     );

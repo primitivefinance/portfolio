@@ -444,7 +444,7 @@ contract TestHyperSingle is Test {
 
     function testSwapReverse() public {
         uint limit = type(uint256).max;
-        uint amount = 2222;
+        uint amount = 17e16;
         // Add liquidity first
         bytes memory data = CPU.encodeAllocate(
             0,
@@ -462,7 +462,6 @@ contract TestHyperSingle is Test {
         (uint input, ) = __contractBeingTested__.swap(__poolId, false, output, limit);
 
         uint256 next = getBalances(address(this), address(asset));
-        console.log(amount, input);
         assertTrue(next <= prev);
         assertTrue(input < amount);
     }
@@ -961,7 +960,7 @@ contract TestHyperSingle is Test {
         vm.warp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x10, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x15, 0x01, 0);
         success = forwarder.process(data);
 
         uint256 prevPositionStaked = getPosition(address(forwarder), positionId).unstakeEpochId;
@@ -994,7 +993,7 @@ contract TestHyperSingle is Test {
         vm.warp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x10, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x15, 0x01, 0);
         success = forwarder.process(data);
 
         uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
@@ -1005,7 +1004,7 @@ contract TestHyperSingle is Test {
         vm.warp((__contractBeingTested__.EPOCH_INTERVAL() + 1) * 2);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = CPU.encodeSwap(0, __poolId, 0x01, 0x01, 0x10, 0x01, 0);
+        data = CPU.encodeSwap(0, __poolId, 0x01, 0x01, 0x15, 0x01, 0);
         success = forwarder.process(data);
 
         // todo: currently fails because unstaking does not change staked liquidity.

@@ -27,14 +27,6 @@ function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 l
 function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
     self.blockTimestamp = timestamp;
     self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
-
-    /* (uint256 liquidity, uint256 feeGrowthAsset, uint256 feeGrowthQuote) = (
-        pool.liquidity,
-        pool.feeGrowthGlobalAsset,
-        pool.feeGrowthGlobalQuote
-    );
-
-    (feeAssetEarned, feeQuoteEarned) = self.syncPositionFees(liquidity, feeGrowthAsset, feeGrowthQuote); */
 }
 
 function syncPositionFees(
@@ -202,7 +194,7 @@ contract Hyper is IHyper {
         });
 
         deltaAsset = info.computeR2WithPrice(pool.lastPrice);
-        deltaQuote = info.computeR1WithR2(deltaAsset, pool.lastPrice, 0);
+        deltaQuote = info.computeR1WithR2(deltaAsset);
     }
 
     function getSecondsSincePositionUpdate(
@@ -493,17 +485,15 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         Curve memory curve = curves[uint32(poolId)];
 
-        if (_blockTimestamp() <= curve.maturity) {
+        uint timestamp = _blockTimestamp();
+        if (timestamp <= curve.maturity) {
             uint256 tau;
+            uint256 elapsed = timestamp - pool.blockTimestamp;
             if (curve.maturity > pool.blockTimestamp) tau = curve.maturity - pool.blockTimestamp; // Keeps tau at zero if pool expired.
-            uint256 elapsed = _blockTimestamp() - pool.blockTimestamp;
             HyperSwapLib.Expiring memory expiring = HyperSwapLib.Expiring(curve.strike, curve.sigma, tau);
 
             price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsed);
             tick = HyperSwapLib.computeTickWithPrice(price);
-            int256 hi = int256(pool.lastTick + TICK_SIZE);
-            int256 lo = int256(pool.lastTick - TICK_SIZE);
-            tick = asm.isBetween(int256(tick), lo, hi) ? tick : pool.lastTick;
 
             _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
         }
@@ -516,6 +506,7 @@ contract Hyper is IHyper {
      *
      * @custom:reverts If input swap amount is zero.
      * @custom:reverts If pool is not initialized with a price.
+     * @custom:security Updates the pool's price in _syncPoolPrice before the swap happens.
      * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
      */
     function _swapExactIn(
@@ -524,25 +515,21 @@ contract Hyper is IHyper {
         if (args.input == 0) revert ZeroInput();
         if (!pools.exists(args.poolId)) revert NonExistentPool(args.poolId);
 
-        state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
-
-        // Pair is used to update global reserves and check msg.sender balance.
         Pair memory pair = pairs[uint16(args.poolId >> 32)];
-        // Pool is used to fetch information and eventually have its state updated.
         HyperPool storage pool = pools[args.poolId];
 
+        state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
         state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
 
-        // Get the variables for first iteration of the swap.
         Iteration memory swap;
         {
-            // Writes the pool after computing its updated price with respect to time elapsed since last update.
+            // Updates price based on time passed since last update.
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
-            // Expect the caller to exhaust their entire balance of the input token.
+            // Assumes useMax flag will be used with caller's internal balance to execute multiple operations.
             remainder = args.useMax == 1
-                ? __balanceOf__(state.sell ? pair.tokenAsset : pair.tokenQuote, msg.sender)
+                ? getBalances(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote)
                 : args.input;
-            // Begin the iteration at the live price & tick, using the total swap input amount as the remainder to fill.
+            // Begin the iteration at the live price, using the total swap input amount as the remainder to fill.
             swap = Iteration({
                 price: price,
                 tick: tick,
@@ -554,135 +541,87 @@ contract Hyper is IHyper {
             });
         }
 
-        // Store the pool transiently, then delete after the swap.
         HyperSwapLib.Expiring memory expiring;
         {
-            // Curve stores the parameters of the trading function.
             Curve memory curve = curves[uint32(args.poolId)];
             if (_blockTimestamp() > curve.maturity) revert PoolExpiredError(); // todo: add buffer
-
             expiring = HyperSwapLib.Expiring({
                 strike: curve.strike,
                 sigma: curve.sigma,
                 tau: curve.maturity - _blockTimestamp()
             });
 
-            // Fetch the correct gamma to calculate the fees after pool synced.
-            state.gamma = msg.sender == pool.prioritySwapper ? curve.priorityGamma : curve.gamma;
+            state.gamma = curve.gamma;
         }
 
-        // =====-- Effects =====-- //
+        // =---= Effects =---= //
+
         uint256 liveIndependent;
         uint256 nextIndependent;
         uint256 liveDependent;
         uint256 nextDependent;
 
         {
-            // Input swap amount for this step.
-            uint256 delta;
+            uint256 deltaInput; // Amount of tokens being swapped in.
+            uint256 maxInput; // Max tokens swapped in.
 
             // Virtual reserves.
-            // Compute them conditionally based on direction in arguments.
             if (state.sell) {
-                liveIndependent = expiring.computeR2WithPrice(swap.price);
-                liveDependent = expiring.computeR1WithPrice(swap.price);
-            } else {
-                liveIndependent = expiring.computeR1WithPrice(swap.price);
-                liveDependent = expiring.computeR2WithPrice(swap.price);
-            }
-
-            // todo: get the next tick with active liquidity.
-
-            // Get the max amount that can be filled for a max distance swap.
-            uint256 maxInput;
-            if (state.sell) {
+                (liveDependent, liveIndependent) = expiring.computeReserves(swap.price);
                 maxInput = (PRECISION - liveIndependent).mulWadDown(swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
             } else {
+                (liveIndependent, liveDependent) = expiring.computeReserves(swap.price);
                 maxInput = (expiring.strike - liveIndependent).mulWadDown(swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            // Calculate the amount of fees paid at this tick.
             swap.feeAmount = ((swap.remainder >= maxInput ? maxInput : swap.remainder) * (1e4 - state.gamma)) / 10_000;
             state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
 
-            // If max tokens are being swapped in...
             if (swap.remainder >= maxInput) {
-                delta = maxInput - swap.feeAmount;
-                swap.remainder -= delta + swap.feeAmount; // Reduce the remainder of the order to fill.
-                nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
+                // If more than max tokens are being swapped in...
+                deltaInput = maxInput - swap.feeAmount;
+                nextIndependent = liveIndependent + deltaInput.divWadDown(swap.liquidity);
+                swap.remainder -= (deltaInput + swap.feeAmount); // Reduce the remainder of the order to fill.
             } else {
-                // Reaching this block will fill the order. Set the swap input
-                delta = swap.remainder - swap.feeAmount;
-                nextIndependent = liveIndependent + delta.divWadDown(swap.liquidity);
-
-                delta = swap.remainder; // the swap input should increment the non-fee applied amount
-                swap.remainder = 0; // Reduce the remainder to zero, as the order has been filled.
+                // Reaching this block will fill the order.
+                deltaInput = swap.remainder - swap.feeAmount;
+                nextIndependent = liveIndependent + deltaInput.divWadDown(swap.liquidity);
+                deltaInput = swap.remainder; // Swap input amount including the fee payment.
+                swap.remainder = 0; // Clear the remainder to zero, as the order has been filled.
             }
 
             // Compute the output of the swap by computing the difference between the dependent reserves.
-            if (state.sell)
-                nextDependent = expiring.computeR1WithR2(nextIndependent, 0, 0); // note: price variable not used here! add invariant too
-            else nextDependent = expiring.computeR2WithR1(nextIndependent, 0, 0); // note: price variable not used here! add invariant too
+            if (state.sell) nextDependent = expiring.computeR1WithR2(nextIndependent);
+            else nextDependent = expiring.computeR2WithR1(nextIndependent);
 
-            swap.input += delta; // Add to the total input of the swap.
-            swap.output += liveDependent - nextDependent;
+            // Apply swap amounts to swap state.
+            swap.input += deltaInput;
+            swap.output += (liveDependent - nextDependent);
         }
 
         {
+            uint256 nextPrice;
             int256 liveInvariant;
             int256 nextInvariant;
-            uint256 nextPrice;
+
             if (state.sell) {
-                liveInvariant = Invariant.invariant(
-                    liveDependent,
-                    liveIndependent,
-                    expiring.strike,
-                    expiring.sigma,
-                    expiring.tau
-                );
-                nextInvariant = Invariant.invariant(
-                    nextDependent,
-                    nextIndependent,
-                    expiring.strike,
-                    expiring.sigma,
-                    expiring.tau
-                );
-                nextPrice = HyperSwapLib.computePriceWithR2(
-                    liveIndependent,
-                    expiring.strike,
-                    expiring.sigma,
-                    expiring.tau
-                );
+                liveInvariant = expiring.invariant(liveDependent, liveIndependent);
+                nextInvariant = expiring.invariant(nextDependent, nextIndependent);
+                nextPrice = expiring.computePriceWithR2(nextIndependent);
             } else {
-                liveInvariant = Invariant.invariant(
-                    liveIndependent,
-                    liveDependent,
-                    expiring.strike,
-                    expiring.sigma,
-                    expiring.tau
-                );
-                nextInvariant = Invariant.invariant(
-                    nextIndependent,
-                    nextDependent,
-                    expiring.strike,
-                    expiring.sigma,
-                    expiring.tau
-                );
-                nextPrice = HyperSwapLib.computePriceWithR2(
-                    liveDependent,
-                    expiring.strike,
-                    expiring.sigma,
-                    expiring.tau
-                );
+                liveInvariant = expiring.invariant(liveIndependent, liveDependent);
+                nextInvariant = expiring.invariant(nextIndependent, nextDependent);
+                nextPrice = expiring.computePriceWithR2(nextDependent);
             }
 
             swap.price = nextPrice;
+            if (swap.price > args.limit) revert SwapLimitReached();
 
-            // TODO: figure out invariant stuff
+            // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision).
             //if (nextInvariant < liveInvariant) revert InvariantError(liveInvariant, nextInvariant);
         }
 
-        // Update Pool State Effects
+        // Apply pool effects.
         _syncPool(
             args.poolId,
             HyperSwapLib.computeTickWithPrice(swap.price),
@@ -692,22 +631,16 @@ contract Hyper is IHyper {
             state.sell ? 0 : state.feeGrowthGlobal
         );
 
-        // Update Global Balance Effects
-        // Return variables and swap event.
-        (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
-        emit Swap(args.poolId, swap.input, swap.output, pair.tokenAsset, pair.tokenQuote);
-
+        // Apply reserve effects.
         _increaseReserves(pair.tokenAsset, swap.input);
         _decreaseReserves(pair.tokenQuote, swap.output);
+
+        (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
+        emit Swap(args.poolId, swap.input, swap.output, pair.tokenAsset, pair.tokenQuote);
     }
 
     /**
-     * @notice Syncs the specified pool to a set of slot variables
      * @dev Effects on a Pool after a successful swap order condition has been met.
-     * @param poolId Identifer of pool.
-     * @param tick Key of the slot specified as the now active slot to sync the pool to.
-     * @param price Actual price to sync the pool to, should be around the actual slot price.
-     * @param liquidity Active liquidity available in the slot to sync the pool to.
      * @return timeDelta Amount of time passed since the last update to the pool.
      */
     function _syncPool(
@@ -718,40 +651,36 @@ contract Hyper is IHyper {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     ) internal returns (uint256 timeDelta) {
-        uint256 timestamp = _blockTimestamp();
-        uint16 pairId = uint16(poolId >> 32);
-        address FEE_SETTLEMENT_TOKEN = pairs[pairId].tokenAsset;
-
-        Epoch memory readEpoch = epochs[poolId];
         HyperPool storage pool = pools[poolId];
+        Epoch memory readEpoch = epochs[poolId];
 
         uint256 epochsPassed = readEpoch.getEpochsPassed(pool.blockTimestamp);
-
         if (epochsPassed > 0) {
             pool.stakedLiquidity = asm.__computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
             pool.borrowableLiquidity = pool.stakedLiquidity;
             pool.epochStakedLiquidityDelta = int256(0);
         }
 
-        if (pool.lastPrice != price) pool.lastPrice = price;
-        if (pool.lastTick != tick) pool.lastTick = tick;
-        if (pool.liquidity != liquidity) pool.liquidity = liquidity;
-
-        Epoch storage epoch = epochs[poolId];
-
+        uint256 timestamp = _blockTimestamp();
         uint256 lastUpdateTime = pool.blockTimestamp;
-
         timeDelta = timestamp - lastUpdateTime;
-        pool.blockTimestamp = timestamp;
+
+        if (pool.lastTick != tick) pool.lastTick = tick;
+        if (pool.lastPrice != price) pool.lastPrice = price;
+        if (pool.liquidity != liquidity) pool.liquidity = liquidity;
+        if (pool.blockTimestamp != timestamp) pool.blockTimestamp = timestamp;
 
         pool.feeGrowthGlobalAsset = asm.__computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = asm.__computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
 
+        Pair memory pair = pairs[uint16(poolId >> 32)];
         emit PoolUpdate(
             poolId,
             pool.lastPrice,
             pool.lastTick,
             pool.liquidity,
+            pair.tokenAsset,
+            pair.tokenQuote,
             feeGrowthGlobalAsset,
             feeGrowthGlobalQuote
         );
