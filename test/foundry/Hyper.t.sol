@@ -349,7 +349,7 @@ contract TestHyperSingle is Test {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = getPool(__poolId).lastPrice; // todo: fix, I know this slot from console.log.
+        uint256 prev = getPool(__poolId).lastPrice;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
@@ -373,7 +373,7 @@ contract TestHyperSingle is Test {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        int256 prev = getPool(__poolId).lastTick; // todo: fix, I know this slot from console.log.
+        int256 prev = getPool(__poolId).lastTick;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
@@ -399,7 +399,7 @@ contract TestHyperSingle is Test {
 
         // move some time
         vm.warp(block.timestamp + 1);
-        uint256 prev = getPool(__poolId).liquidity; // todo: fix, I know this slot from console.log.
+        uint256 prev = getPool(__poolId).liquidity;
 
         __contractBeingTested__.swap(__poolId, true, amount, limit);
 
@@ -422,12 +422,37 @@ contract TestHyperSingle is Test {
 
         // move some time
         vm.warp(block.timestamp + 1);
-        uint256 prev = getPool(__poolId).liquidity; // todo: fix, I know this slot from console.log.
+        uint256 prev = getPool(__poolId).liquidity;
 
         __contractBeingTested__.swap(__poolId, false, amount, limit);
 
         uint256 next = getPool(__poolId).liquidity;
         assertTrue(next == prev);
+    }
+
+    function testSwapReverse() public {
+        uint limit = type(uint256).max;
+        uint amount = 2222;
+        // Add liquidity first
+        bytes memory data = CPU.encodeAllocate(
+            0,
+            __poolId,
+            0x13, // 19 zeroes, so 10e19 liquidity
+            0x01
+        );
+        bool success = forwarder.process(data);
+        assertTrue(success);
+
+        // move some time
+        uint256 prev = getBalances(address(this), address(asset));
+
+        (uint output, ) = __contractBeingTested__.swap(__poolId, true, amount, limit);
+        (uint input, ) = __contractBeingTested__.swap(__poolId, false, output, limit);
+
+        uint256 next = getBalances(address(this), address(asset));
+        console.log(amount, input);
+        assertTrue(next <= prev);
+        assertTrue(input < amount);
     }
 
     function testSwapExpiredPoolReverts() public {
@@ -462,7 +487,7 @@ contract TestHyperSingle is Test {
         assertTrue(success);
         // move some time
         vm.warp(block.timestamp + 1);
-        uint256 prev = getPool(__poolId).liquidity; // todo: fix, I know this slot from console.log.
+        uint256 prev = getPool(__poolId).liquidity;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
@@ -486,7 +511,7 @@ contract TestHyperSingle is Test {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = getPool(__poolId).blockTimestamp; // todo: fix, I know this slot from console.log.
+        uint256 prev = getPool(__poolId).blockTimestamp;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
@@ -510,7 +535,7 @@ contract TestHyperSingle is Test {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = getReserves(address(asset)); // todo: fix, I know this slot from console.log.
+        uint256 prev = getReserves(address(asset));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
@@ -534,7 +559,7 @@ contract TestHyperSingle is Test {
         // move some time
         vm.warp(block.timestamp + 1);
 
-        uint256 prev = getReserves(address(quote)); // todo: fix, I know this slot from console.log.
+        uint256 prev = getReserves(address(quote));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);

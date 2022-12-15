@@ -148,10 +148,7 @@ function encodeCreatePool(uint48 poolId, uint128 price) pure returns (bytes memo
 /// @dev Expects a poolId and one left zero padded amount for `price`.
 /// @param data Maximum 1 + 6 + 16 = 23 bytes.
 /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes |
-function decodeCreatePool(
-    bytes calldata data
-) pure returns (uint48 poolId, uint16 pairId, uint32 curveId, uint128 price) {
-    poolId = uint48(bytes6(data[1:7])); // note: First byte is the create pool ecode.
+function decodeCreatePool(bytes calldata data) pure returns (uint16 pairId, uint32 curveId, uint128 price) {
     pairId = uint16(bytes2(data[1:3]));
     curveId = uint32(bytes4(data[3:7]));
     price = uint128(bytes16(data[7:23]));

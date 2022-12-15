@@ -184,10 +184,6 @@ contract Hyper is IHyper {
         }
     }
 
-    function _maxLiquidityMinted() public view returns (uint maxLiquidity) {
-        // todo: compute based on price that is updated over time
-    }
-
     function _getAmounts(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
         uint256 timestamp = _blockTimestamp();
 
@@ -378,7 +374,7 @@ contract Hyper is IHyper {
 
         uint16 pairId = uint16(poolId >> 32);
         Pair memory pair = pairs[pairId];
-        // note: Global reserves are used at the end of instruction processing to settle transactions.
+        // note: Reserves are used at the end of instruction processing to settle transactions.
         _increaseReserves(pair.tokenAsset, deltaAsset);
         _increaseReserves(pair.tokenQuote, deltaQuote);
 
@@ -397,12 +393,12 @@ contract Hyper is IHyper {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
-        // note: Global reserves are referenced at end of processing to determine amounts of token to transfer.
+        // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
         (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity); // computed before changing liquidity
 
         // Compute amounts of tokens for the real reserves.
         HyperPool storage pool = pools[poolId];
-        changePoolLiquidity(pool, _blockTimestamp(), -int128(deltaLiquidity));
+        pool.changePoolLiquidity(_blockTimestamp(), -int128(deltaLiquidity));
         (uint feeAsset, uint feeQuote) = _decreasePosition(poolId, deltaLiquidity);
 
         Pair memory pair = pairs[pairId];
@@ -427,15 +423,6 @@ contract Hyper is IHyper {
         emit FeesEarned(msg.sender, poolId, feeAsset, pair.tokenAsset, feeQuote, pair.tokenQuote);
         emit DecreasePosition(msg.sender, poolId, deltaLiquidity);
     }
-
-    /// @dev Reverts if liquidity was allocated within time elapsed in seconds returned by `_liquidityPolicy`.
-    /// @custom:security High. Must be used in place of `_decreasePosition` in most scenarios.
-    /* function _decreasePositionCheckJit(
-        uint48 poolId,
-        uint256 deltaLiquidity
-    ) internal returns (uint feeAsset, uint feeQuote) {
-        (feeAsset, feeQuote) = _decreasePosition(poolId, deltaLiquidity);
-    } */
 
     function _stake(uint48 poolId) internal {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
@@ -690,7 +677,7 @@ contract Hyper is IHyper {
 
         // Update Global Balance Effects
         // Return variables and swap event.
-        //(poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
+        (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
         emit Swap(args.poolId, swap.input, swap.output, pair.tokenAsset, pair.tokenQuote);
 
         _increaseReserves(pair.tokenAsset, swap.input);
@@ -724,38 +711,9 @@ contract Hyper is IHyper {
         uint256 epochsPassed = readEpoch.getEpochsPassed(pool.blockTimestamp);
 
         if (epochsPassed > 0) {
-            uint256 lastUpdatedEpochId = readEpoch.getLastUpdatedId(epochsPassed);
-            // distribute remaining proceeds in lastUpdatedEpochId
-            /* if (pool.stakedLiquidity > 0) {
-                // TODO
-            } */
-
-            // save pool snapshot for lastUpdatedEpochId
-            //poolSnapshots[pool.id][lastUpdatedEpochId] = getPoolSnapshot(pool);
-
-            // update the pool's liquidity due to the transition
             pool.stakedLiquidity = asm.__computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
             pool.borrowableLiquidity = pool.stakedLiquidity;
             pool.epochStakedLiquidityDelta = int256(0);
-
-            // TODO: Pay user
-
-            // check if multiple epochs have passed
-            /* if (epochsPassed > 1) {
-                // update proceeds per liquidity distributed for next epoch if needed
-                if (pool.stakedLiquidity > 0) {
-                    // TODO
-                }
-                // TODO: pay user
-            } */
-        }
-
-        // add proceeds for time passed in the current epoch
-        if (pool.stakedLiquidity > 0) {
-            uint256 timePassedInCurrentEpoch = readEpoch.getTimePassedInCurrentEpoch(pool.blockTimestamp, timestamp);
-            if (timePassedInCurrentEpoch > 0) {
-                // TODO
-            }
         }
 
         if (pool.lastPrice != price) pool.lastPrice = price;
@@ -793,22 +751,19 @@ contract Hyper is IHyper {
      * @custom:reverts If pool with pair and curve has already been created.
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
-    function _createPool(uint48 poolId, uint16 pairId, uint32 curveId, uint128 price) internal {
+    function _createPool(uint16 pairId, uint32 curveId, uint128 price) internal {
         if (price == 0) revert ZeroPrice();
         if (pairId == 0) pairId = uint16(getPairNonce); // magic variable
         if (curveId == 0) curveId = uint32(getCurveNonce); // magic variable
 
-        poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
+        uint48 poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
         if (pools.exists(poolId)) revert PoolExists();
 
         Curve memory curve = curves[curveId];
         uint128 timestamp = _blockTimestamp();
         if (timestamp > curve.maturity) revert PoolExpiredError();
 
-        // Write the epoch data.
         epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
-
-        // Write the pool to state with the desired price.
         pools[poolId].lastPrice = price;
         pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price);
         pools[poolId].blockTimestamp = timestamp;
@@ -833,7 +788,6 @@ contract Hyper is IHyper {
         uint128 strike
     ) internal returns (uint32 curveId) {
         bytes32 rawCurveId = CPU.toBytes32(abi.encodePacked(sigma, maturity, fee, priorityFee, strike));
-
         curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
         if (curveId != 0) revert CurveExists(curveId);
 
@@ -849,7 +803,7 @@ contract Hyper is IHyper {
         uint32 gamma = uint32(HyperSwapLib.UNIT_PERCENT - fee); // gamma = 100% - fee %.
         uint32 priorityGamma = uint32(HyperSwapLib.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
 
-        // Writes the curve to state with a reverse lookup.
+        getCurveId[rawCurveId] = curveId; // Reverse lookup
         curves[curveId] = Curve({
             strike: strike,
             sigma: sigma,
@@ -857,7 +811,6 @@ contract Hyper is IHyper {
             gamma: gamma,
             priorityGamma: priorityGamma
         });
-        getCurveId[rawCurveId] = curveId;
 
         emit CreateCurve(curveId, strike, sigma, maturity, gamma, priorityGamma);
     }
@@ -877,18 +830,14 @@ contract Hyper is IHyper {
         if (pairId != 0) revert PairExists(pairId);
 
         (uint8 decimalsAsset, uint8 decimalsQuote) = (IERC20(asset).decimals(), IERC20(quote).decimals());
-
         if (!asm.isBetween(decimalsAsset, MIN_DECIMALS, MAX_DECIMALS)) revert DecimalsError(decimalsAsset);
         if (!asm.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert DecimalsError(decimalsQuote);
 
         unchecked {
-            pairId = uint16(++getPairNonce); // Increments the pair nonce, returning the nonce for this pair.
+            pairId = uint16(++getPairNonce);
         }
 
-        // Writes the pairId into a fetchable mapping using its tokens.
         getPairId[asset][quote] = pairId; // note: No reverse lookup, because order matters!
-
-        // Writes the pair into Enigma state.
         pairs[pairId] = Pair({
             tokenAsset: asset,
             decimalsBase: decimalsAsset,
@@ -938,29 +887,27 @@ contract Hyper is IHyper {
     /// @param data Encoded Enigma data. First byte must be an Enigma instruction.
     /// @custom:security Critical. Directly sends CPU to be executed.
     function _process(bytes calldata data) internal {
-        uint48 poolId;
-        bytes1 instruction = bytes1(data[0] & 0x0f);
-        if (instruction == CPU.UNKNOWN) revert UnknownInstruction();
+        (, bytes1 instruction) = CPU.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == CPU.ALLOCATE) {
-            (uint8 useMax, uint48 poolId_, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
-            _allocate(useMax, poolId_, deltaLiquidity);
+            (uint8 useMax, uint48 poolId, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
+            _allocate(useMax, poolId, deltaLiquidity);
         } else if (instruction == CPU.UNALLOCATE) {
-            (uint8 useMax, uint48 poolId_, uint16 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
-            _unallocate(useMax, poolId_, pairId, deltaLiquidity);
+            (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
+            _unallocate(useMax, poolId, pairId, deltaLiquidity);
         } else if (instruction == CPU.SWAP) {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
-            (poolId, , , ) = _swapExactIn(args);
+            _swapExactIn(args);
         } else if (instruction == CPU.STAKE_POSITION) {
-            uint48 poolId_ = CPU.decodeStakePosition(data);
-            _stake(poolId_);
+            uint48 poolId = CPU.decodeStakePosition(data);
+            _stake(poolId);
         } else if (instruction == CPU.UNSTAKE_POSITION) {
-            uint48 poolId_ = CPU.decodeUnstakePosition(data);
-            _unstake(poolId_);
+            uint48 poolId = CPU.decodeUnstakePosition(data);
+            _unstake(poolId);
         } else if (instruction == CPU.CREATE_POOL) {
-            (uint48 poolId_, uint16 pairId, uint32 curveId, uint128 price) = CPU.decodeCreatePool(data);
-            _createPool(poolId_, pairId, curveId, price);
+            (uint16 pairId, uint32 curveId, uint128 price) = CPU.decodeCreatePool(data);
+            _createPool(pairId, curveId, price);
         } else if (instruction == CPU.CREATE_CURVE) {
             (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = CPU.decodeCreateCurve(
                 data
