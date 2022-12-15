@@ -184,7 +184,7 @@ contract Hyper is IHyper {
         }
     }
 
-    function _getAmounts(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+    function _getAmounts(uint48 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
         uint256 timestamp = _blockTimestamp();
 
         // Compute amounts of tokens for the real reserves.
@@ -202,7 +202,7 @@ contract Hyper is IHyper {
 
     // TODO: fix this with non-delta liquidity amount
     /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
-    function getPhysicalReserves(
+    function getVirtualReserves(
         uint48 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
@@ -350,7 +350,7 @@ contract Hyper is IHyper {
             deltaLiquidity = asm.toUint128(liquidity);
         } else {
             // todo: investigate how to fix this, leads to expected reserves being less in useMax case
-            (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity);
+            (deltaAsset, deltaQuote) = getVirtualReserves(poolId, deltaLiquidity);
         }
 
         _increaseLiquidity(poolId, deltaAsset, deltaQuote, deltaLiquidity);
@@ -394,7 +394,7 @@ contract Hyper is IHyper {
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
-        (deltaAsset, deltaQuote) = getPhysicalReserves(poolId, deltaLiquidity); // computed before changing liquidity
+        (deltaAsset, deltaQuote) = getVirtualReserves(poolId, deltaLiquidity); // computed before changing liquidity
 
         // Compute amounts of tokens for the real reserves.
         HyperPool storage pool = pools[poolId];
@@ -491,8 +491,6 @@ contract Hyper is IHyper {
     }
 
     SwapState state;
-
-    event log(string);
 
     /**
      * @dev Swaps exact input of tokens for an output of tokens in the specified direction.

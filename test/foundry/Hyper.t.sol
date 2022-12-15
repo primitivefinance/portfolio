@@ -55,6 +55,10 @@ contract HyperTester is Hyper {
     function process(bytes calldata data) external payable lock settle {
         super._process(data);
     }
+
+    function getAmounts(uint48 poolId) public returns (uint deltaAsset, uint deltaQuote) {
+        return _getAmounts(poolId);
+    }
 }
 
 /** @dev Forwards calls to Hyper. Bubbles up custom errors. */
@@ -92,14 +96,14 @@ contract Forwarder is Test {
     }
 }
 
-uint128 constant DEFAULT_STRIKE = 1e19;
+uint128 constant DEFAULT_STRIKE = 10e18;
 uint24 constant DEFAULT_SIGMA = 1e4;
 uint32 constant DEFAULT_MATURITY = 31556953; // adds 1
 uint16 constant DEFAULT_FEE = 100;
 uint32 constant DEFAULT_GAMMA = 9900;
 uint32 constant DEFAULT_PRIORITY_GAMMA = 9950;
-uint128 constant DEFAULT_R1_QUOTE = 3085375387260000000;
-uint128 constant DEFAULT_R2_ASSET = 308537538726000000;
+uint128 constant DEFAULT_QUOTE_RESERVE = 3085375116376210650;
+uint128 constant DEFAULT_ASSET_RESERVE = 308537516918601823;
 uint128 constant DEFAULT_LIQUIDITY = 1e18;
 uint128 constant DEFAULT_PRICE = 10e18;
 int24 constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
@@ -186,7 +190,7 @@ contract TestHyperSingle is Test {
             address(token0),
             address(token1),
             DEFAULT_SIGMA,
-            DEFAULT_MATURITY,
+            uint32(block.timestamp) + DEFAULT_MATURITY,
             uint16(1e4 - DEFAULT_GAMMA),
             uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
             DEFAULT_STRIKE,
@@ -232,6 +236,14 @@ contract TestHyperSingle is Test {
     }
 
     // ===== Getters ===== //
+
+    function testGetAmounts() public {
+        Curve memory curve = getCurve(uint32(__poolId));
+        (uint deltaAsset, uint deltaQuote) = __contractBeingTested__.getAmounts(__poolId);
+
+        assertEq(deltaAsset, DEFAULT_ASSET_RESERVE);
+        assertEq(deltaQuote, DEFAULT_QUOTE_RESERVE);
+    }
 
     function testGetLiquidityMinted() public {
         (uint a, uint b, uint c) = __contractBeingTested__.getLiquidityMinted(__poolId, 1, 1e19);

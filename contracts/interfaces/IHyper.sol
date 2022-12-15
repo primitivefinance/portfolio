@@ -165,7 +165,7 @@ interface IHyperGetters {
     /// @notice Computes amount of asset and quote tokens entitled to `liquidity` amount.
     /// @dev Can be used to fetch the expected amount of tokens withdrawn from removing `liquidity`.
     /// @custom:security Medium. Designed to round in a direction disadvantageous to the liquidity owner.
-    function getPhysicalReserves(
+    function getVirtualReserves(
         uint48 poolId,
         uint256 deltaLiquidity
     ) external view returns (uint256 deltaAsset, uint256 deltaQuote);

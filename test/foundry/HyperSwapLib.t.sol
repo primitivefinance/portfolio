@@ -20,5 +20,6 @@ contract TestHyperSwapLib is Test {
         int256 inv = 0;
         uint256 y = Invariant.getY(R_x, stk, vol, tau, inv);
         console.log(y);
+        uint actual = 800_678616226e9;
     }
 }

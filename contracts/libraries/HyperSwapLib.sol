@@ -73,14 +73,10 @@ library HyperSwapLib {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
     }
 
-    function computeReservesWithTick(Expiring memory args, int24 tick)
-        internal
-        returns (
-            uint256 price,
-            uint256 R1,
-            uint256 R2
-        )
-    {
+    function computeReservesWithTick(
+        Expiring memory args,
+        int24 tick
+    ) internal returns (uint256 price, uint256 R1, uint256 R2) {
         price = computePriceWithTick(tick);
         R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
@@ -151,7 +147,7 @@ library HyperSwapLib {
         uint256 price,
         int256 invariant
     ) internal view returns (uint256 R1) {
-        R1 = Invariant.getY(R2, strike, sigma, tau, invariant); // todo: use price for concentrated curve
+        R1 = Invariant.getY(R2, strike, convertPercentageToWad(sigma), tau, invariant); // todo: use price for concentrated curve
     }
 
     /**
@@ -167,18 +163,13 @@ library HyperSwapLib {
         uint256 price,
         int256 invariant
     ) internal view returns (uint256 R2) {
-        R2 = Invariant.getX(R1, strike, sigma, tau, invariant); // todo: use price for concentrated curve
+        R2 = Invariant.getX(R1, strike, convertPercentageToWad(sigma), tau, invariant); // todo: use price for concentrated curve
     }
 
     /**
      * @custom:math R1 = KΦ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
-    function computeR1WithPrice(
-        uint256 prc,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau
-    ) internal view returns (uint256 R1) {
+    function computeR1WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal view returns (uint256 R1) {
         // todo: handle price when above strike.
         if (prc != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
@@ -199,12 +190,7 @@ library HyperSwapLib {
     /**
      * @custom:math R2 = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
-    function computeR2WithPrice(
-        uint256 prc,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau
-    ) internal view returns (uint256 R2) {
+    function computeR2WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal view returns (uint256 R2) {
         // todo: handle price when above strike.
         if (prc != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
@@ -235,12 +221,7 @@ library HyperSwapLib {
     /**
      * @custom:math price(R2) = Ke^(Φ^-1(1 - R2)σ√τ - 1/2σ^2τ)
      */
-    function computePriceWithR2(
-        uint256 R2,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau
-    ) internal view returns (uint256 prc) {
+    function computePriceWithR2(uint256 R2, uint256 stk, uint256 vol, uint256 tau) internal view returns (uint256 prc) {
         uint256 tauYears = convertSecondsToWadYears(tau);
         uint256 volWad = convertPercentageToWad(vol);
 
