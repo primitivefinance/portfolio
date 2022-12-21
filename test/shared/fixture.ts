@@ -6,13 +6,13 @@ import { TestDecompiler, TestEnigmaVirtualMachine, TestERC20, TestHyperLiquidity
 export async function setupPool(
   contract: TestDecompiler,
   poolId: number,
-  tokenBase: string,
+  tokenAsset: string,
   tokenQuote: string,
   internalBase: BigNumberish,
   internalQuote: BigNumberish,
   internalLiquidity: BigNumberish
 ) {
-  await contract.setTokens(poolId, tokenBase, tokenQuote)
+  await contract.setTokens(poolId, tokenAsset, tokenQuote)
   await contract.setLiquidity(poolId, internalBase, internalQuote, internalLiquidity)
   await contract.setTimestamp(100)
 }

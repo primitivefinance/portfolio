@@ -1,17 +1,21 @@
 {
   "name": "hyper",
-  "version": "0.0.1",
+  "version": "prototype-v0.0.1",
   "description": "Enigma Virtual Machine processes instructions for interacting with liquidity pools.",
   "scripts": {
     "build": "hardhat compile --config ./hardhat.config.ts",
+    "clean": "hardhat clean && forge clean",
     "test": "TS_NODE_TRANSPILE_ONLY=1 hardhat test --config ./hardhat.config.ts",
     "test:forge": "FOUNDRY_PROFILE=test forge test -vvv",
+    "coverage:forge": "FOUNDRY_PROFILE=test forge coverage",
     "profile": "REPORT_GAS=true hardhat test --config ./hardhat.config.ts",
     "coverage": "hardhat coverage --config ./hardhat-coverage.config.ts --solcoverjs ./config/.solcover.js",
     "lint:check": "prettier --check **.sol && prettier --check **.js && prettier --check **.ts && hardhat compile --config ./hardhat.config.ts",
     "lint:fix": "prettier --write **.sol && prettier --write **.js && prettier --write **.ts",
     "prepare": "husky install",
-    "generate": "cd ./test/differential/scripts/ && npm run compile && npm run generate"
+    "generate": "cd ./test/differential/scripts/ && npm run compile && npm run generate",
+    "sync-deps": "forge remappings > remappings.txt",
+    "deploy": "forge script scripts/Deploy.s.sol:Deploy --rpc-url $PRIMITIVE_RPC --fork-url $FORK_URL --broadcast"
   },
   "repository": {
     "type": "git",
@@ -29,24 +33,24 @@
   },
   "homepage": "https://github.com/primitivefinance/hyper#readme",
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.5",
-    "@nomiclabs/hardhat-waffle": "^2.0.3",
     "@primitivefi/hardhat-dodoc": "^0.2.3",
     "@types/chai": "^4.3.1",
     "@types/mocha": "^9.1.1",
     "@types/node": "^17.0.24",
     "chai": "^4.3.6",
     "dotenv": "^16.0.0",
-    "ethereum-waffle": "^3.4.4",
     "ethers": "5.6.1",
     "evm-bn": "^1.1.1",
-    "hardhat": "^2.9.3",
+    "hardhat": "^2.10.2",
     "hardhat-gas-reporter": "^1.0.8",
+    "hardhat-preprocessor": "^0.1.5",
     "hardhat-tracer": "^1.1.0-rc.5",
     "husky": ">=6",
     "lint-staged": ">=10",
     "prettier": "2.6.2",
-    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "prettier-plugin-solidity": "^1.0.0",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.3"
   },
@@ -54,13 +58,12 @@
     "node": ">=16.0.0"
   },
   "lint-staged": {
-    "*.sol": "prettier --write",
     "*.js": "prettier --write",
     "*.ts": "prettier --write"
   },
   "dependencies": {
     "@primitivefi/rmm-core": "^1.0.0",
-    "@rari-capital/solmate": "^6.4.0",
+    "@rari-capital/solmate": "7.0.0-alpha.3",
     "@typechain/ethers-v5": "^10.0.0",
     "@typechain/hardhat": "^6.0.0",
     "typechain": "^8.0.0"

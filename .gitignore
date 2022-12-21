@@ -12,6 +12,7 @@ hh-cache/
 
 
 # Foundry
+forge-cache/
 cache
 out
 optimized-out
@@ -24,3 +25,7 @@ optimized-out
 # Differential testing
 test/differential/data
 test/differential/scripts/node_modules
+
+lcov.info
+
+broadcast

@@ -1,5 +1,10 @@
-ds-test/=./lib/ds-test/src/
-solmate/=./lib/solm/src/
-forge-std/=./lib/forge-std/src/
-@rari-capital/solmate=./lib/solm/
-solstat/=./lib/solstat/contracts/
+@primitivefi/=node_modules/@primitivefi/
+@rari-capital/=node_modules/@rari-capital/
+contracts/=contracts/
+ds-test/=lib/solmate/lib/ds-test/src/
+eth-gas-reporter/=node_modules/eth-gas-reporter/
+forge-std/=lib/forge-std/src/
+hardhat/=node_modules/hardhat/
+lib/=lib/
+solmate/=lib/solmate/src/
+solstat/=lib/solstat/contracts/
