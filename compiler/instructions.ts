@@ -8,10 +8,10 @@ import { bytesToHex, hexToBytes } from './units'
  */
 export enum Instructions {
   UNKNOWN = 0x00,
-  ADD_LIQUIDITY = 0x01,
-  ADD_LIQUIDITY_ETH = 0x02,
-  REMOVE_LIQUIDITY = 0x03,
-  REMOVE_LIQUIDITY_ETH = 0x04,
+  ALLOCATE = 0x01,
+  ALLOCATE_ETH = 0x02,
+  UNALLOCATE = 0x03,
+  UNALLOCATE_ETH = 0x04,
   SWAP = 0x05,
   SWAP_TOKENS_FOR_EXACT_TOKENS,
   SWAP_EXACT_ETH_FOR_TOKENS,
@@ -146,18 +146,21 @@ export function encodeCreateCurve(
   strike: BigNumber,
   sigma: number,
   maturity: number,
-  fee: number
+  fee: number,
+  priorityFee: number
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.CREATE_CURVE
   const strikeByte = hexZeroPad(strike.toHexString(), 16)
   const sigmaByte = hexZeroPad(hexlify(sigma), 3)
   const maturityByte = hexZeroPad(hexlify(maturity), 4)
   const feeByte = hexZeroPad(hexlify(fee), 2)
+  const priorityFeeByte = hexZeroPad(hexlify(priorityFee), 2)
   const bytes = [
     ...hexToBytes(hexlify(opcode)),
     ...hexToBytes(sigmaByte),
     ...hexToBytes(maturityByte),
     ...hexToBytes(feeByte),
+    ...hexToBytes(priorityFeeByte),
     ...hexToBytes(strikeByte),
   ]
   return { bytes, hex: bytesToHex(bytes) }
@@ -170,81 +173,86 @@ export function encodePoolId(pairId: number, curveId: number): { bytes: number[]
   return { bytes, hex: bytesToHex(bytes) }
 }
 
-export function encodeCreatePool(
-  pairId: number,
-  curveId: number,
-  basePerLiquidity: BigNumber,
-  deltaLiquidity: BigNumber
-): { bytes: number[]; hex: string } {
+export function encodeCreatePool(pairId: number, curveId: number, price: BigNumber): { bytes: number[]; hex: string } {
   const opcode = Instructions.CREATE_POOL
   const pairBytes = hexZeroPad(hexlify(pairId), 2)
   const curveBytes = hexZeroPad(hexlify(curveId), 4)
-  const basePerLiquidityBytes = hexZeroPad(basePerLiquidity.toHexString(), 16)
-  const deltaLiquidityBytes = hexZeroPad(deltaLiquidity.toHexString(), 16)
+  const priceBytes = hexZeroPad(price.toHexString(), 16)
   const bytes = [
     ...hexToBytes(hexlify(opcode)),
     ...hexToBytes(pairBytes),
     ...hexToBytes(curveBytes),
-    ...hexToBytes(basePerLiquidityBytes),
-    ...hexToBytes(deltaLiquidityBytes),
+    ...hexToBytes(priceBytes),
   ]
   return { bytes, hex: bytesToHex(bytes) }
 }
 
-export function encodeRemoveLiquidity(
+export function encodeUnallocate(
   useMax: boolean,
   poolId: number,
-  deltaLiquidity: BigNumber
+  loTick: number,
+  hiTick: number,
+  liquidity: BigNumber
 ): { bytes: number[]; hex: string } {
-  const opcode = Instructions.REMOVE_LIQUIDITY
-  const firstByte = encodeFirstByte(useMax, opcode)
-  if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
-  const { amount, decimals } = trailingRunLengthEncode(deltaLiquidity.toString())
-  const decimalBytes = encodeSecondByte(0, decimals)
-  const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const bytes = [firstByte, ...hexToBytes(poolIdBytes), decimalBytes, ...hexToBytes(BigNumber.from(amount)._hex)]
-  return { bytes, hex: bytesToHex(bytes) }
-}
-
-export function encodeAddLiquidity(
-  useMax: boolean,
-  poolId: number,
-  deltaBase: BigNumber,
-  deltaQuote: BigNumber
-): { bytes: number[]; hex: string } {
-  const opcode = Instructions.ADD_LIQUIDITY
+  const opcode = Instructions.UNALLOCATE
   const firstByte = encodeFirstByte(useMax, opcode)
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
   const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const { amount: encodedBase, decimals: decimalsBase } = trailingRunLengthEncode(deltaBase.toString())
-  const { amount: encodedQuote, decimals: decimalsQuote } = trailingRunLengthEncode(deltaQuote.toString())
-  const baseBytes = hexToBytes(BigNumber.from(encodedBase)._hex)
-  const baseDecimalByte = decimalsBase
-  const quoteBytes = hexToBytes(BigNumber.from(encodedQuote)._hex)
-  const quoteDecimalByte = decimalsQuote
 
-  const firstSection = [firstByte, ...hexToBytes(poolIdBytes)]
-  const secondSection = [baseDecimalByte, ...baseBytes]
-  const pointer = firstSection.length + secondSection.length + 1
+  const { amount, decimals } = trailingRunLengthEncode(liquidity.toString())
+  const amountBytes = hexToBytes(BigNumber.from(amount)._hex)
+  const powerByte = encodeSecondByte(0, decimals)
+
+  const loTickBytes = hexZeroPad(hexlify(loTick), 3)
+  const hiTickBytes = hexZeroPad(hexlify(hiTick), 3)
 
   const bytes = [
     firstByte,
     ...hexToBytes(poolIdBytes),
-    pointer,
-    baseDecimalByte,
-    ...baseBytes,
-    quoteDecimalByte,
-    ...quoteBytes,
+    ...hexToBytes(loTickBytes),
+    ...hexToBytes(hiTickBytes),
+    powerByte,
+    ...amountBytes,
   ]
+  return { bytes, hex: bytesToHex(bytes) }
+}
+
+export function encodeAllocate(
+  useMax: boolean,
+  poolId: number,
+  loTick: number,
+  hiTick: number,
+  liquidity: BigNumber
+): { bytes: number[]; hex: string } {
+  const opcode = Instructions.ALLOCATE
+  const firstByte = encodeFirstByte(useMax, opcode)
+  if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
+
+  const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
+  const { amount: encodedAmount, decimals: decimalsBase } = trailingRunLengthEncode(liquidity.toString())
+  const amountBytes = hexToBytes(BigNumber.from(encodedAmount)._hex)
+  const powerByte = decimalsBase
+  const loTickBytes = hexZeroPad(hexlify(loTick), 3)
+  const hiTickBytes = hexZeroPad(hexlify(hiTick), 3)
+
+  const bytes = [
+    firstByte,
+    ...hexToBytes(poolIdBytes),
+    ...hexToBytes(loTickBytes),
+    ...hexToBytes(hiTickBytes),
+    powerByte,
+    ...amountBytes,
+  ]
+
   return { bytes, hex: bytesToHex(bytes) }
 }
 
 export function encodeSwapExactTokens(
   useMax: boolean,
   poolId: number,
-  deltaIn: BigNumber,
-  deltaOut: BigNumber,
+  amount: BigNumber,
+  limit: BigNumber,
   direction: 0 | 1
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.SWAP
@@ -252,8 +260,8 @@ export function encodeSwapExactTokens(
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
   const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const { amount: input, decimals: inputDecimals } = trailingRunLengthEncode(deltaIn.toString())
-  const { amount: output, decimals: outputDecimals } = trailingRunLengthEncode(deltaOut.toString())
+  const { amount: input, decimals: inputDecimals } = trailingRunLengthEncode(amount.toString())
+  const { amount: output, decimals: outputDecimals } = trailingRunLengthEncode(limit.toString())
   const inputBytes = hexToBytes(BigNumber.from(input)._hex)
   const outputBytes = hexToBytes(BigNumber.from(output)._hex)
   const lastByte = hexToBytes(BigNumber.from(direction)._hex)
