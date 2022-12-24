@@ -111,6 +111,7 @@ contract Hyper is IHyper {
 
     /** @dev Used on every external operation that touches tokens. */
     modifier settle() {
+        __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
         _;
         __account__.prepare();
         __account__.settlement(__dangerousTransferFrom__, address(this));
@@ -213,11 +214,13 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function fund(address token, uint256 amount) external payable override lock settle {
-        _applyCredit(token, amount);
+    function fund(address token, uint256 amount) external override lock settle {
+        __account__.dangerousFund(token, address(this), amount); // Pulls tokens, settlement credits msg.sender.
+    }
 
-        if (token == WETH) __wrapEther__(WETH);
-        else __dangerousTransferFrom__(token, address(this), amount);
+    /// @inheritdoc IHyperActions
+    function deposit() external payable override lock settle {
+        emit Deposit(msg.sender, msg.value);
     }
 
     // ===== Internal ===== //

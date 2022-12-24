@@ -86,6 +86,9 @@ interface IHyperEvents {
 
     /**  @dev Emitted on external calls to `syncPool` or `swap`. Syncs a pool's timestamp to block.timestamp. */
     event UpdateLastTimestamp(uint48 indexed poolId);
+
+    /** @dev Emitted on depositing ether. */
+    event Deposit(address indexed account, uint amount);
 }
 
 /**
@@ -191,7 +194,9 @@ interface IHyperActions {
         uint limit
     ) external returns (uint output, uint remainder);
 
-    function fund(address token, uint256 amount) external payable;
+    function fund(address token, uint256 amount) external;
+
+    function deposit() external payable;
 
     function draw(address token, uint256 amount, address to) external;
 

@@ -7,7 +7,7 @@ import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
 import {BalanceError, EtherTransferFail} from "./EnigmaTypes.sol";
 
-using {cache, deposit, withdraw, credit, debit, prepare, settle, settlement, clear, getNetBalance, touch} for AccountSystem global;
+using {__wrapEther__, dangerousFund, cache, deposit, withdraw, credit, debit, prepare, settle, settlement, clear, getNetBalance, touch} for AccountSystem global;
 
 /** @dev Novel accounting mechanism to track internally held balances and settle differences with actual balances. */
 struct AccountSystem {
@@ -30,8 +30,12 @@ function __balanceOf__(address token, address account) view returns (uint256) {
 }
 
 /** @dev Sends ether in `deposit` function to target address. Must validate `weth`. */
-function __wrapEther__(address weth) {
-    IWETH(weth).deposit{value: msg.value}(); // todo: be careful with
+function __wrapEther__(AccountSystem storage self, address weth) {
+    // todo: be careful with this, since it uses msg.value
+    if(msg.value > 0) {
+        IWETH(weth).deposit{value: msg.value}();
+        self.touch(weth);
+    } 
 }
 
 /** @dev Dangerously sends ether to `to` in a low-level call. */
@@ -49,6 +53,11 @@ function __dangerousTransferEther__(address to, uint256 value) {
 /** @dev Used in a for loop in the `settlement` function. */
 function __dangerousTransferFrom__(address token, address to, uint amount) {
     SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
+}
+
+function dangerousFund(AccountSystem storage self, address token, address to, uint amount) {
+    self.touch(token);
+    __dangerousTransferFrom__(token, to, amount);
 }
 
 /** @dev Increases an `owner`'s spendable balance. */

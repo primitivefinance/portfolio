@@ -301,7 +301,7 @@ contract TestHyperSingle is Test {
 
     function testDrawFromWethTransfersEther() public checkSettlementInvariant {
         // First fund the account
-        __contractBeingTested__.fund{value: 4000}(address(__weth__), 4000);
+        __contractBeingTested__.deposit{value: 4000}();
 
         // Draw
         uint prevBalance = address(this).balance;
@@ -319,10 +319,10 @@ contract TestHyperSingle is Test {
         assertTrue(nextBalance > prevBalance);
     }
 
-    function testFundWrapsEther() public checkSettlementInvariant {
+    function testDepositWrapsEther() public checkSettlementInvariant {
         uint prevWethBalance = __weth__.balanceOf(address(__contractBeingTested__));
         uint prevBalance = address(this).balance;
-        __contractBeingTested__.fund{value: 4000}(address(__weth__), 4000);
+        __contractBeingTested__.deposit{value: 4000}();
         uint nextBalance = address(this).balance;
         uint nextWethBalance = __weth__.balanceOf(address(__contractBeingTested__));
 
