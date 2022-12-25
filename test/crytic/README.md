@@ -4,25 +4,15 @@ These are Echidna based testing files for developing a thorough corpus of covera
 
 ## Setup
 
-The setup is a little complicated... here&#39;s what is going on:
+[Setup instructions](../README.md)
 
-### Pre-reqs: Must have python!
+## Run tests
 
-### 1. Installed nix. [source](https://nixos.org/download.html#nix-install-linux)
+1. `forge install`
+2. `yarn install`
+3. `yarn test:echidna`
 
-`sh <(curl -L https://nixos.org/nix/install) --no-daemon`
-
-### 2. Installed crytic-compile
-
-`pip3 install crytic-compile`
-
-### 3.Installed echidna using nix
-
-`nix-env -i -f https://github.com/crytic/echidna/tarball/master`
-
-At this point, you should be setup to interact with the crytic test suite.
-
-### How it works
+## Configuration
 
 `test/crytic` is the folder that holds all the echidna related configs and "corpus".
 
@@ -34,8 +24,12 @@ Corpus is stored in `test/crytic/corpus`, which is specified in the echidna conf
 
 Echidna uses `crytic-compile` in the background to compile the files. Crytic compile will delegate the work to the testing framework, e.g. hardhat, foundry, etc., if specified. For us, we are letting crytic-compile default to Hardhat, which uses the root `hardhat.config.ts` file.
 
-### Issues?
+## Issues?
 
 - crytic-compile is sensitive to the specific build/cache/contract folders. Make sure the `crytic-export` folder is being written to after trying to run `crytic-compile`. You can use the command, `yarn build:crytic` to test run compilation without echidna.
 
 - Using forge framework requires the use of the 'crytic' profile in the foundry.toml config.
+
+## Notes (TODO: remove)
+
+- Using echidna 2.0.4, `assert` does not seem to trigger a failure for echidna for solidity ^0.8.0.
