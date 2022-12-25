@@ -48,12 +48,12 @@ contract HyperTester is Hyper {
     }
 
     /** @dev This is an implemented function to test process, so it has to have settle and re-entrancy guard. */
-    function jumpProcess(bytes calldata data) external payable lock settle {
+    function jumpProcess(bytes calldata data) external payable lock interactions {
         CPU._jumpProcess(data, super._process);
     }
 
     /** @dev This is an implemented function to test process, so it has to have settle and re-entrancy guard. */
-    function process(bytes calldata data) external payable lock settle {
+    function process(bytes calldata data) external payable lock interactions {
         super._process(data);
     }
 
