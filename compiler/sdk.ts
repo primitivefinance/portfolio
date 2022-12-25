@@ -35,6 +35,8 @@ export default class HyperSDK {
     const forwarder = await factory.deploy()
     this.forwarder = forwarder
 
+    console.log(`Deployed Hyper at: ${instance.address}`)
+    console.log(`Deployed Forwarder at: ${forwarder.address}`)
     return this.instance
   }
 

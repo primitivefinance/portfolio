@@ -13,16 +13,18 @@
     "coverage:hardhat": "hardhat coverage --config ./hardhat-coverage.config.ts --solcoverjs ./config/.solcover.js",
     "test": "FOUNDRY_PROFILE=test forge test -vvv",
     "test:hardhat": "TS_NODE_TRANSPILE_ONLY=1 hardhat test --config ./hardhat.config.ts",
-    "test:echidna": "FOUNDRY_PROFILE=crytic echidna-test . --contract Basic --config test/crytic/config.yaml",
+    "test:echidna": "FOUNDRY_PROFILE=crytic echidna-test . --config test/crytic/config.yaml",
     "profile": "yarn test:forge --report-gas",
     "profile:hardhat": "REPORT_GAS=true hardhat test --config ./hardhat.config.ts",
     "lint:check": "prettier --check **.sol && prettier --check **.js && prettier --check **.ts && hardhat compile --config ./hardhat.config.ts",
     "lint:fix": "prettier --write **.sol && prettier --write **.js && prettier --write **.ts",
     "prepare": "husky install",
     "prepare:remappings": "forge remappings > remappings.txt",
-    "prepare:echidna": "etheno --ganache --ganache-args='--miner.blockGasLimit 20_000_000' -x test/crytic/init.json",
+    "prepare:echidna": "etheno --ganache --ganache-args='--miner.blockGasLimit 20000000' -x test/crytic/init.json",
+    "prepare:echidna:corpus": "yarn test:hardhat --network ganache",
     "prepare:differential": "cd ./test/differential/scripts/ && npm run compile && npm run generate",
-    "deploy": "forge script scripts/Deploy.s.sol:Deploy --rpc-url $PRIMITIVE_RPC --fork-url $FORK_URL --broadcast"
+    "deploy": "forge script scripts/Deploy.s.sol:Deploy --rpc-url $PRIMITIVE_RPC --fork-url $FORK_URL --broadcast",
+    "deploy:ganache": "forge script scripts/Deploy.s.sol:Deploy --fork-url http://localhost:8545 --broadcast"
   },
   "repository": {
     "type": "git",
