@@ -110,7 +110,7 @@ contract Hyper is IHyper {
     }
 
     /** @dev Used on every external operation that touches tokens. */
-    modifier settle() {
+    modifier interactions() {
         __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
         _;
         __account__.prepare();
@@ -144,7 +144,7 @@ contract Hyper is IHyper {
      *
      * @custom:security Guarded against re-entrancy externally and when settling. This is the vault door, is it `locked`?.
      */
-    fallback() external payable lock settle {
+    fallback() external payable lock interactions {
         CPU.__startProcess__(_process);
     }
 
@@ -157,30 +157,37 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function syncPool(uint48 poolId) external override returns (uint128 blockTimestamp) {
+        blockTimestamp; // TODO
         _syncPoolPrice(poolId);
     }
 
     /// @inheritdoc IHyperActions
-    function allocate(uint48 poolId, uint amount) external lock settle returns (uint deltaAsset, uint deltaQuote) {
+    function allocate(
+        uint48 poolId,
+        uint amount
+    ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = asm.toUint128(useMax ? type(uint128).max : amount);
         (deltaAsset, deltaQuote) = _allocate(useMax ? 1 : 0, poolId, input);
     }
 
     /// @inheritdoc IHyperActions
-    function unallocate(uint48 poolId, uint amount) external lock settle returns (uint deltaAsset, uint deltaQuote) {
+    function unallocate(
+        uint48 poolId,
+        uint amount
+    ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = asm.toUint128(useMax ? type(uint128).max : amount);
         (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint16(poolId >> 32), input);
     }
 
     /// @inheritdoc IHyperActions
-    function stake(uint48 poolId) external lock settle {
+    function stake(uint48 poolId) external lock interactions {
         _stake(poolId);
     }
 
     /// @inheritdoc IHyperActions
-    function unstake(uint48 poolId) external lock settle {
+    function unstake(uint48 poolId) external lock interactions {
         _unstake(poolId);
     }
 
@@ -190,7 +197,7 @@ contract Hyper is IHyper {
         bool sellAsset,
         uint amount,
         uint limit
-    ) external lock settle returns (uint output, uint remainder) {
+    ) external lock interactions returns (uint output, uint remainder) {
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = useMax ? type(uint128).max : asm.toUint128(amount);
         if (limit == type(uint256).max) limit = type(uint128).max;
@@ -205,7 +212,7 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function draw(address token, uint256 amount, address to) external lock settle {
+    function draw(address token, uint256 amount, address to) external lock interactions {
         if (__account__.balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
         _applyDebit(token, amount);
 
@@ -214,12 +221,12 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function fund(address token, uint256 amount) external override lock settle {
+    function fund(address token, uint256 amount) external override lock interactions {
         __account__.dangerousFund(token, address(this), amount); // Pulls tokens, settlement credits msg.sender.
     }
 
     /// @inheritdoc IHyperActions
-    function deposit() external payable override lock settle {
+    function deposit() external payable override lock interactions {
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -313,7 +320,7 @@ contract Hyper is IHyper {
      */
     function _changePosition(ChangeLiquidityParams memory args) internal {
         if (args.deltaLiquidity < 0) {
-            (uint256 distance, uint256 timestamp) = getSecondsSincePositionUpdate(args.owner, args.poolId);
+            (uint256 distance, ) = getSecondsSincePositionUpdate(args.owner, args.poolId);
             if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
             emit DecreasePosition(args.owner, args.poolId, uint128(args.deltaLiquidity));
         } else {
@@ -336,7 +343,7 @@ contract Hyper is IHyper {
             _decreaseReserves(asset, args.deltaAsset);
             _decreaseReserves(quote, args.deltaQuote);
         } else {
-            // note: Reserves are used at the end of instruction processing to settle transactions.
+            // note: Reserves are used at the end of instruction processing to interactions transactions.
             _increaseReserves(asset, args.deltaAsset);
             _increaseReserves(quote, args.deltaQuote);
         }
@@ -351,6 +358,7 @@ contract Hyper is IHyper {
         uint16 pairId,
         uint128 deltaLiquidity
     ) internal returns (uint deltaAsset, uint deltaQuote) {
+        pairId; // TODO
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
@@ -466,7 +474,7 @@ contract Hyper is IHyper {
         state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
         state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
 
-        Iteration memory swap;
+        Iteration memory _swap;
         {
             // Updates price based on time passed since last update.
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
@@ -475,7 +483,7 @@ contract Hyper is IHyper {
                 ? getBalance(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote)
                 : args.input;
             // Begin the iteration at the live price, using the total swap input amount as the remainder to fill.
-            swap = Iteration({
+            _swap = Iteration({
                 price: price,
                 tick: tick,
                 feeAmount: 0,
@@ -512,27 +520,29 @@ contract Hyper is IHyper {
 
             // Virtual reserves.
             if (state.sell) {
-                (liveDependent, liveIndependent) = expiring.computeReserves(swap.price);
-                maxInput = (PRECISION - liveIndependent).mulWadDown(swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
+                (liveDependent, liveIndependent) = expiring.computeReserves(_swap.price);
+                maxInput = (PRECISION - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
             } else {
-                (liveIndependent, liveDependent) = expiring.computeReserves(swap.price);
-                maxInput = (expiring.strike - liveIndependent).mulWadDown(swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+                (liveIndependent, liveDependent) = expiring.computeReserves(_swap.price);
+                maxInput = (expiring.strike - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            swap.feeAmount = ((swap.remainder >= maxInput ? maxInput : swap.remainder) * (1e4 - state.gamma)) / 10_000;
-            state.feeGrowthGlobal = FixedPointMathLib.divWadDown(swap.feeAmount, swap.liquidity);
+            _swap.feeAmount =
+                ((_swap.remainder >= maxInput ? maxInput : _swap.remainder) * (1e4 - state.gamma)) /
+                10_000;
+            state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
 
-            if (swap.remainder >= maxInput) {
+            if (_swap.remainder >= maxInput) {
                 // If more than max tokens are being swapped in...
-                deltaInput = maxInput - swap.feeAmount;
-                nextIndependent = liveIndependent + deltaInput.divWadDown(swap.liquidity);
-                swap.remainder -= (deltaInput + swap.feeAmount); // Reduce the remainder of the order to fill.
+                deltaInput = maxInput - _swap.feeAmount;
+                nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
+                _swap.remainder -= (deltaInput + _swap.feeAmount); // Reduce the remainder of the order to fill.
             } else {
                 // Reaching this block will fill the order.
-                deltaInput = swap.remainder - swap.feeAmount;
-                nextIndependent = liveIndependent + deltaInput.divWadDown(swap.liquidity);
-                deltaInput = swap.remainder; // Swap input amount including the fee payment.
-                swap.remainder = 0; // Clear the remainder to zero, as the order has been filled.
+                deltaInput = _swap.remainder - _swap.feeAmount;
+                nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
+                deltaInput = _swap.remainder; // Swap input amount including the fee payment.
+                _swap.remainder = 0; // Clear the remainder to zero, as the order has been filled.
             }
 
             // Compute the output of the swap by computing the difference between the dependent reserves.
@@ -540,8 +550,8 @@ contract Hyper is IHyper {
             else nextDependent = expiring.computeR2WithR1(nextIndependent);
 
             // Apply swap amounts to swap state.
-            swap.input += deltaInput;
-            swap.output += (liveDependent - nextDependent);
+            _swap.input += deltaInput;
+            _swap.output += (liveDependent - nextDependent);
         }
 
         {
@@ -559,8 +569,8 @@ contract Hyper is IHyper {
                 nextPrice = expiring.computePriceWithR2(nextDependent);
             }
 
-            swap.price = nextPrice;
-            if (swap.price > args.limit) revert SwapLimitReached();
+            _swap.price = nextPrice;
+            if (_swap.price > args.limit) revert SwapLimitReached();
 
             // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision).
             //if (nextInvariant < liveInvariant) revert InvariantError(liveInvariant, nextInvariant);
@@ -569,19 +579,19 @@ contract Hyper is IHyper {
         // Apply pool effects.
         _syncPool(
             args.poolId,
-            HyperSwapLib.computeTickWithPrice(swap.price),
-            swap.price,
-            swap.liquidity,
+            HyperSwapLib.computeTickWithPrice(_swap.price),
+            _swap.price,
+            _swap.liquidity,
             state.sell ? state.feeGrowthGlobal : 0,
             state.sell ? 0 : state.feeGrowthGlobal
         );
 
         // Apply reserve effects.
-        _increaseReserves(pair.tokenAsset, swap.input);
-        _decreaseReserves(pair.tokenQuote, swap.output);
+        _increaseReserves(pair.tokenAsset, _swap.input);
+        _decreaseReserves(pair.tokenQuote, _swap.output);
 
-        (poolId, remainder, input, output) = (args.poolId, swap.remainder, swap.input, swap.output);
-        emit Swap(args.poolId, swap.input, swap.output, pair.tokenAsset, pair.tokenQuote);
+        (poolId, remainder, input, output) = (args.poolId, _swap.remainder, _swap.input, _swap.output);
+        emit Swap(args.poolId, _swap.input, _swap.output, pair.tokenAsset, pair.tokenQuote);
     }
 
     /**
@@ -745,7 +755,7 @@ contract Hyper is IHyper {
      * @custom:security Directly manipulates reserves.
      */
     function _increaseReserves(address token, uint256 amount) internal {
-        __account__.deposit(token, amount);
+        __account__.increase(token, amount);
         emit IncreaseReserveBalance(token, amount);
     }
 
@@ -913,8 +923,8 @@ function syncPositionFees(
     uint checkpointAsset = asm.__computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
     uint checkpointQuote = asm.__computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
 
-    feeAssetEarned = FixedPointMathLib.mulWadDown(feeGrowthAsset - self.feeGrowthAssetLast, liquidity);
-    feeQuoteEarned = FixedPointMathLib.mulWadDown(feeGrowthQuote - self.feeGrowthQuoteLast, liquidity);
+    feeAssetEarned = FixedPointMathLib.mulWadDown(checkpointAsset, liquidity);
+    feeQuoteEarned = FixedPointMathLib.mulWadDown(checkpointQuote, liquidity);
 
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;

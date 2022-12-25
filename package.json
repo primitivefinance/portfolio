@@ -4,6 +4,9 @@
   "description": "Enigma Virtual Machine processes instructions for interacting with liquidity pools.",
   "scripts": {
     "build": "hardhat compile --config ./hardhat.config.ts",
+    "build:forge": "FOUNDRY_PROFILE=test forge build",
+    "build:forge:crytic": "FOUNDRY_PROFILE=crytic forge build",
+    "build:crytic": "crytic-compile . --config-file='test/crytic/crytic_compile.config.json' --compile-custom-build='yarn build:forge:crytic --extra-output abi --extra-output userdoc --extra-output devdoc --extra-output evm.methodIdentifiers --force'",
     "clean": "hardhat clean && forge clean",
     "test": "TS_NODE_TRANSPILE_ONLY=1 hardhat test --config ./hardhat.config.ts",
     "test:forge": "FOUNDRY_PROFILE=test forge test -vvv",
@@ -12,6 +15,8 @@
     "coverage": "hardhat coverage --config ./hardhat-coverage.config.ts --solcoverjs ./config/.solcover.js",
     "lint:check": "prettier --check **.sol && prettier --check **.js && prettier --check **.ts && hardhat compile --config ./hardhat.config.ts",
     "lint:fix": "prettier --write **.sol && prettier --write **.js && prettier --write **.ts",
+    "fuzz:capture": "etheno --ganache --ganache-args='--miner.blockGasLimit 20_000_000' -x test/crytic/init.json",
+    "fuzz:test": "echidna-test . --config test/crytic/config.yaml",
     "prepare": "husky install",
     "generate": "cd ./test/differential/scripts/ && npm run compile && npm run generate",
     "sync-deps": "forge remappings > remappings.txt",

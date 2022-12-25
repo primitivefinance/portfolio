@@ -81,13 +81,7 @@ library Invariant {
      * @custom:error Technically, none. This is the source of truth for the trading function.
      * @custom:source https://primitive.xyz/whitepaper
      */
-    function getY(
-        uint256 R_x,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau,
-        int256 inv
-    ) internal view returns (uint256 R_y) {
+    function getY(uint256 R_x, uint256 stk, uint256 vol, uint256 tau, int256 inv) internal pure returns (uint256 R_y) {
         if (R_x > uint256(ONE)) revert OOB();
         // Short circuits because tau != 0 is more likely.
         if (tau != 0) {
@@ -142,13 +136,7 @@ library Invariant {
      * @custom:error Up to 1e-6. This an **approximated** "inverse" of the `getY` function.
      * @custom:source https://primitive.xyz/whitepaper
      */
-    function getX(
-        uint256 R_y,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau,
-        int256 inv
-    ) internal view returns (uint256 R_x) {
+    function getX(uint256 R_y, uint256 stk, uint256 vol, uint256 tau, int256 inv) internal pure returns (uint256 R_x) {
         if (R_y > stk) revert OOB();
         // Short circuits because tau != 0 is more likely.
         if (tau != 0) {
@@ -199,7 +187,7 @@ library Invariant {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) internal view returns (int256 inv) {
+    ) internal pure returns (int256 inv) {
         uint256 y = getY(R_x, stk, vol, tau, inv); // `inv` is 0 because we are solving `inv`, aka `k`.
         assembly {
             inv := sub(R_y, y)

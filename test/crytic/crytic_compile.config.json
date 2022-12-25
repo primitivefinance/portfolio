@@ -1,0 +1,4 @@
+{
+  "compile_force_framework": "foundry",
+  "compile_custom_build": "yarn build:forge:crytic --extra-output abi --extra-output userdoc --extra-output devdoc --extra-output evm.methodIdentifiers --force"
+}

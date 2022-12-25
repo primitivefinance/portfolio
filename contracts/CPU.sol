@@ -195,7 +195,7 @@ function encodeSwap(
     uint8 power1,
     uint128 amount1,
     uint8 direction
-) returns (bytes memory data) {
+) pure returns (bytes memory data) {
     uint8 pointer = 0x0a + 0x0f; // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
     data = abi.encodePacked(pack(bytes1(useMax), SWAP), poolId, pointer, power0, amount0, power1, amount1, direction);
 }
