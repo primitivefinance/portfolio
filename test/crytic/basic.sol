@@ -8,7 +8,8 @@ contract Basic {
     event AssertionFailed();
 
     function test_add(uint a) public returns (bool) {
-        require(a + 1 > 1);
+        /* require(a < type(uint256).max);
+        require(a + 1 > 1); */
     }
 
     IHyper h = IHyper(0x1D7022f5B17d2F8B695918FB48fa1089C9f85401);
