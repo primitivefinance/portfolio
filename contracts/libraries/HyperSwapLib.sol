@@ -31,31 +31,31 @@ library HyperSwapLib {
 
     // --- Class Methods --- //
 
-    function invariant(Expiring memory args, uint R1, uint R2) internal view returns (int256) {
+    function invariant(Expiring memory args, uint R1, uint R2) internal pure returns (int256) {
         return Invariant.invariant(R1, R2, args.strike, convertPercentageToWad(args.sigma), args.tau);
     }
 
-    function computeR1WithPrice(Expiring memory args, uint256 price) internal view returns (uint256 R1) {
+    function computeR1WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R1) {
         R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
     }
 
-    function computeR2WithPrice(Expiring memory args, uint256 price) internal view returns (uint256 R2) {
+    function computeR2WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
     }
 
-    function computePriceWithR1(Expiring memory args, uint256 R1) internal view returns (uint256 price) {
+    function computePriceWithR1(Expiring memory args, uint256 R1) internal pure returns (uint256 price) {
         price = computePriceWithR1(R1, args.strike, args.sigma, args.tau);
     }
 
-    function computePriceWithR2(Expiring memory args, uint256 R2) internal view returns (uint256 price) {
+    function computePriceWithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 price) {
         price = computePriceWithR2(R2, args.strike, args.sigma, args.tau);
     }
 
-    function computeR1WithR2(Expiring memory args, uint256 R2) internal view returns (uint256 R1) {
+    function computeR1WithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 R1) {
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, 0);
     }
 
-    function computeR2WithR1(Expiring memory args, uint256 R1) internal view returns (uint256 R2) {
+    function computeR2WithR1(Expiring memory args, uint256 R1) internal pure returns (uint256 R2) {
         R2 = computeR2WithR1(R1, args.strike, args.sigma, args.tau, 0);
     }
 
@@ -63,11 +63,11 @@ library HyperSwapLib {
         Expiring memory args,
         uint256 prc,
         uint256 epsilon
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
     }
 
-    function computeReserves(Expiring memory args, uint price) internal returns (uint R1, uint R2) {
+    function computeReserves(Expiring memory args, uint price) internal pure returns (uint R1, uint R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, 0);
     }
@@ -75,7 +75,7 @@ library HyperSwapLib {
     function computeReservesWithTick(
         Expiring memory args,
         int24 tick
-    ) internal returns (uint256 price, uint256 R1, uint256 R2) {
+    ) internal pure returns (uint256 price, uint256 R1, uint256 R2) {
         price = computePriceWithTick(tick);
         R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
@@ -92,7 +92,7 @@ library HyperSwapLib {
         uint256 prc,
         uint256 tau,
         uint256 epsilon
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         if (epsilon == 0) return prc;
 
         Expiring memory params = Expiring(stk, vol, tau);
@@ -143,9 +143,9 @@ library HyperSwapLib {
         uint256 strike,
         uint256 sigma,
         uint256 tau,
-        int256 invariant
-    ) internal view returns (uint256 R1) {
-        R1 = Invariant.getY(R2, strike, convertPercentageToWad(sigma), tau, invariant); // todo: use price for concentrated curve
+        int256 inv
+    ) internal pure returns (uint256 R1) {
+        R1 = Invariant.getY(R2, strike, convertPercentageToWad(sigma), tau, inv); // todo: use price for concentrated curve
     }
 
     /**
@@ -158,15 +158,15 @@ library HyperSwapLib {
         uint256 strike,
         uint256 sigma,
         uint256 tau,
-        int256 invariant
-    ) internal view returns (uint256 R2) {
-        R2 = Invariant.getX(R1, strike, convertPercentageToWad(sigma), tau, invariant) + 1; // todo: use price for concentrated curve
+        int256 inv
+    ) internal pure returns (uint256 R2) {
+        R2 = Invariant.getX(R1, strike, convertPercentageToWad(sigma), tau, inv) + 1; // todo: use price for concentrated curve
     }
 
     /**
      * @custom:math R1 = KΦ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
-    function computeR1WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal view returns (uint256 R1) {
+    function computeR1WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 R1) {
         // todo: handle price when above strike.
         /* if (prc != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
@@ -189,7 +189,7 @@ library HyperSwapLib {
     /**
      * @custom:math R2 = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
-    function computeR2WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal view returns (uint256 R2) {
+    function computeR2WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 R2) {
         // todo: handle price when above strike.
         if (prc != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
@@ -220,7 +220,7 @@ library HyperSwapLib {
     /**
      * @custom:math price(R2) = Ke^(Φ^-1(1 - R2)σ√τ - 1/2σ^2τ)
      */
-    function computePriceWithR2(uint256 R2, uint256 stk, uint256 vol, uint256 tau) internal view returns (uint256 prc) {
+    function computePriceWithR2(uint256 R2, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 prc) {
         uint256 tauYears = convertSecondsToWadYears(tau);
         uint256 volWad = convertPercentageToWad(vol);
 
@@ -263,7 +263,6 @@ library HyperSwapLib {
     function computeTickWithPrice(uint256 price) internal pure returns (int24 tick) {
         uint256 numerator = uint256(int256(price).lnWad());
         uint256 denominator = uint256(TICK_BASE.lnWad());
-        uint256 val = numerator / denominator + 1; // Values are in Fixed Point Q.96 format. Rounds up.
         tick = int24(int256((numerator)) / int256(denominator) + 1);
     }
 

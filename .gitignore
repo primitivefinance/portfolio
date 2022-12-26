@@ -16,7 +16,9 @@ forge-cache/
 cache
 out
 optimized-out
+broadcast
 
+# macOS
 .DS_Store
 
 # VScode
@@ -26,6 +28,10 @@ optimized-out
 test/differential/data
 test/differential/scripts/node_modules
 
+# coverage
 lcov.info
 
-broadcast
+# echidna
+crytic-export/
+
+

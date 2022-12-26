@@ -5,6 +5,10 @@ Full vision of Primitive Replicating Market Maker.
 ## Notes
 
 Investigate use of msg.value! (used in fund)
+Improve/fix swap.
+Investigate gas costs of swaps.
+Investigate curve/pair nonces.
+Add utility functions to fetch all data.
 
 #### Allocate
 

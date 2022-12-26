@@ -1,42 +1,36 @@
-[profile.default]
-via_ir = true
+[profile.default] # all profiles inherit from this
+solc = '0.8.13' 
 src = 'contracts'
-out = 'artifacts/contracts'
+out = 'out' # default
+test = 'test' # default
 libs = ['lib', 'node_modules']
-test = 'test/foundry'
-cache_path = 'forge-cache'
+cache = false # !important! breaks echidna if cache = true.
 remappings = [
-    'ds-test/=lib/solmate/lib/ds-test/src/',
     'forge-std/=lib/forge-std/src/',
     'solmate/=lib/solmate/src/',
     'solstat/=lib/solstat/contracts/',
     'contracts/=contracts/',
     'lib/=lib/'
 ]
+
+[profile.optimized] # uses via_ir and optimizer
+via_ir = true
+out = 'optimized-out'
 optimizer_runs = 15000
 fuzz_runs = 256
 fuzz_max_local_rejects = 65536
 fuzz_max_global_rejects = 1024
 
-[profile.optimized]
-solc = '0.8.13'
-out = 'optimized-out'
-
-[profile.test]
-solc = '0.8.13'
-via_ir = false
-src = 'test/'
-out = 'artifacts/contracts'
-cache_path = 'forge-cache'
-libs = ['lib', 'node_modules']
+[profile.test] # does not use optimizer
+src = 'test/' # not default
 gas_reports = ["*"]
 ffi = true
 fuzz_runs = 500
 
-[profile.lite]
-out = 'optimized-out'
+[profile.crytic]
 via_ir = false
-fuzz_runs = 1000
+src = 'test/crytic' # not default
+test = 'test/crytic' # not default
 
 
 [rpc_endpoints]

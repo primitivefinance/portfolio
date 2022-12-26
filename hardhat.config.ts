@@ -51,6 +51,10 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true,
       blockGasLimit: 30_000_000,
     },
+    ganache: {
+      url: 'http://localhost:8545',
+      chainId: 1337,
+    },
     primitive: {
       url: `http://${PRIMITIVE_RPC}:8545`,
       chainId: 1337,

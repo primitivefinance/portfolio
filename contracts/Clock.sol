@@ -48,7 +48,7 @@ function getTimePassedInCurrentEpoch(
     Epoch memory epoch,
     uint timestamp,
     uint256 lastUpdatedTimestamp
-) view returns (uint256 timePassed) {
+) pure returns (uint256 timePassed) {
     uint256 startTime = epoch.getStartTime();
     uint256 lastUpdateInCurrentEpoch = lastUpdatedTimestamp > startTime ? lastUpdatedTimestamp : startTime;
     timePassed = timestamp - lastUpdateInCurrentEpoch;

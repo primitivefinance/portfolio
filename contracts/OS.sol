@@ -7,7 +7,21 @@ import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
 import {BalanceError, EtherTransferFail} from "./EnigmaTypes.sol";
 
-using {cache, deposit, withdraw, credit, debit, prepare, settle, settlement, clear, getNetBalance, touch} for AccountSystem global;
+using {
+    __wrapEther__,
+    dangerousFund,
+    cache,
+    increase,
+    withdraw,
+    credit,
+    debit,
+    prepare,
+    settle,
+    settlement,
+    clear,
+    getNetBalance,
+    touch
+} for AccountSystem global;
 
 /** @dev Novel accounting mechanism to track internally held balances and settle differences with actual balances. */
 struct AccountSystem {
@@ -30,8 +44,12 @@ function __balanceOf__(address token, address account) view returns (uint256) {
 }
 
 /** @dev Sends ether in `deposit` function to target address. Must validate `weth`. */
-function __wrapEther__(address weth) {
-    IWETH(weth).deposit{value: msg.value}(); // todo: be careful with
+function __wrapEther__(AccountSystem storage self, address weth) {
+    // todo: be careful with this, since it uses msg.value
+    if (msg.value > 0) {
+        IWETH(weth).deposit{value: msg.value}();
+        self.touch(weth);
+    }
 }
 
 /** @dev Dangerously sends ether to `to` in a low-level call. */
@@ -51,13 +69,18 @@ function __dangerousTransferFrom__(address token, address to, uint amount) {
     SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
 }
 
+function dangerousFund(AccountSystem storage self, address token, address to, uint amount) {
+    self.touch(token);
+    __dangerousTransferFrom__(token, to, amount);
+}
+
 /** @dev Increases an `owner`'s spendable balance. */
 function credit(AccountSystem storage self, address owner, address token, uint amount) {
     self.balances[owner][token] += amount;
 }
 
 /** @dev Decreases an `owner`'s spendable balance. */
-function debit(AccountSystem storage self, address owner, address token, uint amount) returns(bool paid) {
+function debit(AccountSystem storage self, address owner, address token, uint amount) returns (bool paid) {
     uint balance = self.balances[owner][token];
     if (balance >= amount) {
         self.balances[owner][token] -= amount;
@@ -68,7 +91,7 @@ function debit(AccountSystem storage self, address owner, address token, uint am
 }
 
 /** @dev Actives a token and increases the reserves. Settlement will pick up this activated token. */
-function deposit(AccountSystem storage self, address token, uint amount) {
+function increase(AccountSystem storage self, address token, uint amount) {
     self.touch(token);
     self.reserves[token] += amount;
 }
@@ -87,8 +110,8 @@ function prepare(AccountSystem storage self) {
 }
 
 /** @notice Settles the difference in balance between tracked tokens and physically held tokens. */
-function settle(AccountSystem storage self, function (address token, address to, uint amount) pay, address token, address account) {
-    if(!self.prepared) revert NotPreparedToSettle();
+function settle(AccountSystem storage self, function(address, address, uint) pay, address token, address account) {
+    if (!self.prepared) revert NotPreparedToSettle();
 
     int net = self.getNetBalance(token, account);
     if (net == 0) return;
@@ -97,20 +120,17 @@ function settle(AccountSystem storage self, function (address token, address to,
     uint amount = uint(-net);
     bool paid = self.debit(msg.sender, token, amount);
     delete self.cached[token];
-    if(!paid) pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
+    if (!paid) pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
 }
 
-
-
 /** @dev Settles the discrepency in all activated token balances so the net balance is zero or positive. */
-function settlement(AccountSystem storage self, function (address token, address to, uint amount) pay, address account) {
-    if(!self.prepared) revert NotPreparedToSettle();
+function settlement(AccountSystem storage self, function(address, address, uint) pay, address account) {
+    if (!self.prepared) revert NotPreparedToSettle();
 
     address[] memory tokens = self.warm;
-    if(tokens.length == 0) return self.clear();
+    if (tokens.length == 0) return self.clear();
 
-  
-    for(uint i; i != tokens.length; ++i) {
+    for (uint i; i != tokens.length; ++i) {
         address token = tokens[i];
         self.settle(pay, token, account);
     }
