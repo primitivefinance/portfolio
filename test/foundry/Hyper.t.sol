@@ -603,7 +603,7 @@ contract TestHyperSingle is Test {
     function testProcessAllocateFull() public checkSettlementInvariant {
         uint256 price = getPool(__poolId).lastPrice;
         Curve memory curve = getCurve(uint32(__poolId));
-        uint256 theoreticalR2 = HyperSwapLib.computeR2WithPrice(
+        uint256 theoreticalR2 = Price.computeR2WithPrice(
             price,
             curve.strike,
             curve.sigma,
@@ -626,7 +626,7 @@ contract TestHyperSingle is Test {
     function testAllocateFull() public checkSettlementInvariant {
         uint256 price = getPool(__poolId).lastPrice;
         Curve memory curve = getCurve(uint32(__poolId));
-        uint256 theoreticalR2 = HyperSwapLib.computeR2WithPrice(
+        uint256 theoreticalR2 = Price.computeR2WithPrice(
             price,
             curve.strike,
             curve.sigma,

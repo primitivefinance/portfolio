@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "forge-std/Test.sol";
 import "../../contracts/libraries/Invariant.sol";
 
-contract TestHyperSwapLib is Test {
+contract TestPrice is Test {
     function testComputePriceWithR2OOBFail() public {}
 
     function testComputeR2WithPriceOOBFail() public {}

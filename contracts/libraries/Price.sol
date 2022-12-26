@@ -6,7 +6,7 @@ import "./Invariant.sol";
 /**
  * @dev Comprehensive library to compute all related functions used with swaps.
  */
-library HyperSwapLib {
+library Price {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
