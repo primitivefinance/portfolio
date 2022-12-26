@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "forge-std/Test.sol";
-import "../../contracts/test/TestERC20.sol";
-import {WETH} from "solmate/tokens/WETH.sol";
+import "./setup/TestPriceSetup.sol";
+import "./setup/TestHyperSetup.sol";
 
-import "../../contracts/Hyper.sol";
+import "contracts/CPU.sol" as CPU;
+import {Curve, Pair, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
 
 /** @dev Exposes process and jump process as external functions to test directly instead of through fallback. */
-contract HyperTester is Hyper {
+/* contract HyperTester is Hyper {
     constructor(address weth) Hyper(weth) {}
 
     uint public TEST_JIT_POLICY;
@@ -47,12 +47,10 @@ contract HyperTester is Hyper {
         return exists(pools, poolId);
     }
 
-    /** @dev This is an implemented function to test process, so it has to have settle and re-entrancy guard. */
     function jumpProcess(bytes calldata data) external payable lock interactions {
         CPU._jumpProcess(data, super._process);
     }
 
-    /** @dev This is an implemented function to test process, so it has to have settle and re-entrancy guard. */
     function process(bytes calldata data) external payable lock interactions {
         super._process(data);
     }
@@ -60,54 +58,7 @@ contract HyperTester is Hyper {
     function getAmounts(uint48 poolId) public returns (uint deltaAsset, uint deltaQuote) {
         return _getAmounts(poolId);
     }
-}
-
-/** @dev Forwards calls to Hyper. Bubbles up custom errors. */
-contract Forwarder is Test {
-    HyperTester public hyper;
-
-    constructor(address prototype) {
-        hyper = HyperTester(payable(prototype));
-    }
-
-    receive() external payable {}
-
-    function approve(address token, address spender) external {
-        TestERC20(token).approve(spender, type(uint256).max);
-    }
-
-    /** @dev Assumes Hyper calls this, for testing only. Uses try catch to bubble up errors. */
-    function process(bytes calldata data) external payable returns (bool) {
-        try hyper.process{value: msg.value}(data) {} catch (bytes memory reason) {
-            assembly {
-                revert(add(32, reason), mload(reason))
-            }
-        }
-        return true;
-    }
-
-    /** @dev Assumes Hyper calls this, for testing only. Uses try catch to bubble up errors. */
-    function jumpProcess(bytes calldata data) external payable returns (bool) {
-        try hyper.jumpProcess{value: msg.value}(data) {} catch (bytes memory reason) {
-            assembly {
-                revert(add(32, reason), mload(reason))
-            }
-        }
-        return true;
-    }
-}
-
-uint128 constant DEFAULT_STRIKE = 10e18;
-uint24 constant DEFAULT_SIGMA = 1e4;
-uint32 constant DEFAULT_MATURITY = 31556953; // adds 1
-uint16 constant DEFAULT_FEE = 100;
-uint32 constant DEFAULT_GAMMA = 9900;
-uint32 constant DEFAULT_PRIORITY_GAMMA = 9950;
-uint128 constant DEFAULT_QUOTE_RESERVE = 3085375116376210650;
-uint128 constant DEFAULT_ASSET_RESERVE = 308537516918601823;
-uint128 constant DEFAULT_LIQUIDITY = 1e18;
-uint128 constant DEFAULT_PRICE = 10e18;
-int24 constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
+} */
 
 interface IHyperStruct {
     function curves(uint32 curveId) external view returns (Curve memory);
@@ -139,57 +90,34 @@ function createPool(
     data = CPU.encodeJumpInstruction(instructions);
 }
 
-contract TestHyperSingle is Test {
+contract TestHyperSingle is TestHyperSetup {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+
+    HyperTimeOverride public __contractBeingTested__;
+
+    modifier checkSettlementInvariant() {
+        _;
+    }
 
     receive() external payable {}
 
     uint48 __poolId;
-    WETH public __weth__;
-    HyperTester public __contractBeingTested__;
-    Forwarder public forwarder;
+
     TestERC20 public asset;
     TestERC20 public quote;
-    TestERC20 public fakeToken0;
 
-    address[] public __addressesUsedInTesting__;
+    function afterSetUp() public override {
+        asset = __token_18__;
+        quote = __usdc__;
 
-    function setUp() public {
-        __weth__ = new WETH();
-        __contractBeingTested__ = new HyperTester(address(__weth__));
-        (asset, quote, fakeToken0) = handlePrerequesites();
-        __addressesUsedInTesting__.push(address(this));
-        __addressesUsedInTesting__.push(address(__contractBeingTested__));
-    }
-
-    modifier checkSettlementInvariant() {
-        _;
-        __contractBeingTested__.check(__poolId, __addressesUsedInTesting__);
-    }
-
-    function handlePrerequesites() public returns (TestERC20 token0, TestERC20 token1, TestERC20 fakeToken0) {
-        // Set the forwarder.
-        forwarder = new Forwarder(address(__contractBeingTested__));
-        __addressesUsedInTesting__.push(address(forwarder));
-
-        // 1. Two token contracts, minted and approved to spend.
-        fakeToken0 = new TestERC20("fakeToken0", "fakeToken0 name", 18);
-        token0 = new TestERC20("token0", "token0 name", 18);
-        token1 = new TestERC20("token1", "token1 name", 18);
-        token0.mint(address(this), 440e18);
-        token1.mint(address(this), 440e18);
-        token0.mint(address(forwarder), 440e18);
-        token1.mint(address(forwarder), 440e18);
-        token0.approve(address(__contractBeingTested__), type(uint256).max);
-        token1.approve(address(__contractBeingTested__), type(uint256).max);
-        forwarder.approve(address(token0), address(__contractBeingTested__));
-        forwarder.approve(address(token1), address(__contractBeingTested__));
+        __contractBeingTested__ = __hyperCatchReverts__;
+        __contractBeingTested__.setTimestamp(uint128(block.timestamp)); // !important!
 
         // 2. Bundled operation set to create a pair, curve, and pool.
         bytes memory data = createPool(
-            address(token0),
-            address(token1),
+            address(__token_18__),
+            address(__usdc__),
             DEFAULT_SIGMA,
             uint32(block.timestamp) + DEFAULT_MATURITY,
             uint16(1e4 - DEFAULT_GAMMA),
@@ -198,16 +126,25 @@ contract TestHyperSingle is Test {
             DEFAULT_PRICE
         );
 
-        bool success = forwarder.jumpProcess(data);
-        assertTrue(success, "forwarder call failed");
+        bool success = __revertCatcher__.jumpProcess(data);
+        assertTrue(success, "__revertCatcher__ call failed");
 
         uint16 pairId = uint16(__contractBeingTested__.getPairNonce());
         uint32 curveId = uint32(__contractBeingTested__.getCurveNonce());
         __poolId = CPU.encodePoolId(pairId, curveId);
 
-        assertEq(__contractBeingTested__.doesPoolExist(__poolId), true);
-        assertEq(IHyperStruct(address(__contractBeingTested__)).pools(__poolId).lastTick != 0, true);
-        assertEq(IHyperStruct(address(__contractBeingTested__)).pools(__poolId).liquidity == 0, true);
+        assertTrue(
+            IHyperStruct(address(__contractBeingTested__)).pools(__poolId).blockTimestamp != 0,
+            "Pool not created"
+        );
+        assertTrue(
+            IHyperStruct(address(__contractBeingTested__)).pools(__poolId).lastTick != 0,
+            "Pool not initialized with price"
+        );
+        assertTrue(
+            IHyperStruct(address(__contractBeingTested__)).pools(__poolId).liquidity == 0,
+            "Pool initialized with liquidity"
+        );
     }
 
     // --- Helpers --- //
@@ -254,9 +191,9 @@ contract TestHyperSingle is Test {
 
     function testJumpProcessCreatesPair() public {
         bytes[] memory instructions = new bytes[](1);
-        instructions[0] = (CPU.encodeCreatePair(address(fakeToken0), address(quote)));
+        instructions[0] = (CPU.encodeCreatePair(address(__token_8__), address(quote)));
         bytes memory data = CPU.encodeJumpInstruction(instructions);
-        bool success = forwarder.jumpProcess(data);
+        bool success = __revertCatcher__.jumpProcess(data);
         assertTrue(success);
 
         uint16 pairId = uint16(__contractBeingTested__.getPairNonce());
@@ -267,18 +204,18 @@ contract TestHyperSingle is Test {
 
     function testProcessRevertsWithUnknownInstructionZeroOpcode() public {
         vm.expectRevert(UnknownInstruction.selector);
-        forwarder.process(hex"00");
+        __revertCatcher__.process(hex"00");
     }
 
     function testProcessRevertsWithUnknownInstruction() public {
         vm.expectRevert(UnknownInstruction.selector);
-        forwarder.process(hex"44");
+        __revertCatcher__.process(hex"44");
     }
 
     // ===== Effects ===== //
 
     function testSyncPool() public {
-        vm.warp(1);
+        customWarp(1);
         __contractBeingTested__.syncPool(__poolId);
     }
 
@@ -337,7 +274,7 @@ contract TestHyperSingle is Test {
         uint48 failureArg = 0x0001030;
         bytes memory data = CPU.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(!success);
     }
 
@@ -345,7 +282,7 @@ contract TestHyperSingle is Test {
         uint128 failureArg = 0;
         bytes memory data = CPU.encodeSwap(0, __poolId, 0x01, failureArg, 0x01, 0x01, 0);
         vm.expectRevert(ZeroInput.selector);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(!success);
     }
 
@@ -357,16 +294,16 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
 
         uint256 prev = getPool(__poolId).lastPrice;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 next = getPool(__poolId).lastPrice;
@@ -381,16 +318,16 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
 
         int256 prev = getPool(__poolId).lastTick;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
         assertTrue(success);
 
         int256 next = getPool(__poolId).lastTick;
@@ -407,11 +344,11 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
         uint256 prev = getPool(__poolId).liquidity;
 
         __contractBeingTested__.swap(__poolId, true, amount, limit);
@@ -430,11 +367,11 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
         uint256 prev = getPool(__poolId).liquidity;
 
         __contractBeingTested__.swap(__poolId, false, amount, limit);
@@ -453,7 +390,7 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         // move some time
@@ -477,11 +414,11 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         // move some time beyond maturity
-        vm.warp(getCurve(uint32(__poolId)).maturity + 1);
+        customWarp(getCurve(uint32(__poolId)).maturity + 1);
 
         vm.expectRevert(PoolExpiredError.selector);
         __contractBeingTested__.swap(__poolId, false, amount, limit);
@@ -495,15 +432,15 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
         uint256 prev = getPool(__poolId).liquidity;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 next = getPool(__poolId).liquidity;
@@ -518,16 +455,16 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity, note: 0x0a amount breaks test? todo: handle case where insufficient liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
 
         uint256 prev = getPool(__poolId).blockTimestamp;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 next = getPool(__poolId).blockTimestamp;
@@ -542,16 +479,16 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
 
         uint256 prev = getReserve(address(asset));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 next = getReserve(address(asset));
@@ -566,16 +503,16 @@ contract TestHyperSingle is Test {
             0x13, // 19 zeroes, so 10e19 liquidity
             0x01
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        vm.warp(block.timestamp + 1);
+        customWarp(block.timestamp + 1);
 
         uint256 prev = getReserve(address(quote));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 next = getReserve(address(quote));
@@ -588,7 +525,7 @@ contract TestHyperSingle is Test {
         uint48 failureArg = uint48(48);
         bytes memory data = CPU.encodeAllocate(0, failureArg, 0x01, 0x01);
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(!success, "forwarder call failed");
     }
 
@@ -596,7 +533,7 @@ contract TestHyperSingle is Test {
         uint8 failureArg = 0;
         bytes memory data = CPU.encodeAllocate(0, __poolId, 0x00, failureArg);
         vm.expectRevert(ZeroLiquidityError.selector);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(!success, "forwarder call failed");
     }
 
@@ -614,7 +551,7 @@ contract TestHyperSingle is Test {
         uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
 
-        forwarder.process(data);
+        __revertCatcher__.process(data);
 
         uint256 globalR1 = getReserve(address(quote));
         uint256 globalR2 = getReserve(address(asset));
@@ -661,15 +598,15 @@ contract TestHyperSingle is Test {
     function testAllocatePositionTimestampUpdated() public checkSettlementInvariant {
         uint48 positionId = __poolId;
 
-        uint256 prevPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
+        uint256 prevPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
+        uint256 nextPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
 
         assertTrue(prevPositionTimestamp == 0);
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
@@ -678,15 +615,15 @@ contract TestHyperSingle is Test {
     function testAllocatePositionTotalLiquidityIncreases() public checkSettlementInvariant {
         uint48 positionId = __poolId;
 
-        uint256 prevPositionTotalLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
+        uint256 prevPositionTotalLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextPositionTotalLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
+        uint256 nextPositionTotalLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
 
         assertTrue(prevPositionTotalLiquidity == 0);
         assertTrue(nextPositionTotalLiquidity > prevPositionTotalLiquidity);
@@ -698,7 +635,7 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
         uint256 nextGlobal = getReserve(address(asset));
@@ -712,7 +649,7 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
         uint256 nextGlobal = getReserve(address(quote));
@@ -733,7 +670,7 @@ contract TestHyperSingle is Test {
     function testUnallocateZeroLiquidityReverts() public {
         bytes memory data = CPU.encodeUnallocate(0, __poolId, 0x00, 0x00);
         vm.expectRevert(ZeroLiquidityError.selector);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(!success);
     }
 
@@ -741,7 +678,7 @@ contract TestHyperSingle is Test {
         uint48 failureArg = 42;
         bytes memory data = CPU.encodeUnallocate(0, 42, 0x01, 0x01);
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(!success);
     }
 
@@ -749,13 +686,13 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
         // Set the distance for the position by warping in time.
         uint256 distance = 22;
         uint256 warpTimestamp = block.timestamp + distance;
-        vm.warp(warpTimestamp);
+        customWarp(warpTimestamp);
 
         // Set the policy from 0 (default 0 in test contract).
         __contractBeingTested__.setJitPolicy(999999999999);
@@ -763,7 +700,7 @@ contract TestHyperSingle is Test {
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
 
         vm.expectRevert(abi.encodeWithSelector(JitLiquidity.selector, distance));
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
         assertTrue(!success, "Should not suceed in testUnllocatePositionJit");
     }
 
@@ -773,19 +710,19 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
         uint48 positionId = __poolId;
-        uint256 prevPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
+        uint256 prevPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
 
         uint256 warpTimestamp = block.timestamp + 1;
-        vm.warp(warpTimestamp);
+        customWarp(warpTimestamp);
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        uint256 nextPositionTimestamp = getPosition(address(forwarder), positionId).blockTimestamp;
+        uint256 nextPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
 
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
     }
@@ -796,16 +733,16 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
         uint48 positionId = __poolId;
-        uint256 prevPositionLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
+        uint256 prevPositionLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        uint256 nextPositionLiquidity = getPosition(address(forwarder), positionId).totalLiquidity;
+        uint256 nextPositionLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
 
         assertTrue(nextPositionLiquidity < prevPositionLiquidity);
     }
@@ -816,13 +753,13 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 prev = getReserve(address(asset));
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
         uint256 next = getReserve(address(asset));
         assertTrue(next < prev, "globalReserves did not change");
@@ -834,13 +771,13 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 prev = getReserve(address(quote));
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
         uint256 next = getReserve(address(quote));
         assertTrue(next < prev, "globalReserves did not change");
@@ -865,17 +802,17 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint48 positionId = __poolId;
 
-        bool prevPositionStaked = getPosition(address(forwarder), positionId).stakeEpochId != 0;
+        bool prevPositionStaked = getPosition(address(__revertCatcher__), positionId).stakeEpochId != 0;
 
         data = CPU.encodeStakePosition(positionId);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        bool nextPositionStaked = getPosition(address(forwarder), positionId).stakeEpochId != 0;
+        bool nextPositionStaked = getPosition(address(__revertCatcher__), positionId).stakeEpochId != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked, "Position staked is not true.");
@@ -887,21 +824,21 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
 
         uint48 positionId = __poolId;
         data = CPU.encodeStakePosition(positionId);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
         uint256 nextPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
 
         if (lo <= getPool(__poolId).lastTick && hi > getPool(__poolId).lastTick) {
             assertTrue(nextPoolStakedLiquidity > prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
             assertTrue(
-                nextPoolStakedLiquidity == getPosition(address(forwarder), positionId).totalLiquidity,
+                nextPoolStakedLiquidity == getPosition(address(__revertCatcher__), positionId).totalLiquidity,
                 "Pool staked liquidity not equal to liquidity of staked position."
             );
         } else {
@@ -951,25 +888,25 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x0f;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint48 positionId = __poolId;
         data = CPU.encodeStakePosition(positionId);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        vm.warp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
+        customWarp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x15, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        uint256 prevPositionStaked = getPosition(address(forwarder), positionId).unstakeEpochId;
+        uint256 prevPositionStaked = getPosition(address(__revertCatcher__), positionId).unstakeEpochId;
 
         data = CPU.encodeUnstakePosition(positionId);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        uint256 nextPositionStaked = getPosition(address(forwarder), positionId).unstakeEpochId;
+        uint256 nextPositionStaked = getPosition(address(__revertCatcher__), positionId).unstakeEpochId;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked != 0, "Position staked is true.");
@@ -984,35 +921,35 @@ contract TestHyperSingle is Test {
         uint8 amount = 0x01;
         uint8 power = 0x0f;
         bytes memory data = CPU.encodeAllocate(0, __poolId, power, amount);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
         uint48 positionId = __poolId;
         data = CPU.encodeStakePosition(positionId);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        vm.warp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
+        customWarp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x15, 0x01, 0);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
         uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
 
         data = CPU.encodeUnstakePosition(positionId);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
-        vm.warp((__contractBeingTested__.EPOCH_INTERVAL() + 1) * 2);
+        customWarp((__contractBeingTested__.EPOCH_INTERVAL() + 1) * 2);
 
         // TODO: FIX FAILING TEST
 
         // touch pool to update it so we know how much staked liquidity the position has
         // data = CPU.encodeSwap(0, __poolId, 0x01, 0x01, 0x15, 0x01, 0);
-        // success = forwarder.process(data);
-// 
+        // success = __revertCatcher__.process(data);
+        //
         // // todo: currently fails because unstaking does not change staked liquidity.
         // uint256 nextPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
-// 
+        //
         // if (lo <= getPool(__poolId).lastTick && hi > getPool(__poolId).lastTick) {
         //     assertTrue(nextPoolStakedLiquidity < prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
         //     assertTrue(nextPoolStakedLiquidity == 0, "Pool staked liquidity does not equal 0 after unstake.");
@@ -1041,14 +978,14 @@ contract TestHyperSingle is Test {
         address token = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(token, token);
         vm.expectRevert(SameTokenError.selector);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(!success, "forwarder call failed");
     }
 
     function testCreatePairPairExistsReverts() public {
         bytes memory data = CPU.encodeCreatePair(address(asset), address(quote));
         vm.expectRevert(abi.encodeWithSelector(PairExists.selector, 1));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreatePairLowerDecimalBoundsAssetReverts() public {
@@ -1056,7 +993,7 @@ contract TestHyperSingle is Test {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 5));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreatePairLowerDecimalBoundsQuoteReverts() public {
@@ -1064,7 +1001,7 @@ contract TestHyperSingle is Test {
         address token1 = address(new TestERC20("t", "t", 5));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 5));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreatePairUpperDecimalBoundsAssetReverts() public {
@@ -1072,7 +1009,7 @@ contract TestHyperSingle is Test {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 24));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreatePairUpperDecimalBoundsQuoteReverts() public {
@@ -1080,7 +1017,7 @@ contract TestHyperSingle is Test {
         address token1 = address(new TestERC20("t", "t", 24));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 24));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreatePairPairNonceIncrementedReturnsOneAdded() public {
@@ -1088,7 +1025,7 @@ contract TestHyperSingle is Test {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint256 nonce = __contractBeingTested__.getPairNonce();
         assertEq(nonce, prevNonce + 1);
     }
@@ -1098,7 +1035,7 @@ contract TestHyperSingle is Test {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint256 pairId = __contractBeingTested__.getPairId(token0, token1);
         assertTrue(pairId != 0);
     }
@@ -1108,7 +1045,7 @@ contract TestHyperSingle is Test {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint16 pairId = __contractBeingTested__.getPairId(token0, token1);
         Pair memory pair = getPair(pairId);
         assertEq(pair.tokenAsset, token0);
@@ -1129,7 +1066,7 @@ contract TestHyperSingle is Test {
             curve.strike
         );
         vm.expectRevert(abi.encodeWithSelector(CurveExists.selector, 1));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreateCurveFeeParameterOutsideBoundsReverts() public {
@@ -1143,7 +1080,7 @@ contract TestHyperSingle is Test {
             curve.strike
         );
         vm.expectRevert(abi.encodeWithSelector(FeeOOB.selector, failureArg));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreateCurvePriorityFeeParameterOutsideBoundsReverts() public {
@@ -1157,7 +1094,7 @@ contract TestHyperSingle is Test {
             curve.strike
         );
         vm.expectRevert(abi.encodeWithSelector(PriorityFeeOOB.selector, failureArg));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreateCurveExpiringPoolZeroSigmaReverts() public {
@@ -1171,7 +1108,7 @@ contract TestHyperSingle is Test {
             curve.strike
         );
         vm.expectRevert(abi.encodeWithSelector(MinSigma.selector, failureArg));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreateCurveExpiringPoolZeroStrikeReverts() public {
@@ -1185,7 +1122,7 @@ contract TestHyperSingle is Test {
             failureArg
         );
         vm.expectRevert(abi.encodeWithSelector(MinStrike.selector, failureArg));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreateCurveCurveNonceIncrementReturnsOne() public {
@@ -1198,7 +1135,7 @@ contract TestHyperSingle is Test {
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint256 nextNonce = __contractBeingTested__.getCurveNonce();
         assertEq(prevNonce, nextNonce - 1);
     }
@@ -1221,7 +1158,7 @@ contract TestHyperSingle is Test {
                 curve.strike
             )
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
         assertTrue(curveId != 0);
     }
@@ -1244,7 +1181,7 @@ contract TestHyperSingle is Test {
                 curve.strike
             )
         );
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
         Curve memory newCurve = getCurve(curveId);
         assertEq(newCurve.sigma, curve.sigma + 1);
@@ -1260,35 +1197,35 @@ contract TestHyperSingle is Test {
         uint128 failureArg = 0;
         bytes memory data = CPU.encodeCreatePool(1, failureArg);
         vm.expectRevert(ZeroPrice.selector);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreatePoolExistentPoolReverts() public {
         uint48 failureArg = __poolId;
         bytes memory data = CPU.encodeCreatePool(failureArg, 1);
         vm.expectRevert(PoolExists.selector);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
     }
 
     function testCreatePoolMagicPairId() public {
         // Create a new curve to increment the nonce to 2
         bytes memory data = CPU.encodeCreateCurve(4, type(uint32).max - 1, 4, 4, 4);
-        forwarder.process(data);
+        __revertCatcher__.process(data);
 
         uint48 magicVariable = 0x000000000002;
         data = CPU.encodeCreatePool(magicVariable, 1);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
     }
 
     function testCreatePoolMagicCurveId() public {
         // Create a new pair to increment the nonce to 2
         bytes memory data = CPU.encodeCreatePair(address(quote), address(__weth__));
-        forwarder.process(data);
+        __revertCatcher__.process(data);
 
         uint48 magicVariable = 0x000200000000;
         data = CPU.encodeCreatePool(magicVariable, 1);
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         assertTrue(success);
     }
 
@@ -1296,7 +1233,7 @@ contract TestHyperSingle is Test {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint16 pairId = __contractBeingTested__.getPairId(token0, token1);
 
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
@@ -1310,20 +1247,20 @@ contract TestHyperSingle is Test {
         bytes32 rawCurveId = CPU.toBytes32(
             abi.encodePacked(curve.sigma + 1, uint32(0), uint16(1e4 - curve.gamma), curve.strike)
         );
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
         uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
         uint48 id = CPU.encodePoolId(pairId, curveId);
         data = CPU.encodeCreatePool(id, 1_000);
         vm.expectRevert(PoolExpiredError.selector);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
     }
 
     function testCreatePoolFetchesPoolDataReturnsNonZeroBlockTimestamp() public {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        bool success = forwarder.process(data);
+        bool success = __revertCatcher__.process(data);
         uint16 pairId = __contractBeingTested__.getPairId(token0, token1);
 
         Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
@@ -1343,12 +1280,12 @@ contract TestHyperSingle is Test {
                 curve.strike
             )
         );
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
         uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
         uint48 id = CPU.encodePoolId(pairId, curveId);
         data = CPU.encodeCreatePool(id, 1_000);
-        success = forwarder.process(data);
+        success = __revertCatcher__.process(data);
 
         uint256 time = getPool(id).blockTimestamp;
         assertTrue(time != 0);

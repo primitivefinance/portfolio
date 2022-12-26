@@ -3,12 +3,13 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import {WETH} from "solmate/tokens/WETH.sol";
+import "contracts/EnigmaTypes.sol";
 import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher} from "./HyperTestOverrides.sol";
 
 uint constant STARTING_BALANCE = 4000e18;
 
 /** @dev Deploys test contracts, test tokens, sets labels, funds users, and approves contracts to spend tokens. */
-contract Setup is Test {
+contract TestHyperSetup is Test {
     WETH public __weth__;
     Hyper public __hyper__;
     HyperTimeOverride public __hyperTimeOverride__;
@@ -64,6 +65,7 @@ contract Setup is Test {
         address self = address(this);
         address alicent = address(0x0001);
         address boba = address(0x0002);
+        address revertCatcher = address(__revertCatcher__);
 
         vm.label(self, "Self");
         vm.label(alicent, "Alicent");
@@ -72,6 +74,7 @@ contract Setup is Test {
         __users__.push(self);
         __users__.push(alicent);
         __users__.push(boba);
+        __users__.push(revertCatcher);
 
         fundUsers();
     }
@@ -91,11 +94,14 @@ contract Setup is Test {
     /** @dev Does not include weth. */
     function fundUsers() internal {
         for (uint i; i != __users__.length; ++i) {
-            deal(address(__usdc__), __users__[i], STARTING_BALANCE); // TODO: Use regular ERC20, since we can deal.
+            for (uint j; j != __tokens__.length; ++j) {
+                deal(__tokens__[j], __users__[i], STARTING_BALANCE); // TODO: Use regular ERC20, since we can deal.
+            }
         }
     }
 
     function setLabels() internal {
+        vm.label(address(this), "Self");
         vm.label(address(__weth__), "Weth");
         vm.label(address(__revertCatcher__), "RevertCatcher");
         vm.label(address(__hyper__), "DefaultHyper");
@@ -105,5 +111,10 @@ contract Setup is Test {
         vm.label(address(__token_8__), "Token8Decimals");
         vm.label(address(__token_18__), "Token18Decimals");
         vm.label(address(__badToken__), "BadToken");
+    }
+
+    function customWarp(uint time) internal {
+        vm.warp(time);
+        __hyperCatchReverts__.setTimestamp(uint128(time));
     }
 }

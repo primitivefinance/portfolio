@@ -10,6 +10,7 @@
     "build:forge:crytic": "FOUNDRY_PROFILE=crytic forge build",
     "clean": "hardhat clean && forge clean && rm -f crytic-export/*",
     "coverage": "FOUNDRY_PROFILE=test forge coverage",
+    "coverage:report": "FOUNDRY_PROFILE=test forge coverage --report lcov",
     "coverage:hardhat": "hardhat coverage --config ./hardhat-coverage.config.ts --solcoverjs ./config/.solcover.js",
     "test": "FOUNDRY_PROFILE=test forge test -vvv",
     "test:hardhat": "TS_NODE_TRANSPILE_ONLY=1 hardhat test --config ./hardhat.config.ts",

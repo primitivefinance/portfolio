@@ -20,12 +20,16 @@ contract HyperTimeOverride is Hyper {
     uint public timestamp;
     uint public jitDelay;
 
-    function setJitDelay(uint delay) public {
+    function setJitPolicy(uint delay) public {
         jitDelay = delay;
     }
 
     function setTimestamp(uint128 time) public {
         timestamp = time;
+    }
+
+    function getAmounts(uint48 poolId) public view returns (uint, uint) {
+        return _getAmounts(poolId);
     }
 }
 
