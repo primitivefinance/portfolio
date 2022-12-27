@@ -14,7 +14,7 @@ contract HelperHyperActions {
         uint16 priorityFee,
         uint128 strike,
         uint128 price
-    ) internal view returns (bytes memory data) {
+    ) internal pure returns (bytes memory data) {
         bytes[] memory instructions = new bytes[](3);
         uint48 magicPoolId = 0x000000000000;
         instructions[0] = (CPU.encodeCreatePair(token0, token1));

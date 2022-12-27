@@ -16,5 +16,6 @@ contract Basic {
 
     function const_jit() public returns (bool) {
         assert(h.JUST_IN_TIME_LIQUIDITY_POLICY() == 3);
+        h = h;
     }
 }
