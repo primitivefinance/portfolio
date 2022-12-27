@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperUnallocate is TestHyperSetup {
-    function testUnallocateUseMax() public checkSettlementInvariant {
+    function testUnallocateUseMax() public postTestInvariantChecks {
         uint maxLiquidity = getPosition(address(__hyperTestingContract__), msg.sender, defaultScenario.poolId)
             .totalLiquidity;
 

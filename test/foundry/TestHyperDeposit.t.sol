@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperDeposit is TestHyperSetup {
-    function testDepositWrapsEther() public checkSettlementInvariant {
+    function testDepositWrapsEther() public postTestInvariantChecks {
         uint prevWethBalance = __weth__.balanceOf(address(__hyperTestingContract__));
         uint prevBalance = address(this).balance;
         __hyperTestingContract__.deposit{value: 4000}();

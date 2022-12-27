@@ -282,9 +282,8 @@ contract Hyper is IHyper {
             deltaQuote,
             pair.tokenAsset,
             pair.tokenQuote,
-            int128(deltaLiquidity)
+            int128(deltaLiquidity) // TODO: add better type safety for these conversions.
         );
-
         _changeLiquidity(args);
 
         emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);

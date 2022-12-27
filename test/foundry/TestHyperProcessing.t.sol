@@ -83,7 +83,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(!success);
     }
 
-    function testSwapExactInPoolPriceUpdated() public checkSettlementInvariant {
+    function testSwapExactInPoolPriceUpdated() public postTestInvariantChecks {
         // Add liquidity first
         bytes memory data = CPU.encodeAllocate(
             0,
@@ -131,7 +131,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next != prev);
     } */
 
-    function testSwapUseMax() public checkSettlementInvariant {
+    function testSwapUseMax() public postTestInvariantChecks {
         uint amount = type(uint256).max;
         uint limit = amount;
         // Add liquidity first
@@ -154,7 +154,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next == prev);
     }
 
-    function testSwapInQuote() public checkSettlementInvariant {
+    function testSwapInQuote() public postTestInvariantChecks {
         uint limit = type(uint256).max;
         uint amount = 2222;
         // Add liquidity first
@@ -222,7 +222,7 @@ contract TestHyperProcessing is TestHyperSetup {
         __hyperTestingContract__.swap(defaultScenario.poolId, false, amount, limit);
     }
 
-    function testSwapExactInPoolLiquidityUnchanged() public checkSettlementInvariant {
+    function testSwapExactInPoolLiquidityUnchanged() public postTestInvariantChecks {
         // Add liquidity first
         bytes memory data = CPU.encodeAllocate(
             0,
@@ -245,7 +245,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next == prev);
     }
 
-    function testSwapExactInPoolTimestampUpdated() public checkSettlementInvariant {
+    function testSwapExactInPoolTimestampUpdated() public postTestInvariantChecks {
         // Add liquidity first
         bytes memory data = CPU.encodeAllocate(
             0,
@@ -269,7 +269,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next != prev);
     }
 
-    function testSwapExactInGlobalAssetBalanceIncreases() public checkSettlementInvariant {
+    function testSwapExactInGlobalAssetBalanceIncreases() public postTestInvariantChecks {
         // Add liquidity first
         bytes memory data = CPU.encodeAllocate(
             0,
@@ -293,7 +293,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next > prev);
     }
 
-    function testSwapExactInGlobalQuoteBalanceDecreases() public checkSettlementInvariant {
+    function testSwapExactInGlobalQuoteBalanceDecreases() public postTestInvariantChecks {
         // Add liquidity first
         bytes memory data = CPU.encodeAllocate(
             0,
@@ -335,7 +335,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(!success, "forwarder call failed");
     }
 
-    function testProcessAllocateFull() public checkSettlementInvariant {
+    function testProcessAllocateFull() public postTestInvariantChecks {
         uint256 price = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastPrice;
         Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
         uint256 theoreticalR2 = Price.computeR2WithPrice(
@@ -358,7 +358,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
-    function testAllocatePositionTimestampUpdated() public checkSettlementInvariant {
+    function testAllocatePositionTimestampUpdated() public postTestInvariantChecks {
         uint48 positionId = defaultScenario.poolId;
 
         uint256 prevPositionTimestamp = getPosition(
@@ -383,7 +383,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
     }
 
-    function testAllocatePositionTotalLiquidityIncreases() public checkSettlementInvariant {
+    function testAllocatePositionTotalLiquidityIncreases() public postTestInvariantChecks {
         uint48 positionId = defaultScenario.poolId;
 
         uint256 prevPositionTotalLiquidity = getPosition(
@@ -408,7 +408,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextPositionTotalLiquidity > prevPositionTotalLiquidity);
     }
 
-    function testAllocateGlobalAssetIncreases() public checkSettlementInvariant {
+    function testAllocateGlobalAssetIncreases() public postTestInvariantChecks {
         uint256 prevGlobal = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
 
         uint8 amount = 0x01;
@@ -422,7 +422,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextGlobal > prevGlobal, "globalReserves did not change");
     }
 
-    function testAllocateGlobalQuoteIncreases() public checkSettlementInvariant {
+    function testAllocateGlobalQuoteIncreases() public postTestInvariantChecks {
         uint256 prevGlobal = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
 
         uint8 amount = 0x01;
@@ -453,7 +453,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(!success);
     }
 
-    function testUnallocatePositionJitPolicyReverts() public checkSettlementInvariant {
+    function testUnallocatePositionJitPolicyReverts() public postTestInvariantChecks {
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = CPU.encodeAllocate(0, defaultScenario.poolId, power, amount);
@@ -475,7 +475,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(!success, "Should not suceed in testUnllocatePositionJit");
     }
 
-    function testUnallocatePositionTimestampUpdated() public checkSettlementInvariant {
+    function testUnallocatePositionTimestampUpdated() public postTestInvariantChecks {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
@@ -506,7 +506,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
     }
 
-    function testUnallocatePositionTotalLiquidityDecreases() public checkSettlementInvariant {
+    function testUnallocatePositionTotalLiquidityDecreases() public postTestInvariantChecks {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
@@ -534,7 +534,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextPositionLiquidity < prevPositionLiquidity);
     }
 
-    function testUnallocateGlobalAssetDecreases() public checkSettlementInvariant {
+    function testUnallocateGlobalAssetDecreases() public postTestInvariantChecks {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -552,7 +552,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next < prev, "globalReserves did not change");
     }
 
-    function testUnallocateGlobalQuoteDecreases() public checkSettlementInvariant {
+    function testUnallocateGlobalQuoteDecreases() public postTestInvariantChecks {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -585,7 +585,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextId != prevId);
     }
 
-    function testStakePositionStakedUpdated() public checkSettlementInvariant {
+    function testStakePositionStakedUpdated() public postTestInvariantChecks {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -609,7 +609,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextPositionStaked, "Position staked is not true.");
     }
 
-    function testStakePoolStakedLiquidityUpdated() public checkSettlementInvariant {
+    function testStakePoolStakedLiquidityUpdated() public postTestInvariantChecks {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
@@ -682,7 +682,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextId != prevId);
     }
 
-    function testUnstakePositionStakedUpdated() public checkSettlementInvariant {
+    function testUnstakePositionStakedUpdated() public postTestInvariantChecks {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK + 256; // fails if not above current tick
         uint8 amount = 0x01;
@@ -723,7 +723,7 @@ contract TestHyperProcessing is TestHyperSetup {
     // note: some unintended side effects most likely from update/sync pool messing with price
     // it creates a discrepency in the contract where the contract holds more tokens than the sum
     // of all claims is entitled to.
-    function testUnstakePoolStakedLiquidityUpdated() public checkSettlementInvariant {
+    function testUnstakePoolStakedLiquidityUpdated() public postTestInvariantChecks {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK + 256; // note: fails if pool.lastTick <= hi
         uint8 amount = 0x01;

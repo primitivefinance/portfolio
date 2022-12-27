@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperDraw is TestHyperSetup {
-    function testDrawReducesBalance() public checkSettlementInvariant {
+    function testDrawReducesBalance() public postTestInvariantChecks {
         // First fund the account
         __hyperTestingContract__.fund(address(defaultScenario.asset), 4000);
 
@@ -22,7 +22,7 @@ contract TestHyperDraw is TestHyperSetup {
         __hyperTestingContract__.draw(address(defaultScenario.asset), 1e18, address(this));
     }
 
-    function testDrawFromWethTransfersEther() public checkSettlementInvariant {
+    function testDrawFromWethTransfersEther() public postTestInvariantChecks {
         // First fund the account
         __hyperTestingContract__.deposit{value: 4000}();
 

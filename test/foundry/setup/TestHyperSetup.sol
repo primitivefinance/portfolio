@@ -9,6 +9,7 @@ import "forge-std/Test.sol";
 import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher, FixedPointMathLib} from "./HyperTestOverrides.sol";
 
 import "../helpers/HelperHyperActions.sol";
+import "../helpers/HelperHyperInvariants.sol";
 import "../helpers/HelperHyperProfiles.sol";
 import "../helpers/HelperHyperView.sol";
 
@@ -22,7 +23,7 @@ struct TestScenario {
 }
 
 /** @dev Deploys test contracts, test tokens, sets labels, funds users, and approves contracts to spend tokens. */
-contract TestHyperSetup is HelperHyperActions, HelperHyperProfiles, HelperHyperView, Test {
+contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHyperProfiles, HelperHyperView, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
@@ -44,8 +45,10 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperProfiles, HelperHyperV
     TestScenario public defaultScenario;
     TestScenario[] public scenarios;
 
-    modifier checkSettlementInvariant() {
+    modifier postTestInvariantChecks() virtual {
         _;
+        assertSettlementInvariant(address(__hyperTestingContract__), address(defaultScenario.asset), __users__);
+        assertSettlementInvariant(address(__hyperTestingContract__), address(defaultScenario.asset), __users__);
     }
 
     function setUp() public {

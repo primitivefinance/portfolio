@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "contracts/Hyper.sol";
+import "contracts/EnigmaTypes.sol";
 import "contracts/test/TestERC20.sol";
 
 contract HyperTimeOverride is Hyper {
