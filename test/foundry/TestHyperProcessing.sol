@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "./setup/TestPriceSetup.sol";
 import "./setup/TestHyperSetup.sol";
-
-import {Curve, Pair, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
 
 contract TestHyperProcessing is TestHyperSetup {
     modifier checkSettlementInvariant() {

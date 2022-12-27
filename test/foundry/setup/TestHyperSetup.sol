@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "forge-std/Test.sol";
-import {WETH} from "solmate/tokens/WETH.sol";
+import "solmate/tokens/WETH.sol";
 import "contracts/EnigmaTypes.sol";
+import "contracts/libraries/Price.sol";
+
+import "forge-std/Test.sol";
 import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher, FixedPointMathLib} from "./HyperTestOverrides.sol";
 
 import "../helpers/HelperHyperActions.sol";
+import "../helpers/HelperHyperProfiles.sol";
 import "../helpers/HelperHyperView.sol";
 
 uint constant STARTING_BALANCE = 4000e18;
 
 /** @dev Deploys test contracts, test tokens, sets labels, funds users, and approves contracts to spend tokens. */
-contract TestHyperSetup is HelperHyperActions, HelperHyperView, Test {
+contract TestHyperSetup is HelperHyperActions, HelperHyperProfiles, HelperHyperView, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
@@ -34,7 +37,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperView, Test {
     function setUp() public {
         initContracts();
         initUsers();
-        approveTokens();
+        runPrerequisites();
 
         afterSetUp();
     }
@@ -90,6 +93,12 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperView, Test {
         __users__.push(revertCatcher);
 
         fundUsers();
+    }
+
+    /** @dev Requires tokens to be spent and spenders to be approved. */
+    function runPrerequisites() internal {
+        fundUsers();
+        approveTokens();
     }
 
     /** @dev Does not include weth. */
