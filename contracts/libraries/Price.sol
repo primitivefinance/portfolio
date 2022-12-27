@@ -4,9 +4,9 @@ pragma solidity 0.8.13;
 import "./Invariant.sol";
 
 /**
- * @dev Comprehensive library to compute all related functions used with swaps.
+ * @dev Comprehensive library to compute reserves, prices, and changes in reserves over time.
  */
-library HyperSwapLib {
+library Price {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
@@ -17,7 +17,7 @@ library HyperSwapLib {
     uint256 internal constant UNIT_YEAR = 31556953;
     uint256 internal constant UNIT_PERCENT = 1e4;
 
-    /// @dev Thrown if value is greater than 1e18.
+    /** @dev Thrown if value is greater than 1e18.  */
     error AboveWAD(int256 cdf);
 
     /**
@@ -29,22 +29,14 @@ library HyperSwapLib {
         uint256 tau;
     }
 
-    // --- Class Methods --- //
+    // ===== Class Methods ===== //
 
     function invariant(Expiring memory args, uint R1, uint R2) internal pure returns (int256) {
         return Invariant.invariant(R1, R2, args.strike, convertPercentageToWad(args.sigma), args.tau);
     }
 
-    function computeR1WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R1) {
-        R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
-    }
-
     function computeR2WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
-    }
-
-    function computePriceWithR1(Expiring memory args, uint256 R1) internal pure returns (uint256 price) {
-        price = computePriceWithR1(R1, args.strike, args.sigma, args.tau);
     }
 
     function computePriceWithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 price) {
@@ -72,19 +64,13 @@ library HyperSwapLib {
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, 0);
     }
 
-    function computeReservesWithTick(
-        Expiring memory args,
-        int24 tick
-    ) internal pure returns (uint256 price, uint256 R1, uint256 R2) {
-        price = computePriceWithTick(tick);
-        R1 = computeR1WithPrice(price, args.strike, args.sigma, args.tau);
-        R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
-    }
-
-    // --- Raw Functions --- //
+    // ===== Raw Functions ===== //
 
     /**
-     * P(τ - ε) = ( P(τ)^(√(1 - ε/τ)) / K^2 )e^((1/2)(t^2)(√(τ)√(τ- ε) - (τ - ε)))
+     * @dev Computes change in price given a change in time in seconds.
+     *
+     * @custom:reverts If epsilon is greater than tau.
+     * @custom:math P(τ - ε) = ( P(τ)^(√(1 - ε/τ)) / K^2 )e^((1/2)(t^2)(√(τ)√(τ- ε) - (τ - ε)))
      */
     function computePriceWithChangeInTau(
         uint256 stk,
@@ -134,9 +120,9 @@ library HyperSwapLib {
     }
 
     /**
-     * @notice Computes the R1 reserve given the R2 reserve and a price.
+     * @notice Computes the R1 reserve given the R2 reserve.
      *
-     * @custom:math R1 / price(hiSlotIndex) = tradingFunction(...)
+     * @custom:math R1 = tradingFunction(R2, ...)
      */
     function computeR1WithR2(
         uint256 R2,
@@ -145,13 +131,13 @@ library HyperSwapLib {
         uint256 tau,
         int256 inv
     ) internal pure returns (uint256 R1) {
-        R1 = Invariant.getY(R2, strike, convertPercentageToWad(sigma), tau, inv); // todo: use price for concentrated curve
+        R1 = Invariant.getY(R2, strike, convertPercentageToWad(sigma), tau, inv);
     }
 
     /**
-     * @notice Computes the R1 reserve given the R2 reserve and a price.
+     * @notice Computes the R1 reserve given the R2 reserve.
      *
-     * @custom:math R1 / price(hiSlotIndex) = tradingFunction(...)
+     * @custom:math R2 = tradingFunction(R1, ...)
      */
     function computeR2WithR1(
         uint256 R1,
@@ -160,33 +146,12 @@ library HyperSwapLib {
         uint256 tau,
         int256 inv
     ) internal pure returns (uint256 R2) {
-        R2 = Invariant.getX(R1, strike, convertPercentageToWad(sigma), tau, inv) + 1; // todo: use price for concentrated curve
+        R2 = Invariant.getX(R1, strike, convertPercentageToWad(sigma), tau, inv);
     }
 
     /**
-     * @custom:math R1 = KΦ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
-     */
-    function computeR1WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 R1) {
-        // todo: handle price when above strike.
-        /* if (prc != 0) {
-            int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
-            uint256 tauYears = convertSecondsToWadYears(tau);
-
-            uint256 sigmaWad = convertPercentageToWad(vol);
-            uint256 doubleSigma = (sigmaWad * sigmaWad) / uint256(Gaussian.TWO);
-            uint256 halfSigmaTau = doubleSigma * tauYears; // todo: verify, might be Wad^2 ?
-            uint256 sqrtTauSigma = (tauYears.sqrt() * 1e9).mulWadDown(sigmaWad);
-
-            int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
-            int256 cdf = Gaussian.cdf(lnOverVol);
-            if (cdf > Gaussian.ONE) revert AboveWAD(cdf);
-            R1 = stk.mulWadDown(uint256(cdf));
-        } */
-        uint R2 = computeR2WithPrice(prc, stk, vol, tau);
-        R1 = Invariant.getY(R2, stk, convertPercentageToWad(vol), tau, 0);
-    }
-
-    /**
+     * @dev Used in `getAmounts` to compute the virtual amount of assets at the pool's price.
+     *
      * @custom:math R2 = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
     function computeR2WithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 R2) {
@@ -208,16 +173,8 @@ library HyperSwapLib {
     }
 
     /**
-     * @custom:math
-     */
-    function computePriceWithR1(
-        uint256 R1,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau
-    ) internal pure returns (uint256 prc) {}
-
-    /**
+     * @dev Used in swaps to compute the next price based on the reserves being added to.
+     *
      * @custom:math price(R2) = Ke^(Φ^-1(1 - R2)σ√τ - 1/2σ^2τ)
      */
     function computePriceWithR2(uint256 R2, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 prc) {
@@ -237,7 +194,7 @@ library HyperSwapLib {
         prc = uint256(exp).mulWadDown(stk);
     }
 
-    // --- Tick Math --- //
+    // ===== Tick Math ===== //
 
     /**
      * @dev Computes a price value from a tick key.
@@ -266,7 +223,7 @@ library HyperSwapLib {
         tick = int24(int256((numerator)) / int256(denominator) + 1);
     }
 
-    // --- Utils --- //
+    // ===== Utils ===== //
 
     /**
      * @notice Changes seconds into WAD units then divides by the amount of seconds in a year.

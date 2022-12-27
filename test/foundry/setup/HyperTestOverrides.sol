@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "contracts/Hyper.sol";
+import "contracts/EnigmaTypes.sol";
 import "contracts/test/TestERC20.sol";
 
 contract HyperTimeOverride is Hyper {
@@ -20,12 +21,16 @@ contract HyperTimeOverride is Hyper {
     uint public timestamp;
     uint public jitDelay;
 
-    function setJitDelay(uint delay) public {
+    function setJitPolicy(uint delay) public {
         jitDelay = delay;
     }
 
     function setTimestamp(uint128 time) public {
         timestamp = time;
+    }
+
+    function getAmounts(uint48 poolId) public view returns (uint, uint) {
+        return _getAmounts(poolId);
     }
 }
 
@@ -44,6 +49,12 @@ contract HyperCatchReverts is HyperTimeOverride {
     function process(bytes calldata data) external payable lock interactions {
         super._process(data);
     }
+
+    /** @dev Solidity does not support error catching with the fallback function, so we use this external function. */
+    function mockFallback(bytes calldata data) external payable lock interactions {
+        if (data[0] != CPU.INSTRUCTION_JUMP) super._process(data);
+        else CPU._jumpProcess(data, super._process);
+    }
 }
 
 contract RevertCatcher {
@@ -57,6 +68,15 @@ contract RevertCatcher {
 
     function approve(address token, address spender) external {
         TestERC20(token).approve(spender, type(uint256).max);
+    }
+
+    function mockFallback(bytes calldata data) external payable returns (bool) {
+        try hyper.mockFallback{value: msg.value}(data) {} catch (bytes memory reason) {
+            assembly {
+                revert(add(32, reason), mload(reason))
+            }
+        }
+        return true;
     }
 
     /** @dev Assumes Hyper calls this, for testing only. Uses try catch to bubble up errors. */

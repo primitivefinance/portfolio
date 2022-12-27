@@ -30,7 +30,7 @@ import "./EnigmaTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
-import "./libraries/HyperSwapLib.sol";
+import "./libraries/Price.sol";
 
 /**
  * @title   Enigma Virtual Machine.
@@ -40,7 +40,7 @@ import "./libraries/HyperSwapLib.sol";
 contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
-    using HyperSwapLib for HyperSwapLib.Expiring;
+    using Price for Price.Expiring;
 
     // ===== Account ===== //
     AccountSystem public __account__;
@@ -215,6 +215,7 @@ contract Hyper is IHyper {
     function draw(address token, uint256 amount, address to) external lock interactions {
         if (__account__.balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
         _applyDebit(token, amount);
+        _decreaseReserves(token, amount);
 
         if (token == WETH) __dangerousUnwrapEther__(WETH, to, amount);
         else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
@@ -222,11 +223,14 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function fund(address token, uint256 amount) external override lock interactions {
+        _applyCredit(token, amount);
         __account__.dangerousFund(token, address(this), amount); // Pulls tokens, settlement credits msg.sender.
     }
 
     /// @inheritdoc IHyperActions
     function deposit() external payable override lock interactions {
+        _applyCredit(WETH, msg.value);
+        _increaseReserves(WETH, msg.value);
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -282,9 +286,8 @@ contract Hyper is IHyper {
             deltaQuote,
             pair.tokenAsset,
             pair.tokenQuote,
-            int128(deltaLiquidity)
+            int128(deltaLiquidity) // TODO: add better type safety for these conversions.
         );
-
         _changeLiquidity(args);
 
         emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
@@ -443,10 +446,10 @@ contract Hyper is IHyper {
             uint256 tau;
             uint256 elapsed = timestamp - pool.blockTimestamp;
             if (curve.maturity > pool.blockTimestamp) tau = curve.maturity - pool.blockTimestamp; // Keeps tau at zero if pool expired.
-            HyperSwapLib.Expiring memory expiring = HyperSwapLib.Expiring(curve.strike, curve.sigma, tau);
+            Price.Expiring memory expiring = Price.Expiring(curve.strike, curve.sigma, tau);
 
             price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsed);
-            tick = HyperSwapLib.computeTickWithPrice(price);
+            tick = Price.computeTickWithPrice(price);
 
             _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
         }
@@ -494,11 +497,11 @@ contract Hyper is IHyper {
             });
         }
 
-        HyperSwapLib.Expiring memory expiring;
+        Price.Expiring memory expiring;
         {
             Curve memory curve = curves[uint32(args.poolId)];
             if (_blockTimestamp() > curve.maturity) revert PoolExpiredError(); // todo: add buffer
-            expiring = HyperSwapLib.Expiring({
+            expiring = Price.Expiring({
                 strike: curve.strike,
                 sigma: curve.sigma,
                 tau: curve.maturity - _blockTimestamp()
@@ -579,7 +582,7 @@ contract Hyper is IHyper {
         // Apply pool effects.
         _syncPool(
             args.poolId,
-            HyperSwapLib.computeTickWithPrice(_swap.price),
+            Price.computeTickWithPrice(_swap.price),
             _swap.price,
             _swap.liquidity,
             state.sell ? state.feeGrowthGlobal : 0,
@@ -667,7 +670,7 @@ contract Hyper is IHyper {
 
         epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
         pools[poolId].lastPrice = price;
-        pools[poolId].lastTick = HyperSwapLib.computeTickWithPrice(price);
+        pools[poolId].lastTick = Price.computeTickWithPrice(price);
         pools[poolId].blockTimestamp = timestamp;
 
         emit CreatePool(poolId, pairId, curveId, price);
@@ -701,8 +704,8 @@ contract Hyper is IHyper {
             curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
         }
 
-        uint32 gamma = uint32(HyperSwapLib.UNIT_PERCENT - fee); // gamma = 100% - fee %.
-        uint32 priorityGamma = uint32(HyperSwapLib.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
+        uint32 gamma = uint32(Price.UNIT_PERCENT - fee); // gamma = 100% - fee %.
+        uint32 priorityGamma = uint32(Price.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
 
         getCurveId[rawCurveId] = curveId; // Reverse lookup
         curves[curveId] = Curve({
@@ -766,7 +769,7 @@ contract Hyper is IHyper {
      * @custom:reverts With `InsufficientBalance` if current reserve balance for `token` iss less than `amount`.
      */
     function _decreaseReserves(address token, uint256 amount) internal {
-        __account__.withdraw(token, amount);
+        __account__.decrease(token, amount);
         emit DecreaseReserveBalance(token, amount);
     }
 
@@ -873,7 +876,7 @@ contract Hyper is IHyper {
 
         Curve memory curve = curves[uint32(poolId)];
         HyperPool storage pool = pools[poolId];
-        HyperSwapLib.Expiring memory info = HyperSwapLib.Expiring({
+        Price.Expiring memory info = Price.Expiring({
             strike: curve.strike,
             sigma: curve.sigma,
             tau: curve.maturity - timestamp

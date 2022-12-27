@@ -39,7 +39,7 @@ describe('HyperPrototype', function () {
       async (signer) => await hre.ethers.getContractFactory('TestHyperTime', signer),
       async (signer) => await hre.ethers.getContractFactory('HyperForwarderHelper', signer)
     )
-    weth = await (await hre.ethers.getContractFactory('WETH9', signers[0])).deploy()
+    weth = await (await hre.ethers.getContractFactory('WETH', signers[0])).deploy()
   })
 
   // Global context for every test.
