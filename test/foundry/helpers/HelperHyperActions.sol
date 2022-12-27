@@ -14,12 +14,23 @@ contract HelperHyperActions {
         uint16 priorityFee,
         uint128 strike,
         uint128 price
-    ) public view returns (bytes memory data) {
+    ) internal view returns (bytes memory data) {
         bytes[] memory instructions = new bytes[](3);
         uint48 magicPoolId = 0x000000000000;
         instructions[0] = (CPU.encodeCreatePair(token0, token1));
         instructions[1] = (CPU.encodeCreateCurve(sigma, maturity, fee, priorityFee, strike));
         instructions[2] = (CPU.encodeCreatePool(magicPoolId, price));
         data = CPU.encodeJumpInstruction(instructions);
+    }
+
+    function allocatePool(address hyper, uint48 poolId, uint amount) internal {
+        bytes memory data = CPU.encodeAllocate(
+            0, // useMax = false
+            poolId,
+            0x0, // amount multiplier = 10^0 = 1
+            uint128(amount)
+        );
+        (bool success, ) = hyper.call{value: 0}(data);
+        require(success, "failed to allocate");
     }
 }

@@ -14,6 +14,13 @@ import "../helpers/HelperHyperView.sol";
 
 uint constant STARTING_BALANCE = 4000e18;
 
+struct TestScenario {
+    TestERC20 asset;
+    TestERC20 quote;
+    uint48 poolId;
+    string label;
+}
+
 /** @dev Deploys test contracts, test tokens, sets labels, funds users, and approves contracts to spend tokens. */
 contract TestHyperSetup is HelperHyperActions, HelperHyperProfiles, HelperHyperView, Test {
     using FixedPointMathLib for uint256;
@@ -34,11 +41,18 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperProfiles, HelperHyperV
     address[] public __users__;
     address[] public __tokens__;
 
+    TestScenario public defaultScenario;
+    TestScenario[] public scenarios;
+
+    modifier checkSettlementInvariant() {
+        _;
+    }
+
     function setUp() public {
         initContracts();
         initUsers();
-        runPrerequisites();
-
+        initScenarios();
+        initPrerequisites();
         afterSetUp();
     }
 
@@ -91,12 +105,32 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperProfiles, HelperHyperV
         __users__.push(alicent);
         __users__.push(boba);
         __users__.push(revertCatcher);
+    }
 
-        fundUsers();
+    function initScenarios() internal {
+        __hyperTestingContract__.setTimestamp(uint128(block.timestamp)); // Important
+        // Create default pool
+        bytes memory data = createPool(
+            address(__token_18__),
+            address(__usdc__),
+            DEFAULT_SIGMA,
+            uint32(block.timestamp) + DEFAULT_MATURITY,
+            uint16(1e4 - DEFAULT_GAMMA),
+            uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
+            DEFAULT_STRIKE,
+            DEFAULT_PRICE
+        );
+
+        bool success = __revertCatcher__.jumpProcess(data);
+        assertTrue(success, "__revertCatcher__ call failed");
+
+        // Create default scenario and add to all scenarios.
+        defaultScenario = TestScenario(__token_18__, __usdc__, 0x000100000001, "Default");
+        scenarios.push(defaultScenario);
     }
 
     /** @dev Requires tokens to be spent and spenders to be approved. */
-    function runPrerequisites() internal {
+    function initPrerequisites() internal {
         fundUsers();
         approveTokens();
     }
