@@ -215,6 +215,7 @@ contract Hyper is IHyper {
     function draw(address token, uint256 amount, address to) external lock interactions {
         if (__account__.balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
         _applyDebit(token, amount);
+        _decreaseReserves(token, amount);
 
         if (token == WETH) __dangerousUnwrapEther__(WETH, to, amount);
         else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
@@ -222,11 +223,14 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function fund(address token, uint256 amount) external override lock interactions {
+        _applyCredit(token, amount);
         __account__.dangerousFund(token, address(this), amount); // Pulls tokens, settlement credits msg.sender.
     }
 
     /// @inheritdoc IHyperActions
     function deposit() external payable override lock interactions {
+        _applyCredit(WETH, msg.value);
+        _increaseReserves(WETH, msg.value);
         emit Deposit(msg.sender, msg.value);
     }
 
@@ -765,7 +769,7 @@ contract Hyper is IHyper {
      * @custom:reverts With `InsufficientBalance` if current reserve balance for `token` iss less than `amount`.
      */
     function _decreaseReserves(address token, uint256 amount) internal {
-        __account__.withdraw(token, amount);
+        __account__.decrease(token, amount);
         emit DecreaseReserveBalance(token, amount);
     }
 

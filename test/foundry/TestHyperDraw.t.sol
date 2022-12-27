@@ -5,16 +5,19 @@ import "./setup/TestHyperSetup.sol";
 
 contract TestHyperDraw is TestHyperSetup {
     function testDrawReducesBalance() public postTestInvariantChecks {
-        // First fund the account
+        // Fund the account
         __hyperTestingContract__.fund(address(defaultScenario.asset), 4000);
 
         // Draw
+        uint prevReserve = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
         uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
         __hyperTestingContract__.draw(address(defaultScenario.asset), 4000, address(this));
         uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint nextReserve = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
 
         assertTrue(nextBalance == 0);
         assertTrue(nextBalance < prevBalance);
+        assertTrue(nextReserve < prevReserve);
     }
 
     function testDrawRevertsWithDrawBalance() public {

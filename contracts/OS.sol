@@ -10,9 +10,10 @@ import {BalanceError, EtherTransferFail} from "./EnigmaTypes.sol";
 using {
     __wrapEther__,
     dangerousFund,
+    dangerousDraw,
     cache,
     increase,
-    withdraw,
+    decrease,
     credit,
     debit,
     prepare,
@@ -70,8 +71,14 @@ function __dangerousTransferFrom__(address token, address to, uint amount) {
 }
 
 function dangerousFund(AccountSystem storage self, address token, address to, uint amount) {
-    self.touch(token);
+    self.increase(token, amount);
     __dangerousTransferFrom__(token, to, amount);
+}
+
+function dangerousDraw(AccountSystem storage self, address weth, address token, uint amount, address to) {
+    self.decrease(token, amount);
+    if (token == weth) __dangerousUnwrapEther__(weth, to, amount);
+    else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
 }
 
 /** @dev Increases an `owner`'s spendable balance. */
@@ -97,7 +104,7 @@ function increase(AccountSystem storage self, address token, uint amount) {
 }
 
 /** @dev Actives a token and decreases the reserves. Settlement will pick up this activated token. */
-function withdraw(AccountSystem storage self, address token, uint amount) {
+function decrease(AccountSystem storage self, address token, uint amount) {
     uint balance = self.reserves[token];
     if (amount > balance) revert InsufficientBalance(balance, amount);
     self.touch(token);

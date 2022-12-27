@@ -15,7 +15,7 @@
     "test": "FOUNDRY_PROFILE=test forge test -vvv",
     "test:hardhat": "TS_NODE_TRANSPILE_ONLY=1 hardhat test --config ./hardhat.config.ts",
     "test:echidna": "FOUNDRY_PROFILE=crytic echidna-test . --config test/crytic/config.yaml",
-    "profile": "yarn test:forge --report-gas",
+    "profile": "yarn test --gas-report",
     "profile:hardhat": "REPORT_GAS=true hardhat test --config ./hardhat.config.ts",
     "lint:check": "prettier --check **.sol && prettier --check **.js && prettier --check **.ts && hardhat compile --config ./hardhat.config.ts",
     "lint:fix": "prettier --write **.sol && prettier --write **.js && prettier --write **.ts",

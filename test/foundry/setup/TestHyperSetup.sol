@@ -48,7 +48,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     modifier postTestInvariantChecks() virtual {
         _;
         assertSettlementInvariant(address(__hyperTestingContract__), address(defaultScenario.asset), __users__);
-        assertSettlementInvariant(address(__hyperTestingContract__), address(defaultScenario.asset), __users__);
+        assertSettlementInvariant(address(__hyperTestingContract__), address(defaultScenario.quote), __users__);
     }
 
     function setUp() public {
