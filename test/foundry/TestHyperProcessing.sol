@@ -4,106 +4,14 @@ pragma solidity 0.8.13;
 import "./setup/TestPriceSetup.sol";
 import "./setup/TestHyperSetup.sol";
 
-import "contracts/CPU.sol" as CPU;
 import {Curve, Pair, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
 
-/** @dev Exposes process and jump process as external functions to test directly instead of through fallback. */
-/* contract HyperTester is Hyper {
-    constructor(address weth) Hyper(weth) {}
-
-    uint public TEST_JIT_POLICY;
-
-    function setJitPolicy(uint policy) public {
-        TEST_JIT_POLICY = policy;
-    }
-
-    function _liquidityPolicy() internal view override returns (uint) {
-        return TEST_JIT_POLICY;
-    }
-
-    function assertSettlementInvariant(address token, address[] memory accounts) public {
-        uint reserve = getReserve(token);
-        uint physical = TestERC20(token).balanceOf(address(this));
-        if (reserve != physical) {
-            uint sum;
-            // @dev important! could be wrong if we miss an account with an internal balance
-            for (uint i; i != accounts.length; ++i) {
-                uint balance = getBalance(accounts[i], token);
-                sum += balance;
-            }
-            if ((reserve + sum) != physical) revert SettlementInvariantInvalid(physical, reserve + sum);
-        }
-    }
-
-    error SettlementInvariantInvalid(uint, uint);
-
-    function check(uint48 poolId, address[] memory accounts) external {
-        Pair memory pair = pairs[uint16(poolId >> 32)];
-        assertSettlementInvariant(pair.tokenAsset, accounts);
-        assertSettlementInvariant(pair.tokenQuote, accounts);
-    }
-
-    function doesPoolExist(uint48 poolId) external view returns (bool) {
-        return exists(pools, poolId);
-    }
-
-    function jumpProcess(bytes calldata data) external payable lock interactions {
-        CPU._jumpProcess(data, super._process);
-    }
-
-    function process(bytes calldata data) external payable lock interactions {
-        super._process(data);
-    }
-
-    function getAmounts(uint48 poolId) public returns (uint deltaAsset, uint deltaQuote) {
-        return _getAmounts(poolId);
-    }
-} */
-
-interface IHyperStruct {
-    function curves(uint32 curveId) external view returns (Curve memory);
-
-    function pairs(uint16 pairId) external view returns (Pair memory);
-
-    function positions(address owner, uint48 positionId) external view returns (HyperPosition memory);
-
-    function pools(uint48 poolId) external view returns (HyperPool memory);
-
-    function globalReserves(address token) external view returns (uint256);
-}
-
-function createPool(
-    address token0,
-    address token1,
-    uint24 sigma,
-    uint32 maturity,
-    uint16 fee,
-    uint16 priorityFee,
-    uint128 strike,
-    uint128 price
-) returns (bytes memory data) {
-    bytes[] memory instructions = new bytes[](3);
-    uint48 magicPoolId = 0x000000000000;
-    instructions[0] = (CPU.encodeCreatePair(token0, token1));
-    instructions[1] = (CPU.encodeCreateCurve(sigma, maturity, fee, priorityFee, strike));
-    instructions[2] = (CPU.encodeCreatePool(magicPoolId, price));
-    data = CPU.encodeJumpInstruction(instructions);
-}
-
-contract TestHyperSingle is TestHyperSetup {
-    using FixedPointMathLib for uint256;
-    using FixedPointMathLib for int256;
-
-    HyperTimeOverride public __contractBeingTested__;
-
+contract TestHyperProcessing is TestHyperSetup {
     modifier checkSettlementInvariant() {
         _;
     }
 
-    receive() external payable {}
-
     uint48 __poolId;
-
     TestERC20 public asset;
     TestERC20 public quote;
 
@@ -111,8 +19,7 @@ contract TestHyperSingle is TestHyperSetup {
         asset = __token_18__;
         quote = __usdc__;
 
-        __contractBeingTested__ = __hyperCatchReverts__;
-        __contractBeingTested__.setTimestamp(uint128(block.timestamp)); // !important!
+        __hyperTestingContract__.setTimestamp(uint128(block.timestamp)); // !important!
 
         // 2. Bundled operation set to create a pair, curve, and pool.
         bytes memory data = createPool(
@@ -129,62 +36,33 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.jumpProcess(data);
         assertTrue(success, "__revertCatcher__ call failed");
 
-        uint16 pairId = uint16(__contractBeingTested__.getPairNonce());
-        uint32 curveId = uint32(__contractBeingTested__.getCurveNonce());
+        uint16 pairId = uint16(__hyperTestingContract__.getPairNonce());
+        uint32 curveId = uint32(__hyperTestingContract__.getCurveNonce());
         __poolId = CPU.encodePoolId(pairId, curveId);
 
+        assertTrue(getPool(address(__hyperTestingContract__), __poolId).blockTimestamp != 0, "Pool not created");
         assertTrue(
-            IHyperStruct(address(__contractBeingTested__)).pools(__poolId).blockTimestamp != 0,
-            "Pool not created"
-        );
-        assertTrue(
-            IHyperStruct(address(__contractBeingTested__)).pools(__poolId).lastTick != 0,
+            getPool(address(__hyperTestingContract__), __poolId).lastTick != 0,
             "Pool not initialized with price"
         );
         assertTrue(
-            IHyperStruct(address(__contractBeingTested__)).pools(__poolId).liquidity == 0,
+            getPool(address(__hyperTestingContract__), __poolId).liquidity == 0,
             "Pool initialized with liquidity"
         );
-    }
-
-    // --- Helpers --- //
-
-    function getPool(uint48 poolId) public view returns (HyperPool memory) {
-        return IHyperStruct(address(__contractBeingTested__)).pools(poolId);
-    }
-
-    function getCurve(uint32 curveId) public view returns (Curve memory) {
-        return IHyperStruct(address(__contractBeingTested__)).curves(curveId);
-    }
-
-    function getPair(uint16 pairId) public view returns (Pair memory) {
-        return IHyperStruct(address(__contractBeingTested__)).pairs(pairId);
-    }
-
-    function getPosition(address owner, uint48 positionId) public view returns (HyperPosition memory) {
-        return IHyperStruct(address(__contractBeingTested__)).positions(owner, positionId);
-    }
-
-    function getReserve(address token) public view returns (uint) {
-        return __contractBeingTested__.getReserve(token);
-    }
-
-    function getBalance(address owner, address token) public view returns (uint) {
-        return __contractBeingTested__.getBalance(owner, token);
     }
 
     // ===== Getters ===== //
 
     function testGetAmounts() public {
-        Curve memory curve = getCurve(uint32(__poolId));
-        (uint deltaAsset, uint deltaQuote) = __contractBeingTested__.getAmounts(__poolId);
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId));
+        (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getAmounts(__poolId);
 
         assertEq(deltaAsset, DEFAULT_ASSET_RESERVE);
         assertEq(deltaQuote, DEFAULT_QUOTE_RESERVE);
     }
 
     function testGetLiquidityMinted() public {
-        uint deltaLiquidity = __contractBeingTested__.getLiquidityMinted(__poolId, 1, 1e19);
+        uint deltaLiquidity = __hyperTestingContract__.getLiquidityMinted(__poolId, 1, 1e19);
     }
 
     // ===== CPU ===== //
@@ -196,8 +74,8 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.jumpProcess(data);
         assertTrue(success);
 
-        uint16 pairId = uint16(__contractBeingTested__.getPairNonce());
-        Pair memory pair = getPair(pairId);
+        uint16 pairId = uint16(__hyperTestingContract__.getPairNonce());
+        Pair memory pair = getPair(address(__hyperTestingContract__), pairId);
         assertTrue(pair.tokenAsset != address(0));
         assertTrue(pair.tokenQuote != address(0));
     }
@@ -216,17 +94,17 @@ contract TestHyperSingle is TestHyperSetup {
 
     function testSyncPool() public {
         customWarp(1);
-        __contractBeingTested__.syncPool(__poolId);
+        __hyperTestingContract__.syncPool(__poolId);
     }
 
     function testDrawReducesBalance() public checkSettlementInvariant {
         // First fund the account
-        __contractBeingTested__.fund(address(asset), 4000);
+        __hyperTestingContract__.fund(address(asset), 4000);
 
         // Draw
-        uint prevBalance = getBalance(address(this), address(asset));
-        __contractBeingTested__.draw(address(asset), 4000, address(this));
-        uint nextBalance = getBalance(address(this), address(asset));
+        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(asset));
+        __hyperTestingContract__.draw(address(asset), 4000, address(this));
+        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(asset));
 
         assertTrue(nextBalance == 0);
         assertTrue(nextBalance < prevBalance);
@@ -234,35 +112,35 @@ contract TestHyperSingle is TestHyperSetup {
 
     function testDrawRevertsWithDrawBalance() public {
         vm.expectRevert(DrawBalance.selector);
-        __contractBeingTested__.draw(address(asset), 1e18, address(this));
+        __hyperTestingContract__.draw(address(asset), 1e18, address(this));
     }
 
     function testDrawFromWethTransfersEther() public checkSettlementInvariant {
         // First fund the account
-        __contractBeingTested__.deposit{value: 4000}();
+        __hyperTestingContract__.deposit{value: 4000}();
 
         // Draw
         uint prevBalance = address(this).balance;
-        __contractBeingTested__.draw(address(__weth__), 4000, address(this));
+        __hyperTestingContract__.draw(address(__weth__), 4000, address(this));
         uint nextBalance = address(this).balance;
 
         assertTrue(nextBalance > prevBalance);
     }
 
     function testFundIncreasesBalance() public checkSettlementInvariant {
-        uint prevBalance = getBalance(address(this), address(asset));
-        __contractBeingTested__.fund(address(asset), 4000);
-        uint nextBalance = getBalance(address(this), address(asset));
+        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(asset));
+        __hyperTestingContract__.fund(address(asset), 4000);
+        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(asset));
 
         assertTrue(nextBalance > prevBalance);
     }
 
     function testDepositWrapsEther() public checkSettlementInvariant {
-        uint prevWethBalance = __weth__.balanceOf(address(__contractBeingTested__));
+        uint prevWethBalance = __weth__.balanceOf(address(__hyperTestingContract__));
         uint prevBalance = address(this).balance;
-        __contractBeingTested__.deposit{value: 4000}();
+        __hyperTestingContract__.deposit{value: 4000}();
         uint nextBalance = address(this).balance;
-        uint nextWethBalance = __weth__.balanceOf(address(__contractBeingTested__));
+        uint nextWethBalance = __weth__.balanceOf(address(__hyperTestingContract__));
 
         assertTrue(nextBalance < prevBalance);
         assertTrue(nextWethBalance > prevWethBalance);
@@ -299,14 +177,14 @@ contract TestHyperSingle is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
 
-        uint256 prev = getPool(__poolId).lastPrice;
+        uint256 prev = getPool(address(__hyperTestingContract__), __poolId).lastPrice;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 next = getPool(__poolId).lastPrice;
+        uint256 next = getPool(address(__hyperTestingContract__), __poolId).lastPrice;
         assertTrue(next != prev);
     }
 
@@ -323,14 +201,14 @@ contract TestHyperSingle is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
 
-        int256 prev = getPool(__poolId).lastTick;
+        int256 prev = getPool(address(__hyperTestingContract__),__poolId).lastTick;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        int256 next = getPool(__poolId).lastTick;
+        int256 next = getPool(address(__hyperTestingContract__),__poolId).lastTick;
         assertTrue(next != prev);
     } */
 
@@ -349,11 +227,11 @@ contract TestHyperSingle is TestHyperSetup {
 
         // move some time
         customWarp(block.timestamp + 1);
-        uint256 prev = getPool(__poolId).liquidity;
+        uint256 prev = getPool(address(__hyperTestingContract__), __poolId).liquidity;
 
-        __contractBeingTested__.swap(__poolId, true, amount, limit);
+        __hyperTestingContract__.swap(__poolId, true, amount, limit);
 
-        uint256 next = getPool(__poolId).liquidity;
+        uint256 next = getPool(address(__hyperTestingContract__), __poolId).liquidity;
         assertTrue(next == prev);
     }
 
@@ -372,11 +250,11 @@ contract TestHyperSingle is TestHyperSetup {
 
         // move some time
         customWarp(block.timestamp + 1);
-        uint256 prev = getPool(__poolId).liquidity;
+        uint256 prev = getPool(address(__hyperTestingContract__), __poolId).liquidity;
 
-        __contractBeingTested__.swap(__poolId, false, amount, limit);
+        __hyperTestingContract__.swap(__poolId, false, amount, limit);
 
-        uint256 next = getPool(__poolId).liquidity;
+        uint256 next = getPool(address(__hyperTestingContract__), __poolId).liquidity;
         assertTrue(next == prev);
     }
 
@@ -394,12 +272,12 @@ contract TestHyperSingle is TestHyperSetup {
         assertTrue(success);
 
         // move some time
-        uint256 prev = getBalance(address(this), address(asset));
+        uint256 prev = getBalance(address(__hyperTestingContract__), address(this), address(asset));
 
-        (uint output, ) = __contractBeingTested__.swap(__poolId, true, amount, limit);
-        (uint input, ) = __contractBeingTested__.swap(__poolId, false, output, limit);
+        (uint output, ) = __hyperTestingContract__.swap(__poolId, true, amount, limit);
+        (uint input, ) = __hyperTestingContract__.swap(__poolId, false, output, limit);
 
-        uint256 next = getBalance(address(this), address(asset));
+        uint256 next = getBalance(address(__hyperTestingContract__), address(this), address(asset));
         assertTrue(next <= prev);
         assertTrue(input < amount);
     }
@@ -418,10 +296,10 @@ contract TestHyperSingle is TestHyperSetup {
         assertTrue(success);
 
         // move some time beyond maturity
-        customWarp(getCurve(uint32(__poolId)).maturity + 1);
+        customWarp(getCurve(address(__hyperTestingContract__), uint32(__poolId)).maturity + 1);
 
         vm.expectRevert(PoolExpiredError.selector);
-        __contractBeingTested__.swap(__poolId, false, amount, limit);
+        __hyperTestingContract__.swap(__poolId, false, amount, limit);
     }
 
     function testSwapExactInPoolLiquidityUnchanged() public checkSettlementInvariant {
@@ -436,14 +314,14 @@ contract TestHyperSingle is TestHyperSetup {
         assertTrue(success);
         // move some time
         customWarp(block.timestamp + 1);
-        uint256 prev = getPool(__poolId).liquidity;
+        uint256 prev = getPool(address(__hyperTestingContract__), __poolId).liquidity;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 next = getPool(__poolId).liquidity;
+        uint256 next = getPool(address(__hyperTestingContract__), __poolId).liquidity;
         assertTrue(next == prev);
     }
 
@@ -460,14 +338,14 @@ contract TestHyperSingle is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
 
-        uint256 prev = getPool(__poolId).blockTimestamp;
+        uint256 prev = getPool(address(__hyperTestingContract__), __poolId).blockTimestamp;
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 next = getPool(__poolId).blockTimestamp;
+        uint256 next = getPool(address(__hyperTestingContract__), __poolId).blockTimestamp;
         assertTrue(next != prev);
     }
 
@@ -484,14 +362,14 @@ contract TestHyperSingle is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
 
-        uint256 prev = getReserve(address(asset));
+        uint256 prev = getReserve(address(__hyperTestingContract__), address(asset));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 next = getReserve(address(asset));
+        uint256 next = getReserve(address(__hyperTestingContract__), address(asset));
         assertTrue(next > prev);
     }
 
@@ -508,14 +386,14 @@ contract TestHyperSingle is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
 
-        uint256 prev = getReserve(address(quote));
+        uint256 prev = getReserve(address(__hyperTestingContract__), address(quote));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         data = CPU.encodeSwap(0, __poolId, 0x12, 0x02, 0x1f, 0x01, 0);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 next = getReserve(address(quote));
+        uint256 next = getReserve(address(__hyperTestingContract__), address(quote));
         assertTrue(next < prev);
     }
 
@@ -538,8 +416,8 @@ contract TestHyperSingle is TestHyperSetup {
     }
 
     function testProcessAllocateFull() public checkSettlementInvariant {
-        uint256 price = getPool(__poolId).lastPrice;
-        Curve memory curve = getCurve(uint32(__poolId));
+        uint256 price = getPool(address(__hyperTestingContract__), __poolId).lastPrice;
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId));
         uint256 theoreticalR2 = Price.computeR2WithPrice(
             price,
             curve.strike,
@@ -553,16 +431,16 @@ contract TestHyperSingle is TestHyperSetup {
 
         __revertCatcher__.process(data);
 
-        uint256 globalR1 = getReserve(address(quote));
-        uint256 globalR2 = getReserve(address(asset));
+        uint256 globalR1 = getReserve(address(__hyperTestingContract__), address(quote));
+        uint256 globalR2 = getReserve(address(__hyperTestingContract__), address(asset));
         assertTrue(globalR1 > 0);
         assertTrue(globalR2 > 0);
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
     function testAllocateFull() public checkSettlementInvariant {
-        uint256 price = getPool(__poolId).lastPrice;
-        Curve memory curve = getCurve(uint32(__poolId));
+        uint256 price = getPool(address(__hyperTestingContract__), __poolId).lastPrice;
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId));
         uint256 theoreticalR2 = Price.computeR2WithPrice(
             price,
             curve.strike,
@@ -570,35 +448,39 @@ contract TestHyperSingle is TestHyperSetup {
             curve.maturity - block.timestamp
         );
 
-        __contractBeingTested__.allocate(__poolId, 4e6);
+        __hyperTestingContract__.allocate(__poolId, 4e6);
 
-        uint256 globalR1 = getReserve(address(quote));
-        uint256 globalR2 = getReserve(address(asset));
+        uint256 globalR1 = getReserve(address(__hyperTestingContract__), address(quote));
+        uint256 globalR2 = getReserve(address(__hyperTestingContract__), address(asset));
         assertTrue(globalR1 > 0);
         assertTrue(globalR2 > 0);
         assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
     }
 
     function testAllocateUseMax() public checkSettlementInvariant {
-        uint maxLiquidity = __contractBeingTested__.getLiquidityMinted(
+        uint maxLiquidity = __hyperTestingContract__.getLiquidityMinted(
             __poolId,
             asset.balanceOf(address(this)),
             quote.balanceOf(address(this))
         );
 
-        (uint deltaAsset, uint deltaQuote) = __contractBeingTested__.getReserveDelta(__poolId, maxLiquidity);
+        (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getReserveDelta(__poolId, maxLiquidity);
 
-        __contractBeingTested__.allocate(__poolId, type(uint256).max);
+        __hyperTestingContract__.allocate(__poolId, type(uint256).max);
 
-        assertEq(maxLiquidity, getPool(__poolId).liquidity);
-        assertEq(deltaAsset, getReserve(address(asset)));
-        assertEq(deltaQuote, getReserve(address(quote)));
+        assertEq(maxLiquidity, getPool(address(__hyperTestingContract__), __poolId).liquidity);
+        assertEq(deltaAsset, getReserve(address(__hyperTestingContract__), address(asset)));
+        assertEq(deltaQuote, getReserve(address(__hyperTestingContract__), address(quote)));
     }
 
     function testAllocatePositionTimestampUpdated() public checkSettlementInvariant {
         uint48 positionId = __poolId;
 
-        uint256 prevPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
+        uint256 prevPositionTimestamp = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).blockTimestamp;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -606,7 +488,11 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
+        uint256 nextPositionTimestamp = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).blockTimestamp;
 
         assertTrue(prevPositionTimestamp == 0);
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
@@ -615,7 +501,11 @@ contract TestHyperSingle is TestHyperSetup {
     function testAllocatePositionTotalLiquidityIncreases() public checkSettlementInvariant {
         uint48 positionId = __poolId;
 
-        uint256 prevPositionTotalLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
+        uint256 prevPositionTotalLiquidity = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).totalLiquidity;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -623,14 +513,18 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextPositionTotalLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
+        uint256 nextPositionTotalLiquidity = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).totalLiquidity;
 
         assertTrue(prevPositionTotalLiquidity == 0);
         assertTrue(nextPositionTotalLiquidity > prevPositionTotalLiquidity);
     }
 
     function testAllocateGlobalAssetIncreases() public checkSettlementInvariant {
-        uint256 prevGlobal = getReserve(address(asset));
+        uint256 prevGlobal = getReserve(address(__hyperTestingContract__), address(asset));
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -638,13 +532,13 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextGlobal = getReserve(address(asset));
+        uint256 nextGlobal = getReserve(address(__hyperTestingContract__), address(asset));
         assertTrue(nextGlobal != 0, "next globalReserves is zero");
         assertTrue(nextGlobal > prevGlobal, "globalReserves did not change");
     }
 
     function testAllocateGlobalQuoteIncreases() public checkSettlementInvariant {
-        uint256 prevGlobal = getReserve(address(quote));
+        uint256 prevGlobal = getReserve(address(__hyperTestingContract__), address(quote));
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -652,7 +546,7 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextGlobal = getReserve(address(quote));
+        uint256 nextGlobal = getReserve(address(__hyperTestingContract__), address(quote));
         assertTrue(nextGlobal != 0, "next globalReserves is zero");
         assertTrue(nextGlobal > prevGlobal, "globalReserves did not change");
     }
@@ -660,11 +554,11 @@ contract TestHyperSingle is TestHyperSetup {
     // --- Remove Liquidity --- //
 
     function testUnallocateUseMax() public {
-        uint maxLiquidity = getPosition(msg.sender, __poolId).totalLiquidity;
+        uint maxLiquidity = getPosition(address(__hyperTestingContract__), msg.sender, __poolId).totalLiquidity;
 
-        __contractBeingTested__.unallocate(__poolId, type(uint256).max);
+        __hyperTestingContract__.unallocate(__poolId, type(uint256).max);
 
-        assertEq(0, getPool(__poolId).liquidity);
+        assertEq(0, getPool(address(__hyperTestingContract__), __poolId).liquidity);
     }
 
     function testUnallocateZeroLiquidityReverts() public {
@@ -695,7 +589,7 @@ contract TestHyperSingle is TestHyperSetup {
         customWarp(warpTimestamp);
 
         // Set the policy from 0 (default 0 in test contract).
-        __contractBeingTested__.setJitPolicy(999999999999);
+        __hyperTestingContract__.setJitPolicy(999999999999);
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
 
@@ -714,7 +608,11 @@ contract TestHyperSingle is TestHyperSetup {
         assertTrue(success, "forwarder call failed");
 
         uint48 positionId = __poolId;
-        uint256 prevPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
+        uint256 prevPositionTimestamp = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).blockTimestamp;
 
         uint256 warpTimestamp = block.timestamp + 1;
         customWarp(warpTimestamp);
@@ -722,7 +620,11 @@ contract TestHyperSingle is TestHyperSetup {
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = __revertCatcher__.process(data);
 
-        uint256 nextPositionTimestamp = getPosition(address(__revertCatcher__), positionId).blockTimestamp;
+        uint256 nextPositionTimestamp = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).blockTimestamp;
 
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
     }
@@ -737,12 +639,20 @@ contract TestHyperSingle is TestHyperSetup {
         assertTrue(success, "forwarder call failed");
 
         uint48 positionId = __poolId;
-        uint256 prevPositionLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
+        uint256 prevPositionLiquidity = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).totalLiquidity;
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = __revertCatcher__.process(data);
 
-        uint256 nextPositionLiquidity = getPosition(address(__revertCatcher__), positionId).totalLiquidity;
+        uint256 nextPositionLiquidity = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).totalLiquidity;
 
         assertTrue(nextPositionLiquidity < prevPositionLiquidity);
     }
@@ -756,12 +666,12 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 prev = getReserve(address(asset));
+        uint256 prev = getReserve(address(__hyperTestingContract__), address(asset));
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = __revertCatcher__.process(data);
 
-        uint256 next = getReserve(address(asset));
+        uint256 next = getReserve(address(__hyperTestingContract__), address(asset));
         assertTrue(next < prev, "globalReserves did not change");
     }
 
@@ -774,12 +684,12 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 prev = getReserve(address(quote));
+        uint256 prev = getReserve(address(__hyperTestingContract__), address(quote));
 
         data = CPU.encodeUnallocate(0, __poolId, power, amount);
         success = __revertCatcher__.process(data);
 
-        uint256 next = getReserve(address(quote));
+        uint256 next = getReserve(address(__hyperTestingContract__), address(quote));
         assertTrue(next < prev, "globalReserves did not change");
     }
 
@@ -787,11 +697,11 @@ contract TestHyperSingle is TestHyperSetup {
 
     function testStakeExternalEpochIncrements() public {
         uint8 amount = 0x05;
-        __contractBeingTested__.allocate(__poolId, amount);
+        __hyperTestingContract__.allocate(__poolId, amount);
 
-        uint prevId = getPosition(address(this), __poolId).stakeEpochId;
-        __contractBeingTested__.stake(__poolId);
-        uint nextId = getPosition(address(this), __poolId).stakeEpochId;
+        uint prevId = getPosition(address(__hyperTestingContract__), address(this), __poolId).stakeEpochId;
+        __hyperTestingContract__.stake(__poolId);
+        uint nextId = getPosition(address(__hyperTestingContract__), address(this), __poolId).stakeEpochId;
 
         assertTrue(nextId != prevId);
     }
@@ -807,12 +717,14 @@ contract TestHyperSingle is TestHyperSetup {
 
         uint48 positionId = __poolId;
 
-        bool prevPositionStaked = getPosition(address(__revertCatcher__), positionId).stakeEpochId != 0;
+        bool prevPositionStaked = getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
+            .stakeEpochId != 0;
 
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        bool nextPositionStaked = getPosition(address(__revertCatcher__), positionId).stakeEpochId != 0;
+        bool nextPositionStaked = getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
+            .stakeEpochId != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked, "Position staked is not true.");
@@ -827,18 +739,23 @@ contract TestHyperSingle is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
+        uint256 prevPoolStakedLiquidity = getPool(address(__hyperTestingContract__), __poolId).stakedLiquidity;
 
         uint48 positionId = __poolId;
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        uint256 nextPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
+        uint256 nextPoolStakedLiquidity = getPool(address(__hyperTestingContract__), __poolId).stakedLiquidity;
 
-        if (lo <= getPool(__poolId).lastTick && hi > getPool(__poolId).lastTick) {
+        if (
+            lo <= getPool(address(__hyperTestingContract__), __poolId).lastTick &&
+            hi > getPool(address(__hyperTestingContract__), __poolId).lastTick
+        ) {
             assertTrue(nextPoolStakedLiquidity > prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
             assertTrue(
-                nextPoolStakedLiquidity == getPosition(address(__revertCatcher__), positionId).totalLiquidity,
+                nextPoolStakedLiquidity ==
+                    getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
+                        .totalLiquidity,
                 "Pool staked liquidity not equal to liquidity of staked position."
             );
         } else {
@@ -852,32 +769,32 @@ contract TestHyperSingle is TestHyperSetup {
     function testStakeNonExistentPoolIdReverts() public {
         uint48 failureArg = 3214;
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        __contractBeingTested__.stake(failureArg);
+        __hyperTestingContract__.stake(failureArg);
     }
 
     function testStakeNonZeroStakeEpochIdReverts() public {
-        __contractBeingTested__.allocate(__poolId, 4355);
-        __contractBeingTested__.stake(__poolId); // Increments stake epoch id
+        __hyperTestingContract__.allocate(__poolId, 4355);
+        __hyperTestingContract__.stake(__poolId); // Increments stake epoch id
 
         vm.expectRevert(abi.encodeWithSelector(PositionStakedError.selector, __poolId));
-        __contractBeingTested__.stake(__poolId);
+        __hyperTestingContract__.stake(__poolId);
     }
 
     function testStakePositionZeroLiquidityReverts() public {
         vm.expectRevert(abi.encodeWithSelector(PositionZeroLiquidityError.selector, __poolId));
-        __contractBeingTested__.stake(__poolId);
+        __hyperTestingContract__.stake(__poolId);
     }
 
     // --- Unstake Position --- //
 
     function testUnstakeExternalEpochIncrements() public {
         uint8 amount = 0x05;
-        __contractBeingTested__.allocate(__poolId, amount);
-        __contractBeingTested__.stake(__poolId);
+        __hyperTestingContract__.allocate(__poolId, amount);
+        __hyperTestingContract__.stake(__poolId);
 
-        uint prevId = getPosition(address(this), __poolId).unstakeEpochId;
-        __contractBeingTested__.unstake(__poolId);
-        uint nextId = getPosition(address(this), __poolId).unstakeEpochId;
+        uint prevId = getPosition(address(__hyperTestingContract__), address(this), __poolId).unstakeEpochId;
+        __hyperTestingContract__.unstake(__poolId);
+        uint nextId = getPosition(address(__hyperTestingContract__), address(this), __poolId).unstakeEpochId;
 
         assertTrue(nextId != prevId);
     }
@@ -895,18 +812,26 @@ contract TestHyperSingle is TestHyperSetup {
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
+        customWarp(__hyperTestingContract__.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x15, 0x01, 0);
         success = __revertCatcher__.process(data);
 
-        uint256 prevPositionStaked = getPosition(address(__revertCatcher__), positionId).unstakeEpochId;
+        uint256 prevPositionStaked = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).unstakeEpochId;
 
         data = CPU.encodeUnstakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        uint256 nextPositionStaked = getPosition(address(__revertCatcher__), positionId).unstakeEpochId;
+        uint256 nextPositionStaked = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            positionId
+        ).unstakeEpochId;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked != 0, "Position staked is true.");
@@ -928,18 +853,18 @@ contract TestHyperSingle is TestHyperSetup {
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp(__contractBeingTested__.EPOCH_INTERVAL() + 1);
+        customWarp(__hyperTestingContract__.EPOCH_INTERVAL() + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         data = CPU.encodeSwap(0, __poolId, 0x09, 0x01, 0x15, 0x01, 0);
         success = __revertCatcher__.process(data);
 
-        uint256 prevPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
+        uint256 prevPoolStakedLiquidity = getPool(address(__hyperTestingContract__), __poolId).stakedLiquidity;
 
         data = CPU.encodeUnstakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp((__contractBeingTested__.EPOCH_INTERVAL() + 1) * 2);
+        customWarp((__hyperTestingContract__.EPOCH_INTERVAL() + 1) * 2);
 
         // TODO: FIX FAILING TEST
 
@@ -948,9 +873,9 @@ contract TestHyperSingle is TestHyperSetup {
         // success = __revertCatcher__.process(data);
         //
         // // todo: currently fails because unstaking does not change staked liquidity.
-        // uint256 nextPoolStakedLiquidity = getPool(__poolId).stakedLiquidity;
+        // uint256 nextPoolStakedLiquidity = getPool(address(__hyperTestingContract__),__poolId).stakedLiquidity;
         //
-        // if (lo <= getPool(__poolId).lastTick && hi > getPool(__poolId).lastTick) {
+        // if (lo <= getPool(address(__hyperTestingContract__),__poolId).lastTick && hi > getPool(address(__hyperTestingContract__),__poolId).lastTick) {
         //     assertTrue(nextPoolStakedLiquidity < prevPoolStakedLiquidity, "Pool staked liquidity did not increase.");
         //     assertTrue(nextPoolStakedLiquidity == 0, "Pool staked liquidity does not equal 0 after unstake.");
         // } else {
@@ -964,12 +889,12 @@ contract TestHyperSingle is TestHyperSetup {
     function testUnstakeNonExistentPoolIdReverts() public {
         uint48 failureArg = 1224;
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        __contractBeingTested__.unstake(failureArg);
+        __hyperTestingContract__.unstake(failureArg);
     }
 
     function testUnstakeNotStakedReverts() public {
         vm.expectRevert(abi.encodeWithSelector(PositionNotStakedError.selector, __poolId));
-        __contractBeingTested__.unstake(__poolId);
+        __hyperTestingContract__.unstake(__poolId);
     }
 
     // --- Create Pair --- //
@@ -1021,33 +946,33 @@ contract TestHyperSingle is TestHyperSetup {
     }
 
     function testCreatePairPairNonceIncrementedReturnsOneAdded() public {
-        uint256 prevNonce = __contractBeingTested__.getPairNonce();
+        uint256 prevNonce = __hyperTestingContract__.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = __revertCatcher__.process(data);
-        uint256 nonce = __contractBeingTested__.getPairNonce();
+        uint256 nonce = __hyperTestingContract__.getPairNonce();
         assertEq(nonce, prevNonce + 1);
     }
 
     function testCreatePairFetchesPairIdReturnsNonZero() public {
-        uint256 prevNonce = __contractBeingTested__.getPairNonce();
+        uint256 prevNonce = __hyperTestingContract__.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = __revertCatcher__.process(data);
-        uint256 pairId = __contractBeingTested__.getPairId(token0, token1);
+        uint256 pairId = __hyperTestingContract__.getPairId(token0, token1);
         assertTrue(pairId != 0);
     }
 
     function testCreatePairFetchesPairDataReturnsAddresses() public {
-        uint256 prevNonce = __contractBeingTested__.getPairNonce();
+        uint256 prevNonce = __hyperTestingContract__.getPairNonce();
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = __revertCatcher__.process(data);
-        uint16 pairId = __contractBeingTested__.getPairId(token0, token1);
-        Pair memory pair = getPair(pairId);
+        uint16 pairId = __hyperTestingContract__.getPairId(token0, token1);
+        Pair memory pair = getPair(address(__hyperTestingContract__), pairId);
         assertEq(pair.tokenAsset, token0);
         assertEq(pair.tokenQuote, token1);
         assertEq(pair.decimalsBase, 18);
@@ -1057,7 +982,7 @@ contract TestHyperSingle is TestHyperSetup {
     // --- Create Curve --- //
 
     function testCreateCurveCurveExistsReverts() public {
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
             curve.maturity,
@@ -1070,7 +995,7 @@ contract TestHyperSingle is TestHyperSetup {
     }
 
     function testCreateCurveFeeParameterOutsideBoundsReverts() public {
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         uint16 failureArg = 5e4;
         bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
@@ -1084,7 +1009,7 @@ contract TestHyperSingle is TestHyperSetup {
     }
 
     function testCreateCurvePriorityFeeParameterOutsideBoundsReverts() public {
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         uint16 failureArg = 5e4;
         bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
@@ -1098,7 +1023,7 @@ contract TestHyperSingle is TestHyperSetup {
     }
 
     function testCreateCurveExpiringPoolZeroSigmaReverts() public {
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         uint24 failureArg = 0;
         bytes memory data = CPU.encodeCreateCurve(
             failureArg,
@@ -1112,7 +1037,7 @@ contract TestHyperSingle is TestHyperSetup {
     }
 
     function testCreateCurveExpiringPoolZeroStrikeReverts() public {
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         uint128 failureArg = 0;
         bytes memory data = CPU.encodeCreateCurve(
             curve.sigma,
@@ -1126,8 +1051,8 @@ contract TestHyperSingle is TestHyperSetup {
     }
 
     function testCreateCurveCurveNonceIncrementReturnsOne() public {
-        uint256 prevNonce = __contractBeingTested__.getCurveNonce();
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        uint256 prevNonce = __hyperTestingContract__.getCurveNonce();
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1136,12 +1061,12 @@ contract TestHyperSingle is TestHyperSetup {
             curve.strike
         );
         bool success = __revertCatcher__.process(data);
-        uint256 nextNonce = __contractBeingTested__.getCurveNonce();
+        uint256 nextNonce = __hyperTestingContract__.getCurveNonce();
         assertEq(prevNonce, nextNonce - 1);
     }
 
     function testCreateCurveFetchesCurveIdReturnsNonZero() public {
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1159,12 +1084,12 @@ contract TestHyperSingle is TestHyperSetup {
             )
         );
         bool success = __revertCatcher__.process(data);
-        uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
+        uint32 curveId = __hyperTestingContract__.getCurveId(rawCurveId);
         assertTrue(curveId != 0);
     }
 
     function testCreateCurveFetchesCurveDataReturnsParametersSet() public {
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         bytes memory data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1182,8 +1107,8 @@ contract TestHyperSingle is TestHyperSetup {
             )
         );
         bool success = __revertCatcher__.process(data);
-        uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
-        Curve memory newCurve = getCurve(curveId);
+        uint32 curveId = __hyperTestingContract__.getCurveId(rawCurveId);
+        Curve memory newCurve = getCurve(address(__hyperTestingContract__), curveId);
         assertEq(newCurve.sigma, curve.sigma + 1);
         assertEq(newCurve.maturity, curve.maturity);
         assertEq(newCurve.gamma, curve.gamma);
@@ -1234,9 +1159,9 @@ contract TestHyperSingle is TestHyperSetup {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = __revertCatcher__.process(data);
-        uint16 pairId = __contractBeingTested__.getPairId(token0, token1);
+        uint16 pairId = __hyperTestingContract__.getPairId(token0, token1);
 
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             uint32(0),
@@ -1249,7 +1174,7 @@ contract TestHyperSingle is TestHyperSetup {
         );
         success = __revertCatcher__.process(data);
 
-        uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
+        uint32 curveId = __hyperTestingContract__.getCurveId(rawCurveId);
         uint48 id = CPU.encodePoolId(pairId, curveId);
         data = CPU.encodeCreatePool(id, 1_000);
         vm.expectRevert(PoolExpiredError.selector);
@@ -1261,9 +1186,9 @@ contract TestHyperSingle is TestHyperSetup {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
         bool success = __revertCatcher__.process(data);
-        uint16 pairId = __contractBeingTested__.getPairId(token0, token1);
+        uint16 pairId = __hyperTestingContract__.getPairId(token0, token1);
 
-        Curve memory curve = getCurve(uint32(__poolId)); // Existing curve from helper setup
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(__poolId)); // Existing curve from helper setup
         data = CPU.encodeCreateCurve(
             curve.sigma + 1,
             curve.maturity,
@@ -1282,12 +1207,12 @@ contract TestHyperSingle is TestHyperSetup {
         );
         success = __revertCatcher__.process(data);
 
-        uint32 curveId = __contractBeingTested__.getCurveId(rawCurveId);
+        uint32 curveId = __hyperTestingContract__.getCurveId(rawCurveId);
         uint48 id = CPU.encodePoolId(pairId, curveId);
         data = CPU.encodeCreatePool(id, 1_000);
         success = __revertCatcher__.process(data);
 
-        uint256 time = getPool(id).blockTimestamp;
+        uint256 time = getPool(address(__hyperTestingContract__), id).blockTimestamp;
         assertTrue(time != 0);
     }
 }

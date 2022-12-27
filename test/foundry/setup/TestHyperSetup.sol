@@ -4,16 +4,22 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import {WETH} from "solmate/tokens/WETH.sol";
 import "contracts/EnigmaTypes.sol";
-import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher} from "./HyperTestOverrides.sol";
+import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher, FixedPointMathLib} from "./HyperTestOverrides.sol";
+
+import "../helpers/HelperHyperActions.sol";
+import "../helpers/HelperHyperView.sol";
 
 uint constant STARTING_BALANCE = 4000e18;
 
 /** @dev Deploys test contracts, test tokens, sets labels, funds users, and approves contracts to spend tokens. */
-contract TestHyperSetup is Test {
+contract TestHyperSetup is HelperHyperActions, HelperHyperView, Test {
+    using FixedPointMathLib for uint256;
+    using FixedPointMathLib for int256;
+
     WETH public __weth__;
-    Hyper public __hyper__;
-    HyperTimeOverride public __hyperTimeOverride__;
-    HyperCatchReverts public __hyperCatchReverts__;
+    Hyper public __hyper__; // Actual contract
+    HyperTimeOverride public __hyperTimeOverride__; // Inherits Hyper, adds block.timestamp and jit policy overrides
+    HyperCatchReverts public __hyperTestingContract__; // Inherits HyperTimeOverrides, adds endpoints to process functions.
     RevertCatcher public __revertCatcher__;
 
     TestERC20 public __usdc__;
@@ -33,8 +39,15 @@ contract TestHyperSetup is Test {
         afterSetUp();
     }
 
+    /** Hook to override receive. Defaults to just accepting ether sent to this test contract. */
+    receive() external payable {
+        receiveOverride();
+    }
+
     /** @dev Hook to run after test setup. */
     function afterSetUp() public virtual {}
+
+    function receiveOverride() public virtual {}
 
     function initContracts() internal {
         __weth__ = new WETH();
@@ -42,11 +55,11 @@ contract TestHyperSetup is Test {
         // --- Hyper Contracts --- //
         __hyper__ = new Hyper(address(__weth__));
         __hyperTimeOverride__ = new HyperTimeOverride(address(__weth__));
-        __hyperCatchReverts__ = new HyperCatchReverts(address(__weth__));
-        __revertCatcher__ = new RevertCatcher(address(__hyperCatchReverts__));
+        __hyperTestingContract__ = new HyperCatchReverts(address(__weth__));
+        __revertCatcher__ = new RevertCatcher(address(__hyperTestingContract__));
         __contracts__.push(address(__hyper__));
         __contracts__.push(address(__hyperTimeOverride__));
-        __contracts__.push(address(__hyperCatchReverts__));
+        __contracts__.push(address(__hyperTestingContract__));
         __contracts__.push(address(__revertCatcher__));
 
         __usdc__ = new TestERC20("USD Coin", "USDC", 6);
@@ -106,7 +119,7 @@ contract TestHyperSetup is Test {
         vm.label(address(__revertCatcher__), "RevertCatcher");
         vm.label(address(__hyper__), "DefaultHyper");
         vm.label(address(__hyperTimeOverride__), "HyperTimeOverride");
-        vm.label(address(__hyperCatchReverts__), "HyperCatchReverts");
+        vm.label(address(__hyperTestingContract__), "HyperCatchReverts");
         vm.label(address(__usdc__), "USDC");
         vm.label(address(__token_8__), "Token8Decimals");
         vm.label(address(__token_18__), "Token18Decimals");
@@ -115,6 +128,6 @@ contract TestHyperSetup is Test {
 
     function customWarp(uint time) internal {
         vm.warp(time);
-        __hyperCatchReverts__.setTimestamp(uint128(time));
+        __hyperTestingContract__.setTimestamp(uint128(time));
     }
 }
