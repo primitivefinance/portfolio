@@ -46,7 +46,7 @@ contract Hyper is IHyper {
     AccountSystem public __account__;
 
     // ===== Constants ===== //
-    string public constant VERSION = "prototype-v0.0.1";
+    string public constant VERSION = "beta-v0.0.1";
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
     /// @dev Distance between the location of prices on the price grid, so distance between price.

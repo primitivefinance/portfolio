@@ -1,5 +1,7 @@
 # Crytic Tests
 
+NOTE: Currently blocked by crytic-compile. There's some difficulty in getting these echidna tests to work because of the use of free functions, and foundry.
+
 These are Echidna based testing files for developing a thorough corpus of coverage.
 
 ## Setup
