@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestE2ESetup.sol";
 
 contract TestE2EAllocateUnallocate is TestE2ESetup {
-    function testFuzzAllocateUnallocateSuccessful(uint deltaLiquidity) public withGlobalInvariants {
+    function testFuzzAllocateUnallocateSuccessful(uint deltaLiquidity) public {
         vm.assume(deltaLiquidity > 0);
         vm.assume(deltaLiquidity < 2 ** 127);
         // TODO: Add use max flag support.
@@ -18,9 +18,9 @@ contract TestE2EAllocateUnallocate is TestE2ESetup {
         fundUsers(expectedDeltaAsset, expectedDeltaQuote);
 
         // Execution
-        State memory prev = getState();
+        HyperState memory prev = getState();
         (uint deltaAsset, uint deltaQuote) = __hyper__.allocate(__poolId__, deltaLiquidity);
-        State memory post = getState();
+        HyperState memory post = getState();
 
         // Postconditions
         {
@@ -53,7 +53,7 @@ contract TestE2EAllocateUnallocate is TestE2ESetup {
         (uint unallocatedAsset, uint unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
 
         {
-            State memory end = getState();
+            HyperState memory end = getState();
             assertEq(unallocatedAsset, deltaAsset);
             assertEq(unallocatedQuote, deltaQuote);
             assertEq(end.reserveAsset, prev.reserveAsset);
