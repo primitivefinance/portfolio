@@ -35,8 +35,6 @@ export default class HyperSDK {
     const forwarder = await factory.deploy()
     this.forwarder = forwarder
 
-    console.log(`Deployed Hyper at: ${instance.address}`)
-    console.log(`Deployed Forwarder at: ${forwarder.address}`)
     return this.instance
   }
 
@@ -60,14 +58,14 @@ export default class HyperSDK {
   }
 
   /** Adds liquidity to a range of ranges to a pool. */
-  async allocate(poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
-    let { hex: data } = instructions.encodeAllocate(false, poolId, loTick, hiTick, amount)
+  async allocate(poolId: number, amount: BigNumber) {
+    let { hex: data } = instructions.encodeAllocate(false, poolId, amount)
     return this.forward(data)
   }
 
   /** Removes liquidity from a range of prices. */
-  async unallocate(useMax: boolean, poolId: number, loTick: number, hiTick: number, amount: BigNumber) {
-    let { hex: data } = instructions.encodeUnallocate(useMax, poolId, loTick, hiTick, amount)
+  async unallocate(useMax: boolean, poolId: number, amount: BigNumber) {
+    let { hex: data } = instructions.encodeUnallocate(useMax, poolId, amount)
     return this.forward(data)
   }
 
