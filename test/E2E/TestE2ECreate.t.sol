@@ -3,4 +3,6 @@ pragma solidity ^0.8.0;
 
 import "./setup/TestE2ESetup.sol";
 
-contract TestE2ECreate is TestE2ESetup {}
+contract TestE2ECreate is TestE2ESetup {
+    function testFuzzCreate() public withGlobalInvariants {}
+}

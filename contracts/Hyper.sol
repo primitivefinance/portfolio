@@ -289,6 +289,7 @@ contract Hyper is IHyper {
             int128(deltaLiquidity) // TODO: add better type safety for these conversions.
         );
         _changeLiquidity(args);
+        emit log(deltaAsset, deltaQuote, "allocate");
 
         emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
@@ -325,7 +326,7 @@ contract Hyper is IHyper {
         if (args.deltaLiquidity < 0) {
             (uint256 distance, ) = getSecondsSincePositionUpdate(args.owner, args.poolId);
             if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
-            emit DecreasePosition(args.owner, args.poolId, uint128(args.deltaLiquidity));
+            emit DecreasePosition(args.owner, args.poolId, uint128(-args.deltaLiquidity)); // TODO: Should be an explict function, unary hard to see...
         } else {
             emit IncreasePosition(args.owner, args.poolId, uint128(args.deltaLiquidity));
         }
@@ -381,9 +382,13 @@ contract Hyper is IHyper {
             -int128(deltaLiquidity)
         );
 
+        emit log(deltaAsset, deltaQuote, "unallocate");
         _changeLiquidity(args);
         emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaQuote, deltaAsset, deltaLiquidity);
     }
+
+    event log(int128);
+    event log(uint, uint, string);
 
     /**
      * @dev Adds desired amount of liquidity to pending staked liquidity changes of a pool.
@@ -872,10 +877,13 @@ contract Hyper is IHyper {
 
     /** @dev Computes each side of a pool's reserves __per one unit of liquidity__. */
     function _getAmounts(uint48 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
-        uint256 timestamp = _blockTimestamp();
+        // TODO: Make a note of the importance of using the pool's _unchanged_ timestamp.
+        // If the blockTimestamp of a pool changes, it will change the pool's price.
+        // This blockTimestamp variable should be updated in swaps, not liquidity provision or removing.
+        HyperPool storage pool = pools[poolId];
+        uint256 timestamp = pool.blockTimestamp;
 
         Curve memory curve = curves[uint32(poolId)];
-        HyperPool storage pool = pools[poolId];
         Price.Expiring memory info = Price.Expiring({
             strike: curve.strike,
             sigma: curve.sigma,
