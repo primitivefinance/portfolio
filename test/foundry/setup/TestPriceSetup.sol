@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "contracts/libraries/Price.sol";
-import "../helpers/HelperHyperProfiles.sol";
+import "test/helpers/HelperHyperProfiles.sol";
 
 contract TestPriceSetup is HelperHyperProfiles, Test {
     Price.Expiring[] cases;

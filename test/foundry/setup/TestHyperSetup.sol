@@ -6,12 +6,12 @@ import "contracts/EnigmaTypes.sol";
 import "contracts/libraries/Price.sol";
 
 import "forge-std/Test.sol";
-import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher, FixedPointMathLib} from "./HyperTestOverrides.sol";
+import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher, FixedPointMathLib} from "test/helpers/HyperTestOverrides.sol";
 
-import "../helpers/HelperHyperActions.sol";
-import "../helpers/HelperHyperInvariants.sol";
-import "../helpers/HelperHyperProfiles.sol";
-import "../helpers/HelperHyperView.sol";
+import "test/helpers/HelperHyperActions.sol";
+import "test/helpers/HelperHyperInvariants.sol";
+import "test/helpers/HelperHyperProfiles.sol";
+import "test/helpers/HelperHyperView.sol";
 
 uint constant STARTING_BALANCE = 4000e18;
 

@@ -90,7 +90,7 @@ describe('HyperPrototype', function () {
       await expect(call)
         .to.emit(sdk.forwarder, 'Success')
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(1, tokens[0].address, tokens[1].address)
+        .withArgs(1, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
     })
 
     it('Creates a curve in the createPool call', async function () {
@@ -126,7 +126,7 @@ describe('HyperPrototype', function () {
       await expect(call)
         .to.emit(sdk.forwarder, 'Success')
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(0x01, tokens[0].address, tokens[1].address)
+        .withArgs(0x01, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
         .to.emit(sdk.instance, 'CreateCurve')
         .withArgs(0x0001, params.strike, params.sigma, params.maturity, 1e4 - params.fee, 1e4 - params.priorityFee)
         .to.emit(sdk.instance, 'CreatePool')
@@ -138,10 +138,10 @@ describe('HyperPrototype', function () {
 
       await expect(deployer.sendTransaction({ to: sdk.instance?.address, data, value: BigInt(0) }))
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(1, tokens[0].address, tokens[1].address)
+        .withArgs(1, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
     })
 
-    it.only('Creates a pair with jump process', async function () {
+    it('Creates a pair with jump process', async function () {
       const { bytes: data, hex: instructionData } = instructions.encodeCreatePair(tokens[0].address, tokens[1].address)
       const { hex: jumpData } = instructions.encodeJumpInstruction([data])
       console.log(instructionData)
@@ -156,7 +156,7 @@ describe('HyperPrototype', function () {
 
       await expect(deployer.sendTransaction({ to: sdk.instance?.address, data, value: BigInt(0) }))
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(1, tokens[0].address, tokens[1].address)
+        .withArgs(1, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
     })
   })
 
@@ -183,20 +183,18 @@ describe('HyperPrototype', function () {
     })
 
     it('adds liquidity', async function () {
-      const hiTick = params.tick + 256
-      const loTick = params.tick - 256
-      const call = sdk.allocate(poolId, loTick, hiTick, params.liquidity)
+      const call = sdk.allocate(poolId, params.liquidity)
       await expect(call).to.emit(sdk.instance, 'Allocate')
       expect(await this.tokens[0].balanceOf(sdk.instance?.address)).to.be.greaterThan(0)
       expect(await this.tokens[1].balanceOf(sdk.instance?.address)).to.be.greaterThan(0)
     })
 
     it('removes liquidity after adding it', async function () {
-      const hiTick = params.tick + 256
-      const loTick = params.tick - 256
-      let call = sdk.allocate(poolId, loTick, hiTick, params.liquidity)
+      let call = sdk.allocate(poolId, params.liquidity)
       await call
-      call = sdk.unallocate(false, poolId, loTick, hiTick, params.liquidity)
+
+      await this.hyper.set(5)
+      call = sdk.unallocate(false, poolId, params.liquidity)
       await expect(call).to.emit(sdk.instance, 'Unallocate')
     })
   })
@@ -223,9 +221,7 @@ describe('HyperPrototype', function () {
     })
 
     it('swaps asset to quote', async function () {
-      const hiTick = params.tick + 256
-      const loTick = params.tick - 256
-      let call = sdk.allocate(poolId, loTick, hiTick, params.liquidity)
+      let call = sdk.allocate(poolId, params.liquidity)
       await call
 
       call = sdk.swapAssetToQuote(false, poolId, parseEther('1'), ethers.constants.MaxUint256)

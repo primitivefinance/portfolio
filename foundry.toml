@@ -27,6 +27,7 @@ gas_reports = ["*"]
 ffi = true
 fuzz_runs = 1000
 
+
 [profile.crytic]
 via_ir = false
 src = 'test/crytic' # not default
@@ -38,3 +39,35 @@ primitive = "http://${PRIMITIVE_RPC}:8545"
 
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
+
+[fuzz]
+# The number of fuzz runs for fuzz tests
+runs = 1000
+# The maximum number of test case rejections allowed by proptest, to be
+# encountered during usage of `vm.assume` cheatcode. This will be used
+# to set the `max_global_rejects` value in proptest test runner config.
+# `max_local_rejects` option isn't exposed here since we're not using
+# `prop_filter`.
+max_test_rejects = 65536
+# The weight of the dictionary
+dictionary_weight = 40
+# The flag indicating whether to include values from storage
+include_storage = true
+# The flag indicating whether to include push bytes values
+include_push_bytes = true
+
+[invariant]
+# The number of runs that must execute for each invariant test group
+runs = 1000
+# The number of calls executed to attempt to break invariants in one run
+depth = 15
+# Fails the invariant fuzzing if a revert occurs
+fail_on_revert = false
+# Allows overriding an unsafe external call when running invariant tests. eg. reentrancy checks
+call_override = false
+# The weight of the dictionary
+dictionary_weight = 80
+# The flag indicating whether to include values from storage
+include_storage = true
+# The flag indicating whether to include push bytes values
+include_push_bytes = true
