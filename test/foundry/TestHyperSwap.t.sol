@@ -18,4 +18,14 @@ contract TestHyperSwap is TestHyperSetup {
             0
         );
     }
+
+    function testSwap_revert_NonExistentPool() public {
+        vm.expectRevert(NonExistentPool.selector);
+        __hyper__.swap(
+            42,
+            true,
+            1,
+            0
+        );
+    }
 }
