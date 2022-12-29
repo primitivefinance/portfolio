@@ -4,8 +4,8 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "./setup/TestInvariantSetup.sol";
 
-/** @dev Example invariant testing contract, for reference only. */
-contract InvariantBreaker {
+/** @dev Example invariant testing contract, for reference only. https://github.com/foundry-rs/foundry/pull/1572#discussion_r869737535 */
+contract InvariantBreaker is Test {
     bool public flag0 = true;
     bool public flag1 = true;
 
@@ -20,7 +20,7 @@ contract InvariantBreaker {
     }
 }
 
-/** @dev Example invariant test. */
+/** @dev Example invariant test. Always fails! */
 contract TestInvariantBasic is TestInvariantSetup, Test {
     InvariantBreaker inv;
 
@@ -29,7 +29,8 @@ contract TestInvariantBasic is TestInvariantSetup, Test {
         addTargetContract(address(inv));
     }
 
-    function invariant_neverFalse() public {
-        require(inv.flag1());
+    function invariant_neverFalse() public view {
+        // note: uncomment to test invariant testing
+        // require(inv.flag1());
     }
 }
