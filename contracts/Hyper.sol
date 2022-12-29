@@ -524,7 +524,7 @@ contract Hyper is IHyper {
         Price.Expiring memory expiring;
         {
             Curve memory curve = curves[uint32(args.poolId)];
-            if (_blockTimestamp() > curve.maturity) revert PoolExpiredError(); // todo: add buffer
+            if (_blockTimestamp() > curve.maturity + BUFFER) revert PoolExpiredError();
             expiring = Price.Expiring({
                 strike: curve.strike,
                 sigma: curve.sigma,
