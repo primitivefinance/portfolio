@@ -28,7 +28,7 @@ using {
 struct AccountSystem {
     mapping(address => mapping(address => uint)) balances; // Internal user balances.
     mapping(address => uint) reserves; // Global balance of tokens held by a contract.
-    mapping(address => bool) cached; // Tokens interacted with that must be settled.
+    mapping(address => bool) cached; // Tokens interacted with that must be settled. TODO: Make it a bitmap.
     address[] warm; // Transiently stored, must be length zero outside of execution.
     bool prepared; // Must be false outside of execution.
     bool settled; // Must be true outside of execution.
