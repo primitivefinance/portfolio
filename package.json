@@ -25,7 +25,8 @@
     "prepare:echidna:corpus": "yarn test:hardhat --network ganache",
     "prepare:differential": "cd ./test/differential/scripts/ && npm run compile && npm run generate",
     "deploy": "forge script scripts/Deploy.s.sol:Deploy --rpc-url $PRIMITIVE_RPC --fork-url $FORK_URL --broadcast",
-    "deploy:ganache": "forge script scripts/Deploy.s.sol:Deploy --fork-url http://localhost:8545 --broadcast"
+    "deploy:ganache": "forge script scripts/Deploy.s.sol:Deploy --fork-url http://localhost:8545 --broadcast",
+    "print:storage": "forge inspect contracts/Hyper.sol:Hyper storage-layout"
   },
   "repository": {
     "type": "git",

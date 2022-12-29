@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {InvariantAllocate} from "./InvariantAllocate.sol";
-import "./setup/TestE2ESetup.sol";
+import "forge-std/Test.sol";
 import "./setup/TestInvariantSetup.sol";
 
+/** @dev Example invariant testing contract, for reference only. */
 contract InvariantBreaker {
     bool public flag0 = true;
     bool public flag1 = true;
@@ -20,22 +20,13 @@ contract InvariantBreaker {
     }
 }
 
-contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
-    InvariantAllocate internal _allocate;
+/** @dev Example invariant test. */
+contract TestInvariantBasic is TestInvariantSetup, Test {
     InvariantBreaker inv;
 
-    function setUp() public override {
-        super.setUp();
-
+    function setUp() public {
         inv = new InvariantBreaker();
-        _allocate = new InvariantAllocate(address(__hyper__), address(__asset__), address(__quote__));
-
-        addTargetContract(address(_allocate));
         addTargetContract(address(inv));
-    }
-
-    function invariant_global() public withGlobalInvariants {
-        console.log("Woooo");
     }
 
     function invariant_neverFalse() public {

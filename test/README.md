@@ -76,16 +76,14 @@ At this point, you should be setup to interact with the test suites.
 
 #### Global
 
-- Postconditions:
-  - Token balance of Hyper should be greater than or equal to the sum of the `balances` and `reserves` of the token.
-  - For every pool, `reserves` of the pool's tokens should always be greater than the `getAmounts` output for the pool's entire liquidity.
-  - The sum of liquidity in all pools must be equal to the sum of liquidity of every position.
-- Outside Runtime conditions:
-  - The `lock` variable must always return `2` outside of execution.
-  - The `__account__.settled` variable must always return true outside of execution.
-  - The `__account__.prepared` variable must always return false outside of execution.
-  - The `__account__.warm` variable must always be an empty array outside of execution.
-  - The `address(this).balance` value must always be zero outside of execution.
+- Token balance of Hyper should be greater than or equal to the sum of the `balances` and `reserves` of the token.
+- For every pool, `reserves` of the pool's tokens should always be greater than the `getAmounts` output for the pool's entire liquidity.
+- The sum of liquidity in all pools must be equal to the sum of liquidity of every position.
+- The `lock` variable must always return `1` outside of execution.
+- The `__account__.settled` variable must always return true outside of execution.
+- The `__account__.prepared` variable must always return false outside of execution.
+- The `__account__.warm` variable must always be an empty array outside of execution.
+- The `address(this).balance` value must always be zero outside of execution.
 
 #### Deposit
 
