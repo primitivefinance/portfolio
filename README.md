@@ -4,11 +4,16 @@ Full vision of Primitive Replicating Market Maker.
 
 ## Notes
 
-Investigate use of msg.value! (used in fund)
-Improve/fix swap.
-Investigate gas costs of swaps.
-Investigate curve/pair nonces.
-Add utility functions to fetch all data.
+- [ ] Investigate use of msg.value! (used in fund).
+- [ ] Improve/fix swap. Assigned to Clement.
+- [ ] Investigate gas costs of swaps.
+- [ ] Investigate curve/pair nonces. Assigned to Alex.
+- [ ] Add utility functions to fetch all data. Assigned to Alex.
+- [ ] Add random swaps to invariant testing.
+- [ ] Investigate typecasting.
+- [ ] Investiate assembly usage.
+- [ ] Explore refactor of free functions. I like free functions but they are so new that not many testing frameworks have good support yet.
+- [ ] Explore implications of time movement creating price changes. Cannot change price and liquidity at the same time, thats an invariant!
 
 #### Allocate
 

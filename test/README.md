@@ -1,6 +1,8 @@
 # Primitive Hyper Testing
 
-Primitive follows [test driven development](https://en.wikipedia.org/wiki/Test-driven_development), writing tests before logic. We follow the principles described in this [Microsoft Unit Testing Best Practices](https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-practices), even though it is written for .NET projects.
+Primitive follows [test driven development](https://en.wikipedia.org/wiki/Test-driven_development).
+
+We follow the principles described in this [Microsoft Unit Testing Best Practices](https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-best-practices).
 
 For solidity, we follow the [Primitive Smart Contract Style Guide]().
 
@@ -28,7 +30,7 @@ For solidity, we follow the [Primitive Smart Contract Style Guide]().
 
 # I. Introduction
 
-This test suite is comprehensive. We use three different testing frameworks; a test for our tests.
+This test suite is comprehensive. There are unit tests written using foundry and hardhat, fuzz testing with echidna and foundry, and invariant testing using foundry.
 
 ## Installation
 
@@ -71,6 +73,8 @@ At this point, you should be setup to interact with the test suites.
 ---
 
 # II. Primitive System Invariants
+
+System invariants are tested using Foundry's invariant testing. There is no documentation for Foundry's invariant testing at the moment, so use the dapptools docs as a reference: [Invariant Testing](https://github.com/dapphub/dapptools/blob/master/src/dapp/README.md#invariant-testing).
 
 ### Hyper.sol
 
