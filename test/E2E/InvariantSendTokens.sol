@@ -10,13 +10,16 @@ contract InvariantSendTokens is InvariantTargetContract {
 
     function sendAssetTokens(uint amount) external {
         amount = bound(amount, 1, 2 ** 127);
-        __asset__.mint(address(__hyper__), amount);
-        emit SentTokens(address(__asset__), amount);
+        transfer(__asset__, amount);
     }
 
     function sendQuoteTokens(uint amount) external {
         amount = bound(amount, 1, 2 ** 127);
-        __quote__.mint(address(__hyper__), amount);
-        emit SentTokens(address(__quote__), amount);
+        transfer(__quote__, amount);
+    }
+
+    function transfer(TestERC20 token, uint amount) internal {
+        token.mint(address(__hyper__), amount);
+        emit SentTokens(address(token), amount);
     }
 }

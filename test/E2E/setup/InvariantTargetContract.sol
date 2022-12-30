@@ -7,6 +7,22 @@ import {HyperPool, HyperPosition, HyperTimeOverride, TestERC20} from "test/helpe
 
 interface Context {
     function users() external view returns (address[] memory);
+
+    function getRandomPoolId(uint id) external view returns (uint48);
+
+    function setPoolId(uint48 poolId) external;
+
+    function addPoolId(uint48 poolId) external;
+
+    function customWarp(uint time) external;
+
+    function getRandomUser(uint id) external view returns (address);
+
+    function __weth__() external view returns (TestERC20);
+
+    function __asset__() external view returns (TestERC20);
+
+    function __quote__() external view returns (TestERC20);
 }
 
 /** @dev Target contract must inherit. Read: https://github.com/dapphub/dapptools/blob/master/src/dapp/README.md#invariant-testing */

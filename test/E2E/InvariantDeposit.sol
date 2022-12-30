@@ -6,17 +6,21 @@ import "./setup/InvariantTargetContract.sol";
 contract InvariantDeposit is InvariantTargetContract {
     constructor(address hyper_, address asset_, address quote_) InvariantTargetContract(hyper_, asset_, quote_) {}
 
-    function deposit(uint amount) external {
+    function deposit(uint amount, uint index) external {
         amount = bound(amount, 1, 1e36);
-        vm.deal(address(this), amount);
+
+        address target = ctx.getRandomUser(index);
+
+        vm.deal(target, amount);
 
         address weth = __hyper__.WETH();
 
-        uint preBal = getBalance(address(__hyper__), address(this), weth);
+        uint preBal = getBalance(address(__hyper__), target, weth);
         uint preRes = getReserve(address(__hyper__), weth);
+        vm.prank(target);
         __hyper__.deposit{value: amount}();
         uint postRes = getReserve(address(__hyper__), weth);
-        uint postBal = getBalance(address(__hyper__), address(this), weth);
+        uint postBal = getBalance(address(__hyper__), target, weth);
 
         assertEq(postRes, preRes + amount, "weth-reserve");
         assertEq(postBal, preBal + amount, "weth-balance");

@@ -140,8 +140,21 @@ contract TestE2ESetup is Helpers, Test {
         }
     }
 
-    function customWarp(uint time) internal {
+    function customWarp(uint time) public virtual {
         vm.warp(time);
         __hyper__.setTimestamp(uint128(time));
+    }
+
+    event SetNewPoolId(uint48);
+
+    /** @dev Sets the pool id and assets in TestE2ESetup state. Affects all tests! */
+    function setPoolId(uint48 poolId) public {
+        __poolId__ = poolId;
+
+        Pair memory pair = getPair(address(__hyper__), uint16(poolId >> 32));
+        __asset__ = TestERC20(pair.tokenAsset);
+        __quote__ = TestERC20(pair.tokenQuote);
+
+        emit SetNewPoolId(poolId);
     }
 }

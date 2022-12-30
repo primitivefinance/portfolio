@@ -6,9 +6,12 @@ import "./setup/InvariantTargetContract.sol";
 contract InvariantAllocateUnallocate is InvariantTargetContract {
     constructor(address hyper_, address asset_, address quote_) InvariantTargetContract(hyper_, asset_, quote_) {}
 
-    function allocate(uint deltaLiquidity) public {
+    function allocate(uint deltaLiquidity, uint index) public {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
-        // TODO: Add use max flag support.
+
+        // Allocate to a random pool.
+        ctx.setPoolId(ctx.getRandomPoolId(index));
+
         _assertAllocate(deltaLiquidity);
     }
 
@@ -110,8 +113,16 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
     event FinishedCall(string);
 
-    function unallocate(uint deltaLiquidity) external {
+    function unallocate(uint deltaLiquidity, uint index) external {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
+
+        // Unallocate from a random pool.
+        ctx.setPoolId(ctx.getRandomPoolId(index));
+
+        _assertUnallocate(deltaLiquidity);
+    }
+
+    function _assertUnallocate(uint deltaLiquidity) internal {
         // TODO: Add use max flag support.
 
         // Get some liquidity.

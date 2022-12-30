@@ -8,6 +8,8 @@ import {InvariantAllocateUnallocate} from "./InvariantAllocateUnallocate.sol";
 import {InvariantFundDraw} from "./InvariantFundDraw.sol";
 import {InvariantDeposit} from "./InvariantDeposit.sol";
 import {InvariantSendTokens} from "./InvariantSendTokens.sol";
+import {InvariantWarper} from "./InvariantWarper.sol";
+import {InvariantCreatePool} from "./InvariantCreatePool.sol";
 
 bytes32 constant SLOT_LOCKED = bytes32(uint(5));
 
@@ -25,6 +27,10 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     InvariantFundDraw internal _fundDraw;
     InvariantDeposit internal _deposit;
     InvariantSendTokens internal _sendTokens;
+    InvariantWarper internal _warper;
+    InvariantCreatePool internal _createPool;
+
+    uint48[] public __poolIds__;
 
     function setUp() public override {
         super.setUp();
@@ -35,16 +41,24 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         _fundDraw = new InvariantFundDraw(hyper, asset, quote);
         _deposit = new InvariantDeposit(hyper, asset, quote);
         _sendTokens = new InvariantSendTokens(hyper, asset, quote);
+        _warper = new InvariantWarper(hyper, asset, quote);
+        _createPool = new InvariantCreatePool(hyper, asset, quote);
 
         addTargetContract(address(_allocateUnallocate));
         addTargetContract(address(_fundDraw));
         addTargetContract(address(_deposit));
         addTargetContract(address(_sendTokens));
+        addTargetContract(address(_warper));
+        addTargetContract(address(_createPool));
 
         __users__.push(address(_allocateUnallocate));
         __users__.push(address(_fundDraw));
         __users__.push(address(_deposit));
         __users__.push(address(_sendTokens));
+        __users__.push(address(_warper));
+        __users__.push(address(_createPool));
+
+        addPoolId(__poolId__);
     }
 
     function invariant_asset_balance_gte_reserves() public {
@@ -67,43 +81,24 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         assertTrue(!prepared, "invariant-prepared");
     }
 
-    event log(string, uint);
-
     function invariant_virtual_pool_asset_reserves() public {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
-        emit log("liq", pool.liquidity);
-        (uint a, uint b) = __hyper__.getAllocateAmounts(__poolId__, pool.liquidity);
-        emit log("a", a);
-        emit log("b", b);
 
         (uint dAsset, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
-        emit log("dAsset", dAsset);
-        emit log("dQuote", dQuote);
-
         uint bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
         uint bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
 
-        emit log("bAsset", bAsset);
-        emit log("bQuote", bQuote);
         assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
     }
 
     function invariant_virtual_pool_quote_reserves() public {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
-        emit log("liq", pool.liquidity);
-        (uint a, uint b) = __hyper__.getAllocateAmounts(__poolId__, pool.liquidity);
-        emit log("a", a);
-        emit log("b", b);
 
         (uint dAsset, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
-        emit log("dAsset", dAsset);
-        emit log("dQuote", dQuote);
 
         uint bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
         uint bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
 
-        emit log("bAsset", bAsset);
-        emit log("bQuote", bQuote);
         assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
     }
 
@@ -131,5 +126,24 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         reserve = getReserve(address(__hyper__), token);
         physical = getPhysicalBalance(address(__hyper__), token);
         balances = getBalanceSum(address(__hyper__), token, users());
+    }
+
+    function addPoolId(uint48 poolId) public {
+        require(poolId != 0, "zero poolId");
+        __poolIds__.push(poolId);
+    }
+
+    function getRandomUser(uint id) public returns (address) {
+        require(__users__.length > 0);
+        uint index = id % __users__.length;
+        address user = __users__[index];
+        return user;
+    }
+
+    function getRandomPoolId(uint id) public returns (uint48) {
+        require(__poolIds__.length > 0);
+        uint index = id % __poolIds__.length;
+        uint48 poolId = __poolIds__[index];
+        return poolId;
     }
 }
