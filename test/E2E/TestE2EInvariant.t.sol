@@ -61,6 +61,10 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         addPoolId(__poolId__);
     }
 
+    function invariant_assert_pools_created() public {
+        assertTrue(__poolIds__.length > 0);
+    }
+
     function invariant_asset_balance_gte_reserves() public {
         (uint reserve, uint physical, ) = getBalances(address(__asset__));
         assertTrue(physical >= reserve, "invariant-asset-physical-balance");
@@ -84,22 +88,21 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     function invariant_virtual_pool_asset_reserves() public {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
 
-        (uint dAsset, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
-        uint bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
-        uint bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
-
-        assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
+        if (pool.liquidity > 0) {
+            (uint dAsset, ) = __hyper__.getVirtualReserves(__poolId__);
+            uint bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
+            assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
+        }
     }
 
     function invariant_virtual_pool_quote_reserves() public {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
 
-        (uint dAsset, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
-
-        uint bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
-        uint bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
-
-        assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
+        if (pool.liquidity > 0) {
+            (, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
+            uint bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
+            assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
+        }
     }
 
     function invariant_liquidity_sum() public {
@@ -125,23 +128,23 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     function getBalances(address token) internal view returns (uint reserve, uint physical, uint balances) {
         reserve = getReserve(address(__hyper__), token);
         physical = getPhysicalBalance(address(__hyper__), token);
-        balances = getBalanceSum(address(__hyper__), token, users());
+        balances = getBalanceSum(address(__hyper__), token, __users__);
     }
 
     function addPoolId(uint48 poolId) public {
-        require(poolId != 0, "zero poolId");
+        assertTrue(poolId != 0, "zero poolId");
         __poolIds__.push(poolId);
     }
 
     function getRandomUser(uint id) public returns (address) {
-        require(__users__.length > 0);
+        assertTrue(__users__.length > 0);
         uint index = id % __users__.length;
         address user = __users__[index];
         return user;
     }
 
     function getRandomPoolId(uint id) public returns (uint48) {
-        require(__poolIds__.length > 0);
+        assertTrue(__poolIds__.length > 0);
         uint index = id % __poolIds__.length;
         uint48 poolId = __poolIds__[index];
         return poolId;

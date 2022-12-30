@@ -11,6 +11,13 @@ contract InvariantFundDraw is InvariantTargetContract {
 
         address target = ctx.getRandomUser(index);
 
+        // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
+        // They will be credited to the msg.sender of the next call.
+        int netAssetBalance = __hyper__.getNetBalance(address(__asset__));
+        int netQuoteBalance = __hyper__.getNetBalance(address(__quote__));
+        assertTrue(netAssetBalance >= 0, "negative-net-asset-tokens");
+        assertTrue(netQuoteBalance >= 0, "negative-net-quote-tokens");
+
         vm.prank(target);
         __asset__.approve(address(__hyper__), amount);
         deal(address(__asset__), target, amount);
@@ -22,8 +29,8 @@ contract InvariantFundDraw is InvariantTargetContract {
         uint postRes = getReserve(address(__hyper__), address(__asset__));
         uint postBal = getBalance(address(__hyper__), target, address(__asset__));
 
-        assertEq(postBal, preBal + amount, "fund-delta-asset-balance");
-        assertEq(postRes, preRes + amount, "fund-delta-asset-reserve");
+        assertEq(postBal, preBal + amount + uint(netAssetBalance), "fund-delta-asset-balance");
+        assertEq(postRes, preRes + amount + uint(netQuoteBalance), "fund-delta-asset-reserve");
     }
 
     function fund_quote(uint amount, uint index) public {

@@ -251,8 +251,8 @@ contract Hyper is IHyper {
     /**
      * @dev Adds liquidity to a position, therefore increasing liquidity in the pool and creating a "debit" balance in settlement.
      *
-     * TODO: Document the requirement to ONLY change one value: liquidity or price. 
-     * 
+     * TODO: Document the requirement to ONLY change one value: liquidity or price.
+     *
      * @custom:reverts If attempting to add zero liquidity.
      * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      */
@@ -888,6 +888,8 @@ contract Hyper is IHyper {
         uint48 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+        if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
+
         require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
@@ -900,6 +902,8 @@ contract Hyper is IHyper {
         uint48 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+        if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
+
         require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
@@ -950,10 +954,10 @@ using {changePositionLiquidity, syncPositionFees} for HyperPosition;
  * @notice Syncs a pool's liquidity and last updated timestamp.
  */
 function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
-    // TODO: Investigate updating timestamp. 
-    // Changing timestamp changes pool price. 
+    // TODO: Investigate updating timestamp.
+    // Changing timestamp changes pool price.
     // Cannot change price and liquidity.
-    // self.blockTimestamp = timestamp; 
+    // self.blockTimestamp = timestamp;
     self.liquidity = asm.toUint128(asm.__computeDelta(self.liquidity, liquidityDelta));
 }
 

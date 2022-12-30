@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+import "contracts/OS.sol" as OS;
 import {Pair, Curve, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
 
 interface IHyperStruct {
@@ -100,7 +101,7 @@ contract HelperHyperView {
     }
 
     function getPhysicalBalance(address hyper, address token) public view returns (uint) {
-        return TokenLike(token).balanceOf(hyper);
+        return OS.__balanceOf__(token, hyper);
     }
 
     function getVirtualBalance(address hyper, address token, address[] memory owners) public view returns (uint) {

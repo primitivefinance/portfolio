@@ -11,6 +11,7 @@ contract InvariantWarper is InvariantTargetContract {
     }
 
     function warpAfterMaturity(uint amount) external {
-        ctx.customWarp(getCurve(address(__hyper__), uint32(__poolId__)).maturity + 1 days);
+        amount = bound(amount, 1 days, 700 days);
+        ctx.customWarp(getCurve(address(__hyper__), uint32(__poolId__)).maturity + amount);
     }
 }

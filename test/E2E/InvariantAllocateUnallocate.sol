@@ -10,7 +10,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
         // Allocate to a random pool.
-        ctx.setPoolId(ctx.getRandomPoolId(index));
+        // VERY IMPORTANT
+        setPoolId(ctx.getRandomPoolId(index));
 
         _assertAllocate(deltaLiquidity);
     }
@@ -117,7 +118,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
         // Unallocate from a random pool.
-        ctx.setPoolId(ctx.getRandomPoolId(index));
+        // VERY IMPORTANT
+        setPoolId(ctx.getRandomPoolId(index));
 
         _assertUnallocate(deltaLiquidity);
     }
@@ -169,6 +171,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     }
 
     function checkVirtualInvariant() internal {
+        HyperPool memory pool = getPool(address(__hyper__), __poolId__);
+        // TODO: Breaks when we call this function on a pool with zero liquidity...
         (uint dAsset, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
@@ -186,6 +190,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
+
+        emit FinishedCall("Check Virtual Invariant");
     }
 
     event log(string, uint);

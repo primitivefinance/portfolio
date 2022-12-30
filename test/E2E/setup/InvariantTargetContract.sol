@@ -48,4 +48,12 @@ contract InvariantTargetContract is HelperHyperView, Test {
     function getState() internal view returns (HyperState memory) {
         return getState(address(__hyper__), __poolId__, address(this), ctx.users());
     }
+
+    function setPoolId(uint48 poolId) internal {
+        ctx.setPoolId(poolId); // TODO: duplicating for now...
+
+        Pair memory pair = getPair(address(__hyper__), uint16(poolId >> 32));
+        __asset__ = TestERC20(pair.tokenAsset);
+        __quote__ = TestERC20(pair.tokenQuote);
+    }
 }
