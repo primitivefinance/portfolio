@@ -160,7 +160,12 @@ interface IHyperGetters {
         uint48 poolId
     ) external view returns (uint256 distance, uint256 timestamp);
 
-    function getReserveDelta(
+    function getAllocateAmounts(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
+
+    function getUnallocateAmounts(
         uint48 poolId,
         uint256 deltaLiquidity
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);

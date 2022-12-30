@@ -7,7 +7,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     constructor(address hyper_, address asset_, address quote_) InvariantTargetContract(hyper_, asset_, quote_) {}
 
     function allocate(uint deltaLiquidity) public {
-        deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 127);
+        deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
         // TODO: Add use max flag support.
         _assertAllocate(deltaLiquidity);
     }
@@ -40,7 +40,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
         // Amounts of tokens that will be allocated to pool.
-        (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getReserveDelta(__poolId__, deltaLiquidity);
+        (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getAllocateAmounts(__poolId__, deltaLiquidity);
 
         // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
         // They will be credited to the msg.sender of the next call.
@@ -111,7 +111,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     event FinishedCall(string);
 
     function unallocate(uint deltaLiquidity) external {
-        deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 127);
+        deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
         // TODO: Add use max flag support.
 
         // Get some liquidity.
@@ -129,7 +129,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             vm.warp(timestamp);
             __hyper__.setTimestamp(uint128(timestamp));
 
-            (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getReserveDelta(__poolId__, deltaLiquidity);
+            (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getUnallocateAmounts(__poolId__, deltaLiquidity);
             prev = getState();
             (uint unallocatedAsset, uint unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
             HyperState memory end = getState();

@@ -251,6 +251,8 @@ contract Hyper is IHyper {
     /**
      * @dev Adds liquidity to a position, therefore increasing liquidity in the pool and creating a "debit" balance in settlement.
      *
+     * TODO: Document the requirement to ONLY change one value: liquidity or price. 
+     * 
      * @custom:reverts If attempting to add zero liquidity.
      * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      */
@@ -277,7 +279,7 @@ contract Hyper is IHyper {
         }
 
         // note: rounds token amounts up, so caller pays more. Prevents siphoning from unallocating rounded down amounts.
-        (deltaAsset, deltaQuote) = _getReserveDeltaWadUp(poolId, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getAllocateAmounts(poolId, deltaLiquidity);
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
@@ -385,7 +387,7 @@ contract Hyper is IHyper {
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
-        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity); // computed before changing liquidity
+        (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity); // computed before changing liquidity
 
         Pair memory pair = pairs[uint16(poolId >> 32)];
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
@@ -878,26 +880,27 @@ contract Hyper is IHyper {
     /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
     function getVirtualReserves(uint48 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
         uint deltaLiquidity = pools[poolId].liquidity;
-        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity);
     }
 
-    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
-    function getReserveDelta(
+    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. Rounded down. */
+    function getUnallocateAmounts(
         uint48 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
-        require(deltaLiquidity < 2 ** 128, "err above uint128");
+        require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
         deltaAsset = asm.toUint128(amountAsset.mulWadDown(deltaLiquidity));
         deltaQuote = asm.toUint128(amountQuote.mulWadDown(deltaLiquidity));
     }
 
-    function _getReserveDeltaWadUp(
+    /** @dev Computes amount of physical reserves that must be added to the pool for `deltaLiquidity`. Rounded up. */
+    function getAllocateAmounts(
         uint48 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
-        require(deltaLiquidity < 2 ** 128, "err above uint128");
+        require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
         deltaAsset = asm.toUint128(amountAsset.mulWadUp(deltaLiquidity));
@@ -947,7 +950,10 @@ using {changePositionLiquidity, syncPositionFees} for HyperPosition;
  * @notice Syncs a pool's liquidity and last updated timestamp.
  */
 function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp;
+    // TODO: Investigate updating timestamp. 
+    // Changing timestamp changes pool price. 
+    // Cannot change price and liquidity.
+    // self.blockTimestamp = timestamp; 
     self.liquidity = asm.toUint128(asm.__computeDelta(self.liquidity, liquidityDelta));
 }
 
@@ -955,7 +961,7 @@ function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 l
  * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
  */
 function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp;
+    self.blockTimestamp = timestamp; // Allowed to change timestamp with changing liquidity of a position.
     self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
 }
 

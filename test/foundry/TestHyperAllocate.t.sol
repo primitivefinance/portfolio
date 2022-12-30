@@ -14,13 +14,14 @@ contract TestHyperAllocate is TestHyperSetup {
             curve.maturity - block.timestamp
         );
 
-        __hyperTestingContract__.allocate(defaultScenario.poolId, 4e6);
+        uint delLiquidity = 4_000_000;
+        __hyperTestingContract__.allocate(defaultScenario.poolId, delLiquidity);
 
         uint256 globalR1 = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
         uint256 globalR2 = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
         assertTrue(globalR1 > 0);
         assertTrue(globalR2 > 0);
-        assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
+        assertApproxEqAbs(globalR2, (theoreticalR2 * delLiquidity) / 1e18, 1, "asset-reserve-theoretic");
     }
 
     function testAllocateUseMax() public postTestInvariantChecks {
@@ -30,7 +31,7 @@ contract TestHyperAllocate is TestHyperSetup {
             defaultScenario.quote.balanceOf(address(this))
         );
 
-        (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getReserveDelta(
+        (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getAllocateAmounts(
             defaultScenario.poolId,
             maxLiquidity
         );
@@ -49,8 +50,8 @@ contract TestHyperAllocate is TestHyperSetup {
      * from uint128 to int128 causing an overflow.
      */
     function testFuzzAllocateUnallocateSuccessful(uint128 deltaLiquidity) public postTestInvariantChecks {
-        vm.assume(deltaLiquidity > 0);
-        vm.assume(deltaLiquidity < 2 ** 127);
+        vm.assume(deltaLiquidity != 0);
+        vm.assume(deltaLiquidity < 2 ** 126); // note: if its 2^127, it could still overflow since liquidity is multiplied against token amounts in getAllocateAmounts.
         // TODO: Add use max flag support.
         _assertAllocate(deltaLiquidity);
     }
@@ -62,7 +63,7 @@ contract TestHyperAllocate is TestHyperSetup {
         assertTrue(pool.blockTimestamp != 0, "Pool not initialized");
         assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
-        (uint expectedDeltaAsset, uint expectedDeltaQuote) = __hyperTestingContract__.getReserveDelta(
+        (uint expectedDeltaAsset, uint expectedDeltaQuote) = __hyperTestingContract__.getAllocateAmounts(
             defaultScenario.poolId,
             deltaLiquidity
         );
@@ -109,13 +110,13 @@ contract TestHyperAllocate is TestHyperSetup {
 
         {
             HyperState memory end = getState();
-            assertEq(unallocatedAsset, deltaAsset);
-            assertEq(unallocatedQuote, deltaQuote);
-            assertEq(end.reserveAsset, prev.reserveAsset);
-            assertEq(end.reserveQuote, prev.reserveQuote);
-            assertEq(end.totalPoolLiquidity, prev.totalPoolLiquidity);
-            assertEq(end.totalPositionLiquidity, prev.totalPositionLiquidity);
-            assertEq(end.callerPositionLiquidity, prev.callerPositionLiquidity);
+            assertApproxEqAbs(unallocatedAsset, deltaAsset, 1, "unallocate-delta-asset");
+            assertApproxEqAbs(unallocatedQuote, deltaQuote, 1, "unallocate-delta-quote");
+            assertApproxEqAbs(end.reserveAsset, prev.reserveAsset, 1, "unallocate-reserve-asset");
+            assertApproxEqAbs(end.reserveQuote, prev.reserveQuote, 1, "unallocate-reserve-quote");
+            assertEq(end.totalPoolLiquidity, prev.totalPoolLiquidity, "unallocate-pool-liquidity");
+            assertEq(end.totalPositionLiquidity, prev.totalPositionLiquidity, "unallocate-sum-position-liquidity");
+            assertEq(end.callerPositionLiquidity, prev.callerPositionLiquidity, "unallocate-caller-position-liquidity");
         }
     }
 }

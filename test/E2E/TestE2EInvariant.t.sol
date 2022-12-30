@@ -72,7 +72,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     function invariant_virtual_pool_asset_reserves() public {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
         emit log("liq", pool.liquidity);
-        (uint a, uint b) = __hyper__.getReserveDelta(__poolId__, pool.liquidity);
+        (uint a, uint b) = __hyper__.getAllocateAmounts(__poolId__, pool.liquidity);
         emit log("a", a);
         emit log("b", b);
 
@@ -91,7 +91,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     function invariant_virtual_pool_quote_reserves() public {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
         emit log("liq", pool.liquidity);
-        (uint a, uint b) = __hyper__.getReserveDelta(__poolId__, pool.liquidity);
+        (uint a, uint b) = __hyper__.getAllocateAmounts(__poolId__, pool.liquidity);
         emit log("a", a);
         emit log("b", b);
 

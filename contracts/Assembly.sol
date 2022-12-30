@@ -27,7 +27,7 @@ function toUint128(uint256 x) pure returns (uint128 z) {
     bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
     uint128 max = type(uint128).max;
     assembly {
-        switch iszero(gt(x, max))
+        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
         case 0 {
             let revertDataSize := mload(revertData)
             revert(add(32, revertData), revertDataSize)
