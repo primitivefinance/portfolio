@@ -23,6 +23,9 @@ contract InvariantTargetContract is HelperHyperView, Test {
         __hyper__ = HyperTimeOverride(payable(hyper_));
         __asset__ = TestERC20(asset_);
         __quote__ = TestERC20(quote_);
+
+        __asset__.approve(hyper_, type(uint).max);
+        __quote__.approve(hyper_, type(uint).max);
     }
 
     /** @dev Uses the initialized context for the getState function. */

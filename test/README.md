@@ -76,7 +76,7 @@ At this point, you should be setup to interact with the test suites.
 
 #### Global
 
-- Token balance of Hyper should be greater than or equal to the sum of the `balances` and `reserves` of the token.
+- Token balances of Hyper should be greater than or equal to the `reserves` of all tokens.
 - For every pool, `reserves` of the pool's tokens should always be greater than the `getAmounts` output for the pool's entire liquidity.
 - The sum of liquidity in all pools must be equal to the sum of liquidity of every position.
 - The `lock` variable must always return `1` outside of execution.

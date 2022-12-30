@@ -163,15 +163,15 @@ interface IHyperGetters {
     function getReserveDelta(
         uint48 poolId,
         uint256 deltaLiquidity
-    ) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
-    function getVirtualReserves(uint48 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+    function getVirtualReserves(uint48 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
     function getLiquidityMinted(
         uint48 poolId,
         uint deltaAsset,
         uint deltaQuote
-    ) external view returns (uint deltaLiquidity);
+    ) external view returns (uint128 deltaLiquidity);
 }
 
 /**
