@@ -251,6 +251,8 @@ contract Hyper is IHyper {
     /**
      * @dev Adds liquidity to a position, therefore increasing liquidity in the pool and creating a "debit" balance in settlement.
      *
+     * TODO: Document the requirement to ONLY change one value: liquidity or price.
+     *
      * @custom:reverts If attempting to add zero liquidity.
      * @custom:reverts If attempting to add liquidity to a pool that has not been created.
      */
@@ -276,7 +278,8 @@ contract Hyper is IHyper {
             );
         }
 
-        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity);
+        // note: rounds token amounts up, so caller pays more. Prevents siphoning from unallocating rounded down amounts.
+        (deltaAsset, deltaQuote) = getAllocateAmounts(poolId, deltaLiquidity);
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
@@ -343,6 +346,13 @@ contract Hyper is IHyper {
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
 
+        emit TouchedTokens(
+            __account__.warm.length,
+            __account__.warm,
+            __account__.cached[asset],
+            __account__.cached[quote]
+        );
+
         if (args.deltaLiquidity < 0) {
             _decreaseReserves(asset, args.deltaAsset);
             _decreaseReserves(quote, args.deltaQuote);
@@ -351,7 +361,16 @@ contract Hyper is IHyper {
             _increaseReserves(asset, args.deltaAsset);
             _increaseReserves(quote, args.deltaQuote);
         }
+
+        emit TouchedTokens(
+            __account__.warm.length,
+            __account__.warm,
+            __account__.cached[asset],
+            __account__.cached[quote]
+        );
     }
+
+    event TouchedTokens(uint amount, address[] warm, bool cachedAsset, bool cachedQuote);
 
     /**
      * @dev Subtracts liquidity from a position, therefore reducing liquidity in the pool and creating a "credit" balance in settlement.
@@ -368,7 +387,7 @@ contract Hyper is IHyper {
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
-        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity); // computed before changing liquidity
+        (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity); // computed before changing liquidity
 
         Pair memory pair = pairs[uint16(poolId >> 32)];
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
@@ -384,7 +403,7 @@ contract Hyper is IHyper {
 
         emit log(deltaAsset, deltaQuote, "unallocate");
         _changeLiquidity(args);
-        emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaQuote, deltaAsset, deltaLiquidity);
+        emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     event log(int128);
@@ -851,28 +870,45 @@ contract Hyper is IHyper {
         uint48 poolId,
         uint deltaAsset,
         uint deltaQuote
-    ) public view returns (uint deltaLiquidity) {
+    ) public view returns (uint128 deltaLiquidity) {
         (uint amount0, uint amount1) = _getAmounts(poolId);
         uint liquidity0 = deltaAsset.divWadDown(amount0); // If `deltaAsset` is twice as much as assets per liquidity in pool, we can mint 2 liquidity.
         uint liquidity1 = deltaQuote.divWadDown(amount1); // If this liquidity amount is lower, it means we don't have enough tokens to mint the above amount.
-        deltaLiquidity = liquidity0 < liquidity1 ? liquidity0 : liquidity1;
+        deltaLiquidity = asm.toUint128(liquidity0 < liquidity1 ? liquidity0 : liquidity1);
     }
 
     /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
-    function getVirtualReserves(uint48 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+    function getVirtualReserves(uint48 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
         uint deltaLiquidity = pools[poolId].liquidity;
-        (deltaAsset, deltaQuote) = getReserveDelta(poolId, deltaLiquidity);
+        (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity);
     }
 
-    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. */
-    function getReserveDelta(
+    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. Rounded down. */
+    function getUnallocateAmounts(
         uint48 poolId,
         uint256 deltaLiquidity
-    ) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
-        (deltaAsset, deltaQuote) = _getAmounts(poolId);
+    ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+        if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
 
-        deltaQuote = deltaQuote.mulWadDown(deltaLiquidity);
-        deltaAsset = deltaAsset.mulWadDown(deltaLiquidity);
+        require(deltaLiquidity < 2 ** 127, "err above uint127");
+        (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
+
+        deltaAsset = asm.toUint128(amountAsset.mulWadDown(deltaLiquidity));
+        deltaQuote = asm.toUint128(amountQuote.mulWadDown(deltaLiquidity));
+    }
+
+    /** @dev Computes amount of physical reserves that must be added to the pool for `deltaLiquidity`. Rounded up. */
+    function getAllocateAmounts(
+        uint48 poolId,
+        uint256 deltaLiquidity
+    ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+        if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
+
+        require(deltaLiquidity < 2 ** 127, "err above uint127");
+        (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
+
+        deltaAsset = asm.toUint128(amountAsset.mulWadUp(deltaLiquidity));
+        deltaQuote = asm.toUint128(amountQuote.mulWadUp(deltaLiquidity));
     }
 
     /** @dev Computes each side of a pool's reserves __per one unit of liquidity__. */
@@ -903,6 +939,11 @@ contract Hyper is IHyper {
         timestamp = _blockTimestamp();
         distance = timestamp - previous;
     }
+
+    /** @dev TODO: Do we want to expose this? */
+    function getNetBalance(address token) public view returns (int) {
+        return __account__.getNetBalance(token, address(this));
+    }
 }
 
 using {changePoolLiquidity} for HyperPool;
@@ -913,7 +954,10 @@ using {changePositionLiquidity, syncPositionFees} for HyperPosition;
  * @notice Syncs a pool's liquidity and last updated timestamp.
  */
 function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp;
+    // TODO: Investigate updating timestamp.
+    // Changing timestamp changes pool price.
+    // Cannot change price and liquidity.
+    // self.blockTimestamp = timestamp;
     self.liquidity = asm.toUint128(asm.__computeDelta(self.liquidity, liquidityDelta));
 }
 
@@ -921,7 +965,7 @@ function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 l
  * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
  */
 function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp;
+    self.blockTimestamp = timestamp; // Allowed to change timestamp with changing liquidity of a position.
     self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
 }
 

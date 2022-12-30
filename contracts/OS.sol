@@ -119,25 +119,42 @@ function prepare(AccountSystem storage self) {
 /** @notice Settles the difference in balance between tracked tokens and physically held tokens. */
 function settle(AccountSystem storage self, function(address, address, uint) pay, address token, address account) {
     if (!self.prepared) revert NotPreparedToSettle();
+    delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of this internal fn.
 
     int net = self.getNetBalance(token, account);
-    if (net == 0) return;
-    if (net > 0) return self.credit(msg.sender, token, uint(net));
-
-    uint amount = uint(-net);
-    bool paid = self.debit(msg.sender, token, amount);
-    delete self.cached[token];
-    if (!paid) pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
+    if (net > 0) {
+        self.credit(msg.sender, token, uint(net));
+    } else if (net < 0) {
+        uint amount = uint(-net);
+        bool paid = self.debit(msg.sender, token, amount);
+        if (!paid) pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
+    }
 }
 
 /** @dev Settles the discrepency in all activated token balances so the net balance is zero or positive. */
 function settlement(AccountSystem storage self, function(address, address, uint) pay, address account) {
     if (!self.prepared) revert NotPreparedToSettle();
 
+    // TODO: Write this into some documentation somewhere:
+    // if tokens are not appropriately cached, or do not exist in the warm array
+    // then its possible for the contract to become insolvent, meaning the physical balance
+    // is less than the contracts internally tracked balance.
+    // These next few functions are the most critical in the entire contract, and they are
+    // sort of obscure.
+    // I recently fixed two bugs:
+    // Token was not removed from cache at the end of settlement,
+    // which means it wasnt pushed to the warm address array,
+    // which means the contract assumes the token was completely paid for.
+    // It was paid for, when it was cached! But if you get to carry over the cached bool,
+    // you win.
+    // The other issue was with `return` statements in the for loop. This will exit
+    // the execution of the for loop, leading to some tokens not being paid for.
     address[] memory tokens = self.warm;
-    if (tokens.length == 0) return self.clear();
+    uint loops = tokens.length;
+    if (loops == 0) return self.clear();
 
-    for (uint i; i != tokens.length; ++i) {
+    uint i;
+    for (i; i != loops; ++i) {
         address token = tokens[i];
         self.settle(pay, token, account);
     }
@@ -148,9 +165,10 @@ function settlement(AccountSystem storage self, function(address, address, uint)
 /** @dev Interacting with a token will activate it, adding it to an array of interacted tokens for settlement to loop through. */
 function touch(AccountSystem storage self, address token) {
     if (self.settled) self.settled = false; // If tokens are warm, they are not settled.
-    if (self.cached[token]) return;
-    self.warm.push(token);
-    self.cache(token, true);
+    if (!self.cached[token]) {
+        self.warm.push(token);
+        self.cache(token, true);
+    }
 }
 
 /** @dev Account system is reset after settlement is successful. */

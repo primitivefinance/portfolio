@@ -32,6 +32,11 @@ contract HyperTimeOverride is Hyper {
     function getAmounts(uint48 poolId) public view returns (uint, uint) {
         return _getAmounts(poolId);
     }
+
+    /** @dev Temp jump override for invariant tests. */
+    function doJumpProcess(bytes calldata data) external payable lock interactions {
+        CPU._jumpProcess(data, super._process);
+    }
 }
 
 /** @dev To catch reverts, external functions can be called by a contract that has a try-cactch. */

@@ -351,11 +351,12 @@ contract TestHyperProcessing is TestHyperSetup {
 
         __revertCatcher__.process(data);
 
+        uint delLiquidity = 4_000_000;
         uint256 globalR1 = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
         uint256 globalR2 = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
         assertTrue(globalR1 > 0);
         assertTrue(globalR2 > 0);
-        assertTrue((theoreticalR2 - FixedPointMathLib.divWadUp(globalR2, 4_000_000)) <= 1e14);
+        assertApproxEqAbs(globalR2, (theoreticalR2 * delLiquidity) / 1e18, 1, "asset-reserve-theoretic");
     }
 
     function testAllocatePositionTimestampUpdated() public postTestInvariantChecks {

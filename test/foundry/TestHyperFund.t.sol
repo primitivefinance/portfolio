@@ -11,4 +11,38 @@ contract TestHyperFund is TestHyperSetup {
 
         assertTrue(nextBalance > prevBalance);
     }
+
+    function testFuzzFundDrawSuccessful(uint amount) public {
+        vm.assume(amount < type(uint).max);
+        vm.assume(amount > 0);
+        _assertFundDraw(amount);
+    }
+
+    function _assertFundDraw(uint amount) internal {
+        // Preconditions
+        defaultScenario.asset.approve(address(__hyperTestingContract__), amount);
+        deal(address(defaultScenario.asset), address(this), amount);
+
+        // Execution
+        uint preBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        HyperState memory prev = getState();
+        __hyperTestingContract__.fund(address(defaultScenario.asset), amount);
+        HyperState memory post = getState();
+        uint postBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+
+        // Post conditions
+        assertTrue(postBal > preBal, "bal-increase");
+        assertEq(postBal, preBal + amount, "bal-increase-exact");
+        assertEq(post.reserveAsset, prev.reserveAsset + amount, "reserve-increase");
+        assertEq(post.physicalBalanceAsset, prev.physicalBalanceAsset + amount, "physical-increase");
+        assertEq(post.totalBalanceAsset, prev.totalBalanceAsset + amount, "total-bal-increase");
+
+        __hyperTestingContract__.draw(address(defaultScenario.asset), amount, address(this));
+        HyperState memory end = getState();
+        uint endBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+
+        assertEq(endBal, preBal, "reverse-exact-bal");
+        assertEq(end.reserveAsset, prev.reserveAsset, "reverse-exact-reserve");
+        assertEq(end.physicalBalanceAsset, prev.physicalBalanceAsset, "reverse-exact-physical");
+    }
 }

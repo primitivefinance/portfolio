@@ -59,6 +59,10 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         afterSetUp();
     }
 
+    function getState() public view returns (HyperState memory) {
+        return getState(address(__hyperTestingContract__), defaultScenario.poolId, address(this), __users__);
+    }
+
     /** Hook to override receive. Defaults to just accepting ether sent to this test contract. */
     receive() external payable {
         receiveOverride();

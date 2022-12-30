@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+import "contracts/OS.sol" as OS;
 import {Pair, Curve, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
 
 interface IHyperStruct {
@@ -28,9 +29,9 @@ struct HyperState {
     uint physicalBalanceQuote; // balanceOf
     uint totalBalanceAsset; // sum of all balances from getBalance
     uint totalBalanceQuote; // sum of all balances from getBalance
-    uint totalPoolLiquidity; // pool.liquidity
     uint totalPositionLiquidity; // sum of all position liquidity
     uint callerPositionLiquidity; // position.totalLiquidity
+    uint totalPoolLiquidity; // pool.liquidity
     uint feeGrowthAssetPool; // getPool
     uint feeGrowthQuotePool; // getPool
     uint feeGrowthAssetPosition; // getPosition
@@ -88,8 +89,8 @@ contract HelperHyperView {
             getBalanceSum(hyper, asset, owners),
             getBalanceSum(hyper, quote, owners),
             getPositionLiquiditySum(hyper, poolId, owners),
-            pool.liquidity,
             position.totalLiquidity,
+            pool.liquidity,
             pool.feeGrowthGlobalAsset,
             pool.feeGrowthGlobalQuote,
             position.feeGrowthAssetLast,
@@ -100,7 +101,7 @@ contract HelperHyperView {
     }
 
     function getPhysicalBalance(address hyper, address token) public view returns (uint) {
-        return TokenLike(token).balanceOf(hyper);
+        return OS.__balanceOf__(token, hyper);
     }
 
     function getVirtualBalance(address hyper, address token, address[] memory owners) public view returns (uint) {
