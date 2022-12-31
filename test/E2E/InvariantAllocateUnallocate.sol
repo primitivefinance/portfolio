@@ -138,7 +138,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
             // Unallocate
-            uint timestamp = block.timestamp + __hyper__.JUST_IN_TIME_LIQUIDITY_POLICY();
+            uint timestamp = block.timestamp + 4; // todo: fix default jit policy
             vm.warp(timestamp);
             __hyper__.setTimestamp(uint128(timestamp));
 

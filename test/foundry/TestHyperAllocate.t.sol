@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {HyperPool} from "contracts/EnigmaTypes.sol";
+import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY} from "contracts/EnigmaTypes.sol";
 import "contracts/Clock.sol" as Clock;
 import "./setup/TestHyperSetup.sol";
 
@@ -115,7 +115,7 @@ contract TestHyperAllocate is TestHyperSetup {
         }
 
         // Unallocate
-        customWarp(block.timestamp + __hyperTestingContract__.JUST_IN_TIME_LIQUIDITY_POLICY()); // TODO: make this public function.
+        customWarp(block.timestamp + JUST_IN_TIME_LIQUIDITY_POLICY); // TODO: make this public function.
         (uint unallocatedAsset, uint unallocatedQuote) = __hyperTestingContract__.unallocate(
             defaultScenario.poolId,
             deltaLiquidity

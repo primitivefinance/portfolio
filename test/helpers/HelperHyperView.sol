@@ -3,11 +3,9 @@ pragma solidity ^0.8.0;
 
 import "contracts/OS.sol" as OS;
 import {Epoch} from "contracts/Clock.sol";
-import {Pair, Curve, HyperCurve, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
+import {Pair, HyperCurve, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
 
 interface IHyperStruct {
-    function curves(uint32 curveId) external view returns (Curve memory);
-
     function pairs(uint24 pairId) external view returns (Pair memory);
 
     function positions(address owner, uint64 positionId) external view returns (HyperPosition memory);

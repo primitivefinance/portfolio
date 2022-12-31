@@ -5,7 +5,7 @@ import "solmate/utils/SafeTransferLib.sol";
 
 import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
-import {BalanceError, EtherTransferFail} from "./EnigmaTypes.sol";
+import {InvalidBalance, EtherTransferFail} from "./EnigmaTypes.sol";
 
 using {
     __wrapEther__,
@@ -40,7 +40,7 @@ error NotPreparedToSettle();
 /** @dev Gas optimized. */
 function __balanceOf__(address token, address account) view returns (uint256) {
     (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
-    if (!success || data.length != 32) revert BalanceError();
+    if (!success || data.length != 32) revert InvalidBalance();
     return abi.decode(data, (uint256));
 }
 

@@ -22,15 +22,10 @@ pragma solidity 0.8.13;
 //                                                   //.-~~~--\                                     //
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-import "./OS.sol";
-import "./CPU.sol" as CPU;
-import "./Clock.sol";
-import "./Assembly.sol" as asm;
 import "./EnigmaTypes.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
-import "./libraries/Price.sol";
 
 /**
  * @title   Enigma Virtual Machine.
@@ -39,6 +34,7 @@ import "./libraries/Price.sol";
  */
 contract Hyper is IHyper {
     using {asm.toUint128, asm.toUint48, asm.toUint32, asm.toUint24, asm.toUint16} for uint;
+    using {exists} for mapping(uint64 => HyperPool);
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using Price for Price.Expiring;
@@ -50,30 +46,6 @@ contract Hyper is IHyper {
     string public constant VERSION = "beta-v0.0.1";
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
-    /// @dev Maximum price multiple. Equal to 5x price at 1bps tick sizes.
-    int24 public constant MAX_TICK = 25556; // TODO: Fix
-    /// @dev Distance between the location of prices on the price grid, so distance between price.
-    int24 public constant TICK_SIZE = 256;
-    /// @dev Minimum amount of decimals supported for ERC20 tokens.
-    uint8 public constant MIN_DECIMALS = 6;
-    /// @dev Maximum amount of decimals supported for ERC20 tokens.
-    uint8 public constant MAX_DECIMALS = 18;
-    /// @dev Amount of seconds of available time to swap past maturity of a pool.
-    uint256 public constant BUFFER = 300;
-    /// @dev Constant amount of 1 ether. All liquidity values have 18 decimals.
-    uint256 public constant PRECISION = 1e18;
-    /// @dev Constant amount of basis points. All percentage values are integers in basis points.
-    uint256 public constant PERCENTAGE = 1e4;
-    /// @dev Minimum pool fee. 0.01%.
-    uint256 public constant MIN_POOL_FEE = 1;
-    /// @dev Maximum pool fee. 10.00%.
-    uint256 public constant MAX_POOL_FEE = 1e3;
-    /// @dev Amount of seconds that an epoch lasts.
-    uint256 public constant EPOCH_INTERVAL = 3600 seconds; // 1 hr
-    /// @dev Used to compute the amount of liquidity to burn on creating a pool.
-    uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
-    /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
-    uint256 public constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
 
     // ===== State ===== //
     /// @dev Reentrancy guard initialized to state
@@ -83,7 +55,7 @@ contract Hyper is IHyper {
     /// @dev A value incremented by one on curve creation. Reduces calldata.
     uint32 public getPoolNonce;
     // todo: fix, lets say this is the current epoch for now.
-    uint48 public currentEpoch = 1; 
+    uint48 public currentEpoch = 1;
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint24 => Pair) public pairs;
     /// @dev Pool id -> Epoch Data Structure.
@@ -103,7 +75,7 @@ contract Hyper is IHyper {
 
     /** @dev Used on every external function and external entrypoint. */
     modifier lock() {
-        if (locked != 1) revert LockedError();
+        if (locked != 1) revert InvalidReentrancy();
 
         locked = 2;
         _;
@@ -262,7 +234,7 @@ contract Hyper is IHyper {
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
-        if (deltaLiquidity == 0) revert ZeroLiquidityError();
+        if (deltaLiquidity == 0) revert ZeroLiquidity();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
 
         Pair memory pair = pairs[uint24(poolId >> 40)];
@@ -384,7 +356,7 @@ contract Hyper is IHyper {
         uint128 deltaLiquidity
     ) internal returns (uint deltaAsset, uint deltaQuote) {
         pairId; // TODO
-        if (deltaLiquidity == 0) revert ZeroLiquidityError();
+        if (deltaLiquidity == 0) revert ZeroLiquidity();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
         if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
@@ -403,7 +375,6 @@ contract Hyper is IHyper {
             -int128(deltaLiquidity)
         );
 
-        emit log(deltaAsset, deltaQuote, "unallocate");
         _changeLiquidity(args);
         emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
@@ -419,8 +390,8 @@ contract Hyper is IHyper {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
 
         HyperPosition storage pos = positions[msg.sender][poolId];
-        if (pos.stakeEpochId != 0) revert PositionStakedError(poolId);
-        if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(poolId);
+        if (pos.stakeEpochId != 0) revert PositionStaked(poolId);
+        if (pos.totalLiquidity == 0) revert PositionZeroLiquidity(poolId);
 
         HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta += int128(pos.totalLiquidity);
@@ -440,7 +411,7 @@ contract Hyper is IHyper {
         _syncPoolPrice(poolId); // Reverts if pool does not exist.
 
         HyperPosition storage pos = positions[msg.sender][poolId];
-        if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(poolId);
+        if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStaked(poolId);
 
         HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta -= int128(pos.totalLiquidity);
@@ -534,7 +505,7 @@ contract Hyper is IHyper {
             emit log("computing tau");
             uint tau = computeTau(poolId);
             emit log(tau);
-            if (tau == 0) revert PoolExpiredError();
+            if (tau == 0) revert PoolExpired();
 
             uint strike = Price.computePriceWithTick(pool.params.maxTick);
             emit log(tau, strike, "tau strike");
@@ -611,7 +582,7 @@ contract Hyper is IHyper {
             if (_swap.price > args.limit) revert SwapLimitReached();
 
             // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision).
-            //if (nextInvariant < liveInvariant) revert InvariantError(liveInvariant, nextInvariant);
+            //if (nextInvariant < liveInvariant) revert InvalidInvariant(liveInvariant, nextInvariant);
         }
 
         // Apply pool effects.
@@ -695,8 +666,8 @@ contract Hyper is IHyper {
         if (pairId != 0) revert PairExists(pairId);
 
         (uint8 decimalsAsset, uint8 decimalsQuote) = (IERC20(asset).decimals(), IERC20(quote).decimals());
-        if (!asm.isBetween(decimalsAsset, MIN_DECIMALS, MAX_DECIMALS)) revert DecimalsError(decimalsAsset);
-        if (!asm.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert DecimalsError(decimalsQuote);
+        if (!asm.isBetween(decimalsAsset, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsAsset);
+        if (!asm.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsQuote);
 
         unchecked {
             pairId = uint16(++getPairNonce); // TODO: change to uint24 probably. Good chance this overflows on higher TPS networks.
@@ -734,12 +705,12 @@ contract Hyper is IHyper {
         uint128 price
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
-        if (vol == 0) revert MinSigma(vol);
+        if (vol == 0) revert InvalidVolatility(vol);
         if (dur == 0) revert InvalidDuration(dur);
         if (max >= MAX_TICK) revert InvalidTick(max);
         if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit); // todo: do proper jit range
-        if (!asm.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
-        if (!asm.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
+        if (!asm.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert InvalidFee(fee);
+        if (!asm.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert InvalidFee(priorityFee);
 
         if (pairId == 0) pairId = uint24(getPairNonce); // magic variable
 
@@ -784,14 +755,9 @@ contract Hyper is IHyper {
         emit CreatePool(poolId, uint16(pairId), 0x0, price); // todo: event
     }
 
-    error NotController();
-    error InvalidJit(uint16);
-    error InvalidTick(int24);
-    error InvalidDuration(uint16);
-
     /// TODO: add interactions modifier to this probably
     function alter(
-        uint64 poolNonce,
+        uint64 poolId,
         uint16 priorityFee,
         uint16 fee,
         uint16 vol,
@@ -799,38 +765,23 @@ contract Hyper is IHyper {
         uint16 jit,
         int24 max
     ) external lock {
-        HyperPool storage pool = pools[poolNonce];
-        if (pool.controller != msg.sender) revert NotController();
-        if (max >= MAX_TICK) revert InvalidTick(max);
-        if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit);
-        if (jit != 0) pool.params.jit = jit;
-        if (max != 0) pool.params.maxTick = max;
-        if (fee != 0) pool.params.fee = fee;
-        if (vol != 0) pool.params.volatility = vol;
-        if (dur != 0) pool.params.duration = dur;
-        if (priorityFee != 0) pool.params.priorityFee = priorityFee;
+        pools[poolId].changePoolParameters(
+            HyperCurve({
+                maxTick: max,
+                jit: jit,
+                fee: fee,
+                duration: dur,
+                volatility: vol,
+                priorityFee: priorityFee,
+                startEpoch: 0 // unchanged...
+            })
+        );
 
         // TODO: emit an event
     }
 
-    function computePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public view returns (uint64) {
+    function computePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public pure returns (uint64) {
         return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
-    }
-
-    // todo: maybe hash? this is not used anywhere right now.
-    function computeRawParams(HyperPool memory params) public view returns (bytes32) {
-        return
-            CPU.toBytes32(
-                abi.encodePacked(
-                    params.controller,
-                    params.params.priorityFee,
-                    params.params.fee,
-                    params.params.volatility,
-                    params.params.duration,
-                    params.params.jit,
-                    params.params.maxTick
-                )
-            );
     }
 
     function computeTau(uint64 poolId) public view returns (uint) {
@@ -937,7 +888,7 @@ contract Hyper is IHyper {
             (address asset, address quote) = CPU.decodeCreatePair(data);
             _createPair(asset, quote);
         } else {
-            revert UnknownInstruction();
+            revert InvalidInstruction();
         }
     }
 
@@ -1024,50 +975,4 @@ contract Hyper is IHyper {
     function getNetBalance(address token) public view returns (int) {
         return __account__.getNetBalance(token, address(this));
     }
-}
-
-using {changePoolLiquidity} for HyperPool;
-using {exists} for mapping(uint64 => HyperPool);
-using {changePositionLiquidity, syncPositionFees} for HyperPosition;
-
-/**
- * @notice Syncs a pool's liquidity and last updated timestamp.
- */
-function changePoolLiquidity(HyperPool storage self, uint256 timestamp, int128 liquidityDelta) {
-    // TODO: Investigate updating timestamp.
-    // Changing timestamp changes pool price.
-    // Cannot change price and liquidity.
-    // self.blockTimestamp = timestamp;
-    self.liquidity = asm.toUint128(asm.__computeDelta(self.liquidity, liquidityDelta));
-}
-
-/**
- * @notice Syncs a position's liquidity, last updated timestamp, fees earned, and fee growth.
- */
-function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp; // Allowed to change timestamp with changing liquidity of a position.
-    self.totalLiquidity = asm.toUint128(asm.__computeDelta(self.totalLiquidity, liquidityDelta));
-}
-
-function syncPositionFees(
-    HyperPosition storage self,
-    uint liquidity,
-    uint feeGrowthAsset,
-    uint feeGrowthQuote
-) returns (uint feeAssetEarned, uint feeQuoteEarned) {
-    uint checkpointAsset = asm.__computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
-    uint checkpointQuote = asm.__computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
-
-    feeAssetEarned = FixedPointMathLib.mulWadDown(checkpointAsset, liquidity);
-    feeQuoteEarned = FixedPointMathLib.mulWadDown(checkpointQuote, liquidity);
-
-    self.feeGrowthAssetLast = feeGrowthAsset;
-    self.feeGrowthQuoteLast = feeGrowthQuote;
-
-    self.tokensOwedAsset += asm.toUint128(feeAssetEarned);
-    self.tokensOwedQuote += asm.toUint128(feeAssetEarned);
-}
-
-function exists(mapping(uint64 => HyperPool) storage pools, uint64 poolId) view returns (bool) {
-    return pools[poolId].lastTimestamp != 0;
 }

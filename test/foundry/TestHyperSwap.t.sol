@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+import "contracts/EnigmaTypes.sol" as HyperTypes;
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperSwap is TestHyperSetup {
@@ -28,12 +29,9 @@ contract TestHyperSwap is TestHyperSetup {
         assertGt(start, finalOutput);
     }
 
-    function testSwap_revert_PoolExpiredError() public allocateFirst {
+    function testSwap_revert_PoolExpired() public allocateFirst {
         customWarp(
-            block.timestamp +
-                __hyperTestingContract__.computeTau(defaultScenario.poolId) +
-                __hyperTestingContract__.BUFFER() +
-                1
+            block.timestamp + __hyperTestingContract__.computeTau(defaultScenario.poolId) + HyperTypes.BUFFER + 1
         );
 
         uint timestamp = __hyperTestingContract__.timestamp();
@@ -42,12 +40,11 @@ contract TestHyperSwap is TestHyperSetup {
         uint current = epoch.getEpochsPassed(timestamp);
         uint tau;
         console.log(current, pool.params.duration);
-        if (current <= pool.params.duration)
-            tau = uint(pool.params.duration - current) * __hyperTestingContract__.EPOCH_INTERVAL(); // expired
+        if (current <= pool.params.duration) tau = uint(pool.params.duration - current) * EPOCH_INTERVAL; // expired
         console.log(tau);
         console.log(__hyperTestingContract__.computeTau(defaultScenario.poolId));
 
-        vm.expectRevert(PoolExpiredError.selector);
+        vm.expectRevert(PoolExpired.selector);
         __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, 50);
     }
 

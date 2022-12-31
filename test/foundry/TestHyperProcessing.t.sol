@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import "contracts/EnigmaTypes.sol" as HyperTypes;
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperProcessing is TestHyperSetup {
@@ -48,13 +49,13 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(pair.tokenQuote != address(0));
     }
 
-    function testProcessRevertsWithUnknownInstructionZeroOpcode() public {
-        vm.expectRevert(UnknownInstruction.selector);
+    function testProcessRevertsWithInvalidInstructionZeroOpcode() public {
+        vm.expectRevert(InvalidInstruction.selector);
         __revertCatcher__.process(hex"00");
     }
 
-    function testProcessRevertsWithUnknownInstruction() public {
-        vm.expectRevert(UnknownInstruction.selector);
+    function testProcessRevertsWithInvalidInstruction() public {
+        vm.expectRevert(InvalidInstruction.selector);
         __revertCatcher__.process(hex"44");
     }
 
@@ -218,7 +219,7 @@ contract TestHyperProcessing is TestHyperSetup {
         // move some time beyond maturity
         customWarp(block.timestamp + __hyperTestingContract__.computeTau(defaultScenario.poolId) + 1);
 
-        vm.expectRevert(PoolExpiredError.selector);
+        vm.expectRevert(PoolExpired.selector);
         __hyperTestingContract__.swap(defaultScenario.poolId, false, amount, limit);
     }
 
@@ -330,7 +331,7 @@ contract TestHyperProcessing is TestHyperSetup {
     function testAllocateZeroLiquidityReverts() public {
         uint8 failureArg = 0;
         bytes memory data = CPU.encodeAllocate(0, defaultScenario.poolId, 0x00, failureArg);
-        vm.expectRevert(ZeroLiquidityError.selector);
+        vm.expectRevert(ZeroLiquidity.selector);
         bool success = __revertCatcher__.process(data);
         assertTrue(!success, "forwarder call failed");
     }
@@ -443,7 +444,7 @@ contract TestHyperProcessing is TestHyperSetup {
 
     function testUnallocateZeroLiquidityReverts() public {
         bytes memory data = CPU.encodeUnallocate(0, defaultScenario.poolId, 0x00, 0x00);
-        vm.expectRevert(ZeroLiquidityError.selector);
+        vm.expectRevert(ZeroLiquidity.selector);
         bool success = __revertCatcher__.process(data);
         assertTrue(!success);
     }
@@ -660,12 +661,12 @@ contract TestHyperProcessing is TestHyperSetup {
         __hyperTestingContract__.allocate(defaultScenario.poolId, 4355);
         __hyperTestingContract__.stake(defaultScenario.poolId); // Increments stake epoch id
 
-        vm.expectRevert(abi.encodeWithSelector(PositionStakedError.selector, defaultScenario.poolId));
+        vm.expectRevert(abi.encodeWithSelector(PositionStaked.selector, defaultScenario.poolId));
         __hyperTestingContract__.stake(defaultScenario.poolId);
     }
 
     function testStakePositionZeroLiquidityReverts() public {
-        vm.expectRevert(abi.encodeWithSelector(PositionZeroLiquidityError.selector, defaultScenario.poolId));
+        vm.expectRevert(abi.encodeWithSelector(PositionZeroLiquidity.selector, defaultScenario.poolId));
         __hyperTestingContract__.stake(defaultScenario.poolId);
     }
 
@@ -698,7 +699,7 @@ contract TestHyperProcessing is TestHyperSetup {
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp(__hyperTestingContract__.EPOCH_INTERVAL() + 1);
+        customWarp(HyperTypes.EPOCH_INTERVAL + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         data = CPU.encodeSwap(0, defaultScenario.poolId, 0x09, 0x01, 0x15, 0x01, 0);
@@ -739,7 +740,7 @@ contract TestHyperProcessing is TestHyperSetup {
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp(__hyperTestingContract__.EPOCH_INTERVAL() + 1);
+        customWarp(HyperTypes.EPOCH_INTERVAL + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         data = CPU.encodeSwap(0, defaultScenario.poolId, 0x09, 0x01, 0x15, 0x01, 0);
@@ -751,7 +752,7 @@ contract TestHyperProcessing is TestHyperSetup {
         data = CPU.encodeUnstakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp((__hyperTestingContract__.EPOCH_INTERVAL() + 1) * 2);
+        customWarp((HyperTypes.EPOCH_INTERVAL + 1) * 2);
 
         // TODO: FIX FAILING TEST
 
@@ -780,7 +781,7 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testUnstakeNotStakedReverts() public {
-        vm.expectRevert(abi.encodeWithSelector(PositionNotStakedError.selector, defaultScenario.poolId));
+        vm.expectRevert(abi.encodeWithSelector(PositionNotStaked.selector, defaultScenario.poolId));
         __hyperTestingContract__.unstake(defaultScenario.poolId);
     }
 
@@ -804,7 +805,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token0 = address(new TestERC20("t", "t", 5));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 5));
+        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 5));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -812,7 +813,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 5));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 5));
+        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 5));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -820,7 +821,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token0 = address(new TestERC20("t", "t", 24));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 24));
+        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 24));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -828,7 +829,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 24));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));
-        vm.expectRevert(abi.encodeWithSelector(DecimalsError.selector, 24));
+        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 24));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -891,7 +892,7 @@ contract TestHyperProcessing is TestHyperSetup {
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        vm.expectRevert(abi.encodeWithSelector(FeeOOB.selector, failureArg));
+        vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, failureArg));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -905,7 +906,7 @@ contract TestHyperProcessing is TestHyperSetup {
             failureArg,
             curve.strike
         );
-        vm.expectRevert(abi.encodeWithSelector(PriorityFeeOOB.selector, failureArg));
+        vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, failureArg));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -919,7 +920,7 @@ contract TestHyperProcessing is TestHyperSetup {
             uint16(1e4 - curve.priorityGamma),
             curve.strike
         );
-        vm.expectRevert(abi.encodeWithSelector(MinSigma.selector, failureArg));
+        vm.expectRevert(abi.encodeWithSelector(InvalidVolatility.selector, failureArg));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -933,7 +934,7 @@ contract TestHyperProcessing is TestHyperSetup {
             uint16(1e4 - curve.priorityGamma),
             failureArg
         );
-        vm.expectRevert(abi.encodeWithSelector(MinStrike.selector, failureArg));
+        vm.expectRevert(abi.encodeWithSelector(InvalidStrike.selector, failureArg));
         bool success = __revertCatcher__.process(data);
     }
 
@@ -1067,7 +1068,7 @@ contract TestHyperProcessing is TestHyperSetup {
         uint32 curveId = __hyperTestingContract__.getCurveId(rawCurveId);
         uint64 id = CPU.encodePoolId(pairId, curveId);
         data = CPU.encodeCreatePool(id, 1_000);
-        vm.expectRevert(PoolExpiredError.selector);
+        vm.expectRevert(PoolExpired.selector);
         success = __revertCatcher__.process(data);
     }
 

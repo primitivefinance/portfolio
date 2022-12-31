@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "contracts/CPU.sol" as CPU;
+import "contracts/CPU.sol" as ProcessingLib;
 
 uint16 constant DEFAULT_HOURLY_EPOCH_ONE_YEAR = 8766;
 
@@ -19,9 +19,9 @@ contract HelperHyperActions {
     ) internal pure returns (bytes memory data) {
         bytes[] memory instructions = new bytes[](2);
         uint64 magicPoolId = 0x000000000000;
-        instructions[0] = (CPU.encodeCreatePair(token0, token1));
+        instructions[0] = (ProcessingLib.encodeCreatePair(token0, token1));
         instructions[1] = (
-            CPU.encodeCreatePool(
+            ProcessingLib.encodeCreatePool(
                 uint24(0x000000), // magic variable for pairId
                 address(0),
                 uint16(1), // priorityFee, 1bps
@@ -33,11 +33,11 @@ contract HelperHyperActions {
                 price
             )
         );
-        data = CPU.encodeJumpInstruction(instructions);
+        data = ProcessingLib.encodeJumpInstruction(instructions);
     }
 
     function allocatePool(address hyper, uint64 poolId, uint amount) internal {
-        bytes memory data = CPU.encodeAllocate(
+        bytes memory data = ProcessingLib.encodeAllocate(
             0, // useMax = false
             poolId,
             0x0, // amount multiplier = 10^0 = 1

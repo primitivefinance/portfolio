@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
-import {JumpError} from "./EnigmaTypes.sol";
+import {InvalidJump} from "./EnigmaTypes.sol";
 import "./Assembly.sol";
 
 // --- Instructions --- //
@@ -39,7 +39,7 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
         // Set the new pointer to the next instruction, located at the pointer.
         pointer = uint8(data[pointer]);
         // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
-        if (pointer > data.length) revert JumpError(pointer);
+        if (pointer > data.length) revert InvalidJump(pointer);
         bytes calldata instruction = data[start:pointer];
         // Process the instruction.
         _process(instruction[1:]); // note: Removes the pointer to the next instruction.

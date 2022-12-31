@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+import "contracts/EnigmaTypes.sol" as HyperTypes;
 import "contracts/CPU.sol" as CPU;
 import "./setup/InvariantTargetContract.sol";
 
@@ -25,8 +26,8 @@ contract InvariantCreatePool is InvariantTargetContract {
 
         maturity = uint32(block.timestamp + bound(maturity, 1, 365 days));
         price = uint128(bound(price, 1, 1e36));
-        gamma = uint32(bound(sigma, 1e4 - __hyper__.MAX_POOL_FEE(), 1e4 - __hyper__.MIN_POOL_FEE()));
-        priorityGamma = uint32(bound(sigma, gamma, 1e4 - __hyper__.MIN_POOL_FEE()));
+        gamma = uint32(bound(sigma, 1e4 - HyperTypes.MAX_POOL_FEE, 1e4 - HyperTypes.MIN_POOL_FEE));
+        priorityGamma = uint32(bound(sigma, gamma, 1e4 - HyperTypes.MIN_POOL_FEE));
 
         // Random user
         address caller = ctx.getRandomUser(index);
