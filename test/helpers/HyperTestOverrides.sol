@@ -29,7 +29,7 @@ contract HyperTimeOverride is Hyper {
         timestamp = time;
     }
 
-    function getAmounts(uint48 poolId) public view returns (uint, uint) {
+    function getAmounts(uint64 poolId) public view returns (uint, uint) {
         return _getAmounts(poolId);
     }
 

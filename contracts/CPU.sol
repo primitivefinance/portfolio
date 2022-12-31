@@ -86,16 +86,16 @@ function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes 
     return payload;
 }
 
-function encodePoolId(uint16 pairId, uint32 curveId) pure returns (uint48 poolId) {
+function encodePoolId(uint24 pairId, uint32 curveId) pure returns (uint64 poolId) {
     bytes memory data = abi.encodePacked(pairId, curveId);
-    poolId = uint48(bytes6(data));
+    poolId = uint64(bytes8(data));
 }
 
 /// @dev Expects a 6 byte left-pad `poolId`.
 /// @param data Maximum 6 bytes. | 0x | left-pad 6 bytes poolId |
 /// Pool id is a packed pair and curve id: | 0x | left-pad 2 bytes pairId | left-pad 4 bytes curveId |
-function decodePoolId(bytes calldata data) pure returns (uint48 poolId, uint16 pairId, uint32 curveId) {
-    poolId = uint48(bytes6(data));
+function decodePoolId(bytes calldata data) pure returns (uint64 poolId, uint24 pairId, uint32 curveId) {
+    poolId = uint64(bytes8(data));
     pairId = uint16(bytes2(data[:2]));
     curveId = uint32(bytes4(data[2:]));
 }
@@ -141,37 +141,68 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
 }
 
 /// @dev Encodes the arguments for the CREATE_POOL instruction.
-function encodeCreatePool(uint48 poolId, uint128 price) pure returns (bytes memory data) {
-    data = abi.encodePacked(CREATE_POOL, poolId, price);
+function encodeCreatePool(
+    uint24 pairId,
+    address controller,
+    uint8 priorityFee,
+    uint8 fee,
+    uint8 vol,
+    uint8 dur,
+    uint16 jit,
+    int24 max,
+    uint128 price
+) pure returns (bytes memory data) {
+    data = abi.encodePacked(CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
 }
 
 /// @dev Expects a poolId and one left zero padded amount for `price`.
 /// @param data Maximum 1 + 6 + 16 = 23 bytes.
 /// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes |
-function decodeCreatePool(bytes calldata data) pure returns (uint16 pairId, uint32 curveId, uint128 price) {
-    pairId = uint16(bytes2(data[1:3]));
-    curveId = uint32(bytes4(data[3:7]));
-    price = uint128(bytes16(data[7:23]));
+function decodeCreatePool(
+    bytes calldata data
+)
+    pure
+    returns (
+        uint24 pairId,
+        address controller,
+        uint8 priorityFee,
+        uint8 fee,
+        uint8 vol,
+        uint8 dur,
+        uint16 jit,
+        int24 max,
+        uint128 price
+    )
+{
+    pairId = uint24(bytes3(data[1:4]));
+    controller = address(bytes20(data[4:24]));
+    priorityFee = uint8(bytes1(data[24:25]));
+    fee = uint8(bytes1(data[25:26]));
+    vol = uint8(bytes1(data[26:27]));
+    dur = uint8(bytes1(data[27:28]));
+    jit = uint8(bytes1(data[28:30]));
+    max = int24(uint24(bytes3(data[30:33]))); // todo: fix, can overflow
+    price = uint128(bytes16(data[33:45]));
 }
 
-function encodeAllocate(uint8 useMax, uint48 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
+function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
     data = abi.encodePacked(pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
 }
 
 /// @dev Expects the standard instruction with two trailing run-length encoded amounts.
 /// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
 /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
-function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint48 poolId, uint128 deltaLiquidity) {
+function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     (bytes1 maxFlag, ) = separate(data[0]);
     useMax = uint8(maxFlag);
-    poolId = uint48(bytes6(data[1:7]));
-    deltaLiquidity = toAmount(data[7:]);
+    poolId = uint64(bytes8(data[1:9]));
+    deltaLiquidity = toAmount(data[9:]);
     //uint8 pointer = uint8(data[13]);
     //deltaAsset = toAmount(data[14:pointer]);
     //deltaQuote = toAmount(data[pointer:]);
 }
 
-function encodeUnallocate(uint8 useMax, uint48 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
+function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
     data = abi.encodePacked(pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
 }
 
@@ -180,23 +211,23 @@ function encodeUnallocate(uint8 useMax, uint48 poolId, uint8 power, uint128 amou
 /// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
 function decodeUnallocate(
     bytes calldata data
-) pure returns (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) {
+) pure returns (uint8 useMax, uint64 poolId, uint24 pairId, uint128 deltaLiquidity) {
     useMax = uint8(data[0] >> 4);
-    pairId = uint16(bytes2(data[1:3]));
-    poolId = uint48(bytes6(data[1:7]));
-    deltaLiquidity = uint128(toAmount(data[7:]));
+    pairId = uint16(bytes2(data[1:4]));
+    poolId = uint64(bytes8(data[1:9]));
+    deltaLiquidity = uint128(toAmount(data[9:]));
 }
 
 function encodeSwap(
     uint8 useMax,
-    uint48 poolId,
+    uint64 poolId,
     uint8 power0,
     uint128 amount0,
     uint8 power1,
     uint128 amount1,
     uint8 direction
 ) pure returns (bytes memory data) {
-    uint8 pointer = 0x0a + 0x0f; // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
+    uint8 pointer = 0x0a + 0x0f + 0x02; // temp: 0x02 for two additional poolId bytes // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
     data = abi.encodePacked(pack(bytes1(useMax), SWAP), poolId, pointer, power0, amount0, power1, amount1, direction);
 }
 
@@ -206,35 +237,35 @@ function encodeSwap(
 /// | 0x | 1 byte packed flag-enigma code | 6 byte poolId | up to 16 byte TRLE amount | 1 byte direction |.
 function decodeSwap(
     bytes calldata data
-) pure returns (uint8 useMax, uint48 poolId, uint128 input, uint128 limit, uint8 direction) {
+) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 limit, uint8 direction) {
     useMax = uint8(data[0] >> 4);
-    poolId = uint48(bytes6(data[1:7]));
-    uint8 pointer = uint8(data[7]);
-    input = uint128(toAmount(data[8:pointer]));
+    poolId = uint64(bytes8(data[1:9]));
+    uint8 pointer = uint8(data[9]);
+    input = uint128(toAmount(data[10:pointer]));
     limit = uint128(toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
     direction = uint8(data[data.length - 1]);
 }
 
-function encodeStakePosition(uint48 positionId) pure returns (bytes memory data) {
+function encodeStakePosition(uint64 positionId) pure returns (bytes memory data) {
     data = abi.encodePacked(STAKE_POSITION, positionId);
 }
 
 /// @dev Expects an enigma code and positionId.
 /// @param data Maximum 1 + 12 = 13 bytes.
 /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-function decodeStakePosition(bytes calldata data) pure returns (uint48 poolId) {
-    poolId = uint48(bytes6(data[1:7]));
+function decodeStakePosition(bytes calldata data) pure returns (uint64 poolId) {
+    poolId = uint64(bytes8(data[1:9]));
 }
 
-function encodeUnstakePosition(uint48 positionId) pure returns (bytes memory data) {
+function encodeUnstakePosition(uint64 positionId) pure returns (bytes memory data) {
     data = abi.encodePacked(UNSTAKE_POSITION, positionId);
 }
 
 /// @dev Expects an enigma code and positionId.
 /// @param data Maximum 1 + 12 = 13 bytes.
 /// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
-function decodeUnstakePosition(bytes calldata data) pure returns (uint48 poolId) {
-    poolId = uint48(bytes6(data[1:7]));
+function decodeUnstakePosition(bytes calldata data) pure returns (uint64 poolId) {
+    poolId = uint64(bytes8(data[1:9]));
 }
 
 // --- Utility --- //

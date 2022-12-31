@@ -23,7 +23,7 @@ contract TestE2ESetup is Helpers, Test {
     using FixedPointMathLib for int256;
 
     // ===== Global Variables ===== //
-    uint48 public __poolId__ = 0x000100000001;
+    uint64 public __poolId__ = 0x0000010000000001;
     address[] public __users__;
 
     WETH public __weth__;
@@ -145,13 +145,13 @@ contract TestE2ESetup is Helpers, Test {
         __hyper__.setTimestamp(uint128(time));
     }
 
-    event SetNewPoolId(uint48);
+    event SetNewPoolId(uint64);
 
     /** @dev Sets the pool id and assets in TestE2ESetup state. Affects all tests! */
-    function setPoolId(uint48 poolId) public {
+    function setPoolId(uint64 poolId) public {
         __poolId__ = poolId;
 
-        Pair memory pair = getPair(address(__hyper__), uint16(poolId >> 32));
+        Pair memory pair = getPair(address(__hyper__), uint24(poolId >> 40));
         __asset__ = TestERC20(pair.tokenAsset);
         __quote__ = TestERC20(pair.tokenQuote);
 

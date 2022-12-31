@@ -18,7 +18,7 @@ uint constant STARTING_BALANCE = 4000e18;
 struct TestScenario {
     TestERC20 asset;
     TestERC20 quote;
-    uint48 poolId;
+    uint64 poolId;
     string label;
 }
 
@@ -132,9 +132,11 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         assertTrue(success, "__revertCatcher__ call failed");
 
         // Create default scenario and add to all scenarios.
-        defaultScenario = TestScenario(__token_18__, __usdc__, 0x000100000001, "Default");
+        defaultScenario = TestScenario(__token_18__, __usdc__, FIRST_POOL, "Default");
         scenarios.push(defaultScenario);
     }
+
+    uint64 public constant FIRST_POOL = 0x0000010000000001;
 
     /** @dev Requires tokens to be spent and spenders to be approved. */
     function initPrerequisites() internal {

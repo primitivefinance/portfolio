@@ -8,11 +8,11 @@ import {HyperPool, HyperPosition, HyperTimeOverride, TestERC20} from "test/helpe
 interface Context {
     function users() external view returns (address[] memory);
 
-    function getRandomPoolId(uint id) external view returns (uint48);
+    function getRandomPoolId(uint id) external view returns (uint64);
 
-    function setPoolId(uint48 poolId) external;
+    function setPoolId(uint64 poolId) external;
 
-    function addPoolId(uint48 poolId) external;
+    function addPoolId(uint64 poolId) external;
 
     function customWarp(uint time) external;
 
@@ -29,7 +29,7 @@ interface Context {
 contract InvariantTargetContract is HelperHyperView, Test {
     Context ctx;
 
-    uint48 public __poolId__ = 0x000100000001;
+    uint64 public __poolId__ = 0x0000010000000001;
     HyperTimeOverride public __hyper__; // Actual contract
     TestERC20 public __quote__;
     TestERC20 public __asset__;
@@ -49,10 +49,10 @@ contract InvariantTargetContract is HelperHyperView, Test {
         return getState(address(__hyper__), __poolId__, address(this), ctx.users());
     }
 
-    function setPoolId(uint48 poolId) internal {
+    function setPoolId(uint64 poolId) internal {
         ctx.setPoolId(poolId); // TODO: duplicating for now...
 
-        Pair memory pair = getPair(address(__hyper__), uint16(poolId >> 32));
+        Pair memory pair = getPair(address(__hyper__), uint24(poolId >> 40));
         __asset__ = TestERC20(pair.tokenAsset);
         __quote__ = TestERC20(pair.tokenQuote);
     }

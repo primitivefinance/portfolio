@@ -80,24 +80,26 @@ contract InvariantCreatePool is InvariantTargetContract {
     bytes[] instructions;
 
     function _assertCreatePool(CreateArgs memory args) internal {
-        uint16 pairId = __hyper__.getPairId(args.token0, args.token1);
+        uint24 pairId = __hyper__.getPairId(args.token0, args.token1);
+        {
+            // Pair not created? Push a create pair call to the stack.
+            if (pairId == 0) instructions.push(CPU.encodeCreatePair(args.token0, args.token1));
 
-        // Pair not created? Push a create pair call to the stack.
-        if (pairId == 0) instructions.push(CPU.encodeCreatePair(args.token0, args.token1));
-
-        uint16 fee = uint16(1e4 - args.gamma);
-        uint16 priorityFee = uint16(1e4 - args.priorityGamma);
-        bytes32 rawCurveId = CPU.toBytes32(abi.encodePacked(args.sigma, args.maturity, fee, priorityFee, args.strike));
-        uint32 curveId = __hyper__.getCurveId(rawCurveId);
-
-        // Curve not created? Push create curve to stack.
-        if (curveId == 0)
-            instructions.push(CPU.encodeCreateCurve(args.sigma, args.maturity, fee, priorityFee, args.strike));
-
-        // Push create pool to stack
-        uint48 poolId = CPU.encodePoolId(pairId, curveId);
-        instructions.push(CPU.encodeCreatePool(poolId, args.price));
-
+            // Push create pool to stack
+            instructions.push(
+                CPU.encodeCreatePool(
+                    pairId,
+                    address(this),
+                    1, // priorityFee
+                    1, // fee
+                    1, // vol
+                    1, // dur
+                    5,
+                    int24(20_000),
+                    args.price
+                )
+            ); // temp
+        }
         bytes memory payload = CPU.encodeJumpInstruction(instructions);
         vm.prank(args.caller);
         console.logBytes(payload);
@@ -105,12 +107,7 @@ contract InvariantCreatePool is InvariantTargetContract {
         assembly {
             log0(add(32, reason), mload(reason))
         }
-        /*  string memory message;
-        assembly {
-            message := mload(add(32, reason))
-        }
 
-        console.log(message); */
         //bool success = forwarder.forward(address(__hyper__), payload); // TODO: Fallback function does not bubble up custom errors.
         assertTrue(success, "hyper-call-failed");
 
@@ -118,10 +115,8 @@ contract InvariantCreatePool is InvariantTargetContract {
         pairId = __hyper__.getPairId(args.token0, args.token1);
         assertTrue(pairId != 0, "pair-not-created");
 
-        curveId = __hyper__.getCurveId(rawCurveId);
-        assertTrue(curveId != 0, "curve-not-created");
-
-        poolId = CPU.encodePoolId(pairId, curveId);
+        // todo: make sure we create the last pool...
+        uint64 poolId = __hyper__.getPoolNonce();
 
         // Add the created pool to the list of pools.
         assertTrue(getPool(address(__hyper__), poolId).lastPrice != 0, "pool-price-zero");

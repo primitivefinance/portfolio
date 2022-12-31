@@ -40,7 +40,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // Preconditions
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
-        assertTrue(pool.blockTimestamp != 0, "Pool not initialized");
+        assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
         assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
         // Amounts of tokens that will be allocated to pool.
@@ -134,7 +134,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         if (pos.totalLiquidity >= deltaLiquidity) {
             // Preconditions
             HyperPool memory pool = getPool(address(__hyper__), __poolId__);
-            assertTrue(pool.blockTimestamp != 0, "Pool not initialized");
+            assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
             assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
             // Unallocate

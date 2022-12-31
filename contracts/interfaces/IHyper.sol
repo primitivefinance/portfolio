@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
+import {HyperCurve} from "../EnigmaTypes.sol";
+
 /**
  * @title IHyperEvents
  * @dev Events emitted in the Hyper contract.
@@ -8,7 +10,7 @@ pragma solidity 0.8.13;
 interface IHyperEvents {
     /**  @dev Emitted on increasing the internal reserves of a pool. */
     event Allocate(
-        uint48 indexed poolId,
+        uint64 indexed poolId,
         address indexed asset,
         address indexed quote,
         uint256 deltaAsset,
@@ -18,7 +20,7 @@ interface IHyperEvents {
 
     /**  @dev Emitted on decreasing the internal reserves of a pool. */
     event Unallocate(
-        uint48 indexed poolId,
+        uint64 indexed poolId,
         address indexed asset,
         address indexed quote,
         uint256 deltaAsset,
@@ -27,11 +29,11 @@ interface IHyperEvents {
     );
 
     /**  @dev Emitted on a token swap in a single virtual pool. */
-    event Swap(uint48 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
+    event Swap(uint64 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
 
     /**  @dev Emitted on setting a new token pair in state with the key `pairId`. */
     event CreatePair(
-        uint16 indexed pairId,
+        uint24 indexed pairId,
         address indexed asset,
         address indexed quote,
         uint8 decimalsAsset,
@@ -49,7 +51,7 @@ interface IHyperEvents {
     );
 
     /**  @dev Emitted on creating a pool for a pair and curve. */
-    event CreatePool(uint48 indexed poolId, uint16 indexed pairId, uint32 indexed curveId, uint256 price);
+    event CreatePool(uint64 indexed poolId, uint24 indexed pairId, uint32 indexed curveId, uint256 price);
     /**  @dev A payment requested by this contract that must be paid by the `msg.sender` account. */
     event DecreaseUserBalance(address indexed token, uint256 amount);
     /**  @dev A payment that is paid out to the `msg.sender` account from this contract. */
@@ -59,13 +61,13 @@ interface IHyperEvents {
     /**  @dev Emitted on any pool interaction which decreases one of the pool's reserves. */
     event DecreaseReserveBalance(address indexed token, uint256 amount);
     /**  @dev Emitted on increasing liquidity. */
-    event IncreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+    event IncreasePosition(address indexed account, uint64 indexed poolId, uint256 deltaLiquidity);
     /**  @dev Emitted on removing liquidity. */
-    event DecreasePosition(address indexed account, uint48 indexed poolId, uint256 deltaLiquidity);
+    event DecreasePosition(address indexed account, uint64 indexed poolId, uint256 deltaLiquidity);
     /**  @dev Emitted on syncing earned fees to a position's claimable balance. */
     event FeesEarned(
         address indexed account,
-        uint48 indexed poolId,
+        uint64 indexed poolId,
         uint256 feeAsset,
         address asset,
         uint256 feeQuote,
@@ -74,7 +76,7 @@ interface IHyperEvents {
 
     /** @dev Emitted on changes to a pool's state. */
     event PoolUpdate(
-        uint48 indexed poolId,
+        uint64 indexed poolId,
         uint256 price,
         int24 indexed tick,
         uint256 liquidity,
@@ -85,7 +87,7 @@ interface IHyperEvents {
     );
 
     /**  @dev Emitted on external calls to `syncPool` or `swap`. Syncs a pool's timestamp to block.timestamp. */
-    event UpdateLastTimestamp(uint48 indexed poolId);
+    event UpdateLastTimestamp(uint64 indexed poolId);
 
     /** @dev Emitted on depositing ether. */
     event Deposit(address indexed account, uint amount);
@@ -103,51 +105,49 @@ interface IHyperGetters {
     function getBalance(address owner, address token) external view returns (uint);
 
     function pairs(
-        uint16 pairId
+        uint24 pairId
     ) external view returns (address tokenasset, uint8 decimalsasset, address tokenQuote, uint8 decimalsQuote);
 
     function curves(
         uint32 curveId
     ) external view returns (uint128 strike, uint24 sigma, uint32 maturity, uint32 gamma, uint32 priorityGamma);
 
-    function epochs(uint48 poolId) external view returns (uint256 id, uint256 endTime, uint256 interval);
+    function epochs(uint64 poolId) external view returns (uint256 id, uint256 endTime, uint256 interval);
 
     function pools(
-        uint48 poolId
+        uint64 poolId
     )
         external
         view
         returns (
-            uint256 lastPrice,
             int24 lastTick,
-            uint256 blockTimestamp,
-            uint256 liquidity,
-            uint256 stakedLiquidity,
-            uint256 borrowableLiquidity,
-            int256 epochStakedLiquidityDelta,
-            address prioritySwapper,
-            uint256 priorityPaymentPerSecond,
+            uint32 lastTimestamp,
+            address controller,
             uint256 feeGrowthGlobalAsset,
             uint256 feeGrowthGlobalQuote,
-            uint48 startEpoch
+            uint128 lastPrice,
+            uint128 liquidity,
+            uint128 stakedLiquidity,
+            int128 epochStakedLiquidityDelta,
+            HyperCurve memory
         );
 
     function positions(
         address owner,
-        uint48 poolId
+        uint64 poolId
     )
         external
         view
         returns (
-            uint256 totalLiquidity,
+            uint128 totalLiquidity,
             uint256 blockTimestamp,
             uint256 stakeEpochId,
             uint256 unstakeEpochId,
             uint256 lastRewardGrowth,
             uint256 feeGrowthAssetLast,
             uint256 feeGrowthQuoteLast,
-            uint256 tokensOwedAsset,
-            uint256 tokensOwedQuote
+            uint128 tokensOwedAsset,
+            uint128 tokensOwedQuote
         );
 
     function getCurveId(bytes32) external view returns (uint32);
@@ -158,23 +158,23 @@ interface IHyperGetters {
 
     function getSecondsSincePositionUpdate(
         address account,
-        uint48 poolId
+        uint64 poolId
     ) external view returns (uint256 distance, uint256 timestamp);
 
     function getAllocateAmounts(
-        uint48 poolId,
+        uint64 poolId,
         uint256 deltaLiquidity
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
     function getUnallocateAmounts(
-        uint48 poolId,
+        uint64 poolId,
         uint256 deltaLiquidity
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
-    function getVirtualReserves(uint48 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
+    function getVirtualReserves(uint64 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
     function getLiquidityMinted(
-        uint48 poolId,
+        uint64 poolId,
         uint deltaAsset,
         uint deltaQuote
     ) external view returns (uint128 deltaLiquidity);
@@ -185,16 +185,16 @@ interface IHyperGetters {
  * @dev External api for interacting with the contract's state.
  */
 interface IHyperActions {
-    function allocate(uint48 poolId, uint deltaLiquidity) external returns (uint deltaAsset, uint deltaQuote);
+    function allocate(uint64 poolId, uint deltaLiquidity) external returns (uint deltaAsset, uint deltaQuote);
 
-    function unallocate(uint48 poolId, uint amount) external returns (uint deltaAsset, uint deltaQuote);
+    function unallocate(uint64 poolId, uint amount) external returns (uint deltaAsset, uint deltaQuote);
 
-    function stake(uint48 poolId) external;
+    function stake(uint64 poolId) external;
 
-    function unstake(uint48 poolId) external;
+    function unstake(uint64 poolId) external;
 
     function swap(
-        uint48 poolId,
+        uint64 poolId,
         bool sellAsset,
         uint amount,
         uint limit
@@ -206,7 +206,7 @@ interface IHyperActions {
 
     function draw(address token, uint256 amount, address to) external;
 
-    function syncPool(uint48 poolId) external returns (uint128 blockTimestamp);
+    function syncPool(uint64 poolId) external returns (uint128 blockTimestamp);
 }
 
 /**

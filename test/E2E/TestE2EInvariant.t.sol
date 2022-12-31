@@ -30,7 +30,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     InvariantWarper internal _warper;
     InvariantCreatePool internal _createPool;
 
-    uint48[] public __poolIds__;
+    uint64[] public __poolIds__;
 
     function setUp() public override {
         super.setUp();
@@ -131,7 +131,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         balances = getBalanceSum(address(__hyper__), token, __users__);
     }
 
-    function addPoolId(uint48 poolId) public {
+    function addPoolId(uint64 poolId) public {
         assertTrue(poolId != 0, "zero poolId");
         __poolIds__.push(poolId);
     }
@@ -143,10 +143,10 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         return user;
     }
 
-    function getRandomPoolId(uint id) public returns (uint48) {
+    function getRandomPoolId(uint id) public returns (uint64) {
         assertTrue(__poolIds__.length > 0);
         uint index = id % __poolIds__.length;
-        uint48 poolId = __poolIds__[index];
+        uint64 poolId = __poolIds__[index];
         return poolId;
     }
 }

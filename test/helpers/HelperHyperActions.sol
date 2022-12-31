@@ -16,14 +16,26 @@ contract HelperHyperActions {
         uint128 price
     ) internal pure returns (bytes memory data) {
         bytes[] memory instructions = new bytes[](3);
-        uint48 magicPoolId = 0x000000000000;
+        uint64 magicPoolId = 0x000000000000;
         instructions[0] = (CPU.encodeCreatePair(token0, token1));
         instructions[1] = (CPU.encodeCreateCurve(sigma, maturity, fee, priorityFee, strike));
-        instructions[2] = (CPU.encodeCreatePool(magicPoolId, price));
+        instructions[2] = (
+            CPU.encodeCreatePool(
+                uint24(0x000000), // magic variable for pairId
+                address(0),
+                uint8(1), // priorityFee
+                uint8(1), // fee
+                uint8(3), // default sigma of 1e4
+                uint8(5), // default dur of 1 year
+                uint16(0), // jit
+                int24(23027), // default tick
+                price
+            )
+        );
         data = CPU.encodeJumpInstruction(instructions);
     }
 
-    function allocatePool(address hyper, uint48 poolId, uint amount) internal {
+    function allocatePool(address hyper, uint64 poolId, uint amount) internal {
         bytes memory data = CPU.encodeAllocate(
             0, // useMax = false
             poolId,

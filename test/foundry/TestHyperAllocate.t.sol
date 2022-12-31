@@ -1,17 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+import {HyperPool} from "contracts/EnigmaTypes.sol";
+import "contracts/Clock.sol" as Clock;
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperAllocate is TestHyperSetup {
     function testAllocateFull() public postTestInvariantChecks {
-        uint256 price = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastPrice;
-        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        assertTrue(pool.lastTimestamp != 0, "pool-created");
+
+        uint256 price = pool.lastPrice;
+        HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
+        Pair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
+
+        Epoch memory epoch = getEpoch(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint elapsed = epoch.getEpochsPassed(block.timestamp) * 3600; // todo: fix epoch time
+        console.log(pool.params.duration);
+        console.log(elapsed);
+        uint tau = uint32((pool.params.duration - uint16(elapsed))) * 3600 seconds; // seconds
+        console.log(tau);
         uint256 theoreticalR2 = Price.computeR2WithPrice(
             price,
-            curve.strike,
-            curve.sigma,
-            curve.maturity - block.timestamp
+            Price.computePriceWithTick(pool.params.maxTick),
+            pool.params.volatility,
+            tau
         );
 
         uint delLiquidity = 4_000_000;
@@ -51,7 +64,7 @@ contract TestHyperAllocate is TestHyperSetup {
      */
     function testFuzzAllocateUnallocateSuccessful(uint128 deltaLiquidity) public postTestInvariantChecks {
         vm.assume(deltaLiquidity != 0);
-        vm.assume(deltaLiquidity < 2 ** 126); // note: if its 2^127, it could still overflow since liquidity is multiplied against token amounts in getAllocateAmounts.
+        vm.assume(deltaLiquidity < (2 ** 126 - 1e36)); // note: if its 2^127, it could still overflow since liquidity is multiplied against token amounts in getAllocateAmounts.
         // TODO: Add use max flag support.
         _assertAllocate(deltaLiquidity);
     }
@@ -60,7 +73,7 @@ contract TestHyperAllocate is TestHyperSetup {
     function _assertAllocate(uint128 deltaLiquidity) internal {
         // Preconditions
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        assertTrue(pool.blockTimestamp != 0, "Pool not initialized");
+        assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
         assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
         (uint expectedDeltaAsset, uint expectedDeltaQuote) = __hyperTestingContract__.getAllocateAmounts(

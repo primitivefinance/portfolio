@@ -38,10 +38,82 @@ function toUint128(uint256 x) pure returns (uint128 z) {
     }
 }
 
+function toUint16(uint256 x) pure returns (uint16 z) {
+    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
+    uint16 max = type(uint16).max;
+    assembly {
+        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
+        case 0 {
+            let revertDataSize := mload(revertData)
+            revert(add(32, revertData), revertDataSize)
+        }
+        case 1 {
+            z := x
+        }
+    }
+}
+
+function toUint24(uint256 x) pure returns (uint24 z) {
+    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
+    uint24 max = type(uint24).max;
+    assembly {
+        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
+        case 0 {
+            let revertDataSize := mload(revertData)
+            revert(add(32, revertData), revertDataSize)
+        }
+        case 1 {
+            z := x
+        }
+    }
+}
+
+function toUint32(uint256 x) pure returns (uint32 z) {
+    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
+    uint32 max = type(uint32).max;
+    assembly {
+        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
+        case 0 {
+            let revertDataSize := mload(revertData)
+            revert(add(32, revertData), revertDataSize)
+        }
+        case 1 {
+            z := x
+        }
+    }
+}
+
+function toUint48(uint256 x) pure returns (uint48 z) {
+    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
+    uint48 max = type(uint48).max;
+    assembly {
+        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
+        case 0 {
+            let revertDataSize := mload(revertData)
+            revert(add(32, revertData), revertDataSize)
+        }
+        case 1 {
+            z := x
+        }
+    }
+}
+
 /**
  * todo: verify this is good to go
  */
-function __computeDelta(uint256 input, int256 delta) pure returns (uint256 output) {
+/* function __computeDelta(uint256 input, int256 delta) pure returns (uint256 output) {
+    assembly {
+        switch slt(input, 0) // input < 0 ? 1 : 0
+        case 0 {
+            output := add(input, delta)
+        }
+        case 1 {
+            output := sub(input, delta)
+        }
+    }
+} */
+
+function __computeDelta(uint128 input, int128 delta) pure returns (uint128 output) {
     assembly {
         switch slt(input, 0) // input < 0 ? 1 : 0
         case 0 {
@@ -96,4 +168,4 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     }
 }
 
-using {toUint128} for uint;
+using {toUint128, toUint48, toUint32, toUint24, toUint16} for uint;

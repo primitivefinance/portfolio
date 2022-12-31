@@ -19,9 +19,9 @@ error LockedError();
 /// @dev Thrown when a pool is being created which has already been created with the same args.
 error CurveExists(uint32 curveId);
 /// @dev Thrown when interacting with a pool that has not been created.
-error NonExistentPool(uint48 poolId);
+error NonExistentPool(uint64 poolId);
 /// @dev Thrown when creating a pair that has been created for the two addresses.
-error PairExists(uint16 pairId);
+error PairExists(uint24 pairId);
 /// @dev Thrown when a pool has been created for the pair and curve combination.
 error PoolExists();
 /// @dev Thrown when decimals of a token in a create pair operation are greater than 18 or less than 6.
@@ -80,47 +80,57 @@ struct Curve {
 /// @dev Token information of each two token pool.
 struct Pair {
     address tokenAsset;
-    uint8 decimalsBase;
+    uint8 decimalsAsset;
     address tokenQuote;
     uint8 decimalsQuote;
+}
+
+struct HyperCurve {
+    // single slot
+    int24 maxTick;
+    uint16 jit;
+    uint16 fee;
+    uint16 duration;
+    uint16 volatility;
+    uint16 priorityFee;
+    uint48 startEpoch;
 }
 
 /// @dev Individual live pool state.
 /// @param epochStakedLiquidityDelta Liquidity to be added to staked liquidity.
 struct HyperPool {
-    uint256 lastPrice;
-    int24 lastTick;
-    uint256 blockTimestamp;
-    uint256 liquidity;
-    uint256 stakedLiquidity;
-    uint256 borrowableLiquidity;
-    int256 epochStakedLiquidityDelta;
-    address prioritySwapper;
-    uint256 priorityPaymentPerSecond;
+    int24 lastTick; // mutable so not optimized in slot.
+    uint32 lastTimestamp;
+    address controller;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
-    // beta/simplify-refactor
-    uint48 startEpoch;
+    // single slot
+    uint128 lastPrice;
+    uint128 liquidity;
+    uint128 stakedLiquidity;
+    int128 epochStakedLiquidityDelta;
+    HyperCurve params;
 }
 
+// todo: optimize slot
 /// @dev Individual position state.
 struct HyperPosition {
-    uint256 totalLiquidity;
+    uint128 totalLiquidity;
     uint256 blockTimestamp;
     uint256 stakeEpochId;
     uint256 unstakeEpochId;
     uint256 lastRewardGrowth;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
-    uint256 tokensOwedAsset;
-    uint256 tokensOwedQuote;
+    uint128 tokensOwedAsset;
+    uint128 tokensOwedQuote;
 }
 
 // --- Parameter Structs --- //
 
 struct ChangeLiquidityParams {
     address owner;
-    uint48 poolId;
+    uint64 poolId;
     uint256 timestamp;
     uint256 deltaAsset;
     uint256 deltaQuote;
@@ -139,7 +149,7 @@ struct ChangeLiquidityParams {
  */
 struct Order {
     uint8 useMax;
-    uint48 poolId;
+    uint64 poolId;
     uint128 input;
     uint128 limit;
     uint8 direction;

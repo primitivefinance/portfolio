@@ -38,6 +38,7 @@ import "./libraries/Price.sol";
  * @dev     Implements low-level internal functions, re-entrancy guard and state.
  */
 contract Hyper is IHyper {
+    using {asm.toUint128, asm.toUint48, asm.toUint32, asm.toUint24, asm.toUint16} for uint;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using Price for Price.Expiring;
@@ -66,7 +67,7 @@ contract Hyper is IHyper {
     /// @dev Maximum pool fee. 10.00%.
     uint256 public constant MAX_POOL_FEE = 1e3;
     /// @dev Amount of seconds that an epoch lasts.
-    uint256 public constant EPOCH_INTERVAL = 300;
+    uint256 public constant EPOCH_INTERVAL = 3600; // 1 hr
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
@@ -80,23 +81,23 @@ contract Hyper is IHyper {
     /// @dev A value incremented by one on curve creation. Reduces calldata.
     uint256 public getCurveNonce;
     /// @dev Pool id -> Pair of a Pool.
-    mapping(uint16 => Pair) public pairs;
+    mapping(uint24 => Pair) public pairs;
     /// @dev Pool id -> Epoch Data Structure.
-    mapping(uint48 => Epoch) public epochs;
+    mapping(uint64 => Epoch) public epochs;
     /// @dev Pool id -> Curve Data Structure stores parameters.
     mapping(uint32 => Curve) public curves;
     /// @dev Pool id -> HyperPool Data Structure.
-    mapping(uint48 => HyperPool) public pools;
+    mapping(uint64 => HyperPool) public pools;
     /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
     mapping(bytes32 => uint32) public getCurveId;
     /// @dev Base Token -> Quote Token -> Pair id
-    mapping(address => mapping(address => uint16)) public getPairId;
+    mapping(address => mapping(address => uint24)) public getPairId;
     /// @dev User -> Position Id -> Liquidity Position.
-    mapping(address => mapping(uint48 => HyperPosition)) public positions;
+    mapping(address => mapping(uint64 => HyperPosition)) public positions;
     /// @dev Amount of rewards globally tracked per epoch.
-    mapping(uint48 => mapping(uint256 => uint256)) internal epochRewardGrowthGlobal;
+    mapping(uint64 => mapping(uint256 => uint256)) internal epochRewardGrowthGlobal;
     /// @dev Individual rewards of a position.
-    mapping(uint48 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
+    mapping(uint64 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
 
     // ===== Reentrancy ===== //
 
@@ -156,14 +157,14 @@ contract Hyper is IHyper {
     // ===== Actions ===== //
 
     /// @inheritdoc IHyperActions
-    function syncPool(uint48 poolId) external override returns (uint128 blockTimestamp) {
+    function syncPool(uint64 poolId) external override returns (uint128 blockTimestamp) {
         blockTimestamp; // TODO
         _syncPoolPrice(poolId);
     }
 
     /// @inheritdoc IHyperActions
     function allocate(
-        uint48 poolId,
+        uint64 poolId,
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
@@ -173,27 +174,27 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function unallocate(
-        uint48 poolId,
+        uint64 poolId,
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = asm.toUint128(useMax ? type(uint128).max : amount);
-        (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint16(poolId >> 32), input);
+        (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint24(poolId >> 40), input);
     }
 
     /// @inheritdoc IHyperActions
-    function stake(uint48 poolId) external lock interactions {
+    function stake(uint64 poolId) external lock interactions {
         _stake(poolId);
     }
 
     /// @inheritdoc IHyperActions
-    function unstake(uint48 poolId) external lock interactions {
+    function unstake(uint64 poolId) external lock interactions {
         _unstake(poolId);
     }
 
     /// @inheritdoc IHyperActions
     function swap(
-        uint48 poolId,
+        uint64 poolId,
         bool sellAsset,
         uint amount,
         uint limit
@@ -258,13 +259,13 @@ contract Hyper is IHyper {
      */
     function _allocate(
         uint8 useMax,
-        uint48 poolId,
+        uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidityError();
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
 
-        Pair memory pair = pairs[uint16(poolId >> 32)];
+        Pair memory pair = pairs[uint24(poolId >> 40)];
         if (useMax == 1) {
             // todo: consider using internal balances too, or in place of real balances.
             deltaLiquidity = (
@@ -377,8 +378,8 @@ contract Hyper is IHyper {
      */
     function _unallocate(
         uint8 useMax,
-        uint48 poolId,
-        uint16 pairId,
+        uint64 poolId,
+        uint24 pairId,
         uint128 deltaLiquidity
     ) internal returns (uint deltaAsset, uint deltaQuote) {
         pairId; // TODO
@@ -389,7 +390,7 @@ contract Hyper is IHyper {
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
         (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity); // computed before changing liquidity
 
-        Pair memory pair = pairs[uint16(poolId >> 32)];
+        Pair memory pair = pairs[uint24(poolId >> 40)];
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
             poolId,
@@ -406,13 +407,14 @@ contract Hyper is IHyper {
         emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
+    event log(string);
     event log(int128);
     event log(uint, uint, string);
 
     /**
      * @dev Adds desired amount of liquidity to pending staked liquidity changes of a pool.
      */
-    function _stake(uint48 poolId) internal {
+    function _stake(uint64 poolId) internal {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
 
         HyperPosition storage pos = positions[msg.sender][poolId];
@@ -420,7 +422,7 @@ contract Hyper is IHyper {
         if (pos.totalLiquidity == 0) revert PositionZeroLiquidityError(poolId);
 
         HyperPool storage pool = pools[poolId];
-        pool.epochStakedLiquidityDelta += int256(pos.totalLiquidity);
+        pool.epochStakedLiquidityDelta += int128(pos.totalLiquidity);
 
         Epoch storage epoch = epochs[poolId];
         pos.stakeEpochId = epoch.id + 1;
@@ -433,14 +435,14 @@ contract Hyper is IHyper {
     /**
      * @dev Subtracts desired amount of liquidity from pending staked liquidity changes of a pool.
      */
-    function _unstake(uint48 poolId) internal {
+    function _unstake(uint64 poolId) internal {
         _syncPoolPrice(poolId); // Reverts if pool does not exist.
 
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStakedError(poolId);
 
         HyperPool storage pool = pools[poolId];
-        pool.epochStakedLiquidityDelta -= int256(pos.totalLiquidity);
+        pool.epochStakedLiquidityDelta -= int128(pos.totalLiquidity);
 
         Epoch storage epoch = epochs[poolId];
         pos.unstakeEpochId = epoch.id + 1;
@@ -459,7 +461,7 @@ contract Hyper is IHyper {
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _syncPoolPrice(uint48 poolId) internal returns (uint256 price, int24 tick) {
+    function _syncPoolPrice(uint64 poolId) internal returns (uint256 price, int24 tick) {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
 
         HyperPool storage pool = pools[poolId];
@@ -468,8 +470,8 @@ contract Hyper is IHyper {
         uint timestamp = _blockTimestamp();
         if (timestamp <= curve.maturity) {
             uint256 tau;
-            uint256 elapsed = timestamp - pool.blockTimestamp;
-            if (curve.maturity > pool.blockTimestamp) tau = curve.maturity - pool.blockTimestamp; // Keeps tau at zero if pool expired.
+            uint256 elapsed = timestamp - pool.lastTimestamp;
+            if (curve.maturity > pool.lastTimestamp) tau = curve.maturity - pool.lastTimestamp; // Keeps tau at zero if pool expired.
             Price.Expiring memory expiring = Price.Expiring(curve.strike, curve.sigma, tau);
 
             price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsed);
@@ -491,11 +493,11 @@ contract Hyper is IHyper {
      */
     function _swapExactIn(
         Order memory args
-    ) internal returns (uint48 poolId, uint256 remainder, uint256 input, uint256 output) {
+    ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
         if (!pools.exists(args.poolId)) revert NonExistentPool(args.poolId);
 
-        Pair memory pair = pairs[uint16(args.poolId >> 32)];
+        Pair memory pair = pairs[uint16(args.poolId >> 40)];
         HyperPool storage pool = pools[args.poolId];
 
         state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
@@ -627,7 +629,7 @@ contract Hyper is IHyper {
      * @return timeDelta Amount of time passed since the last update to the pool.
      */
     function _syncPool(
-        uint48 poolId,
+        uint64 poolId,
         int24 tick,
         uint256 price,
         uint256 liquidity,
@@ -637,26 +639,25 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         Epoch memory readEpoch = epochs[poolId];
 
-        uint256 epochsPassed = readEpoch.getEpochsPassed(pool.blockTimestamp);
+        uint256 epochsPassed = readEpoch.getEpochsPassed(pool.lastTimestamp);
         if (epochsPassed > 0) {
             pool.stakedLiquidity = asm.__computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
-            pool.borrowableLiquidity = pool.stakedLiquidity;
-            pool.epochStakedLiquidityDelta = int256(0);
+            pool.epochStakedLiquidityDelta = int128(0);
         }
 
         uint256 timestamp = _blockTimestamp();
-        uint256 lastUpdateTime = pool.blockTimestamp;
+        uint256 lastUpdateTime = pool.lastTimestamp;
         timeDelta = timestamp - lastUpdateTime;
 
         if (pool.lastTick != tick) pool.lastTick = tick;
-        if (pool.lastPrice != price) pool.lastPrice = price;
-        if (pool.liquidity != liquidity) pool.liquidity = liquidity;
-        if (pool.blockTimestamp != timestamp) pool.blockTimestamp = timestamp;
+        if (pool.lastPrice != price) pool.lastPrice = price.toUint128();
+        if (pool.liquidity != liquidity) pool.liquidity = liquidity.toUint128();
+        if (pool.lastTimestamp != timestamp) pool.lastTimestamp = uint32(timestamp);
 
         pool.feeGrowthGlobalAsset = asm.__computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = asm.__computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
 
-        Pair memory pair = pairs[uint16(poolId >> 32)];
+        Pair memory pair = pairs[uint24(poolId >> 40)];
         emit PoolUpdate(
             poolId,
             pool.lastPrice,
@@ -680,12 +681,12 @@ contract Hyper is IHyper {
      * @custom:reverts If pool with pair and curve has already been created.
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
-    function _createPool(uint16 pairId, uint32 curveId, uint128 price) internal {
+    /* function _createPool(uint24 pairId, uint32 curveId, uint128 price) internal {
         if (price == 0) revert ZeroPrice();
         if (pairId == 0) pairId = uint16(getPairNonce); // magic variable
         if (curveId == 0) curveId = uint32(getCurveNonce); // magic variable
 
-        uint48 poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
+        uint64 poolId = uint64(bytes8(abi.encodePacked(pairId, curveId)));
         if (pools.exists(poolId)) revert PoolExists();
 
         Curve memory curve = curves[curveId];
@@ -695,10 +696,10 @@ contract Hyper is IHyper {
         epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
         pools[poolId].lastPrice = price;
         pools[poolId].lastTick = Price.computeTickWithPrice(price);
-        pools[poolId].blockTimestamp = timestamp;
+        pools[poolId].lastTimestamp = timestamp;
 
         emit CreatePool(poolId, pairId, curveId, price);
-    }
+    } */
 
     /**
      * @dev Curves are used to create pools by mapping a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
@@ -708,7 +709,7 @@ contract Hyper is IHyper {
      * @custom:reverts If priority fee parameter is outside the bounds of 0.01% to fee parameter, inclusive.
      * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
      */
-    function _createCurve(
+    /* function _createCurve(
         uint24 sigma,
         uint32 maturity,
         uint16 fee,
@@ -741,7 +742,7 @@ contract Hyper is IHyper {
         });
 
         emit CreateCurve(curveId, strike, sigma, maturity, gamma, priorityGamma);
-    }
+    } */
 
     /**
      * @dev Pairs are used in pool creation to determine the pool's underlying tokens.
@@ -750,7 +751,7 @@ contract Hyper is IHyper {
      * @custom:reverts If __ordered__ pair of addresses has already been created and has a non-zero pairId.
      * @custom:reverts If decimals of either token are not between 6 and 18, inclusive.
      */
-    function _createPair(address asset, address quote) internal returns (uint16 pairId) {
+    function _createPair(address asset, address quote) internal returns (uint24 pairId) {
         if (asset == quote) revert SameTokenError();
 
         pairId = getPairId[asset][quote];
@@ -767,7 +768,7 @@ contract Hyper is IHyper {
         getPairId[asset][quote] = pairId; // note: order of tokens matters!
         pairs[pairId] = Pair({
             tokenAsset: asset,
-            decimalsBase: decimalsAsset, // TODO: change pair struct to decimalsAsset
+            decimalsAsset: decimalsAsset, // TODO: change pair struct to decimalsAsset
             tokenQuote: quote,
             decimalsQuote: decimalsQuote
         });
@@ -775,12 +776,16 @@ contract Hyper is IHyper {
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
     }
 
-    uint[6] public volatilities = [2500, 5000, 7500, 10_000, 12_500, 15_00]; // 10_000 = 100%
-    uint[6] public durations = [1 weeks, 2 weeks, 4 weeks, 8 weeks, 16 weeks, 32 weeks];
+    uint[6] public volatilities = [2500, 5000, 7500, 10_000, 12_500, 15_000]; // [3] = default, 10_000 = 100%
+    uint[6] public durations = [168, 336, 672, 1344, 2688, 8766]; // last one is one year, [5]
     uint[5] public fees = [1, 5, 25, 65, 100]; // 10_000 = 100%, 1 = .01%
+
+    uint32 public getPoolNonce;
 
     /**
      * @dev Uses a pair and curve to instantiate a pool at a price.
+     *
+     * temp: parameters are indexes for now, not values of the array
      *
      * @custom:magic If pairId is 0, uses current pair nonce.
      * @custom:magic If curveId is 0, uses current curve nonce.
@@ -788,60 +793,91 @@ contract Hyper is IHyper {
      * @custom:reverts If pool with pair and curve has already been created.
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
-    function _createPoolSet(uint16 pairId, uint32 curveId, uint128 price) internal returns (uint48 poolId) {
+    function _createPool(
+        uint24 pairId,
+        address controller,
+        uint8 priorityFee,
+        uint8 fee,
+        uint8 vol,
+        uint8 dur,
+        uint16 jit,
+        int24 max,
+        uint128 price
+    ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
-        if (pairId == 0) pairId = uint16(getPairNonce); // magic variable
-        if (curveId == 0) curveId = uint32(getCurveNonce); // magic variable
+        if (max >= MAX_TICK) revert InvalidTick(max);
+        if (fee >= fees.length) revert InvalidIndex(fee, "fee");
+        if (dur >= durations.length) revert InvalidIndex(dur, "dur");
+        if (vol >= volatilities.length) revert InvalidIndex(vol, "vol");
+        if (priorityFee >= fees.length) revert InvalidIndex(priorityFee, "fee");
 
-        bool isMutable = isMutable(curveId);
-        if (isMutable) {
-            if (sets[curveId].controller != msg.sender) revert NotController();
+        if (pairId == 0) pairId = uint24(getPairNonce); // magic variable
+
+        uint32 poolNonce;
+        unchecked {
+            poolNonce = uint32(++getPoolNonce);
         }
 
-        uint48 poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
+        HyperPool memory params = HyperPool({
+            lastTick: Price.computeTickWithPrice(price),
+            lastTimestamp: uint32(_blockTimestamp()), // fix type
+            controller: controller,
+            feeGrowthGlobalAsset: 0,
+            feeGrowthGlobalQuote: 0,
+            lastPrice: price,
+            liquidity: 0,
+            stakedLiquidity: 0,
+            epochStakedLiquidityDelta: 0,
+            params: HyperCurve({
+                maxTick: max,
+                jit: jit,
+                fee: uint16(fees[fee]),
+                duration: uint16(durations[dur]),
+                volatility: uint16(volatilities[vol]),
+                priorityFee: uint16(fees[priorityFee]),
+                startEpoch: currentEpoch
+            })
+        });
+
+        // immutable parameters
+        bool isMutable = controller != address(0);
+        if (isMutable) {
+            params.params.jit = uint8(JUST_IN_TIME_LIQUIDITY_POLICY);
+            params.params.priorityFee = 0;
+        } else {
+            if (params.params.jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(params.params.jit);
+        }
+
+        uint64 poolId = computePoolId(pairId, isMutable, poolNonce);
         if (pools.exists(poolId)) revert PoolExists();
 
-        uint128 timestamp = _blockTimestamp();
-        epochs[poolId] = Epoch({id: currentEpoch, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
-        pools[poolId].startEpoch = currentEpoch;
-        pools[poolId].lastPrice = price;
-        pools[poolId].lastTick = Price.computeTickWithPrice(price);
-        pools[poolId].blockTimestamp = timestamp;
+        epochs[poolId] = Epoch({
+            id: currentEpoch,
+            endTime: params.lastTimestamp + EPOCH_INTERVAL,
+            interval: EPOCH_INTERVAL
+        });
 
-        emit CreatePool(poolId, pairId, curveId, price); // TODO: add isMutable param
+        pools[poolId] = params;
+
+        emit logBytes(bytes8(poolId));
+
+        // todo: event
+        emit CreatePool(poolId, uint16(pairId), 0x0, price);
     }
 
-    struct HyperCurve {
-        // can manipulate parameters conditionally.
-        address controller;
-        // fee charged on swaps by controller.
-        uint8 priorityFee;
-        // fee charged on swaps.
-        uint8 fee;
-        // volatility affects price changes.
-        uint8 vol;
-        // duration until price = max price.
-        uint8 dur;
-        // just in time liquidity must stay for jit seconds.
-        uint8 jit;
-        // max price the pool can reach.
-        int24 max;
-    }
+    event logBytes(bytes8);
 
     int24 public constant MAX_TICK = 25556; // TODO: Fix
     uint48 public currentEpoch = 1; // lets say this is the current epoch.
 
     error NotController();
-    error InvalidJit(uint8);
+    error InvalidJit(uint16);
     error InvalidTick(int24);
     error InvalidIndex(uint8, string);
 
-    mapping(uint32 => HyperCurve) public sets; // curveNonce -> data
-    mapping(bytes32 => uint32) public lookupImmutable; // raw -> curveNonce
-
     /// TODO: add interactions modifier to this probably
     function alter(
-        uint32 nonce,
+        uint64 poolNonce,
         uint8 priorityFee,
         uint8 fee,
         uint8 vol,
@@ -849,93 +885,52 @@ contract Hyper is IHyper {
         uint8 jit,
         int24 max
     ) external lock {
-        HyperCurve storage curve = sets[nonce];
-        if (curve.controller != msg.sender) revert NotController();
+        HyperPool storage pool = pools[poolNonce];
+        if (pool.controller != msg.sender) revert NotController();
         if (max >= MAX_TICK) revert InvalidTick(max);
         if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit);
-        if (jit != 0) curve.jit = jit;
-        if (max != 0) curve.max = max;
-        if (fee != 0) curve.fee = uint8(fees[fee]);
-        if (vol != 0) curve.vol = uint8(volatilities[vol]);
-        if (dur != 0) curve.dur = uint8(durations[dur]);
-        if (priorityFee != 0) curve.priorityFee = uint8(fees[priorityFee]);
+        if (jit != 0) pool.params.jit = jit;
+        if (max != 0) pool.params.maxTick = max;
+        if (fee != 0) pool.params.fee = uint8(fees[fee]);
+        if (vol != 0) pool.params.volatility = uint8(volatilities[vol]);
+        if (dur != 0) pool.params.duration = uint8(durations[dur]);
+        if (priorityFee != 0) pool.params.priorityFee = uint8(fees[priorityFee]);
 
         // TODO: emit an event
     }
 
-    /// temp: these are indexes of the param arrays, not values.
-    /**
-     * @dev Curves are used to create pools by mapping a nonce to a set of curve parameters, max price, volatility, fee, priority fee, and duration.
-     *
-     * @custom:reverts If set parameters have already been used to create a curve for controller = 0x0.
-     * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
-     * @custom:reverts If priority fee parameter is outside the bounds of 0.01% to fee parameter, inclusive.
-     */
-    function _createCurveParameterSet(
-        address controller,
-        uint8 priorityFee,
-        uint8 fee,
-        uint8 vol,
-        uint8 dur,
-        uint8 jit,
-        int24 max
-    ) internal returns (uint32 curveId) {
-        if (max >= MAX_TICK) revert InvalidTick(max);
-        if (fee >= fees.length) revert InvalidIndex(fee, "fee");
-        if (dur >= durations.length) revert InvalidIndex(dur, "dur");
-        if (vol >= volatilities.length) revert InvalidIndex(vol, "vol");
-        if (priorityFee >= fees.length) revert InvalidIndex(priorityFee, "fee");
-
-        HyperCurve memory params = HyperCurve({
-            controller: controller,
-            priorityFee: uint8(fees[priorityFee]),
-            fee: uint8(fees[fee]),
-            vol: uint8(volatilities[vol]),
-            dur: uint8(durations[dur]),
-            jit: jit,
-            max: max
-        });
-
-        // immutable parameters
-        if (controller == address(0)) {
-            params.jit = uint8(JUST_IN_TIME_LIQUIDITY_POLICY);
-            params.priorityFee = 0;
-
-            bytes32 raw = computeRawCurveId(params);
-
-            curveId = lookupImmutable[raw]; // immutable lookup
-            if (curveId != 0) revert CurveExists(curveId);
-        } else {
-            if (params.jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(params.jit);
-        }
-
-        unchecked {
-            curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
-        }
-
-        sets[curveId] = params;
-
-        // TODO: emit event
+    function computePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public view returns (uint64) {
+        return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
     }
 
-    // todo: maybe hash?
-    function computeRawCurveId(HyperCurve memory params) public view returns (bytes32) {
+    // todo: maybe hash? this is not used anywhere right now.
+    function computeRawParams(HyperPool memory params) public view returns (bytes32) {
         return
             CPU.toBytes32(
                 abi.encodePacked(
                     params.controller,
-                    params.priorityFee,
-                    params.fee,
-                    params.vol,
-                    params.dur,
-                    params.jit,
-                    params.max
+                    params.params.priorityFee,
+                    params.params.fee,
+                    params.params.volatility,
+                    params.params.duration,
+                    params.params.jit,
+                    params.params.maxTick
                 )
             );
     }
 
-    function isMutable(uint32 curveId) public view returns (bool) {
-        return sets[curveId].controller != address(0);
+    function computeTau(uint64 poolId) public view returns (uint) {
+        HyperPool memory pool = pools[poolId];
+        Epoch memory epoch = epochs[poolId];
+        uint timestamp = _blockTimestamp();
+        uint elapsed = epoch.getEpochsPassed(timestamp);
+        uint tau = pool.params.duration - (elapsed + pool.params.startEpoch);
+        uint tauSeconds = tau * EPOCH_INTERVAL;
+        return tauSeconds;
+    }
+
+    function isMutable(uint64 poolId) public view returns (bool) {
+        return pools[poolId].controller != address(0);
     }
 
     // ===== Accounting System ===== //
@@ -995,29 +990,39 @@ contract Hyper is IHyper {
         (, bytes1 instruction) = CPU.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == CPU.ALLOCATE) {
-            (uint8 useMax, uint48 poolId, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
             _allocate(useMax, poolId, deltaLiquidity);
         } else if (instruction == CPU.UNALLOCATE) {
-            (uint8 useMax, uint48 poolId, uint16 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
+            (uint8 useMax, uint64 poolId, uint24 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
             _unallocate(useMax, poolId, pairId, deltaLiquidity);
         } else if (instruction == CPU.SWAP) {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
             _swapExactIn(args);
         } else if (instruction == CPU.STAKE_POSITION) {
-            uint48 poolId = CPU.decodeStakePosition(data);
+            uint64 poolId = CPU.decodeStakePosition(data);
             _stake(poolId);
         } else if (instruction == CPU.UNSTAKE_POSITION) {
-            uint48 poolId = CPU.decodeUnstakePosition(data);
+            uint64 poolId = CPU.decodeUnstakePosition(data);
             _unstake(poolId);
         } else if (instruction == CPU.CREATE_POOL) {
-            (uint16 pairId, uint32 curveId, uint128 price) = CPU.decodeCreatePool(data);
-            _createPool(pairId, curveId, price);
+            (
+                uint24 pairId,
+                address controller,
+                uint8 priorityFee,
+                uint8 fee,
+                uint8 vol,
+                uint8 dur,
+                uint16 jit,
+                int24 max,
+                uint128 price
+            ) = CPU.decodeCreatePool(data);
+            _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
         } else if (instruction == CPU.CREATE_CURVE) {
             (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = CPU.decodeCreateCurve(
                 data
             );
-            _createCurve(sigma, maturity, fee, priorityFee, strike);
+            //_createCurve(sigma, maturity, fee, priorityFee, strike);
         } else if (instruction == CPU.CREATE_PAIR) {
             (address asset, address quote) = CPU.decodeCreatePair(data);
             _createPair(asset, quote);
@@ -1030,7 +1035,7 @@ contract Hyper is IHyper {
 
     /** @dev Computes amount of liquidity added to position and pool if token amounts were provided. */
     function getLiquidityMinted(
-        uint48 poolId,
+        uint64 poolId,
         uint deltaAsset,
         uint deltaQuote
     ) public view returns (uint128 deltaLiquidity) {
@@ -1041,14 +1046,14 @@ contract Hyper is IHyper {
     }
 
     /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
-    function getVirtualReserves(uint48 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+    function getVirtualReserves(uint64 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
         uint deltaLiquidity = pools[poolId].liquidity;
         (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity);
     }
 
     /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. Rounded down. */
     function getUnallocateAmounts(
-        uint48 poolId,
+        uint64 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
         if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
@@ -1062,7 +1067,7 @@ contract Hyper is IHyper {
 
     /** @dev Computes amount of physical reserves that must be added to the pool for `deltaLiquidity`. Rounded up. */
     function getAllocateAmounts(
-        uint48 poolId,
+        uint64 poolId,
         uint256 deltaLiquidity
     ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
         if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
@@ -1075,18 +1080,20 @@ contract Hyper is IHyper {
     }
 
     /** @dev Computes each side of a pool's reserves __per one unit of liquidity__. */
-    function _getAmounts(uint48 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
+    function _getAmounts(uint64 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
         // TODO: Make a note of the importance of using the pool's _unchanged_ timestamp.
         // If the blockTimestamp of a pool changes, it will change the pool's price.
         // This blockTimestamp variable should be updated in swaps, not liquidity provision or removing.
         HyperPool storage pool = pools[poolId];
-        uint256 timestamp = pool.blockTimestamp;
+        uint256 timestamp = pool.lastTimestamp;
 
-        Curve memory curve = curves[uint32(poolId)];
+        Epoch memory epoch = epochs[poolId];
+        uint elapsed = epoch.getEpochsPassed(timestamp) * epoch.interval; // todo: fix epoch time
+        uint tau = uint32((pool.params.duration - uint16(elapsed))) * epoch.interval;
         Price.Expiring memory info = Price.Expiring({
-            strike: curve.strike,
-            sigma: curve.sigma,
-            tau: curve.maturity - timestamp
+            strike: Price.computePriceWithTick(pool.params.maxTick),
+            sigma: pool.params.volatility,
+            tau: tau
         });
 
         deltaAsset = info.computeR2WithPrice(pool.lastPrice);
@@ -1096,7 +1103,7 @@ contract Hyper is IHyper {
     /** @dev Computes the time elapsed since position of `account` was last updated. */
     function getSecondsSincePositionUpdate(
         address account,
-        uint48 poolId
+        uint64 poolId
     ) public view returns (uint256 distance, uint256 timestamp) {
         uint256 previous = positions[account][poolId].blockTimestamp;
         timestamp = _blockTimestamp();
@@ -1110,7 +1117,7 @@ contract Hyper is IHyper {
 }
 
 using {changePoolLiquidity} for HyperPool;
-using {exists} for mapping(uint48 => HyperPool);
+using {exists} for mapping(uint64 => HyperPool);
 using {changePositionLiquidity, syncPositionFees} for HyperPosition;
 
 /**
@@ -1147,10 +1154,10 @@ function syncPositionFees(
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;
 
-    self.tokensOwedAsset += feeAssetEarned;
-    self.tokensOwedQuote += feeQuoteEarned;
+    self.tokensOwedAsset += asm.toUint128(feeAssetEarned);
+    self.tokensOwedQuote += asm.toUint128(feeAssetEarned);
 }
 
-function exists(mapping(uint48 => HyperPool) storage pools, uint48 poolId) view returns (bool) {
-    return pools[poolId].blockTimestamp != 0;
+function exists(mapping(uint64 => HyperPool) storage pools, uint64 poolId) view returns (bool) {
+    return pools[poolId].lastTimestamp != 0;
 }
