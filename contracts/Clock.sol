@@ -23,9 +23,7 @@ function getStartTime(Epoch memory epoch) pure returns (uint256 startTime) {
 }
 
 function getEpochsPassed(Epoch memory epoch, uint256 lastUpdatedTimestamp) pure returns (uint256 epochsPassed) {
-    if (epoch.endTime < (lastUpdatedTimestamp + 1))
-        epochsPassed = 1; // todo: fix this, avoids the arthimetic undeflow
-    else epochsPassed = (epoch.endTime - (lastUpdatedTimestamp + 1)) / epoch.interval;
+    if (epoch.interval != 0) epochsPassed = lastUpdatedTimestamp / epoch.interval + 1; // todo: fix, starts at 1 epoch
 }
 
 function getLastUpdatedId(Epoch memory epoch, uint256 epochsPassed) pure returns (uint256 lastUpdateId) {

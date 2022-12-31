@@ -9,75 +9,51 @@ contract TestHyperSwap is TestHyperSetup {
         _;
     }
 
-    function testSwap_should_succeed() public allocateFirst() {
+    function testSwap_should_succeed() public allocateFirst {
         (uint output, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             false,
             10000,
-            type(uint256).max
+            type(uint128).max
         );
     }
 
-    function testSwap_back_and_forth_outputs_less() public allocateFirst() {
+    function testSwap_back_and_forth_outputs_less() public allocateFirst {
         uint256 start = 10000;
 
-        (uint output, ) = __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            false,
-            start,
-            type(uint256).max
-        );
+        (uint output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, false, start, type(uint128).max);
 
-        (uint finalOutput, ) = __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            true,
-            output,
-            type(uint256).max
-        );
+        (uint finalOutput, ) = __hyperTestingContract__.swap(defaultScenario.poolId, true, output, type(uint128).max);
 
         assertGt(start, finalOutput);
     }
 
-    function testSwap_revert_PoolExpiredError() public allocateFirst() {
-        (
-            uint256 lastPrice,
-            int24 lastTick,
-            uint256 blockTimestamp,
-            uint256 liquidity,
-            uint256 stakedLiquidity,
-            uint256 borrowableLiquidity,
-            int256 epochStakedLiquidityDelta,
-            address prioritySwapper,
-            uint256 priorityPaymentPerSecond,
-            uint256 feeGrowthGlobalAsset,
-            uint256 feeGrowthGlobalQuote
-        ) = __hyperTestingContract__.pools(
-            defaultScenario.poolId
+    function testSwap_revert_PoolExpiredError() public allocateFirst {
+        customWarp(
+            block.timestamp +
+                __hyperTestingContract__.computeTau(defaultScenario.poolId) +
+                __hyperTestingContract__.BUFFER() +
+                1
         );
 
-        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
-
-        // assumes curve.maturity is passed block.timestamp
-        customWarp(curve.maturity + __hyperTestingContract__.BUFFER() + 1);
+        uint timestamp = __hyperTestingContract__.timestamp();
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        Epoch memory epoch = getEpoch(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint current = epoch.getEpochsPassed(timestamp);
+        uint tau;
+        console.log(current, pool.params.duration);
+        if (current <= pool.params.duration)
+            tau = uint(pool.params.duration - current) * __hyperTestingContract__.EPOCH_INTERVAL(); // expired
+        console.log(tau);
+        console.log(__hyperTestingContract__.computeTau(defaultScenario.poolId));
 
         vm.expectRevert(PoolExpiredError.selector);
-
-        __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            false,
-            10000,
-            50
-        );
+        __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, 50);
     }
 
     function testSwap_revert_ZeroInput() public {
         vm.expectRevert(ZeroInput.selector);
-        __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            true,
-            0,
-            0
-        );
+        __hyperTestingContract__.swap(defaultScenario.poolId, true, 0, 0);
     }
 
     /*

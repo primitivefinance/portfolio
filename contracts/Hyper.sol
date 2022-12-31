@@ -67,7 +67,7 @@ contract Hyper is IHyper {
     /// @dev Maximum pool fee. 10.00%.
     uint256 public constant MAX_POOL_FEE = 1e3;
     /// @dev Amount of seconds that an epoch lasts.
-    uint256 public constant EPOCH_INTERVAL = 3600; // 1 hr
+    uint256 public constant EPOCH_INTERVAL = 3600 seconds; // 1 hr
     /// @dev Used to compute the amount of liquidity to burn on creating a pool.
     uint256 public constant MIN_LIQUIDITY_FACTOR = 6;
     /// @dev Policy for the "wait" time in seconds between adding and removing liquidity.
@@ -465,21 +465,24 @@ contract Hyper is IHyper {
         if (!pools.exists(poolId)) revert NonExistentPool(poolId);
 
         HyperPool storage pool = pools[poolId];
-        Curve memory curve = curves[uint32(poolId)];
 
         uint timestamp = _blockTimestamp();
-        if (timestamp <= curve.maturity) {
-            uint256 tau;
-            uint256 elapsed = timestamp - pool.lastTimestamp;
-            if (curve.maturity > pool.lastTimestamp) tau = curve.maturity - pool.lastTimestamp; // Keeps tau at zero if pool expired.
-            Price.Expiring memory expiring = Price.Expiring(curve.strike, curve.sigma, tau);
+        Epoch memory epoch = epochs[poolId];
+        uint passed = epoch.getEpochsPassed(timestamp);
+        if (passed > 0) {
+            uint256 tauSeconds = computeTau(poolId);
+            uint256 elapsedSeconds = passed * epoch.interval;
+            uint strike = Price.computePriceWithTick(pool.params.maxTick);
+            Price.Expiring memory expiring = Price.Expiring(strike, pool.params.volatility, tauSeconds);
 
-            price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsed);
+            price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsedSeconds);
             tick = Price.computeTickWithPrice(price);
-
             _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
         }
     }
+
+    event log(uint);
+    event log(bool);
 
     SwapState state;
 
@@ -525,17 +528,22 @@ contract Hyper is IHyper {
 
         Price.Expiring memory expiring;
         {
-            Curve memory curve = curves[uint32(args.poolId)];
-            if (_blockTimestamp() > curve.maturity + BUFFER) revert PoolExpiredError();
-            expiring = Price.Expiring({
-                strike: curve.strike,
-                sigma: curve.sigma,
-                tau: curve.maturity - _blockTimestamp()
-            });
+            Epoch memory epoch = epochs[poolId];
+            uint timestamp = _blockTimestamp();
+            emit log("computing tau");
+            uint tau = computeTau(poolId);
+            emit log(tau);
+            if (tau == 0) revert PoolExpiredError();
 
-            state.gamma = curve.gamma;
+            uint strike = Price.computePriceWithTick(pool.params.maxTick);
+            emit log(tau, strike, "tau strike");
+            // todo: fix this with buffer too
+            expiring = Price.Expiring({strike: strike, sigma: pool.params.volatility, tau: tau});
+
+            state.gamma = 1e4 - pool.params.fee;
         }
 
+        emit log("here");
         // =---= Effects =---= //
 
         uint256 liveIndependent;
@@ -920,13 +928,14 @@ contract Hyper is IHyper {
     }
 
     function computeTau(uint64 poolId) public view returns (uint) {
-        HyperPool memory pool = pools[poolId];
+        HyperPool storage pool = pools[poolId];
         Epoch memory epoch = epochs[poolId];
         uint timestamp = _blockTimestamp();
-        uint elapsed = epoch.getEpochsPassed(timestamp);
-        uint tau = pool.params.duration - (elapsed + pool.params.startEpoch);
-        uint tauSeconds = tau * EPOCH_INTERVAL;
-        return tauSeconds;
+        uint current = epoch.getEpochsPassed(timestamp);
+        //if (current > pool.params.duration) return 0; // expired
+
+        uint computedTau = uint(pool.params.duration - current) * EPOCH_INTERVAL;
+        return computedTau;
     }
 
     function isMutable(uint64 poolId) public view returns (bool) {
