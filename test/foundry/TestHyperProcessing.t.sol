@@ -216,7 +216,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
 
         // move some time beyond maturity
-        customWarp(getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId)).maturity + 1);
+        customWarp(getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId)).maturity + 1 + __hyperTestingContract__.BUFFER());
 
         vm.expectRevert(PoolExpiredError.selector);
         __hyperTestingContract__.swap(defaultScenario.poolId, false, amount, limit);
