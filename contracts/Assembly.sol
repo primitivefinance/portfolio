@@ -22,82 +22,6 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
     }
 }
 
-/// @notice reverts if x > type(uint128).max
-function toUint128(uint256 x) pure returns (uint128 z) {
-    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
-    uint128 max = type(uint128).max;
-    assembly {
-        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
-        case 0 {
-            let revertDataSize := mload(revertData)
-            revert(add(32, revertData), revertDataSize)
-        }
-        case 1 {
-            z := x
-        }
-    }
-}
-
-function toUint16(uint256 x) pure returns (uint16 z) {
-    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
-    uint16 max = type(uint16).max;
-    assembly {
-        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
-        case 0 {
-            let revertDataSize := mload(revertData)
-            revert(add(32, revertData), revertDataSize)
-        }
-        case 1 {
-            z := x
-        }
-    }
-}
-
-function toUint24(uint256 x) pure returns (uint24 z) {
-    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
-    uint24 max = type(uint24).max;
-    assembly {
-        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
-        case 0 {
-            let revertDataSize := mload(revertData)
-            revert(add(32, revertData), revertDataSize)
-        }
-        case 1 {
-            z := x
-        }
-    }
-}
-
-function toUint32(uint256 x) pure returns (uint32 z) {
-    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
-    uint32 max = type(uint32).max;
-    assembly {
-        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
-        case 0 {
-            let revertDataSize := mload(revertData)
-            revert(add(32, revertData), revertDataSize)
-        }
-        case 1 {
-            z := x
-        }
-    }
-}
-
-function toUint48(uint256 x) pure returns (uint48 z) {
-    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
-    uint48 max = type(uint48).max;
-    assembly {
-        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
-        case 0 {
-            let revertDataSize := mload(revertData)
-            revert(add(32, revertData), revertDataSize)
-        }
-        case 1 {
-            z := x
-        }
-    }
-}
-
 function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
     assembly {
         switch slt(input, 0) // input < 0 ? 1 : 0
@@ -170,5 +94,3 @@ function toAmount(bytes calldata raw) pure returns (uint128 amount) {
     amount = uint128(toBytes16(raw[1:raw.length]));
     if (power != 0) amount = amount * uint128(10 ** power);
 }
-
-using {toUint128, toUint48, toUint32, toUint24, toUint16} for uint;

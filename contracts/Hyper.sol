@@ -28,25 +28,19 @@ import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
 
 /**
- * @title   Enigma Virtual Machine.
- * @notice  Exposes an external api and an alternative multi-operation api that uses compressed data inputs.
- * @dev     Implements low-level internal functions, re-entrancy guard and state.
+ * @title   Primitive Hyper.
  */
 contract Hyper is IHyper {
-    using {Assembly.toUint128, Assembly.toUint48, Assembly.toUint32, Assembly.toUint24, Assembly.toUint16} for uint;
+    using SafeCastLib for uint;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using Price for Price.Expiring;
 
-    // ===== Account ===== //
+    /// @dev If balanceOf token < getReserve of token, you win.
     OS.AccountSystem public __account__;
-
-    // ===== Constants ===== //
     string public constant VERSION = "beta-v0.0.1";
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
-
-    // ===== State ===== //
     /// @dev Reentrancy guard initialized to state
     uint256 private locked = 1;
     /// @dev A value incremented by one on pair creation. Reduces calldata.
@@ -70,8 +64,6 @@ contract Hyper is IHyper {
     /// @dev Individual rewards of a position.
     mapping(uint64 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
 
-    // ===== Reentrancy ===== //
-
     /** @dev Used on every external function and external entrypoint. */
     modifier lock() {
         if (locked != 1) revert InvalidReentrancy();
@@ -91,13 +83,10 @@ contract Hyper is IHyper {
         if (!__account__.settled) revert InvalidSettlement();
     }
 
-    // ===== Constructor ===== //
     constructor(address weth) {
         WETH = weth;
         __account__.settled = true;
     }
-
-    // ===== Getters ===== //
 
     /** @dev Fetches internally tracked amount of `token` owned by this contract. */
     function getReserve(address token) public view returns (uint) {
@@ -109,18 +98,11 @@ contract Hyper is IHyper {
         return __account__.balances[owner][token];
     }
 
-    // ===== CPU Entrypoint ===== //
-
-    /**
-     * @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`.
-     *
-     * @custom:security Guarded against re-entrancy externally and when settling. This is the vault door, is it `locked`?.
-     */
+    /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
     fallback() external payable lock interactions {
         CPU.__startProcess__(_process);
     }
 
-    /** @dev Only accepts Ether from Wrapped Ether contract. */
     receive() external payable {
         if (msg.sender != WETH) revert();
     }
@@ -139,7 +121,7 @@ contract Hyper is IHyper {
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = Assembly.toUint128(useMax ? type(uint128).max : amount);
+        uint128 input = (useMax ? type(uint128).max : amount).safeCastTo128();
         (deltaAsset, deltaQuote) = _allocate(useMax ? 1 : 0, poolId, input);
     }
 
@@ -149,7 +131,7 @@ contract Hyper is IHyper {
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = Assembly.toUint128(useMax ? type(uint128).max : amount);
+        uint128 input = (useMax ? type(uint128).max : amount).safeCastTo128();
         (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint24(poolId >> 40), input);
     }
 
@@ -171,13 +153,13 @@ contract Hyper is IHyper {
         uint limit
     ) external lock interactions returns (uint output, uint remainder) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = useMax ? type(uint128).max : Assembly.toUint128(amount);
+        uint128 input = useMax ? type(uint128).max : (amount).safeCastTo128();
         if (limit == type(uint256).max) limit = type(uint128).max;
         Order memory args = Order({
             useMax: useMax ? 1 : 0,
             poolId: poolId,
             input: input,
-            limit: Assembly.toUint128(limit),
+            limit: (limit).safeCastTo128(),
             direction: sellAsset ? 0 : 1
         });
         (, remainder, , output) = _swapExactIn(args);
@@ -239,14 +221,10 @@ contract Hyper is IHyper {
         Pair memory pair = pairs[uint24(poolId >> 40)];
         if (useMax == 1) {
             // todo: consider using internal balances too, or in place of real balances.
-            deltaLiquidity = (
-                Assembly.toUint128(
-                    getLiquidityMinted(
-                        poolId,
-                        OS.__balanceOf__(pair.tokenAsset, msg.sender),
-                        OS.__balanceOf__(pair.tokenQuote, msg.sender)
-                    )
-                )
+            deltaLiquidity = getLiquidityMinted(
+                poolId,
+                OS.__balanceOf__(pair.tokenAsset, msg.sender),
+                OS.__balanceOf__(pair.tokenQuote, msg.sender)
             );
         }
 
@@ -356,7 +334,7 @@ contract Hyper is IHyper {
         pairId; // TODO
         if (deltaLiquidity == 0) revert ZeroLiquidity();
         if (!pools[poolId].exists()) revert NonExistentPool(poolId);
-        if (useMax == 1) deltaLiquidity = Assembly.toUint128(positions[msg.sender][poolId].totalLiquidity);
+        if (useMax == 1) deltaLiquidity = positions[msg.sender][poolId].totalLiquidity;
 
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
         (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity); // computed before changing liquidity
@@ -628,8 +606,8 @@ contract Hyper is IHyper {
         timeDelta = timestamp - lastUpdateTime;
 
         if (pool.lastTick != tick) pool.lastTick = tick;
-        if (pool.lastPrice != price) pool.lastPrice = price.toUint128();
-        if (pool.liquidity != liquidity) pool.liquidity = liquidity.toUint128();
+        if (pool.lastPrice != price) pool.lastPrice = price.safeCastTo128();
+        if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
         if (pool.lastTimestamp != timestamp) pool.lastTimestamp = uint32(timestamp);
 
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
@@ -897,7 +875,7 @@ contract Hyper is IHyper {
         (uint amount0, uint amount1) = _getAmounts(poolId);
         uint liquidity0 = deltaAsset.divWadDown(amount0); // If `deltaAsset` is twice as much as assets per liquidity in pool, we can mint 2 liquidity.
         uint liquidity1 = deltaQuote.divWadDown(amount1); // If this liquidity amount is lower, it means we don't have enough tokens to mint the above amount.
-        deltaLiquidity = Assembly.toUint128(liquidity0 < liquidity1 ? liquidity0 : liquidity1);
+        deltaLiquidity = (liquidity0 < liquidity1 ? liquidity0 : liquidity1).safeCastTo128();
     }
 
     /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
@@ -916,8 +894,8 @@ contract Hyper is IHyper {
         require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
-        deltaAsset = Assembly.toUint128(amountAsset.mulWadDown(deltaLiquidity));
-        deltaQuote = Assembly.toUint128(amountQuote.mulWadDown(deltaLiquidity));
+        deltaAsset = (amountAsset.mulWadDown(deltaLiquidity)).safeCastTo128();
+        deltaQuote = (amountQuote.mulWadDown(deltaLiquidity)).safeCastTo128();
     }
 
     /** @dev Computes amount of physical reserves that must be added to the pool for `deltaLiquidity`. Rounded up. */
@@ -930,8 +908,8 @@ contract Hyper is IHyper {
         require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
-        deltaAsset = Assembly.toUint128(amountAsset.mulWadUp(deltaLiquidity));
-        deltaQuote = Assembly.toUint128(amountQuote.mulWadUp(deltaLiquidity));
+        deltaAsset = (amountAsset.mulWadUp(deltaLiquidity)).safeCastTo128();
+        deltaQuote = (amountQuote.mulWadUp(deltaLiquidity)).safeCastTo128();
     }
 
     /** @dev Computes each side of a pool's reserves __per one unit of liquidity__. */

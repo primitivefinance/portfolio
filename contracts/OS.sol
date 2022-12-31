@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import "solmate/utils/SafeTransferLib.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
+import "./Assembly.sol" as Assembly;
 
 using {
     __wrapEther__,
@@ -17,7 +18,7 @@ using {
     prepare,
     settle,
     settlement,
-    clear,
+    reset,
     getNetBalance,
     touch
 } for AccountSystem global;
@@ -44,12 +45,11 @@ function __balanceOf__(address token, address account) view returns (uint256) {
     return abi.decode(data, (uint256));
 }
 
-/** @dev Sends ether in `deposit` function to target address. Must validate `weth`. */
+/** @dev Must validate `weth`. */
 function __wrapEther__(AccountSystem storage self, address weth) {
-    // todo: be careful with this, since it uses msg.value
     if (msg.value > 0) {
-        IWETH(weth).deposit{value: msg.value}();
         self.touch(weth);
+        IWETH(weth).deposit{value: msg.value}();
     }
 }
 
@@ -65,16 +65,18 @@ function __dangerousTransferEther__(address to, uint256 value) {
     if (!success) revert EtherTransferFail();
 }
 
-/** @dev Used in a for loop in the `settlement` function. */
+/** @dev External call to the `to` address is dangerous. */
 function __dangerousTransferFrom__(address token, address to, uint amount) {
     SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
 }
 
+/** @dev External call to the `to` address is dangerous. */
 function dangerousFund(AccountSystem storage self, address token, address to, uint amount) {
     self.increase(token, amount);
     __dangerousTransferFrom__(token, to, amount);
 }
 
+/** @dev Dangerously sends ether or tokens to `to` in a low-level call. */
 function dangerousDraw(AccountSystem storage self, address weth, address token, uint amount, address to) {
     self.decrease(token, amount);
     if (token == weth) __dangerousUnwrapEther__(weth, to, amount);
@@ -151,7 +153,7 @@ function settlement(AccountSystem storage self, function(address, address, uint)
     // the execution of the for loop, leading to some tokens not being paid for.
     address[] memory tokens = self.warm;
     uint loops = tokens.length;
-    if (loops == 0) return self.clear();
+    if (loops == 0) return self.reset();
 
     uint i;
     for (i; i != loops; ++i) {
@@ -159,7 +161,7 @@ function settlement(AccountSystem storage self, function(address, address, uint)
         self.settle(pay, token, account);
     }
 
-    self.clear();
+    self.reset();
 }
 
 /** @dev Interacting with a token will activate it, adding it to an array of interacted tokens for settlement to loop through. */
@@ -172,7 +174,7 @@ function touch(AccountSystem storage self, address token) {
 }
 
 /** @dev Account system is reset after settlement is successful. */
-function clear(AccountSystem storage self) {
+function reset(AccountSystem storage self) {
     self.settled = true;
     delete self.warm;
     delete self.prepared;

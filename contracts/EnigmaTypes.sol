@@ -6,6 +6,7 @@ import "./CPU.sol" as CPU;
 import "./Clock.sol" as Clock;
 import "./Assembly.sol" as Assembly;
 import "./libraries/Price.sol";
+import "solmate/utils/SafeCastLib.sol";
 
 int24 constant MAX_TICK = 25556; // todo: fix, Equal to 5x price at 1bps tick sizes.
 int24 constant TICK_SIZE = 256; // todo: use this?
@@ -134,16 +135,16 @@ function exists(HyperPool memory self) view returns (bool) {
 }
 
 function changePoolLiquidity(HyperPool storage self, int128 liquidityDelta) {
-    self.liquidity = Assembly.toUint128(Assembly.addSignedDelta(self.liquidity, liquidityDelta));
+    self.liquidity = Assembly.addSignedDelta(self.liquidity, liquidityDelta);
 }
 
 function syncPoolTimestamp(HyperPool storage self, uint timestamp) {
-    self.lastTimestamp = Assembly.toUint32(timestamp);
+    self.lastTimestamp = SafeCastLib.safeCastTo32(timestamp);
 }
 
 function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
     self.blockTimestamp = timestamp;
-    self.totalLiquidity = Assembly.toUint128(Assembly.addSignedDelta(self.totalLiquidity, liquidityDelta));
+    self.totalLiquidity = Assembly.addSignedDelta(self.totalLiquidity, liquidityDelta);
 }
 
 // todo: proper parameter checks
@@ -174,6 +175,6 @@ function syncPositionFees(
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;
 
-    self.tokensOwedAsset += Assembly.toUint128(feeAssetEarned);
-    self.tokensOwedQuote += Assembly.toUint128(feeAssetEarned);
+    self.tokensOwedAsset += SafeCastLib.safeCastTo128(feeAssetEarned);
+    self.tokensOwedQuote += SafeCastLib.safeCastTo128(feeAssetEarned);
 }
