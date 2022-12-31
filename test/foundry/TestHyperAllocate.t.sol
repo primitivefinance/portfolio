@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY} from "contracts/EnigmaTypes.sol";
-import "contracts/Clock.sol" as Clock;
+import "contracts/Clock.sol";
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperAllocate is TestHyperSetup {

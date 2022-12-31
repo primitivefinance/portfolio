@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+error CastOverflow(uint);
+
 function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     return __between(value, lower, upper);
 }
@@ -19,8 +21,6 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
         valid := isValid(value, lower, upper)
     }
 }
-
-error CastOverflow(uint);
 
 /// @notice reverts if x > type(uint128).max
 function toUint128(uint256 x) pure returns (uint128 z) {
@@ -98,22 +98,7 @@ function toUint48(uint256 x) pure returns (uint48 z) {
     }
 }
 
-/**
- * todo: verify this is good to go
- */
-/* function __computeDelta(uint256 input, int256 delta) pure returns (uint256 output) {
-    assembly {
-        switch slt(input, 0) // input < 0 ? 1 : 0
-        case 0 {
-            output := add(input, delta)
-        }
-        case 1 {
-            output := sub(input, delta)
-        }
-    }
-} */
-
-function __computeDelta(uint128 input, int128 delta) pure returns (uint128 output) {
+function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
     assembly {
         switch slt(input, 0) // input < 0 ? 1 : 0
         case 0 {
@@ -125,7 +110,7 @@ function __computeDelta(uint128 input, int128 delta) pure returns (uint128 outpu
     }
 }
 
-function __computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) pure returns (uint256 nextCheckpoint) {
+function computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) pure returns (uint256 nextCheckpoint) {
     nextCheckpoint = liveCheckpoint;
 
     if (checkpointChange != 0) {
@@ -136,10 +121,7 @@ function __computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) p
     }
 }
 
-function __computeCheckpointDistance(
-    uint256 currentCheckpoint,
-    uint256 prevCheckpoint
-) pure returns (uint256 distance) {
+function computeCheckpointDistance(uint256 currentCheckpoint, uint256 prevCheckpoint) pure returns (uint256 distance) {
     // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
     assembly {
         distance := sub(currentCheckpoint, prevCheckpoint)
@@ -166,6 +148,27 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
         let shift := mul(sub(16, mload(raw)), 8)
         data := shr(shift, data)
     }
+}
+
+function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
+    upper = data >> 4;
+    lower = data & 0x0f;
+}
+
+function pack(bytes1 upper, bytes1 lower) pure returns (bytes1 data) {
+    data = (upper << 4) | lower;
+}
+
+/**
+ * @dev             Converts an array of bytes into an uint128, the array must adhere
+ *                  to the the following format:
+ *                  - First byte: Amount of trailing zeros.
+ *                  - Rest of the array: A hexadecimal number.
+ */
+function toAmount(bytes calldata raw) pure returns (uint128 amount) {
+    uint8 power = uint8(raw[0]);
+    amount = uint128(toBytes16(raw[1:raw.length]));
+    if (power != 0) amount = amount * uint128(10 ** power);
 }
 
 using {toUint128, toUint48, toUint32, toUint24, toUint16} for uint;

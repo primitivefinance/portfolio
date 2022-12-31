@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
-import {InvalidJump} from "./EnigmaTypes.sol";
-import "./Assembly.sol";
+import "./Assembly.sol" as Assembly;
 
-// --- Instructions --- //
+/// @dev Used as the first pointer for the jump process.
+uint8 constant JUMP_PROCESS_START_POINTER = 2;
+
 bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET00 = 0x02;
@@ -20,8 +21,8 @@ bytes1 constant CREATE_PAIR = 0x0C;
 bytes1 constant CREATE_CURVE = 0x0D;
 bytes1 constant INSTRUCTION_JUMP = 0xAA;
 
-/// @dev Used as the first pointer for the jump process.
-uint8 constant JUMP_PROCESS_START_POINTER = 2;
+error InvalidJump(uint256 pointer);
+error InvalidPairBytes(uint256 expected, uint256 length);
 
 function __startProcess__(function(bytes calldata) _process) {
     if (msg.data[0] != INSTRUCTION_JUMP) _process(msg.data);
@@ -45,8 +46,6 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
         _process(instruction[1:]); // note: Removes the pointer to the next instruction.
     }
 }
-
-error DecodePairBytesLength(uint256 expected, uint256 length);
 
 function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes memory) {
     uint8 len = uint8(instructions.length);
@@ -73,9 +72,8 @@ function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes 
     return payload;
 }
 
-function encodePoolId(uint24 pairId, uint32 curveId) pure returns (uint64 poolId) {
-    bytes memory data = abi.encodePacked(pairId, curveId);
-    poolId = uint64(bytes8(data));
+function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64) {
+    return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
 }
 
 /** @dev [0x 3 bytes 1 byte 4 bytes] == [0x pairId isMutable poolNonce]. */
@@ -94,7 +92,7 @@ function encodeCreatePair(address token0, address token1) pure returns (bytes me
 
 /** @dev [0x 00 3 bytes 1 byte 4 bytes] == [0x instruction token0 token1]. */
 function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
-    if (data.length != 41) revert DecodePairBytesLength(41, data.length);
+    if (data.length != 41) revert InvalidPairBytes(41, data.length);
     tokenAsset = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
     tokenQuote = address(bytes20(data[21:]));
 }
@@ -141,19 +139,19 @@ function decodeCreatePool(
 }
 
 function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
+    data = abi.encodePacked(Assembly.pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
 }
 
 /** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId deltaLiquidity] */
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
-    (bytes1 maxFlag, ) = separate(data[0]);
+    (bytes1 maxFlag, ) = Assembly.separate(data[0]);
     useMax = uint8(maxFlag);
     poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = toAmount(data[9:]);
+    deltaLiquidity = Assembly.toAmount(data[9:]);
 }
 
 function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
+    data = abi.encodePacked(Assembly.pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
 }
 
 /** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId=[pairId + 5 bytes] deltaLiquidity] */
@@ -163,7 +161,7 @@ function decodeUnallocate(
     useMax = uint8(data[0] >> 4);
     pairId = uint16(bytes2(data[1:4]));
     poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = uint128(toAmount(data[9:]));
+    deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }
 
 function encodeSwap(
@@ -176,7 +174,16 @@ function encodeSwap(
     uint8 direction
 ) pure returns (bytes memory data) {
     uint8 pointer = 0x0a + 0x0f + 0x02; // temp: fix: 0x02 for two additional poolId bytes // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
-    data = abi.encodePacked(pack(bytes1(useMax), SWAP), poolId, pointer, power0, amount0, power1, amount1, direction);
+    data = abi.encodePacked(
+        Assembly.pack(bytes1(useMax), SWAP),
+        poolId,
+        pointer,
+        power0,
+        amount0,
+        power1,
+        amount1,
+        direction
+    );
 }
 
 /** @dev Swap direction: 0 = base token to quote token, 1 = quote token to base token. */
@@ -186,8 +193,8 @@ function decodeSwap(
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
     uint8 pointer = uint8(data[9]);
-    input = uint128(toAmount(data[10:pointer]));
-    limit = uint128(toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
+    input = uint128(Assembly.toAmount(data[10:pointer]));
+    limit = uint128(Assembly.toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
     direction = uint8(data[data.length - 1]);
 }
 
@@ -205,25 +212,4 @@ function encodeUnstakePosition(uint64 positionId) pure returns (bytes memory dat
 
 function decodeUnstakePosition(bytes calldata data) pure returns (uint64 poolId) {
     poolId = uint64(bytes8(data[1:9]));
-}
-
-function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
-    upper = data >> 4;
-    lower = data & 0x0f;
-}
-
-function pack(bytes1 upper, bytes1 lower) pure returns (bytes1 data) {
-    data = (upper << 4) | lower;
-}
-
-/// @dev             Converts an array of bytes into an uint128, the array must adhere
-///                  to the the following format:
-///                  - First byte: Amount of trailing zeros.
-///                  - Rest of the array: A hexadecimal number.
-/// @param raw       Array of bytes to convert.
-/// @return amount   Converted amount.
-function toAmount(bytes calldata raw) pure returns (uint128 amount) {
-    uint8 power = uint8(raw[0]);
-    amount = uint128(toBytes16(raw[1:raw.length]));
-    if (power != 0) amount = amount * uint128(10 ** power);
 }

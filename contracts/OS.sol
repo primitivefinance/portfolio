@@ -2,10 +2,8 @@
 pragma solidity 0.8.13;
 
 import "solmate/utils/SafeTransferLib.sol";
-
 import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
-import {InvalidBalance, EtherTransferFail} from "./EnigmaTypes.sol";
 
 using {
     __wrapEther__,
@@ -34,7 +32,9 @@ struct AccountSystem {
     bool settled; // Must be true outside of execution.
 }
 
+error EtherTransferFail();
 error InsufficientBalance(uint amount, uint delta);
+error InvalidBalance();
 error NotPreparedToSettle();
 
 /** @dev Gas optimized. */

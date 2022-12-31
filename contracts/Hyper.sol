@@ -33,14 +33,13 @@ import "./interfaces/IERC20.sol";
  * @dev     Implements low-level internal functions, re-entrancy guard and state.
  */
 contract Hyper is IHyper {
-    using {asm.toUint128, asm.toUint48, asm.toUint32, asm.toUint24, asm.toUint16} for uint;
-    using {exists} for mapping(uint64 => HyperPool);
+    using {Assembly.toUint128, Assembly.toUint48, Assembly.toUint32, Assembly.toUint24, Assembly.toUint16} for uint;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using Price for Price.Expiring;
 
     // ===== Account ===== //
-    AccountSystem public __account__;
+    OS.AccountSystem public __account__;
 
     // ===== Constants ===== //
     string public constant VERSION = "beta-v0.0.1";
@@ -58,8 +57,8 @@ contract Hyper is IHyper {
     uint48 public currentEpoch = 1;
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint24 => Pair) public pairs;
-    /// @dev Pool id -> Epoch Data Structure.
-    mapping(uint64 => Epoch) public epochs;
+    /// @dev Pool id -> Clock.Epoch Data Structure.
+    mapping(uint64 => Clock.Epoch) public epochs;
     /// @dev Pool id -> HyperPool Data Structure.
     mapping(uint64 => HyperPool) public pools;
     /// @dev Base Token -> Quote Token -> Pair id
@@ -87,7 +86,7 @@ contract Hyper is IHyper {
         __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
         _;
         __account__.prepare();
-        __account__.settlement(__dangerousTransferFrom__, address(this));
+        __account__.settlement(OS.__dangerousTransferFrom__, address(this));
 
         if (!__account__.settled) revert InvalidSettlement();
     }
@@ -140,7 +139,7 @@ contract Hyper is IHyper {
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = asm.toUint128(useMax ? type(uint128).max : amount);
+        uint128 input = Assembly.toUint128(useMax ? type(uint128).max : amount);
         (deltaAsset, deltaQuote) = _allocate(useMax ? 1 : 0, poolId, input);
     }
 
@@ -150,7 +149,7 @@ contract Hyper is IHyper {
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = asm.toUint128(useMax ? type(uint128).max : amount);
+        uint128 input = Assembly.toUint128(useMax ? type(uint128).max : amount);
         (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint24(poolId >> 40), input);
     }
 
@@ -172,13 +171,13 @@ contract Hyper is IHyper {
         uint limit
     ) external lock interactions returns (uint output, uint remainder) {
         bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = useMax ? type(uint128).max : asm.toUint128(amount);
+        uint128 input = useMax ? type(uint128).max : Assembly.toUint128(amount);
         if (limit == type(uint256).max) limit = type(uint128).max;
         Order memory args = Order({
             useMax: useMax ? 1 : 0,
             poolId: poolId,
             input: input,
-            limit: asm.toUint128(limit),
+            limit: Assembly.toUint128(limit),
             direction: sellAsset ? 0 : 1
         });
         (, remainder, , output) = _swapExactIn(args);
@@ -190,8 +189,8 @@ contract Hyper is IHyper {
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
 
-        if (token == WETH) __dangerousUnwrapEther__(WETH, to, amount);
-        else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
+        if (token == WETH) OS.__dangerousUnwrapEther__(WETH, to, amount);
+        else OS.SafeTransferLib.safeTransfer(OS.ERC20(token), to, amount);
     }
 
     /// @inheritdoc IHyperActions
@@ -235,17 +234,17 @@ contract Hyper is IHyper {
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        if (!pools.exists(poolId)) revert NonExistentPool(poolId);
+        if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
         Pair memory pair = pairs[uint24(poolId >> 40)];
         if (useMax == 1) {
             // todo: consider using internal balances too, or in place of real balances.
             deltaLiquidity = (
-                asm.toUint128(
+                Assembly.toUint128(
                     getLiquidityMinted(
                         poolId,
-                        __balanceOf__(pair.tokenAsset, msg.sender),
-                        __balanceOf__(pair.tokenQuote, msg.sender)
+                        OS.__balanceOf__(pair.tokenAsset, msg.sender),
+                        OS.__balanceOf__(pair.tokenQuote, msg.sender)
                     )
                 )
             );
@@ -265,7 +264,6 @@ contract Hyper is IHyper {
             int128(deltaLiquidity) // TODO: add better type safety for these conversions.
         );
         _changeLiquidity(args);
-        emit log(deltaAsset, deltaQuote, "allocate");
 
         emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
@@ -315,7 +313,7 @@ contract Hyper is IHyper {
      * @dev Syncs timestamp and liquidity for a pool before adding debits (increase reserve) or credits (decrease reserve) to settlement.
      */
     function _changePool(ChangeLiquidityParams memory args) internal {
-        pools[args.poolId].changePoolLiquidity(args.timestamp, args.deltaLiquidity);
+        pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
 
@@ -357,8 +355,8 @@ contract Hyper is IHyper {
     ) internal returns (uint deltaAsset, uint deltaQuote) {
         pairId; // TODO
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        if (!pools.exists(poolId)) revert NonExistentPool(poolId);
-        if (useMax == 1) deltaLiquidity = asm.toUint128(positions[msg.sender][poolId].totalLiquidity);
+        if (!pools[poolId].exists()) revert NonExistentPool(poolId);
+        if (useMax == 1) deltaLiquidity = Assembly.toUint128(positions[msg.sender][poolId].totalLiquidity);
 
         // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
         (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity); // computed before changing liquidity
@@ -387,7 +385,7 @@ contract Hyper is IHyper {
      * @dev Adds desired amount of liquidity to pending staked liquidity changes of a pool.
      */
     function _stake(uint64 poolId) internal {
-        if (!pools.exists(poolId)) revert NonExistentPool(poolId);
+        if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.stakeEpochId != 0) revert PositionStaked(poolId);
@@ -396,7 +394,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta += int128(pos.totalLiquidity);
 
-        Epoch storage epoch = epochs[poolId];
+        Clock.Epoch storage epoch = epochs[poolId];
         pos.stakeEpochId = epoch.id + 1;
 
         // note: do we need to update position blockTimestamp?
@@ -416,7 +414,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta -= int128(pos.totalLiquidity);
 
-        Epoch storage epoch = epochs[poolId];
+        Clock.Epoch storage epoch = epochs[poolId];
         pos.unstakeEpochId = epoch.id + 1;
 
         // note: do we need to update position blockTimestamp?
@@ -434,12 +432,12 @@ contract Hyper is IHyper {
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
     function _syncPoolPrice(uint64 poolId) internal returns (uint256 price, int24 tick) {
-        if (!pools.exists(poolId)) revert NonExistentPool(poolId);
+        if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
         HyperPool storage pool = pools[poolId];
 
         uint timestamp = _blockTimestamp();
-        Epoch memory epoch = epochs[poolId];
+        Clock.Epoch memory epoch = epochs[poolId];
         uint passed = epoch.getEpochsPassed(timestamp);
         if (passed > 0) {
             uint256 tauSeconds = computeTau(poolId);
@@ -470,7 +468,7 @@ contract Hyper is IHyper {
         Order memory args
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
-        if (!pools.exists(args.poolId)) revert NonExistentPool(args.poolId);
+        if (!pools[args.poolId].exists()) revert NonExistentPool(args.poolId);
 
         Pair memory pair = pairs[uint16(args.poolId >> 40)];
         HyperPool storage pool = pools[args.poolId];
@@ -500,7 +498,7 @@ contract Hyper is IHyper {
 
         Price.Expiring memory expiring;
         {
-            Epoch memory epoch = epochs[poolId];
+            Clock.Epoch memory epoch = epochs[poolId];
             uint timestamp = _blockTimestamp();
             emit log("computing tau");
             uint tau = computeTau(poolId);
@@ -530,7 +528,7 @@ contract Hyper is IHyper {
             // Virtual reserves.
             if (state.sell) {
                 (liveDependent, liveIndependent) = expiring.computeReserves(_swap.price);
-                maxInput = (PRECISION - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
+                maxInput = (FixedPointMathLib.WAD - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
             } else {
                 (liveIndependent, liveDependent) = expiring.computeReserves(_swap.price);
                 maxInput = (expiring.strike - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
@@ -617,11 +615,11 @@ contract Hyper is IHyper {
         uint256 feeGrowthGlobalQuote
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
-        Epoch memory readEpoch = epochs[poolId];
+        Clock.Epoch memory readEpoch = epochs[poolId];
 
         uint256 epochsPassed = readEpoch.getEpochsPassed(pool.lastTimestamp);
         if (epochsPassed > 0) {
-            pool.stakedLiquidity = asm.__computeDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
+            pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
             pool.epochStakedLiquidityDelta = int128(0);
         }
 
@@ -634,8 +632,8 @@ contract Hyper is IHyper {
         if (pool.liquidity != liquidity) pool.liquidity = liquidity.toUint128();
         if (pool.lastTimestamp != timestamp) pool.lastTimestamp = uint32(timestamp);
 
-        pool.feeGrowthGlobalAsset = asm.__computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
-        pool.feeGrowthGlobalQuote = asm.__computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
+        pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
+        pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
 
         Pair memory pair = pairs[uint24(poolId >> 40)];
         emit PoolUpdate(
@@ -666,8 +664,8 @@ contract Hyper is IHyper {
         if (pairId != 0) revert PairExists(pairId);
 
         (uint8 decimalsAsset, uint8 decimalsQuote) = (IERC20(asset).decimals(), IERC20(quote).decimals());
-        if (!asm.isBetween(decimalsAsset, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsAsset);
-        if (!asm.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsQuote);
+        if (!Assembly.isBetween(decimalsAsset, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsAsset);
+        if (!Assembly.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsQuote);
 
         unchecked {
             pairId = uint16(++getPairNonce); // TODO: change to uint24 probably. Good chance this overflows on higher TPS networks.
@@ -709,8 +707,8 @@ contract Hyper is IHyper {
         if (dur == 0) revert InvalidDuration(dur);
         if (max >= MAX_TICK) revert InvalidTick(max);
         if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit); // todo: do proper jit range
-        if (!asm.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert InvalidFee(fee);
-        if (!asm.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert InvalidFee(priorityFee);
+        if (!Assembly.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert InvalidFee(fee);
+        if (!Assembly.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert InvalidFee(priorityFee);
 
         if (pairId == 0) pairId = uint24(getPairNonce); // magic variable
 
@@ -741,10 +739,10 @@ contract Hyper is IHyper {
             })
         });
 
-        uint64 poolId = computePoolId(pairId, isMutable, poolNonce);
-        if (pools.exists(poolId)) revert PoolExists();
+        uint64 poolId = CPU.encodePoolId(pairId, isMutable, poolNonce);
+        if (pools[poolId].exists()) revert PoolExists();
 
-        epochs[poolId] = Epoch({
+        epochs[poolId] = Clock.Epoch({
             id: currentEpoch,
             endTime: params.lastTimestamp + EPOCH_INTERVAL,
             interval: EPOCH_INTERVAL
@@ -780,13 +778,9 @@ contract Hyper is IHyper {
         // TODO: emit an event
     }
 
-    function computePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public pure returns (uint64) {
-        return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
-    }
-
     function computeTau(uint64 poolId) public view returns (uint) {
         HyperPool storage pool = pools[poolId];
-        Epoch memory epoch = epochs[poolId];
+        Clock.Epoch memory epoch = epochs[poolId];
         uint timestamp = _blockTimestamp();
         uint current = epoch.getEpochsPassed(timestamp);
         //if (current > pool.params.duration) return 0; // expired
@@ -853,17 +847,17 @@ contract Hyper is IHyper {
      * @custom:reverts If encoded data does not match the decoding format for the instruction specified.
      */
     function _process(bytes calldata data) internal {
-        (, bytes1 instruction) = CPU.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
+        (, bytes1 instruction) = Assembly.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == CPU.ALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = CPU.decodeAllocate(data); // Packs the use max flag in the Enigma instruction code byte.
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = CPU.decodeAllocate(data);
             _allocate(useMax, poolId, deltaLiquidity);
         } else if (instruction == CPU.UNALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint24 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data); // Packs useMax flag into Enigma instruction code byte.
+            (uint8 useMax, uint64 poolId, uint24 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data);
             _unallocate(useMax, poolId, pairId, deltaLiquidity);
         } else if (instruction == CPU.SWAP) {
             Order memory args;
-            (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data); // Packs useMax flag into Enigma instruction code byte.
+            (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data);
             _swapExactIn(args);
         } else if (instruction == CPU.STAKE_POSITION) {
             uint64 poolId = CPU.decodeStakePosition(data);
@@ -903,7 +897,7 @@ contract Hyper is IHyper {
         (uint amount0, uint amount1) = _getAmounts(poolId);
         uint liquidity0 = deltaAsset.divWadDown(amount0); // If `deltaAsset` is twice as much as assets per liquidity in pool, we can mint 2 liquidity.
         uint liquidity1 = deltaQuote.divWadDown(amount1); // If this liquidity amount is lower, it means we don't have enough tokens to mint the above amount.
-        deltaLiquidity = asm.toUint128(liquidity0 < liquidity1 ? liquidity0 : liquidity1);
+        deltaLiquidity = Assembly.toUint128(liquidity0 < liquidity1 ? liquidity0 : liquidity1);
     }
 
     /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
@@ -922,8 +916,8 @@ contract Hyper is IHyper {
         require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
-        deltaAsset = asm.toUint128(amountAsset.mulWadDown(deltaLiquidity));
-        deltaQuote = asm.toUint128(amountQuote.mulWadDown(deltaLiquidity));
+        deltaAsset = Assembly.toUint128(amountAsset.mulWadDown(deltaLiquidity));
+        deltaQuote = Assembly.toUint128(amountQuote.mulWadDown(deltaLiquidity));
     }
 
     /** @dev Computes amount of physical reserves that must be added to the pool for `deltaLiquidity`. Rounded up. */
@@ -936,8 +930,8 @@ contract Hyper is IHyper {
         require(deltaLiquidity < 2 ** 127, "err above uint127");
         (uint amountAsset, uint amountQuote) = _getAmounts(poolId);
 
-        deltaAsset = asm.toUint128(amountAsset.mulWadUp(deltaLiquidity));
-        deltaQuote = asm.toUint128(amountQuote.mulWadUp(deltaLiquidity));
+        deltaAsset = Assembly.toUint128(amountAsset.mulWadUp(deltaLiquidity));
+        deltaQuote = Assembly.toUint128(amountQuote.mulWadUp(deltaLiquidity));
     }
 
     /** @dev Computes each side of a pool's reserves __per one unit of liquidity__. */
@@ -948,7 +942,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         uint256 timestamp = pool.lastTimestamp;
 
-        Epoch memory epoch = epochs[poolId];
+        Clock.Epoch memory epoch = epochs[poolId];
         uint elapsed = epoch.getEpochsPassed(timestamp) * epoch.interval; // todo: fix epoch time
         uint tau = uint32((pool.params.duration - uint16(elapsed))) * epoch.interval;
         Price.Expiring memory info = Price.Expiring({
