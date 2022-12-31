@@ -99,6 +99,8 @@ struct HyperPool {
     uint256 priorityPaymentPerSecond;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
+    // beta/simplify-refactor
+    uint48 startEpoch;
 }
 
 /// @dev Individual position state.

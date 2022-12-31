@@ -761,18 +761,181 @@ contract Hyper is IHyper {
         if (!asm.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert DecimalsError(decimalsQuote);
 
         unchecked {
-            pairId = uint16(++getPairNonce);
+            pairId = uint16(++getPairNonce); // TODO: change to uint24 probably. Good chance this overflows on higher TPS networks.
         }
 
-        getPairId[asset][quote] = pairId; // note: No reverse lookup, because order matters!
+        getPairId[asset][quote] = pairId; // note: order of tokens matters!
         pairs[pairId] = Pair({
             tokenAsset: asset,
-            decimalsBase: decimalsAsset,
+            decimalsBase: decimalsAsset, // TODO: change pair struct to decimalsAsset
             tokenQuote: quote,
             decimalsQuote: decimalsQuote
         });
 
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
+    }
+
+    uint[6] public volatilities = [2500, 5000, 7500, 10_000, 12_500, 15_00]; // 10_000 = 100%
+    uint[6] public durations = [1 weeks, 2 weeks, 4 weeks, 8 weeks, 16 weeks, 32 weeks];
+    uint[5] public fees = [1, 5, 25, 65, 100]; // 10_000 = 100%, 1 = .01%
+
+    /**
+     * @dev Uses a pair and curve to instantiate a pool at a price.
+     *
+     * @custom:magic If pairId is 0, uses current pair nonce.
+     * @custom:magic If curveId is 0, uses current curve nonce.
+     * @custom:reverts If price is 0.
+     * @custom:reverts If pool with pair and curve has already been created.
+     * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
+     */
+    function _createPoolSet(uint16 pairId, uint32 curveId, uint128 price) internal returns (uint48 poolId) {
+        if (price == 0) revert ZeroPrice();
+        if (pairId == 0) pairId = uint16(getPairNonce); // magic variable
+        if (curveId == 0) curveId = uint32(getCurveNonce); // magic variable
+
+        bool isMutable = isMutable(curveId);
+        if (isMutable) {
+            if (sets[curveId].controller != msg.sender) revert NotController();
+        }
+
+        uint48 poolId = uint48(bytes6(abi.encodePacked(pairId, curveId)));
+        if (pools.exists(poolId)) revert PoolExists();
+
+        uint128 timestamp = _blockTimestamp();
+        epochs[poolId] = Epoch({id: currentEpoch, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
+        pools[poolId].startEpoch = currentEpoch;
+        pools[poolId].lastPrice = price;
+        pools[poolId].lastTick = Price.computeTickWithPrice(price);
+        pools[poolId].blockTimestamp = timestamp;
+
+        emit CreatePool(poolId, pairId, curveId, price); // TODO: add isMutable param
+    }
+
+    struct HyperCurve {
+        // can manipulate parameters conditionally.
+        address controller;
+        // fee charged on swaps by controller.
+        uint8 priorityFee;
+        // fee charged on swaps.
+        uint8 fee;
+        // volatility affects price changes.
+        uint8 vol;
+        // duration until price = max price.
+        uint8 dur;
+        // just in time liquidity must stay for jit seconds.
+        uint8 jit;
+        // max price the pool can reach.
+        int24 max;
+    }
+
+    int24 public constant MAX_TICK = 25556; // TODO: Fix
+    uint48 public currentEpoch = 1; // lets say this is the current epoch.
+
+    error NotController();
+    error InvalidJit(uint8);
+    error InvalidTick(int24);
+    error InvalidIndex(uint8, string);
+
+    mapping(uint32 => HyperCurve) public sets; // curveNonce -> data
+    mapping(bytes32 => uint32) public lookupImmutable; // raw -> curveNonce
+
+    /// TODO: add interactions modifier to this probably
+    function alter(
+        uint32 nonce,
+        uint8 priorityFee,
+        uint8 fee,
+        uint8 vol,
+        uint8 dur,
+        uint8 jit,
+        int24 max
+    ) external lock {
+        HyperCurve storage curve = sets[nonce];
+        if (curve.controller != msg.sender) revert NotController();
+        if (max >= MAX_TICK) revert InvalidTick(max);
+        if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit);
+        if (jit != 0) curve.jit = jit;
+        if (max != 0) curve.max = max;
+        if (fee != 0) curve.fee = uint8(fees[fee]);
+        if (vol != 0) curve.vol = uint8(volatilities[vol]);
+        if (dur != 0) curve.dur = uint8(durations[dur]);
+        if (priorityFee != 0) curve.priorityFee = uint8(fees[priorityFee]);
+
+        // TODO: emit an event
+    }
+
+    /// temp: these are indexes of the param arrays, not values.
+    /**
+     * @dev Curves are used to create pools by mapping a nonce to a set of curve parameters, max price, volatility, fee, priority fee, and duration.
+     *
+     * @custom:reverts If set parameters have already been used to create a curve for controller = 0x0.
+     * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
+     * @custom:reverts If priority fee parameter is outside the bounds of 0.01% to fee parameter, inclusive.
+     */
+    function _createCurveParameterSet(
+        address controller,
+        uint8 priorityFee,
+        uint8 fee,
+        uint8 vol,
+        uint8 dur,
+        uint8 jit,
+        int24 max
+    ) internal returns (uint32 curveId) {
+        if (max >= MAX_TICK) revert InvalidTick(max);
+        if (fee >= fees.length) revert InvalidIndex(fee, "fee");
+        if (dur >= durations.length) revert InvalidIndex(dur, "dur");
+        if (vol >= volatilities.length) revert InvalidIndex(vol, "vol");
+        if (priorityFee >= fees.length) revert InvalidIndex(priorityFee, "fee");
+
+        HyperCurve memory params = HyperCurve({
+            controller: controller,
+            priorityFee: uint8(fees[priorityFee]),
+            fee: uint8(fees[fee]),
+            vol: uint8(volatilities[vol]),
+            dur: uint8(durations[dur]),
+            jit: jit,
+            max: max
+        });
+
+        // immutable parameters
+        if (controller == address(0)) {
+            params.jit = uint8(JUST_IN_TIME_LIQUIDITY_POLICY);
+            params.priorityFee = 0;
+
+            bytes32 raw = computeRawCurveId(params);
+
+            curveId = lookupImmutable[raw]; // immutable lookup
+            if (curveId != 0) revert CurveExists(curveId);
+        } else {
+            if (params.jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(params.jit);
+        }
+
+        unchecked {
+            curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
+        }
+
+        sets[curveId] = params;
+
+        // TODO: emit event
+    }
+
+    // todo: maybe hash?
+    function computeRawCurveId(HyperCurve memory params) public view returns (bytes32) {
+        return
+            CPU.toBytes32(
+                abi.encodePacked(
+                    params.controller,
+                    params.priorityFee,
+                    params.fee,
+                    params.vol,
+                    params.dur,
+                    params.jit,
+                    params.max
+                )
+            );
+    }
+
+    function isMutable(uint32 curveId) public view returns (bool) {
+        return sets[curveId].controller != address(0);
     }
 
     // ===== Accounting System ===== //

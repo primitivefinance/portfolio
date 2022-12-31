@@ -128,7 +128,8 @@ interface IHyperGetters {
             address prioritySwapper,
             uint256 priorityPaymentPerSecond,
             uint256 feeGrowthGlobalAsset,
-            uint256 feeGrowthGlobalQuote
+            uint256 feeGrowthGlobalQuote,
+            uint48 startEpoch
         );
 
     function positions(
