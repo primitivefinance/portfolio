@@ -55,7 +55,10 @@ contract TestHyperSwap is TestHyperSetup {
             defaultScenario.poolId
         );
 
-        vm.warp(blockTimestamp + __hyperTestingContract__.BUFFER());
+        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
+
+        // assumes curve.maturity is passed block.timestamp
+        customWarp(curve.maturity + __hyperTestingContract__.BUFFER() + 1);
 
         vm.expectRevert(PoolExpiredError.selector);
 
@@ -63,7 +66,7 @@ contract TestHyperSwap is TestHyperSetup {
             defaultScenario.poolId,
             false,
             10000,
-            type(uint256).max
+            50
         );
     }
 
