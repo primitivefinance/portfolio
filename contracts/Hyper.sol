@@ -50,6 +50,8 @@ contract Hyper is IHyper {
     string public constant VERSION = "beta-v0.0.1";
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
+    /// @dev Maximum price multiple. Equal to 5x price at 1bps tick sizes.
+    int24 public constant MAX_TICK = 25556; // TODO: Fix
     /// @dev Distance between the location of prices on the price grid, so distance between price.
     int24 public constant TICK_SIZE = 256;
     /// @dev Minimum amount of decimals supported for ERC20 tokens.
@@ -79,17 +81,15 @@ contract Hyper is IHyper {
     /// @dev A value incremented by one on pair creation. Reduces calldata.
     uint256 public getPairNonce;
     /// @dev A value incremented by one on curve creation. Reduces calldata.
-    uint256 public getCurveNonce;
+    uint32 public getPoolNonce;
+    // todo: fix, lets say this is the current epoch for now.
+    uint48 public currentEpoch = 1; 
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint24 => Pair) public pairs;
     /// @dev Pool id -> Epoch Data Structure.
     mapping(uint64 => Epoch) public epochs;
-    /// @dev Pool id -> Curve Data Structure stores parameters.
-    mapping(uint32 => Curve) public curves;
     /// @dev Pool id -> HyperPool Data Structure.
     mapping(uint64 => HyperPool) public pools;
-    /// @dev Raw curve parameters packed into bytes32 mapped onto a Curve id when it was deployed.
-    mapping(bytes32 => uint32) public getCurveId;
     /// @dev Base Token -> Quote Token -> Pair id
     mapping(address => mapping(address => uint24)) public getPairId;
     /// @dev User -> Position Id -> Liquidity Position.
@@ -347,6 +347,7 @@ contract Hyper is IHyper {
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
 
+        // todo: fix, was for debugging
         emit TouchedTokens(
             __account__.warm.length,
             __account__.warm,
@@ -681,78 +682,6 @@ contract Hyper is IHyper {
     // ===== Initializing Pools ===== //
 
     /**
-     * @dev Uses a pair and curve to instantiate a pool at a price.
-     *
-     * @custom:magic If pairId is 0, uses current pair nonce.
-     * @custom:magic If curveId is 0, uses current curve nonce.
-     * @custom:reverts If price is 0.
-     * @custom:reverts If pool with pair and curve has already been created.
-     * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
-     */
-    /* function _createPool(uint24 pairId, uint32 curveId, uint128 price) internal {
-        if (price == 0) revert ZeroPrice();
-        if (pairId == 0) pairId = uint16(getPairNonce); // magic variable
-        if (curveId == 0) curveId = uint32(getCurveNonce); // magic variable
-
-        uint64 poolId = uint64(bytes8(abi.encodePacked(pairId, curveId)));
-        if (pools.exists(poolId)) revert PoolExists();
-
-        Curve memory curve = curves[curveId];
-        uint128 timestamp = _blockTimestamp();
-        if (timestamp > curve.maturity) revert PoolExpiredError();
-
-        epochs[poolId] = Epoch({id: 0, endTime: timestamp + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
-        pools[poolId].lastPrice = price;
-        pools[poolId].lastTick = Price.computeTickWithPrice(price);
-        pools[poolId].lastTimestamp = timestamp;
-
-        emit CreatePool(poolId, pairId, curveId, price);
-    } */
-
-    /**
-     * @dev Curves are used to create pools by mapping a nonce to a set of curve parameters, strike, sigma, fee, priority fee, and maturity.
-     *
-     * @custom:reverts If set parameters have already been used to create a curve.
-     * @custom:reverts If fee parameter is outside the bounds of 0.01% to 10.00%, inclusive.
-     * @custom:reverts If priority fee parameter is outside the bounds of 0.01% to fee parameter, inclusive.
-     * @custom:reverts If one of the non-fee parameters is zero, but the others are not zero.
-     */
-    /* function _createCurve(
-        uint24 sigma,
-        uint32 maturity,
-        uint16 fee,
-        uint16 priorityFee,
-        uint128 strike
-    ) internal returns (uint32 curveId) {
-        bytes32 rawCurveId = CPU.toBytes32(abi.encodePacked(sigma, maturity, fee, priorityFee, strike));
-        curveId = getCurveId[rawCurveId]; // Gets the nonce of this raw curve, if it was created already.
-        if (curveId != 0) revert CurveExists(curveId);
-
-        if (!asm.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
-        if (!asm.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
-        if (sigma == 0) revert MinSigma(sigma);
-        if (strike == 0) revert MinStrike(strike);
-
-        unchecked {
-            curveId = uint32(++getCurveNonce); // note: Unlikely to reach this limit.
-        }
-
-        uint32 gamma = uint32(Price.UNIT_PERCENT - fee); // gamma = 100% - fee %.
-        uint32 priorityGamma = uint32(Price.UNIT_PERCENT - priorityFee); // priorityGamma = 100% - priorityFee %.
-
-        getCurveId[rawCurveId] = curveId; // Reverse lookup
-        curves[curveId] = Curve({
-            strike: strike,
-            sigma: sigma,
-            maturity: maturity,
-            gamma: gamma,
-            priorityGamma: priorityGamma
-        });
-
-        emit CreateCurve(curveId, strike, sigma, maturity, gamma, priorityGamma);
-    } */
-
-    /**
      * @dev Pairs are used in pool creation to determine the pool's underlying tokens.
      *
      * @custom:reverts If decoded addresses are the same.
@@ -784,40 +713,33 @@ contract Hyper is IHyper {
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
     }
 
-    uint[6] public volatilities = [2500, 5000, 7500, 10_000, 12_500, 15_000]; // [3] = default, 10_000 = 100%
-    uint[6] public durations = [168, 336, 672, 1344, 2688, 8766]; // last one is one year, [5]
-    uint[5] public fees = [1, 5, 25, 65, 100]; // 10_000 = 100%, 1 = .01%
-
-    uint32 public getPoolNonce;
-
     /**
-     * @dev Uses a pair and curve to instantiate a pool at a price.
+     * @dev Uses a pair and set of parameters to instantiate a pool at a price.
      *
-     * temp: parameters are indexes for now, not values of the array
      *
      * @custom:magic If pairId is 0, uses current pair nonce.
-     * @custom:magic If curveId is 0, uses current curve nonce.
      * @custom:reverts If price is 0.
-     * @custom:reverts If pool with pair and curve has already been created.
+     * @custom:reverts If pool with same pairId, isMutable, and poolNonce has already been created.
      * @custom:reverts If an expiring pool and the current timestamp is beyond the pool's maturity parameter.
      */
     function _createPool(
         uint24 pairId,
         address controller,
-        uint8 priorityFee,
-        uint8 fee,
-        uint8 vol,
-        uint8 dur,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 vol,
+        uint16 dur,
         uint16 jit,
         int24 max,
         uint128 price
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
+        if (vol == 0) revert MinSigma(vol);
+        if (dur == 0) revert InvalidDuration(dur);
         if (max >= MAX_TICK) revert InvalidTick(max);
-        if (fee >= fees.length) revert InvalidIndex(fee, "fee");
-        if (dur >= durations.length) revert InvalidIndex(dur, "dur");
-        if (vol >= volatilities.length) revert InvalidIndex(vol, "vol");
-        if (priorityFee >= fees.length) revert InvalidIndex(priorityFee, "fee");
+        if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit); // todo: do proper jit range
+        if (!asm.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert FeeOOB(fee);
+        if (!asm.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert PriorityFeeOOB(priorityFee);
 
         if (pairId == 0) pairId = uint24(getPairNonce); // magic variable
 
@@ -826,6 +748,7 @@ contract Hyper is IHyper {
             poolNonce = uint32(++getPoolNonce);
         }
 
+        bool isMutable = controller != address(0);
         HyperPool memory params = HyperPool({
             lastTick: Price.computeTickWithPrice(price),
             lastTimestamp: uint32(_blockTimestamp()), // fix type
@@ -838,23 +761,14 @@ contract Hyper is IHyper {
             epochStakedLiquidityDelta: 0,
             params: HyperCurve({
                 maxTick: max,
-                jit: jit,
-                fee: uint16(fees[fee]),
-                duration: uint16(durations[dur]),
-                volatility: uint16(volatilities[vol]),
-                priorityFee: uint16(fees[priorityFee]),
+                jit: isMutable ? jit : uint8(JUST_IN_TIME_LIQUIDITY_POLICY),
+                fee: fee,
+                duration: dur,
+                volatility: vol,
+                priorityFee: isMutable ? priorityFee : 0,
                 startEpoch: currentEpoch
             })
         });
-
-        // immutable parameters
-        bool isMutable = controller != address(0);
-        if (isMutable) {
-            params.params.jit = uint8(JUST_IN_TIME_LIQUIDITY_POLICY);
-            params.params.priorityFee = 0;
-        } else {
-            if (params.params.jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(params.params.jit);
-        }
 
         uint64 poolId = computePoolId(pairId, isMutable, poolNonce);
         if (pools.exists(poolId)) revert PoolExists();
@@ -867,30 +781,22 @@ contract Hyper is IHyper {
 
         pools[poolId] = params;
 
-        emit logBytes(bytes8(poolId));
-
-        // todo: event
-        emit CreatePool(poolId, uint16(pairId), 0x0, price);
+        emit CreatePool(poolId, uint16(pairId), 0x0, price); // todo: event
     }
-
-    event logBytes(bytes8);
-
-    int24 public constant MAX_TICK = 25556; // TODO: Fix
-    uint48 public currentEpoch = 1; // lets say this is the current epoch.
 
     error NotController();
     error InvalidJit(uint16);
     error InvalidTick(int24);
-    error InvalidIndex(uint8, string);
+    error InvalidDuration(uint16);
 
     /// TODO: add interactions modifier to this probably
     function alter(
         uint64 poolNonce,
-        uint8 priorityFee,
-        uint8 fee,
-        uint8 vol,
-        uint8 dur,
-        uint8 jit,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 vol,
+        uint16 dur,
+        uint16 jit,
         int24 max
     ) external lock {
         HyperPool storage pool = pools[poolNonce];
@@ -899,10 +805,10 @@ contract Hyper is IHyper {
         if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit);
         if (jit != 0) pool.params.jit = jit;
         if (max != 0) pool.params.maxTick = max;
-        if (fee != 0) pool.params.fee = uint8(fees[fee]);
-        if (vol != 0) pool.params.volatility = uint8(volatilities[vol]);
-        if (dur != 0) pool.params.duration = uint8(durations[dur]);
-        if (priorityFee != 0) pool.params.priorityFee = uint8(fees[priorityFee]);
+        if (fee != 0) pool.params.fee = fee;
+        if (vol != 0) pool.params.volatility = vol;
+        if (dur != 0) pool.params.duration = dur;
+        if (priorityFee != 0) pool.params.priorityFee = priorityFee;
 
         // TODO: emit an event
     }
@@ -1018,20 +924,15 @@ contract Hyper is IHyper {
             (
                 uint24 pairId,
                 address controller,
-                uint8 priorityFee,
-                uint8 fee,
-                uint8 vol,
-                uint8 dur,
+                uint16 priorityFee,
+                uint16 fee,
+                uint16 vol,
+                uint16 dur,
                 uint16 jit,
                 int24 max,
                 uint128 price
             ) = CPU.decodeCreatePool(data);
             _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
-        } else if (instruction == CPU.CREATE_CURVE) {
-            (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) = CPU.decodeCreateCurve(
-                data
-            );
-            //_createCurve(sigma, maturity, fee, priorityFee, strike);
         } else if (instruction == CPU.CREATE_PAIR) {
             (address asset, address quote) = CPU.decodeCreatePair(data);
             _createPair(asset, quote);

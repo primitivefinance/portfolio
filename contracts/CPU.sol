@@ -23,14 +23,11 @@ bytes1 constant INSTRUCTION_JUMP = 0xAA;
 /// @dev Used as the first pointer for the jump process.
 uint8 constant JUMP_PROCESS_START_POINTER = 2;
 
-/** @dev Be careful. Main entry point to start processing instructions. */
-// ignore-prettier
 function __startProcess__(function(bytes calldata) _process) {
     if (msg.data[0] != INSTRUCTION_JUMP) _process(msg.data);
     else _jumpProcess(msg.data, _process);
 }
 
-// ignore-prettier
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
     uint8 length = uint8(data[1]);
     uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
@@ -49,17 +46,7 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
     }
 }
 
-/* /// @notice First byte should always be the INSTRUCTION_JUMP Enigma code.
-/// @dev Expects a special encoding method for multiple instructions.
-/// @param data Includes opcode as byte at index 0. First byte should point to next instruction.
-/// @custom:security Critical. Processes multiple instructions. Data must be encoded perfectly. */
-
-// --- Compiler & Decompiler --- //
-
-// --- Errors --- //
 error DecodePairBytesLength(uint256 expected, uint256 length);
-
-// --- Encoding & Decoding --- //
 
 function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes memory) {
     uint8 len = uint8(instructions.length);
@@ -91,63 +78,34 @@ function encodePoolId(uint24 pairId, uint32 curveId) pure returns (uint64 poolId
     poolId = uint64(bytes8(data));
 }
 
-/// @dev Expects a 6 byte left-pad `poolId`.
-/// @param data Maximum 6 bytes. | 0x | left-pad 6 bytes poolId |
-/// Pool id is a packed pair and curve id: | 0x | left-pad 2 bytes pairId | left-pad 4 bytes curveId |
-function decodePoolId(bytes calldata data) pure returns (uint64 poolId, uint24 pairId, uint32 curveId) {
-    poolId = uint64(bytes8(data));
-    pairId = uint16(bytes2(data[:2]));
-    curveId = uint32(bytes4(data[2:]));
-}
-
-/// @dev Encodes the arugments for the CREATE_CURVE instruction.
-function encodeCreateCurve(
-    uint24 sigma,
-    uint32 maturity,
-    uint16 fee,
-    uint16 priorityFee,
-    uint128 strike
-) pure returns (bytes memory data) {
-    data = abi.encodePacked(CREATE_CURVE, sigma, maturity, fee, priorityFee, strike);
-}
-
-/// @notice The pool swap fee is a parameter, which is store and then used to calculate `gamma`.
-/// @dev Expects a 27 length byte array of left padded parameters.
-/// @param data Maximum 1 + 3 + 4 + 2 + 2 + 16 = 28 bytes.
-/// | 0x | 1 byte enigma code | 3 bytes sigma | 4 bytes maturity | 2 bytes fee | 2 bytes priority fee | 16 bytes strike |
-function decodeCreateCurve(
+/** @dev [0x 3 bytes 1 byte 4 bytes] == [0x pairId isMutable poolNonce]. */
+function decodePoolId(
     bytes calldata data
-) pure returns (uint24 sigma, uint32 maturity, uint16 fee, uint16 priorityFee, uint128 strike) {
-    require(data.length < 32, "Curve data too long");
-    sigma = uint24(bytes3(data[1:4])); // note: First byte is the create pair ecode.
-    maturity = uint32(bytes4(data[4:8]));
-    fee = uint16(bytes2(data[8:10]));
-    priorityFee = uint16(bytes2(data[10:12]));
-    strike = uint128(bytes16(data[12:]));
+) pure returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) {
+    poolId = uint64(bytes8(data));
+    pairId = uint16(bytes2(data[:3]));
+    isMutable = uint8(bytes1(data[3:4]));
+    poolNonce = uint32(bytes4(data[4:]));
 }
 
-/// @dev Encodes the arguments for the CREATE_PAIR instruction.
 function encodeCreatePair(address token0, address token1) pure returns (bytes memory data) {
     data = abi.encodePacked(CREATE_PAIR, token0, token1);
 }
 
-/// @dev Expects a 41-byte length array with two addresses packed into it.
-/// @param data Maximum 1 + 20 + 20 = 41 bytes.
-/// | 0x | 1 byte enigma code | 20 bytes base token | 20 bytes quote token |.
+/** @dev [0x 00 3 bytes 1 byte 4 bytes] == [0x instruction token0 token1]. */
 function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
     if (data.length != 41) revert DecodePairBytesLength(41, data.length);
     tokenAsset = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
     tokenQuote = address(bytes20(data[21:]));
 }
 
-/// @dev Encodes the arguments for the CREATE_POOL instruction.
 function encodeCreatePool(
     uint24 pairId,
     address controller,
-    uint8 priorityFee,
-    uint8 fee,
-    uint8 vol,
-    uint8 dur,
+    uint16 priorityFee,
+    uint16 fee,
+    uint16 vol,
+    uint16 dur,
     uint16 jit,
     int24 max,
     uint128 price
@@ -155,9 +113,6 @@ function encodeCreatePool(
     data = abi.encodePacked(CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
 }
 
-/// @dev Expects a poolId and one left zero padded amount for `price`.
-/// @param data Maximum 1 + 6 + 16 = 23 bytes.
-/// | 0x | 1 byte enigma code | left-pad 6 bytes poolId | left-pad 16 bytes |
 function decodeCreatePool(
     bytes calldata data
 )
@@ -165,10 +120,10 @@ function decodeCreatePool(
     returns (
         uint24 pairId,
         address controller,
-        uint8 priorityFee,
-        uint8 fee,
-        uint8 vol,
-        uint8 dur,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 vol,
+        uint16 dur,
         uint16 jit,
         int24 max,
         uint128 price
@@ -176,39 +131,32 @@ function decodeCreatePool(
 {
     pairId = uint24(bytes3(data[1:4]));
     controller = address(bytes20(data[4:24]));
-    priorityFee = uint8(bytes1(data[24:25]));
-    fee = uint8(bytes1(data[25:26]));
-    vol = uint8(bytes1(data[26:27]));
-    dur = uint8(bytes1(data[27:28]));
-    jit = uint8(bytes1(data[28:30]));
-    max = int24(uint24(bytes3(data[30:33]))); // todo: fix, can overflow
-    price = uint128(bytes16(data[33:45]));
+    priorityFee = uint16(bytes2(data[24:26]));
+    fee = uint16(bytes2(data[26:28]));
+    vol = uint16(bytes2(data[28:30]));
+    dur = uint16(bytes2(data[30:32]));
+    jit = uint16(bytes2(data[32:34]));
+    max = int24(uint24(bytes3(data[34:37]))); // todo: fix, can overflow
+    price = uint128(bytes16(data[37:48]));
 }
 
 function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
     data = abi.encodePacked(pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
 }
 
-/// @dev Expects the standard instruction with two trailing run-length encoded amounts.
-/// @param data Maximum 8 + 3 + 3 + 16 + 16 = 46 bytes.
-/// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick | 3 byte hiTick | 1 byte pointer to next power byte | 1 byte power | ...amount | 1 byte power | ...amount |
+/** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId deltaLiquidity] */
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     (bytes1 maxFlag, ) = separate(data[0]);
     useMax = uint8(maxFlag);
     poolId = uint64(bytes8(data[1:9]));
     deltaLiquidity = toAmount(data[9:]);
-    //uint8 pointer = uint8(data[13]);
-    //deltaAsset = toAmount(data[14:pointer]);
-    //deltaQuote = toAmount(data[pointer:]);
 }
 
 function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
     data = abi.encodePacked(pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
 }
 
-/// @dev Expects an enigma code, poolId, and trailing run-length encoded amount.
-/// @param data Maximum 1 + 6 + 3 + 3 + 16 = 29 bytes.
-/// | 0x | 1 packed byte useMax Flag - enigma code | 6 byte poolId | 3 byte loTick index | 3 byte hiTick index | 1 byte amount power | amount in amount length bytes |.
+/** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId=[pairId + 5 bytes] deltaLiquidity] */
 function decodeUnallocate(
     bytes calldata data
 ) pure returns (uint8 useMax, uint64 poolId, uint24 pairId, uint128 deltaLiquidity) {
@@ -227,14 +175,11 @@ function encodeSwap(
     uint128 amount1,
     uint8 direction
 ) pure returns (bytes memory data) {
-    uint8 pointer = 0x0a + 0x0f + 0x02; // temp: 0x02 for two additional poolId bytes // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
+    uint8 pointer = 0x0a + 0x0f + 0x02; // temp: fix: 0x02 for two additional poolId bytes // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
     data = abi.encodePacked(pack(bytes1(useMax), SWAP), poolId, pointer, power0, amount0, power1, amount1, direction);
 }
 
-/// @notice Swap direction: 0 = base token to quote token, 1 = quote token to base token.
-/// @dev Expects standard instructions with the end byte specifying swap direction.
-/// @param data Maximum 1 + 6 + 16 + 1 = 24 bytes.
-/// | 0x | 1 byte packed flag-enigma code | 6 byte poolId | up to 16 byte TRLE amount | 1 byte direction |.
+/** @dev Swap direction: 0 = base token to quote token, 1 = quote token to base token. */
 function decodeSwap(
     bytes calldata data
 ) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 limit, uint8 direction) {
@@ -250,9 +195,6 @@ function encodeStakePosition(uint64 positionId) pure returns (bytes memory data)
     data = abi.encodePacked(STAKE_POSITION, positionId);
 }
 
-/// @dev Expects an enigma code and positionId.
-/// @param data Maximum 1 + 12 = 13 bytes.
-/// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
 function decodeStakePosition(bytes calldata data) pure returns (uint64 poolId) {
     poolId = uint64(bytes8(data[1:9]));
 }
@@ -261,14 +203,9 @@ function encodeUnstakePosition(uint64 positionId) pure returns (bytes memory dat
     data = abi.encodePacked(UNSTAKE_POSITION, positionId);
 }
 
-/// @dev Expects an enigma code and positionId.
-/// @param data Maximum 1 + 12 = 13 bytes.
-/// | 0x | 1 packed byte useMax Flag - enigma code | 12 byte positionId |.
 function decodeUnstakePosition(bytes calldata data) pure returns (uint64 poolId) {
     poolId = uint64(bytes8(data[1:9]));
 }
-
-// --- Utility --- //
 
 function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
     upper = data >> 4;

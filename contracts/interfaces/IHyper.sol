@@ -108,10 +108,6 @@ interface IHyperGetters {
         uint24 pairId
     ) external view returns (address tokenasset, uint8 decimalsasset, address tokenQuote, uint8 decimalsQuote);
 
-    function curves(
-        uint32 curveId
-    ) external view returns (uint128 strike, uint24 sigma, uint32 maturity, uint32 gamma, uint32 priorityGamma);
-
     function epochs(uint64 poolId) external view returns (uint256 id, uint256 endTime, uint256 interval);
 
     function pools(
@@ -149,10 +145,6 @@ interface IHyperGetters {
             uint128 tokensOwedAsset,
             uint128 tokensOwedQuote
         );
-
-    function getCurveId(bytes32) external view returns (uint32);
-
-    function getCurveNonce() external view returns (uint256);
 
     function getPairNonce() external view returns (uint256);
 
