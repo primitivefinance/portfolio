@@ -5,6 +5,8 @@ import "contracts/EnigmaTypes.sol" as HyperTypes;
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperProcessing is TestHyperSetup {
+    using SafeCastLib for uint;
+
     function afterSetUp() public override {
         assertTrue(
             getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastTimestamp != 0,
@@ -23,11 +25,12 @@ contract TestHyperProcessing is TestHyperSetup {
     // ===== Getters ===== //
 
     function testGetAmounts() public {
-        HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        HyperCurve memory curve = pool.params;
         (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getAmounts(defaultScenario.poolId);
-
-        assertApproxEqAbs(deltaAsset, 1e6, DEFAULT_ASSET_RESERVE, "asset-reserve"); // todo: fix default amounts
-        assertApproxEqAbs(deltaQuote, 1e6, DEFAULT_QUOTE_RESERVE, "quote-reserve");
+        uint maxDelta = 0.001 ether; // 1ether = 100%, 0.001 ether = 0.10%
+        assertApproxEqRel(deltaAsset, DEFAULT_ASSET_RESERVE, maxDelta, "asset-reserve"); // todo: fix default amounts
+        assertApproxEqRel(deltaQuote, DEFAULT_QUOTE_RESERVE, maxDelta, "quote-reserve");
     }
 
     function testGetLiquidityMinted() public {
@@ -69,8 +72,8 @@ contract TestHyperProcessing is TestHyperSetup {
     // --- Swap --- //
 
     function testSwapExactInNonExistentPoolIdReverts() public {
-        uint64 failureArg = 0x0001030;
-        bytes memory data = CPU.encodeSwap(0, 0x0001030, 0x01, 0x01, 0x01, 0x01, 0);
+        uint64 failureArg = uint64(0x01);
+        bytes memory data = CPU.encodeSwap(0, failureArg, 0x01, 0x01, 0x01, 0x01, 0);
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
         bool success = __revertCatcher__.process(data);
         assertTrue(!success);
@@ -99,8 +102,11 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastPrice;
 
+        uint8 useMax = 0;
+        uint8 direction = 0;
+        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = CPU.encodeSwap(0, defaultScenario.poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -148,8 +154,8 @@ contract TestHyperProcessing is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
-
-        __hyperTestingContract__.swap(defaultScenario.poolId, true, amount, limit);
+        bool direction = true;
+        __hyperTestingContract__.swap(defaultScenario.poolId, direction, amount, getMaxSwapLimit(direction));
 
         uint256 next = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
         assertTrue(next == prev);
@@ -171,14 +177,15 @@ contract TestHyperProcessing is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
-
-        __hyperTestingContract__.swap(defaultScenario.poolId, false, amount, limit);
+        bool direction = false;
+        __hyperTestingContract__.swap(defaultScenario.poolId, direction, amount, getMaxSwapLimit(direction));
 
         uint256 next = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
         assertTrue(next == prev);
     }
 
     function testSwapReverse() public {
+        bool direction = true;
         uint limit = type(uint256).max;
         uint amount = 17e16;
         // Add liquidity first
@@ -195,8 +202,19 @@ contract TestHyperProcessing is TestHyperSetup {
         // move some time
         uint256 prev = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
-        (uint output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, true, amount, limit);
-        (uint input, ) = __hyperTestingContract__.swap(defaultScenario.poolId, false, output, limit);
+        (uint output, ) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            direction,
+            amount,
+            getMaxSwapLimit(direction)
+        );
+        direction = false;
+        (uint input, ) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            direction,
+            output,
+            getMaxSwapLimit(direction)
+        );
 
         uint256 next = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
         assertTrue(next <= prev);
@@ -243,8 +261,11 @@ contract TestHyperProcessing is TestHyperSetup {
         customWarp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
 
+        uint8 useMax = 0;
+        uint8 direction = 0;
+        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = CPU.encodeSwap(0, defaultScenario.poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -266,9 +287,12 @@ contract TestHyperProcessing is TestHyperSetup {
         customWarp(block.timestamp + 1);
 
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastTimestamp;
+        uint8 useMax = 0;
+        uint8 direction = 0;
+        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = CPU.encodeSwap(0, defaultScenario.poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        data = CPU.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -292,7 +316,10 @@ contract TestHyperProcessing is TestHyperSetup {
         uint256 prev = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = CPU.encodeSwap(0, defaultScenario.poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        uint8 useMax = 0;
+        uint8 direction = 0;
+        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
+        data = CPU.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -316,7 +343,10 @@ contract TestHyperProcessing is TestHyperSetup {
         uint256 prev = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = CPU.encodeSwap(0, defaultScenario.poolId, 0x12, 0x02, 0x1f, 0x01, 0);
+        uint8 useMax = 0;
+        uint8 direction = 0;
+        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
+        data = CPU.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -465,11 +495,30 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(!success);
     }
 
+    // needs a mutable pool, or a pool with a non-zero jit policy
     function testUnallocatePositionJitPolicyReverts() public postTestInvariantChecks {
+        uint16 jit = 99;
+        bytes memory createData = CPU.encodeCreatePool(
+            uint24(1), // pairId
+            address(this), // controller
+            DEFAULT_FEE,
+            DEFAULT_FEE,
+            uint16(DEFAULT_SIGMA),
+            DEFAULT_DURATION_DAYS,
+            jit,
+            DEFAULT_TICK,
+            DEFAULT_PRICE
+        );
+
+        bool success = __revertCatcher__.process(createData);
+        assertTrue(success, "forwarder call failed");
+
+        uint64 poolId = CPU.encodePoolId(uint24(0x01), true, uint32(__hyperTestingContract__.getPoolNonce()));
+
         uint8 amount = 0x01;
         uint8 power = 0x01;
-        bytes memory data = CPU.encodeAllocate(0, defaultScenario.poolId, power, amount);
-        bool success = __revertCatcher__.process(data);
+        bytes memory data = CPU.encodeAllocate(0, poolId, power, amount);
+        success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
         // Set the distance for the position by warping in time.
@@ -477,10 +526,7 @@ contract TestHyperProcessing is TestHyperSetup {
         uint256 warpTimestamp = block.timestamp + distance;
         customWarp(warpTimestamp);
 
-        // Set the policy from 0 (default 0 in test contract).
-        __hyperTestingContract__.setJitPolicy(999999999999);
-
-        data = CPU.encodeUnallocate(0, defaultScenario.poolId, power, amount);
+        data = CPU.encodeUnallocate(0, poolId, power, amount);
 
         vm.expectRevert(abi.encodeWithSelector(JitLiquidity.selector, distance));
         success = __revertCatcher__.process(data);
@@ -660,7 +706,7 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testStakeNonExistentPoolIdReverts() public {
-        uint64 failureArg = 3214;
+        uint64 failureArg = uint64(3214);
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
         __hyperTestingContract__.stake(failureArg);
     }
@@ -695,8 +741,6 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testUnstakePositionStakedUpdated() public postTestInvariantChecks {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK + 256; // fails if not above current tick
         uint8 amount = 0x01;
         uint8 power = 0x0f;
         bytes memory data = CPU.encodeAllocate(0, defaultScenario.poolId, power, amount);
@@ -715,7 +759,10 @@ contract TestHyperProcessing is TestHyperSetup {
         customWarp(pos.unstakeTimestamp + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = CPU.encodeSwap(0, defaultScenario.poolId, 0x09, 0x01, 0x15, 0x01, 0);
+        uint8 useMax = 0;
+        uint8 direction = 0;
+        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
+        data = CPU.encodeSwap(useMax, defaultScenario.poolId, 0x09, 0x01, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
 
         uint256 prevPositionStaked = getPosition(
@@ -741,8 +788,6 @@ contract TestHyperProcessing is TestHyperSetup {
     // it creates a discrepency in the contract where the contract holds more tokens than the sum
     // of all claims is entitled to.
     function testUnstakePoolStakedLiquidityUpdated() public postTestInvariantChecks {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK + 256; // note: fails if pool.lastTick <= hi
         uint8 amount = 0x01;
         uint8 power = 0x0f;
         bytes memory data = CPU.encodeAllocate(0, defaultScenario.poolId, power, amount);
@@ -757,7 +802,10 @@ contract TestHyperProcessing is TestHyperSetup {
         customWarp(pos.unstakeTimestamp + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = CPU.encodeSwap(0, positionId, 0x09, 0x01, 0x15, 0x01, 0);
+        uint8 useMax = 0;
+        uint8 direction = 0;
+        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
+        data = CPU.encodeSwap(useMax, positionId, 0x09, 0x01, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
 
         uint256 prevPoolStakedLiquidity = getPool(address(__hyperTestingContract__), positionId).stakedLiquidity;

@@ -45,7 +45,7 @@ contract Hyper is IHyper {
 
     uint256 private locked = 1;
     uint256 public getPairNonce;
-    uint32 public getPoolNonce;
+    uint256 public getPoolNonce;
 
     mapping(uint24 => Pair) public pairs;
     mapping(uint64 => HyperPool) public pools;
@@ -313,6 +313,8 @@ contract Hyper is IHyper {
     }
 
     function _unstake(uint64 poolId) internal {
+        if (!pools[poolId].exists()) revert NonExistentPool(poolId);
+
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.stakeTimestamp == 0 || pos.unstakeTimestamp != 0) revert PositionNotStaked(poolId);
 

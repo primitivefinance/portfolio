@@ -229,7 +229,7 @@ function getLiquidityDeltas(
     }
 }
 
-/** @dev Amounts per WAD of liquidity. */
+/** @dev WAD Amounts per WAD of liquidity. */
 function getAmounts(HyperPool memory self) view returns (uint amountAsset, uint amountQuote) {
     Price.RMM memory rmm = self.getRMM();
     amountAsset = rmm.computeR2WithPrice(self.lastPrice);

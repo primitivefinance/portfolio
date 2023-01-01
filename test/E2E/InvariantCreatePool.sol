@@ -81,6 +81,7 @@ contract InvariantCreatePool is InvariantTargetContract {
     bytes[] instructions;
 
     function _assertCreatePool(CreateArgs memory args) internal {
+        bool isMutable = true;
         uint24 pairId = __hyper__.getPairId(args.token0, args.token1);
         {
             // Pair not created? Push a create pair call to the stack.
@@ -117,7 +118,7 @@ contract InvariantCreatePool is InvariantTargetContract {
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = __hyper__.getPoolNonce();
+        uint64 poolId = CPU.encodePoolId(pairId, isMutable, uint32(__hyper__.getPoolNonce()));
 
         // Add the created pool to the list of pools.
         assertTrue(getPool(address(__hyper__), poolId).lastPrice != 0, "pool-price-zero");
