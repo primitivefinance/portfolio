@@ -337,39 +337,28 @@ contract Hyper is IHyper {
 
     SwapState state;
 
-    /**
-     * @dev Swaps exact input of tokens for an output of tokens in the specified direction.
-     *
-     * @custom:mev Must have price limit to avoid losses from flash loan price manipulations.
-     * @custom:reverts If input swap amount is zero.
-     * @custom:reverts If pool is not initialized with a price.
-     * @custom:security Updates the pool's price in _syncPoolPrice before the swap happens.
-     */
+    /** * @dev Swaps in direction (0 or 1) exact input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset) up to limit price. */
     function _swapExactIn(
         Order memory args
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
         if (!pools[args.poolId].exists()) revert NonExistentPool(args.poolId);
 
-        Pair memory pair = pairs[uint16(args.poolId >> 40)];
-        HyperPool storage pool = pools[args.poolId];
+        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(args.poolId)];
+        HyperPool memory pool = pools[args.poolId];
 
-        state.sell = args.direction == 0; // args.direction == 0 ? Swap asset for quote : Swap quote for asset.
+        state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
+        state.fee = uint(pool.params.fee);
         state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
 
         Iteration memory _swap;
         {
-            // Updates price based on time passed since last update.
+            console.log("sync");
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
-            // Assumes useMax flag will be used with caller's internal balance to execute multiple operations.
-            remainder = args.useMax == 1
-                ? getBalance(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote)
-                : args.input;
-            // Input amount is a token amount, which must be scaled to WAD.
-            remainder = remainder * 10 ** (MAX_DECIMALS - (state.sell ? pair.decimalsAsset : pair.decimalsQuote));
-            // Begin the iteration at the live price, using the total swap input amount as the remainder to fill.
-            console.log("price", price);
-            console.log("strike", Price.computePriceWithTick(pool.params.maxTick));
+            console.log("done");
+            uint internalBalance = getBalance(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote);
+            remainder = args.useMax == 1 ? internalBalance : args.input;
+            remainder = remainder * 10 ** (MAX_DECIMALS - (state.sell ? pair.decimalsAsset : pair.decimalsQuote)); // WAD
             _swap = Iteration({
                 price: price,
                 tick: tick,
@@ -383,29 +372,26 @@ contract Hyper is IHyper {
 
         Price.Expiring memory expiring;
         {
-            uint tau = computeLastTau(args.poolId); // should be updated to latest now
-            if (tau == 0) revert PoolExpired();
+            uint tau = computeLastTau(args.poolId);
+            if (tau == 0) revert PoolExpired(); // todo: fix this with buffer too
 
             uint strike = Price.computePriceWithTick(pool.params.maxTick);
-            // todo: fix this with buffer too
             expiring = Price.Expiring({strike: strike, sigma: pool.params.volatility, tau: tau});
-
-            state.fee = uint(pool.params.fee);
         }
 
-        emit log("here");
         // =---= Effects =---= //
 
+        // These are WAD values.
         uint256 liveIndependent;
         uint256 nextIndependent;
         uint256 liveDependent;
         uint256 nextDependent;
 
         {
-            uint256 deltaInput; // Amount of tokens being swapped in.
-            uint256 maxInput; // Max tokens swapped in.
+            uint256 maxInput;
+            uint256 deltaInput;
 
-            // Virtual reserves, not scaled by token decimals.
+            // Virtual reserves
             if (state.sell) {
                 (liveDependent, liveIndependent) = expiring.computeReserves(_swap.price);
                 maxInput = (FixedPointMathLib.WAD - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
@@ -417,13 +403,11 @@ contract Hyper is IHyper {
             _swap.feeAmount = ((_swap.remainder >= maxInput ? maxInput : _swap.remainder) * state.fee) / 10_000;
             state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
 
-            if (_swap.remainder >= maxInput) {
-                // If more than max tokens are being swapped in...
+            if (_swap.remainder > maxInput) {
                 deltaInput = maxInput - _swap.feeAmount;
                 nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
-                _swap.remainder -= (deltaInput + _swap.feeAmount); // Reduce the remainder of the order to fill.
+                _swap.remainder -= (deltaInput + _swap.feeAmount);
             } else {
-                // Reaching this block will fill the order.
                 deltaInput = _swap.remainder - _swap.feeAmount;
                 nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
                 deltaInput = _swap.remainder; // Swap input amount including the fee payment.
@@ -440,8 +424,8 @@ contract Hyper is IHyper {
         }
 
         {
-            uint limitPrice = args.limit;
             uint256 nextPrice;
+            uint256 limitPrice = args.limit;
             int256 liveInvariant;
             int256 nextInvariant;
 
@@ -458,14 +442,14 @@ contract Hyper is IHyper {
             if (!state.sell && nextPrice > limitPrice) revert SwapLimitReached();
             if (state.sell && limitPrice > nextPrice) revert SwapLimitReached();
 
-            // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision).
+            // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision)?
             if (nextInvariant < liveInvariant) revert InvalidInvariant(liveInvariant, nextInvariant);
 
             _swap.price = nextPrice;
         }
 
         {
-            // scale down amounts
+            // Scale down amounts from WAD.
             uint inputScale;
             uint outputScale;
             if (state.sell) {
@@ -517,13 +501,8 @@ contract Hyper is IHyper {
 
         uint passed = getTimePassed(poolId);
         if (passed > 0) {
-            uint256 tau = computeLastTau(poolId); // must be the non-updated tau.
-
-            console.log("change", tau, passed);
+            uint256 tau = computeLastTau(poolId); // uses pool's last update timestamp.
             (price, tick) = pool.computePriceChangeWithTime(tau, passed);
-            console.log(price);
-            console.logInt(int(tick));
-
             _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
         }
     }
@@ -703,7 +682,7 @@ contract Hyper is IHyper {
     /** @dev Duration remaining in pool in seconds based on last pool update. */
     function computeLastTau(uint64 poolId) public view returns (uint tau) {
         HyperPool memory pool = pools[poolId];
-        uint end = convertDaysToSeconds(pool.params.duration) + pool.params.createdAt;
+        uint end = Assembly.convertDaysToSeconds(pool.params.duration) + pool.params.createdAt;
         uint present = pool.lastTimestamp;
         if (present > end) return 0;
         tau = end - present; // (createdAt + duration) - lastTimestamp
@@ -712,14 +691,10 @@ contract Hyper is IHyper {
     // todo: fix, do we need this?
     function computeCurrentTau(uint64 poolId) public view returns (uint tau) {
         HyperPool storage pool = pools[poolId];
-        uint end = convertDaysToSeconds(pool.params.duration) + pool.params.createdAt;
+        uint end = Assembly.convertDaysToSeconds(pool.params.duration) + pool.params.createdAt;
         uint present = uint(_blockTimestamp()).safeCastTo32();
         if (present > end) return 0;
         tau = end - present;
-    }
-
-    function convertDaysToSeconds(uint amountDays) public view returns (uint amountSeconds) {
-        return amountDays * 86_400;
     }
 
     /** @dev Overridable in tests.  */

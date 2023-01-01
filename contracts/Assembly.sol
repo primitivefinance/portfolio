@@ -3,6 +3,8 @@ pragma solidity 0.8.13;
 
 error CastOverflow(uint);
 
+uint constant SECONDS_PER_DAY = 86_400 seconds;
+
 function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     return __between(value, lower, upper);
 }
@@ -49,6 +51,12 @@ function computeCheckpointDistance(uint256 currentCheckpoint, uint256 prevCheckp
     // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
     assembly {
         distance := sub(currentCheckpoint, prevCheckpoint)
+    }
+}
+
+function convertDaysToSeconds(uint amountDays) pure returns (uint amountSeconds) {
+    assembly {
+        amountSeconds := mul(amountDays, SECONDS_PER_DAY)
     }
 }
 

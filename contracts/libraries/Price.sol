@@ -80,6 +80,7 @@ library Price {
         uint256 epsilon
     ) internal pure returns (uint256) {
         if (epsilon == 0) return prc;
+        if (epsilon > tau) return stk;
 
         Expiring memory params = Expiring(stk, convertPercentageToWad(vol), tau);
 

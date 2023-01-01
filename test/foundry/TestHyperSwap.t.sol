@@ -30,30 +30,33 @@ contract TestHyperSwap is TestHyperSetup {
     function testSwap_back_and_forth_outputs_less() public allocateFirst {
         uint256 start = 10000;
 
-        (uint output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, false, start, type(uint128).max);
+        bool direction = false;
+        (uint output, ) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            direction,
+            start,
+            direction ? 0 : type(uint128).max
+        );
 
-        (uint finalOutput, ) = __hyperTestingContract__.swap(defaultScenario.poolId, true, output, type(uint128).max);
+        direction = true;
+        (uint finalOutput, ) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            direction,
+            output,
+            direction ? 0 : type(uint128).max
+        );
 
         assertGt(start, finalOutput);
     }
 
     function testSwap_revert_PoolExpired() public allocateFirst {
-        customWarp(
-            block.timestamp + __hyperTestingContract__.computeCurrentTau(defaultScenario.poolId) + HyperTypes.BUFFER + 1
-        );
-
-        uint timestamp = __hyperTestingContract__.timestamp();
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        Epoch memory epoch = getEpoch(address(__hyperTestingContract__), defaultScenario.poolId);
-        uint current = epoch.getEpochsPassed(timestamp);
-        uint tau;
-        console.log(current, pool.params.duration);
-        if (current <= pool.params.duration) tau = uint(pool.params.duration - current) * EPOCH_INTERVAL; // expired
-        console.log(tau);
-        console.log(__hyperTestingContract__.computeCurrentTau(defaultScenario.poolId));
+        console.log(__hyperTestingContract__.timestamp(), pool.lastTimestamp);
+        uint end = pool.params.createdAt + Assembly.convertDaysToSeconds(pool.params.duration);
 
+        customWarp(end + 1);
         vm.expectRevert(PoolExpired.selector);
-        __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, 50);
+        __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, type(uint128).max);
     }
 
     function testSwap_revert_ZeroInput() public {
