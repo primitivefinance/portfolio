@@ -113,9 +113,9 @@ contract Hyper is IHyper {
     // ===== Actions ===== //
 
     /// @inheritdoc IHyperActions
-    function syncPool(uint64 poolId) external override returns (uint128 lastTimestamp) {
-        lastTimestamp; // TODO
+    function syncPool(uint64 poolId) external override lock returns (uint128 lastTimestamp) {
         _syncPoolPrice(poolId);
+        return _blockTimestamp();
     }
 
     /// @inheritdoc IHyperActions
@@ -153,14 +153,14 @@ contract Hyper is IHyper {
         uint amount,
         uint limit
     ) external lock interactions returns (uint output, uint remainder) {
-        bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = useMax ? type(uint128).max : (amount).safeCastTo128();
         if (limit == type(uint256).max) limit = type(uint128).max;
+        bool useMax = amount == type(uint256).max; // magic variable.
+        uint128 input = useMax ? type(uint128).max : amount.safeCastTo128();
         Order memory args = Order({
             useMax: useMax ? 1 : 0,
             poolId: poolId,
             input: input,
-            limit: (limit).safeCastTo128(),
+            limit: limit.safeCastTo128(),
             direction: sellAsset ? 0 : 1
         });
         (, remainder, , output) = _swapExactIn(args);
@@ -168,7 +168,7 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function draw(address token, uint256 amount, address to) external lock interactions {
-        if (getBalance(msg.sender, token) < amount) revert DrawBalance(); // Only withdraw if user has enough.
+        if (amount > getBalance(msg.sender, token)) revert DrawBalance();
 
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
@@ -247,7 +247,7 @@ contract Hyper is IHyper {
 
         if (args.deltaLiquidity < 0) {
             uint distance = position.getTimeSinceChanged(_blockTimestamp());
-            if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
+            if (pools[args.poolId].params.jit > distance) revert JitLiquidity(distance);
         }
 
         position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
@@ -630,7 +630,7 @@ contract Hyper is IHyper {
             stakedLiquidityDelta: 0,
             params: HyperCurve({
                 maxTick: max,
-                jit: isMutable ? jit : uint8(JUST_IN_TIME_LIQUIDITY_POLICY),
+                jit: isMutable ? jit : uint8(_liquidityPolicy()),
                 fee: fee,
                 duration: dur,
                 volatility: vol,
@@ -647,25 +647,26 @@ contract Hyper is IHyper {
         emit CreatePool(poolId, uint16(pairId), 0x0, price); // todo: event
     }
 
-    /// TODO: add interactions modifier to this probably
-    function alter(
+    function changeParameters(
         uint64 poolId,
         uint16 priorityFee,
         uint16 fee,
-        uint16 vol,
-        uint16 dur,
+        uint16 volatility,
+        uint16 duration,
         uint16 jit,
-        int24 max
-    ) external lock {
-        pools[poolId].changePoolParameters(
+        int24 maxTick
+    ) external lock interactions {
+        HyperPool storage pool = pools[poolId];
+        if (pool.controller != msg.sender) revert NotController();
+        pool.changePoolParameters(
             HyperCurve({
-                maxTick: max,
+                maxTick: maxTick,
                 jit: jit,
                 fee: fee,
-                duration: dur,
-                volatility: vol,
+                duration: duration,
+                volatility: volatility,
                 priorityFee: priorityFee,
-                createdAt: 0 // unchanged...
+                createdAt: 0
             })
         );
 
@@ -777,29 +778,26 @@ contract Hyper is IHyper {
 
     // ===== View ===== //
 
-    /** @dev Computes amount of liquidity added to position and pool if token amounts were provided. */
     function getMaxLiquidity(
         uint64 poolId,
         uint deltaAsset,
         uint deltaQuote
-    ) public view returns (uint128 deltaLiquidity) {
+    ) public view override returns (uint128 deltaLiquidity) {
         return pools[poolId].getMaxLiquidity(deltaAsset, deltaQuote);
     }
 
-    /** @dev Computes total amount of reserves entitled to the total liquidity of a pool. */
-    function getVirtualReserves(uint64 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+    function getVirtualReserves(uint64 poolId) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
         return pools[poolId].getVirtualReserves();
     }
 
-    /** @dev Computes amount of phsyical reserves entitled to amount of liquidity in a pool. Rounded down. */
     function getLiquidityDeltas(
         uint64 poolId,
         int128 deltaLiquidity
-    ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+    ) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
         return pools[poolId].getLiquidityDeltas(deltaLiquidity);
     }
 
-    function getAmounts(uint64 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+    function getAmounts(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
         return pools[poolId].getAmounts();
     }
 }
