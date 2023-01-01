@@ -40,7 +40,7 @@ Changing a position:
 
 ## todo
 
-- [ ] Fix tests, especially swaps.
+- [x] Fix tests, especially swaps.
 - [ ] Solstat tests.
 - [ ] Refactor accounting system!
 - [ ] Work on docs 1 pager for auditor

@@ -65,6 +65,16 @@ interface IHyperEvents {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     );
+
+    event ChangeParameters(
+        uint64 indexed poolId,
+        uint16 priorityFee,
+        uint16 indexed fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        int24 indexed maxTick
+    );
 }
 
 interface IHyperGetters {

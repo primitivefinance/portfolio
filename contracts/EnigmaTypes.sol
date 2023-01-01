@@ -26,7 +26,7 @@ using {
     getRMM,
     getAmountOut
 } for HyperPool global;
-using {maturity} for HyperCurve global;
+using {maturity, checkParameters, revertOnInvalid} for HyperCurve global;
 using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
 using Price for Price.RMM;
 using SafeCastLib for uint;
@@ -161,15 +161,9 @@ function changePoolLiquidity(HyperPool storage self, int128 liquidityDelta) {
 
 // todo: proper parameter checks
 function changePoolParameters(HyperPool storage self, HyperCurve memory updated) {
-    if (self.controller != msg.sender) revert NotController();
-    if (updated.maxTick >= MAX_TICK) revert InvalidTick(updated.maxTick);
-    if (updated.jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(updated.jit);
-    if (updated.jit != 0) self.params.jit = updated.jit;
-    if (updated.maxTick != 0) self.params.maxTick = updated.maxTick;
-    if (updated.fee != 0) self.params.fee = updated.fee;
-    if (updated.volatility != 0) self.params.volatility = updated.volatility;
-    if (updated.duration != 0) self.params.duration = updated.duration;
-    if (updated.priorityFee != 0) self.params.priorityFee = updated.priorityFee;
+    bool success = updated.revertOnInvalid();
+    self.params = updated;
+    assert(success);
 }
 
 function exists(HyperPool memory self) view returns (bool) {
@@ -322,6 +316,31 @@ function tau(HyperPool memory self, uint timestamp) view returns (uint) {
 
 function maturity(HyperCurve memory self) view returns (uint endTimestamp) {
     return Assembly.convertDaysToSeconds(self.duration) + self.createdAt;
+}
+
+/** @dev Invalid parameters should revert. */
+function checkParameters(HyperCurve memory self) view returns (bool, bytes memory) {
+    if (self.volatility == 0) return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));
+    if (self.duration == 0) return (false, abi.encodeWithSelector(InvalidDuration.selector, self.duration));
+    if (self.maxTick >= MAX_TICK) return (false, abi.encodeWithSelector(InvalidTick.selector, self.maxTick));
+    if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
+    if (!Assembly.isBetween(self.fee, MIN_POOL_FEE, MAX_POOL_FEE))
+        return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
+    if (!Assembly.isBetween(self.priorityFee, MIN_POOL_FEE, self.fee))
+        return (false, abi.encodeWithSelector(InvalidFee.selector, self.priorityFee));
+
+    return (true, "");
+}
+
+function revertOnInvalid(HyperCurve memory self) view returns (bool) {
+    (bool success, bytes memory reason) = self.checkParameters();
+    if (!success) {
+        assembly {
+            revert(add(32, reason), mload(reason))
+        }
+    }
+
+    return success;
 }
 
 function getTimeSinceChanged(HyperPosition memory self, uint timestamp) view returns (uint distance) {

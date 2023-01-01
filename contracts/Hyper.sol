@@ -640,19 +640,18 @@ contract Hyper is IHyper {
     ) external lock interactions {
         HyperPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
-        pool.changePoolParameters(
-            HyperCurve({
-                maxTick: maxTick,
-                jit: jit,
-                fee: fee,
-                duration: duration,
-                volatility: volatility,
-                priorityFee: priorityFee,
-                createdAt: 0
-            })
-        );
 
-        // TODO: emit an event
+        HyperCurve memory modified = pool.params;
+        if (jit != 0) modified.jit = jit;
+        if (maxTick != 0) modified.maxTick = maxTick;
+        if (fee != 0) modified.fee = fee;
+        if (volatility != 0) modified.volatility = volatility;
+        if (duration != 0) modified.duration = duration;
+        if (priorityFee != 0) modified.priorityFee = priorityFee;
+
+        pool.changePoolParameters(modified);
+
+        emit ChangeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
     }
 
     /** @dev Overridable in tests.  */
