@@ -22,7 +22,9 @@ using {
     getLiquidityDeltas,
     getAmounts,
     lastTau,
-    tau
+    tau,
+    getRMM,
+    getAmountOut
 } for HyperPool global;
 using {maturity} for HyperCurve global;
 using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
@@ -228,9 +230,83 @@ function getLiquidityDeltas(
 
 /** @dev Amounts per WAD of liquidity. */
 function getAmounts(HyperPool memory self) view returns (uint amountAsset, uint amountQuote) {
-    Price.RMM memory rmm = Price.RMM({strike: self.strike(), sigma: self.params.volatility, tau: self.lastTau()});
+    Price.RMM memory rmm = self.getRMM();
     amountAsset = rmm.computeR2WithPrice(self.lastPrice);
     amountQuote = rmm.computeR1WithR2(amountAsset);
+}
+
+function getAmountOut(
+    HyperPool memory self,
+    Pair memory pair,
+    bool sellAsset,
+    uint amountIn,
+    uint timeSinceUpdate
+) view returns (uint, uint) {
+    Iteration memory data;
+    Price.RMM memory rmm = self.getRMM();
+    (data.price, data.tick) = self.computePriceChangeWithTime(self.lastTau(), timeSinceUpdate);
+    data.remainder = amountIn * 10 ** (MAX_DECIMALS - (sellAsset ? pair.decimalsAsset : pair.decimalsQuote));
+    data.liquidity = self.liquidity;
+
+    uint prevInd;
+    uint prevDep;
+    uint nextInd;
+    uint nextDep;
+
+    {
+        uint maxInput;
+        uint delInput;
+
+        if (sellAsset) {
+            (prevDep, prevInd) = rmm.computeReserves(data.price);
+            maxInput = (FixedPointMathLib.WAD - prevInd).mulWadDown(self.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
+        } else {
+            (prevInd, prevDep) = rmm.computeReserves(data.price);
+            maxInput = (rmm.strike - prevInd).mulWadDown(self.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+        }
+
+        data.feeAmount = ((data.remainder > maxInput ? maxInput : data.remainder) * self.params.fee) / 10_000;
+
+        if (data.remainder > maxInput) {
+            delInput = maxInput - data.feeAmount;
+            nextInd = prevInd + delInput.divWadDown(data.liquidity);
+            data.remainder -= (delInput + data.feeAmount);
+        } else {
+            delInput = data.remainder - data.feeAmount;
+            nextInd = prevInd + delInput.divWadDown(data.liquidity);
+            delInput = data.remainder; // Swap input amount including the fee payment.
+            data.remainder = 0; // Clear the remainder to zero, as the order has been filled.
+        }
+
+        // Compute the output of the swap by computing the difference between the dependent reserves.
+        if (sellAsset) nextDep = rmm.computeR1WithR2(nextInd);
+        else nextDep = rmm.computeR2WithR1(nextInd);
+
+        data.input += delInput;
+        data.output += (prevDep - nextDep);
+    }
+
+    {
+        // Scale down amounts from WAD.
+        uint inputScale;
+        uint outputScale;
+        if (sellAsset) {
+            inputScale = MAX_DECIMALS - pair.decimalsAsset;
+            outputScale = MAX_DECIMALS - pair.decimalsQuote;
+        } else {
+            inputScale = MAX_DECIMALS - pair.decimalsQuote;
+            outputScale = MAX_DECIMALS - pair.decimalsAsset;
+        }
+
+        data.input = data.input / (10 ** inputScale);
+        data.output = data.output / (10 ** outputScale);
+    }
+
+    return (data.output, data.remainder);
+}
+
+function getRMM(HyperPool memory self) view returns (Price.RMM memory) {
+    return Price.RMM({strike: self.strike(), sigma: self.params.volatility, tau: self.lastTau()});
 }
 
 function lastTau(HyperPool memory self) view returns (uint tau) {

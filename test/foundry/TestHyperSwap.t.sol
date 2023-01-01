@@ -12,8 +12,17 @@ contract TestHyperSwap is TestHyperSetup {
     }
 
     function testSwap_should_succeed() public allocateFirst {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
         uint input = DEFAULT_SWAP_INPUT;
         uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
+        (uint out, ) = pool.getAmountOut(
+            getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40)),
+            true,
+            input,
+            0
+        );
+
         (uint output, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
@@ -23,8 +32,9 @@ contract TestHyperSwap is TestHyperSetup {
 
         assertEq(output, expected, "expected-output");
 
-        (uint amount0, uint amount1) = getPool(address(__hyperTestingContract__), defaultScenario.poolId).getAmounts();
+        (uint amount0, uint amount1) = pool.getAmounts();
         console.log("amounts", amount0, amount1);
+        console.log("outputs, actual, expected", output, out);
     }
 
     function testSwap_back_and_forth_outputs_less() public allocateFirst {

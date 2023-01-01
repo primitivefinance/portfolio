@@ -126,6 +126,10 @@ interface IHyperGetters {
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
     function getAmounts(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    function getAssetAmountOut(uint64 poolId, uint amountIn) external view returns (uint);
+
+    function getQuoteAmountOut(uint64 poolId, uint amountIn) external view returns (uint);
 }
 
 interface IHyperActions {

@@ -394,7 +394,7 @@ contract Hyper is IHyper {
                 maxInput = (rmm.strike - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            _swap.feeAmount = ((_swap.remainder >= maxInput ? maxInput : _swap.remainder) * state.fee) / 10_000;
+            _swap.feeAmount = ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * state.fee) / 10_000;
             state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
 
             if (_swap.remainder > maxInput) {
@@ -799,5 +799,24 @@ contract Hyper is IHyper {
 
     function getAmounts(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
         return pools[poolId].getAmounts();
+    }
+
+    function getAssetAmountOut(uint64 poolId, uint amountIn) public view returns (uint) {
+        return _getAmountOut(poolId, false, amountIn);
+    }
+
+    function getQuoteAmountOut(uint64 poolId, uint amountIn) public view returns (uint) {
+        return _getAmountOut(poolId, true, amountIn);
+    }
+
+    function _getAmountOut(uint64 poolId, bool sellAsset, uint amountIn) internal view returns (uint output) {
+        uint24 pairId = CPU.decodePairIdFromPoolId(poolId);
+        HyperPool memory pool = pools[poolId];
+        (output, ) = pool.getAmountOut({
+            pair: pairs[pairId],
+            sellAsset: sellAsset,
+            amountIn: amountIn,
+            timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp
+        });
     }
 }
