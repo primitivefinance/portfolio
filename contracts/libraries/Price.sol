@@ -57,7 +57,7 @@ library Price {
         RMM memory args,
         uint256 prc,
         uint256 epsilon
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
     }
 
@@ -84,7 +84,7 @@ library Price {
         if (epsilon == 0) return prc;
         if (epsilon > tau) return stk;
 
-        RMM memory params = RMM(stk, convertPercentageToWad(vol), tau);
+        RMM memory params = RMM(stk, vol, tau);
 
         uint256 tauYears;
         assembly {
@@ -110,10 +110,9 @@ library Price {
             uint256 tausSqrt = tauYears.sqrt() * (currentTau).sqrt(); // sqrt(1e18) = 1e9, so 1e9 * 1e9 = 1e18
             uint256 term_4 = tausSqrt - currentTau; // WAD - WAD = WAD
 
-            uint256 sigmaWad = (uint256(params.sigma) * UNIT_WAD) / 1e4;
+            uint256 sigmaWad = convertPercentageToWad(uint256(params.sigma));
 
             uint256 term_5 = (sigmaWad * sigmaWad) / UNIT_DOUBLE_WAD; // 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
-
             uint256 term_6 = uint256((int256(term_5.mulWadDown(term_4))).expWad()); // exp(WAD * WAD / WAD)
             term_7 = uint256(params.strike).mulWadDown(term_6); // WAD * WAD / WAD
         }

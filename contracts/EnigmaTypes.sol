@@ -188,7 +188,7 @@ function computePriceChangeWithTime(
     HyperPool memory self,
     uint tau,
     uint epsilon
-) view returns (uint price, int24 tick) {
+) pure returns (uint price, int24 tick) {
     uint strike = Price.computePriceWithTick(self.params.maxTick);
     price = Price.computePriceWithChangeInTau(strike, self.params.volatility, self.lastPrice, tau, epsilon);
     tick = Price.computeTickWithPrice(price);

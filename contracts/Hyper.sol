@@ -336,7 +336,7 @@ contract Hyper is IHyper {
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
 
-        HyperPool memory pool = pools[args.poolId];
+        HyperPool storage pool = pools[args.poolId];
         if (!pool.exists()) revert NonExistentPool(args.poolId);
 
         state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
@@ -503,15 +503,12 @@ contract Hyper is IHyper {
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
-        uint256 elapsed = getTimePassed(poolId);
-        if (elapsed > 0) {
+        uint256 timestamp = _blockTimestamp();
+        timeDelta = getTimePassed(poolId);
+        if (timeDelta > 0) {
             pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
             pool.stakedLiquidityDelta = int128(0);
         }
-
-        uint256 timestamp = _blockTimestamp();
-        uint256 lastUpdateTime = pool.lastTimestamp;
-        timeDelta = timestamp - lastUpdateTime;
 
         if (pool.lastTick != tick) pool.lastTick = tick;
         if (pool.lastPrice != price) pool.lastPrice = price.safeCastTo128();

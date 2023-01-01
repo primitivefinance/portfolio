@@ -36,6 +36,7 @@ Changing a position:
 #### Notes
 
 - Increasing reserves but paying entirely with internal balance leads to a deficit and therefore invariant failure.
+- Be careful about `storage` or `memory` when using the library types. If a pool is computing important values, it should always be from storage, else it might not have the updates in the transaction. There was a bug where I was using the `lastTau` method on a pool in memory, and this was not updated even though the same `storage` pool was updated.
 
 ## todo
 
