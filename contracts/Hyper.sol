@@ -86,13 +86,13 @@ contract Hyper is IHyper {
         __account__.settled = true;
     }
 
+    receive() external payable {
+        if (msg.sender != WETH) revert();
+    }
+
     /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
     fallback() external payable lock interactions {
         CPU.__startProcess__(_process);
-    }
-
-    receive() external payable {
-        if (msg.sender != WETH) revert();
     }
 
     /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
@@ -220,7 +220,7 @@ contract Hyper is IHyper {
             deltaQuote,
             pair.tokenAsset,
             pair.tokenQuote,
-            int128(deltaLiquidity) // TODO: add better type safety for these conversions.
+            int128(deltaLiquidity) // TODO: add better type safety for these conversions, or tests to make sure its not an issue.
         );
 
         _changeLiquidity(args);

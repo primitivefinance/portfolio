@@ -1,6 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+/**
+  
+  This is called the Enigma, it's an alternative ABI.
+  Originally, it was designed to compress calldata and therefore
+  save gas on optimistic rollup networks.
+
+  There are levels to the optimizations that can be made for it,
+  but this one focuses on the alternative multicall.
+
+  Multicalls will pad all calls to a full bytes32.
+  This means two calls are at least 64 bytes.
+  This alternative multicall can process over 10 calls in the same 64 bytes.
+  The smallest bytes provided by a call is for allocate and unallocate, at 11 bytes.
+
+  Be aware of a function selector hash collisions.
+  Data is delivered via the `fallback` function.
+
+ */
+
 import "./Assembly.sol" as Assembly;
 
 uint8 constant JUMP_PROCESS_START_POINTER = 2; // points to first pointer
@@ -27,9 +46,10 @@ function __startProcess__(function(bytes calldata) _process) {
     else _jumpProcess(msg.data, _process);
 }
 
+/** @dev  [jump instruction, instructions.length, pointer, ...instruction, pointer, ...etc] */
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
     uint8 length = uint8(data[1]);
-    uint8 pointer = JUMP_PROCESS_START_POINTER; // note: [opcode, length, pointer, ...instruction, pointer, ...etc]
+    uint8 pointer = JUMP_PROCESS_START_POINTER;
     uint256 start;
     // For each instruction set...
     for (uint256 i; i != length; ++i) {
@@ -46,9 +66,8 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
 }
 
 function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes memory) {
-    uint8 len = uint8(instructions.length);
-
     uint8 nextPointer;
+    uint8 len = uint8(instructions.length);
     bytes memory payload = bytes.concat(INSTRUCTION_JUMP, bytes1(len));
 
     // for each instruction set...
@@ -78,7 +97,6 @@ function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure retu
     return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
 }
 
-/** @dev [0x 3 bytes 1 byte 4 bytes] == [0x pairId isMutable poolNonce]. */
 function decodePoolId(
     bytes calldata data
 ) pure returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) {
@@ -92,10 +110,9 @@ function encodeCreatePair(address token0, address token1) pure returns (bytes me
     data = abi.encodePacked(CREATE_PAIR, token0, token1);
 }
 
-/** @dev [0x 00 3 bytes 1 byte 4 bytes] == [0x instruction token0 token1]. */
 function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
     if (data.length != 41) revert InvalidPairBytes(41, data.length);
-    tokenAsset = address(bytes20(data[1:21])); // note: First byte is the create pair ecode.
+    tokenAsset = address(bytes20(data[1:21]));
     tokenQuote = address(bytes20(data[21:]));
 }
 
@@ -144,7 +161,6 @@ function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount
     data = abi.encodePacked(Assembly.pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
 }
 
-/** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId deltaLiquidity] */
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     (bytes1 maxFlag, ) = Assembly.separate(data[0]);
     useMax = uint8(maxFlag);
@@ -156,7 +172,6 @@ function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amou
     data = abi.encodePacked(Assembly.pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
 }
 
-/** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId deltaLiquidity] */
 function decodeUnallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
@@ -185,7 +200,6 @@ function encodeSwap(
     );
 }
 
-/** @dev Swap direction: 0 = base token to quote token, 1 = quote token to base token. */
 function decodeSwap(
     bytes calldata data
 ) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 limit, uint8 direction) {

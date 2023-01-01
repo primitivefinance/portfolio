@@ -60,9 +60,7 @@ function convertDaysToSeconds(uint amountDays) pure returns (uint amountSeconds)
     }
 }
 
-/// @dev           Converts an array of bytes into a byte32
-/// @param raw     Array of bytes to convert
-/// @return data   Converted data
+/** @dev Converts an array of bytes into a byte32. */
 function toBytes32(bytes memory raw) pure returns (bytes32 data) {
     assembly {
         data := mload(add(raw, 32))
@@ -71,9 +69,7 @@ function toBytes32(bytes memory raw) pure returns (bytes32 data) {
     }
 }
 
-/// @dev           Converts an array of bytes into a bytes16.
-/// @param raw     Array of bytes to convert.
-/// @return data   Converted data.
+/** @dev Converts an array of bytes into a bytes16. */
 function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     assembly {
         data := mload(add(raw, 32))
