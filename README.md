@@ -48,3 +48,4 @@ Changing a position:
 - [ ] Finish stake/unstake
 - [ ] Add parameter validation to changeParameters function
 - [ ] Rename EnigmaTypes to HyperLib ?
+- [ ] TOKEN DECIMALS NOT HANDLED

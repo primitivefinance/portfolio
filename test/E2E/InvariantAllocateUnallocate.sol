@@ -97,8 +97,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             "position-liquidity-increases"
         );
 
-        assertEq(post.reserveAsset, prev.reserveAsset + expectedDeltaAsset, "reserve-asset");
-        assertEq(post.reserveQuote, prev.reserveQuote + expectedDeltaQuote, "reserve-quote");
+        assertEq(post.reserveAsset, prev.reserveAsset + physicalAssetPayment, "reserve-asset");
+        assertEq(post.reserveQuote, prev.reserveQuote + physicalQuotePayment, "reserve-quote");
         assertEq(post.physicalBalanceAsset, prev.physicalBalanceAsset + physicalAssetPayment, "physical-asset");
         assertEq(post.physicalBalanceQuote, prev.physicalBalanceQuote + physicalQuotePayment, "physical-quote");
 
