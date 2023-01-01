@@ -9,26 +9,28 @@ contract HelperHyperActions {
     function createPool(
         address token0,
         address token1,
-        uint24 sigma,
-        uint32 maturity,
-        uint16 fee,
+        address controller,
         uint16 priorityFee,
-        uint128 strike,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        int24 maxTick,
         uint128 price
     ) internal pure returns (bytes memory data) {
         bytes[] memory instructions = new bytes[](2);
-        uint64 magicPoolId = 0x000000000000;
+        uint24 magicPoolId = 0x000000;
         instructions[0] = (ProcessingLib.encodeCreatePair(token0, token1));
         instructions[1] = (
             ProcessingLib.encodeCreatePool(
-                uint24(0x000000), // magic variable for pairId
-                address(0),
-                uint16(1), // priorityFee, 1bps
-                uint16(DEFAULT_FEE), // fee, 30 bps
-                uint16(DEFAULT_SIGMA), // default sigma of 1e4
-                uint16(DEFAULT_HOURLY_EPOCH_ONE_YEAR), // default dur of 1 year
-                uint16(0), // jit
-                int24(23027), // default tick
+                magicPoolId, // magic variable
+                controller,
+                priorityFee,
+                fee,
+                volatility,
+                duration,
+                jit,
+                maxTick,
                 price
             )
         );

@@ -62,7 +62,7 @@ struct HyperCurve {
     uint16 duration;
     uint16 volatility;
     uint16 priorityFee;
-    uint48 startEpoch;
+    uint48 createdAt;
 }
 
 struct HyperPool {
@@ -123,7 +123,7 @@ struct Iteration {
 
 struct SwapState {
     bool sell;
-    uint256 gamma;
+    uint256 fee;
     uint256 feeGrowthGlobal;
 }
 

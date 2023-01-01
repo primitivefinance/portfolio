@@ -7,13 +7,14 @@ uint32 constant DEFAULT_MATURITY = 31556953; // adds 1
 uint16 constant DEFAULT_FEE = 100; // 100 bps = 1%
 uint32 constant DEFAULT_GAMMA = 9900;
 uint32 constant DEFAULT_PRIORITY_GAMMA = 9950;
-uint16 constant DEFAULT_HOURLY_EPOCH_ONE_YEAR = 8766;
+uint16 constant DEFAULT_DURATION_DAYS = 365;
 uint128 constant DEFAULT_QUOTE_RESERVE = 3085375116376210650;
 uint128 constant DEFAULT_ASSET_RESERVE = 308537516918601823;
 uint128 constant DEFAULT_LIQUIDITY = 1e18;
 uint128 constant DEFAULT_PRICE = 10e18;
 int24 constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
 uint constant DEFAULT_SWAP_INPUT = 0.1 ether;
-uint constant DEFAULT_SWAP_OUTPUT = 867_339 wei;
+uint constant DEFAULT_SWAP_OUTPUT = 97_627 wei;
+uint16 constant DEFAULT_JIT = 4;
 
 contract HelperHyperProfiles {}

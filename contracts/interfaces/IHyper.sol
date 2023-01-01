@@ -106,8 +106,6 @@ interface IHyperGetters {
         uint24 pairId
     ) external view returns (address tokenasset, uint8 decimalsasset, address tokenQuote, uint8 decimalsQuote);
 
-    function epochs(uint64 poolId) external view returns (uint256 id, uint256 endTime, uint256 interval);
-
     function pools(
         uint64 poolId
     )

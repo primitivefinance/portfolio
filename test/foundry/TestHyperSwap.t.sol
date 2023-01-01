@@ -7,7 +7,7 @@ import "test/helpers/HelperHyperProfiles.sol";
 
 contract TestHyperSwap is TestHyperSetup {
     modifier allocateFirst() {
-        __hyperTestingContract__.allocate(defaultScenario.poolId, 1e18);
+        __hyperTestingContract__.allocate(defaultScenario.poolId, 10 ether);
         _;
     }
 
@@ -16,12 +16,15 @@ contract TestHyperSwap is TestHyperSetup {
         uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
         (uint output, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
-            false,
+            true,
             input,
-            type(uint128).max // limit
+            0 // limit
         );
 
         assertEq(output, expected, "expected-output");
+
+        (uint amount0, uint amount1) = __hyperTestingContract__.amounts(defaultScenario.poolId);
+        console.log("amounts", amount0, amount1);
     }
 
     function testSwap_back_and_forth_outputs_less() public allocateFirst {

@@ -81,7 +81,7 @@ library Price {
     ) internal pure returns (uint256) {
         if (epsilon == 0) return prc;
 
-        Expiring memory params = Expiring(stk, vol, tau);
+        Expiring memory params = Expiring(stk, convertPercentageToWad(vol), tau);
 
         uint256 tauYears;
         assembly {

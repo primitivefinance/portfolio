@@ -120,11 +120,13 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         bytes memory data = createPool(
             address(__token_18__),
             address(__usdc__),
-            DEFAULT_SIGMA,
-            uint32(block.timestamp) + DEFAULT_MATURITY,
-            uint16(1e4 - DEFAULT_GAMMA),
+            address(0),
             uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
-            DEFAULT_STRIKE,
+            uint16(1e4 - DEFAULT_GAMMA),
+            uint16(DEFAULT_SIGMA),
+            uint16(DEFAULT_DURATION_DAYS),
+            DEFAULT_JIT,
+            DEFAULT_TICK,
             DEFAULT_PRICE
         );
 

@@ -27,6 +27,8 @@ import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
 
+import {console} from "forge-std/Test.sol";
+
 /**
  * @title   Primitive Hyper.
  */
@@ -48,22 +50,14 @@ contract Hyper is IHyper {
     uint256 public getPairNonce;
     /// @dev A value incremented by one on curve creation. Reduces calldata.
     uint32 public getPoolNonce;
-    // todo: fix, lets say this is the current epoch for now.
-    uint48 public currentEpoch = 1;
     /// @dev Pool id -> Pair of a Pool.
     mapping(uint24 => Pair) public pairs;
-    /// @dev Pool id -> Clock.Epoch Data Structure.
-    mapping(uint64 => Clock.Epoch) public epochs;
     /// @dev Pool id -> HyperPool Data Structure.
     mapping(uint64 => HyperPool) public pools;
     /// @dev Base Token -> Quote Token -> Pair id
     mapping(address => mapping(address => uint24)) public getPairId;
     /// @dev User -> Position Id -> Liquidity Position.
     mapping(address => mapping(uint64 => HyperPosition)) public positions;
-    /// @dev Amount of rewards globally tracked per epoch.
-    mapping(uint64 => mapping(uint256 => uint256)) internal epochRewardGrowthGlobal;
-    /// @dev Individual rewards of a position.
-    mapping(uint64 => mapping(int24 => mapping(uint256 => uint256))) internal epochRewardGrowthOutside;
 
     /** @dev Used on every external function and external entrypoint. */
     modifier lock() {
@@ -90,7 +84,6 @@ contract Hyper is IHyper {
     constructor(address weth) {
         WETH = weth;
         __account__.settled = true;
-        globalEpoch = Clock.Epoch({id: 0, endTime: _blockTimestamp() + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
     }
 
     /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
@@ -314,8 +307,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta += int128(pos.totalLiquidity);
 
-        Clock.Epoch storage epoch = epochs[poolId];
-        pos.stakeEpochId = epoch.id + 1;
+        pos.stakeEpochId = _blockTimestamp(); // todo: fix
 
         // note: do we need to update position blockTimestamp?
 
@@ -331,8 +323,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[poolId];
         pool.epochStakedLiquidityDelta -= int128(pos.totalLiquidity);
 
-        Clock.Epoch storage epoch = epochs[poolId];
-        pos.unstakeEpochId = epoch.id + 1;
+        pos.unstakeEpochId = _blockTimestamp(); // todo: fix
 
         // note: do we need to update position blockTimestamp?
 
@@ -374,7 +365,11 @@ contract Hyper is IHyper {
             remainder = args.useMax == 1
                 ? getBalance(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote)
                 : args.input;
+            // Input amount is a token amount, which must be scaled to WAD.
+            remainder = remainder * 10 ** (MAX_DECIMALS - (state.sell ? pair.decimalsAsset : pair.decimalsQuote));
             // Begin the iteration at the live price, using the total swap input amount as the remainder to fill.
+            console.log("price", price);
+            console.log("strike", Price.computePriceWithTick(pool.params.maxTick));
             _swap = Iteration({
                 price: price,
                 tick: tick,
@@ -388,19 +383,14 @@ contract Hyper is IHyper {
 
         Price.Expiring memory expiring;
         {
-            Clock.Epoch memory epoch = epochs[poolId];
-            uint timestamp = _blockTimestamp();
-            emit log("computing tau");
-            uint tau = computeLastTau(poolId);
-            emit log(tau);
+            uint tau = computeLastTau(args.poolId); // should be updated to latest now
             if (tau == 0) revert PoolExpired();
 
             uint strike = Price.computePriceWithTick(pool.params.maxTick);
-            emit log(tau, strike, "tau strike");
             // todo: fix this with buffer too
             expiring = Price.Expiring({strike: strike, sigma: pool.params.volatility, tau: tau});
 
-            state.gamma = 1e4 - pool.params.fee;
+            state.fee = uint(pool.params.fee);
         }
 
         emit log("here");
@@ -415,7 +405,7 @@ contract Hyper is IHyper {
             uint256 deltaInput; // Amount of tokens being swapped in.
             uint256 maxInput; // Max tokens swapped in.
 
-            // Virtual reserves.
+            // Virtual reserves, not scaled by token decimals.
             if (state.sell) {
                 (liveDependent, liveIndependent) = expiring.computeReserves(_swap.price);
                 maxInput = (FixedPointMathLib.WAD - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
@@ -424,9 +414,7 @@ contract Hyper is IHyper {
                 maxInput = (expiring.strike - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            _swap.feeAmount =
-                ((_swap.remainder >= maxInput ? maxInput : _swap.remainder) * (1e4 - state.gamma)) /
-                10_000;
+            _swap.feeAmount = ((_swap.remainder >= maxInput ? maxInput : _swap.remainder) * state.fee) / 10_000;
             state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
 
             if (_swap.remainder >= maxInput) {
@@ -452,6 +440,7 @@ contract Hyper is IHyper {
         }
 
         {
+            uint limitPrice = args.limit;
             uint256 nextPrice;
             int256 liveInvariant;
             int256 nextInvariant;
@@ -466,11 +455,29 @@ contract Hyper is IHyper {
                 nextPrice = expiring.computePriceWithR2(nextDependent);
             }
 
-            _swap.price = nextPrice;
-            if (_swap.price > args.limit) revert SwapLimitReached();
+            if (!state.sell && nextPrice > limitPrice) revert SwapLimitReached();
+            if (state.sell && limitPrice > nextPrice) revert SwapLimitReached();
 
             // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision).
-            //if (nextInvariant < liveInvariant) revert InvalidInvariant(liveInvariant, nextInvariant);
+            if (nextInvariant < liveInvariant) revert InvalidInvariant(liveInvariant, nextInvariant);
+
+            _swap.price = nextPrice;
+        }
+
+        {
+            // scale down amounts
+            uint inputScale;
+            uint outputScale;
+            if (state.sell) {
+                inputScale = MAX_DECIMALS - pair.decimalsAsset;
+                outputScale = MAX_DECIMALS - pair.decimalsQuote;
+            } else {
+                inputScale = MAX_DECIMALS - pair.decimalsQuote;
+                outputScale = MAX_DECIMALS - pair.decimalsAsset;
+            }
+
+            _swap.input = _swap.input / (10 ** inputScale);
+            _swap.output = _swap.output / (10 ** outputScale);
         }
 
         // Apply pool effects.
@@ -491,7 +498,9 @@ contract Hyper is IHyper {
         emit Swap(args.poolId, _swap.input, _swap.output, pair.tokenAsset, pair.tokenQuote);
     }
 
-    Clock.Epoch public globalEpoch;
+    function getTimePassed(uint64 poolId) public view returns (uint) {
+        return _blockTimestamp() - pools[poolId].lastTimestamp;
+    }
 
     /**
      * @dev Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.
@@ -503,15 +512,17 @@ contract Hyper is IHyper {
     function _syncPoolPrice(uint64 poolId) internal returns (uint256 price, int24 tick) {
         if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
-        uint timestamp = _blockTimestamp();
-        uint passed = globalEpoch.syncEpoch(timestamp);
+        HyperPool storage pool = pools[poolId];
+        (price, tick) = (pool.lastPrice, pool.lastTick);
 
+        uint passed = getTimePassed(poolId);
         if (passed > 0) {
-            HyperPool storage pool = pools[poolId];
             uint256 tau = computeLastTau(poolId); // must be the non-updated tau.
-            uint256 elapsedSeconds = passed * globalEpoch.interval;
 
-            (price, tick) = pool.computePriceChangeWithTime(tau, elapsedSeconds);
+            console.log("change", tau, passed);
+            (price, tick) = pool.computePriceChangeWithTime(tau, passed);
+            console.log(price);
+            console.logInt(int(tick));
 
             _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
         }
@@ -531,10 +542,9 @@ contract Hyper is IHyper {
         uint256 feeGrowthGlobalQuote
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
-        Clock.Epoch memory readEpoch = epochs[poolId];
 
-        uint256 epochsPassed = readEpoch.getEpochsPassed(pool.lastTimestamp);
-        if (epochsPassed > 0) {
+        uint256 elapsed = getTimePassed(poolId);
+        if (elapsed > 0) {
             pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
             pool.epochStakedLiquidityDelta = int128(0);
         }
@@ -634,9 +644,10 @@ contract Hyper is IHyper {
         }
 
         bool isMutable = controller != address(0);
+        uint32 timestamp = uint(_blockTimestamp()).safeCastTo32();
         HyperPool memory params = HyperPool({
             lastTick: Price.computeTickWithPrice(price),
-            lastTimestamp: uint32(_blockTimestamp()), // fix type
+            lastTimestamp: timestamp, // fix type
             controller: controller,
             feeGrowthGlobalAsset: 0,
             feeGrowthGlobalQuote: 0,
@@ -651,18 +662,12 @@ contract Hyper is IHyper {
                 duration: dur,
                 volatility: vol,
                 priorityFee: isMutable ? priorityFee : 0,
-                startEpoch: currentEpoch
+                createdAt: timestamp
             })
         });
 
         uint64 poolId = CPU.encodePoolId(pairId, isMutable, poolNonce);
         if (pools[poolId].exists()) revert PoolExists();
-
-        epochs[poolId] = Clock.Epoch({
-            id: currentEpoch,
-            endTime: params.lastTimestamp + EPOCH_INTERVAL,
-            interval: EPOCH_INTERVAL
-        });
 
         pools[poolId] = params;
 
@@ -687,7 +692,7 @@ contract Hyper is IHyper {
                 duration: dur,
                 volatility: vol,
                 priorityFee: priorityFee,
-                startEpoch: 0 // unchanged...
+                createdAt: 0 // unchanged...
             })
         );
 
@@ -697,29 +702,24 @@ contract Hyper is IHyper {
     // todo: maybe add lastTau to pool struct
     /** @dev Duration remaining in pool in seconds based on last pool update. */
     function computeLastTau(uint64 poolId) public view returns (uint tau) {
-        HyperPool storage pool = pools[poolId];
-
-        uint timestamp = pool.lastTimestamp;
-        // getting last epoch, block.timestamp - (globalEpoch.id * interval)
-        uint passed = globalEpoch.getEpochsPassed(timestamp);
-        uint end = pool.params.duration + pool.params.startEpoch;
-        uint present = globalEpoch.id; // todo: reconsider global pool updates...
-
+        HyperPool memory pool = pools[poolId];
+        uint end = convertDaysToSeconds(pool.params.duration) + pool.params.createdAt;
+        uint present = pool.lastTimestamp;
         if (present > end) return 0;
-        tau = (end - present) * EPOCH_INTERVAL;
+        tau = end - present; // (createdAt + duration) - lastTimestamp
     }
 
     // todo: fix, do we need this?
     function computeCurrentTau(uint64 poolId) public view returns (uint tau) {
         HyperPool storage pool = pools[poolId];
-
-        uint timestamp = _blockTimestamp();
-        uint passed = globalEpoch.getEpochsPassed(timestamp);
-        uint end = pool.params.duration + pool.params.startEpoch;
-        uint present = globalEpoch.id + passed;
+        uint end = convertDaysToSeconds(pool.params.duration) + pool.params.createdAt;
+        uint present = uint(_blockTimestamp()).safeCastTo32();
         if (present > end) return 0;
+        tau = end - present;
+    }
 
-        tau = end - globalEpoch.id * EPOCH_INTERVAL;
+    function convertDaysToSeconds(uint amountDays) public view returns (uint amountSeconds) {
+        return amountDays * 86_400;
     }
 
     /** @dev Overridable in tests.  */
@@ -886,12 +886,8 @@ contract Hyper is IHyper {
         // TODO: Make a note of the importance of using the pool's _unchanged_ timestamp.
         // If the blockTimestamp of a pool changes, it will change the pool's price.
         // This blockTimestamp variable should be updated in swaps, not liquidity provision or removing.
+        uint tau = computeLastTau(poolId);
         HyperPool storage pool = pools[poolId];
-        uint256 timestamp = pool.lastTimestamp;
-
-        Clock.Epoch memory epoch = epochs[poolId];
-        uint elapsed = epoch.getEpochsPassed(timestamp) * epoch.interval; // todo: fix epoch time
-        uint tau = uint32((pool.params.duration - uint16(elapsed))) * epoch.interval;
         Price.Expiring memory info = Price.Expiring({
             strike: Price.computePriceWithTick(pool.params.maxTick),
             sigma: pool.params.volatility,
@@ -900,6 +896,10 @@ contract Hyper is IHyper {
 
         deltaAsset = info.computeR2WithPrice(pool.lastPrice);
         deltaQuote = info.computeR1WithR2(deltaAsset);
+    }
+
+    function amounts(uint64 poolId) public view returns (uint256 deltaAsset, uint256 deltaQuote) {
+        return _getAmounts(poolId);
     }
 
     /** @dev Computes the time elapsed since position of `account` was last updated. */
