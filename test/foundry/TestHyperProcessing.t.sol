@@ -916,7 +916,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
     }
 
-    function testCreateCurveExpiringPoolZeroSigmaReverts() public {
+    function testCreateCurveRMMPoolZeroSigmaReverts() public {
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId)); // Existing curve from helper setup
         uint24 failureArg = 0;
         bytes memory data = CPU.encodeCreateCurve(
@@ -930,7 +930,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
     }
 
-    function testCreateCurveExpiringPoolZeroStrikeReverts() public {
+    function testCreateCurveRMMPoolZeroStrikeReverts() public {
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId)); // Existing curve from helper setup
         uint128 failureArg = 0;
         bytes memory data = CPU.encodeCreateCurve(
@@ -1051,7 +1051,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
     }
 
-    function testCreatePoolExpiringPoolExpiredReverts() public {
+    function testCreatePoolRMMPoolExpiredReverts() public {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = CPU.encodeCreatePair(address(token0), address(token1));

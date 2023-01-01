@@ -23,7 +23,7 @@ library Price {
     /**
      * @notice Packaged data structure to easily compute single values from a set of parameters.
      */
-    struct Expiring {
+    struct RMM {
         uint256 strike;
         uint256 sigma;
         uint256 tau;
@@ -31,35 +31,35 @@ library Price {
 
     // ===== Class Methods ===== //
 
-    function invariant(Expiring memory args, uint R1, uint R2) internal pure returns (int256) {
+    function invariant(RMM memory args, uint R1, uint R2) internal pure returns (int256) {
         return Invariant.invariant(R1, R2, args.strike, convertPercentageToWad(args.sigma), args.tau);
     }
 
-    function computeR2WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R2) {
+    function computeR2WithPrice(RMM memory args, uint256 price) internal pure returns (uint256 R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
     }
 
-    function computePriceWithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 price) {
+    function computePriceWithR2(RMM memory args, uint256 R2) internal pure returns (uint256 price) {
         price = computePriceWithR2(R2, args.strike, args.sigma, args.tau);
     }
 
-    function computeR1WithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 R1) {
+    function computeR1WithR2(RMM memory args, uint256 R2) internal pure returns (uint256 R1) {
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, 0);
     }
 
-    function computeR2WithR1(Expiring memory args, uint256 R1) internal pure returns (uint256 R2) {
+    function computeR2WithR1(RMM memory args, uint256 R1) internal pure returns (uint256 R2) {
         R2 = computeR2WithR1(R1, args.strike, args.sigma, args.tau, 0);
     }
 
     function computePriceWithChangeInTau(
-        Expiring memory args,
+        RMM memory args,
         uint256 prc,
         uint256 epsilon
     ) internal pure returns (uint256) {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
     }
 
-    function computeReserves(Expiring memory args, uint price) internal pure returns (uint R1, uint R2) {
+    function computeReserves(RMM memory args, uint price) internal pure returns (uint R1, uint R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, 0);
     }
@@ -82,7 +82,7 @@ library Price {
         if (epsilon == 0) return prc;
         if (epsilon > tau) return stk;
 
-        Expiring memory params = Expiring(stk, convertPercentageToWad(vol), tau);
+        RMM memory params = RMM(stk, convertPercentageToWad(vol), tau);
 
         uint256 tauYears;
         assembly {

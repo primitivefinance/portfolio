@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestPriceSetup.sol";
 
 contract TestPriceComputePrice is TestPriceSetup {
-    using Price for Price.Expiring;
+    using Price for Price.RMM;
 
     function testComputedPriceWithDefaultAssetReserve() public {
         uint actual = cases[0].computePriceWithR2(DEFAULT_ASSET_RESERVE);
@@ -21,7 +21,7 @@ contract TestPriceComputePrice is TestPriceSetup {
     }
 
     function testComputePriceWithEpsilonEqualsTauReturnsStrike() public {
-        Price.Expiring memory info = cases[0];
+        Price.RMM memory info = cases[0];
         uint price = DEFAULT_PRICE;
         uint epsilon = info.tau;
         uint actual = info.computePriceWithChangeInTau(price, epsilon);
@@ -29,7 +29,7 @@ contract TestPriceComputePrice is TestPriceSetup {
     }
 
     function testFuzzComputePriceWithChangeInTau(uint32 epsilon) public {
-        Price.Expiring memory info = cases[0];
+        Price.RMM memory info = cases[0];
         // Fuzzing Filters
         vm.assume(epsilon > 0); // Fuzzing non-zero test cases only.
         vm.assume(epsilon < info.tau); // Epsilon > tau is the same as epsilon == tau.

@@ -3,9 +3,7 @@ pragma solidity 0.8.13;
 
 import "./Assembly.sol" as Assembly;
 
-/// @dev Used as the first pointer for the jump process.
-uint8 constant JUMP_PROCESS_START_POINTER = 2;
-
+uint8 constant JUMP_PROCESS_START_POINTER = 2; // points to first pointer
 bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET00 = 0x02;

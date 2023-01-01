@@ -30,13 +30,13 @@ import "./interfaces/IERC20.sol";
 import {console} from "forge-std/Test.sol";
 
 /**
- * @title   Primitive Hyper.
+ * @title Primitive Hyper.
  */
 contract Hyper is IHyper {
     using SafeCastLib for uint;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
-    using Price for Price.Expiring;
+    using Price for Price.RMM;
 
     /// @dev If balanceOf token < getReserve of token, you win.
     OS.AccountSystem public __account__;
@@ -95,12 +95,17 @@ contract Hyper is IHyper {
         if (msg.sender != WETH) revert();
     }
 
-    /** @dev Fetches internally tracked amount of `token` owned by this contract. */
+    /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
+    function getNetBalance(address token) public view returns (int256) {
+        return __account__.getNetBalance(token, address(this));
+    }
+
+    /** @dev Internal balance sum of `token`. */
     function getReserve(address token) public view returns (uint) {
         return __account__.reserves[token];
     }
 
-    /** @dev Fetches internally tracked amount of `token` owned by `owner`. */
+    /** @dev Internal balance of `owner` of `token`. */
     function getBalance(address owner, address token) public view returns (uint) {
         return __account__.balances[owner][token];
     }
@@ -293,10 +298,6 @@ contract Hyper is IHyper {
         emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
-    event log(string);
-    event log(int128);
-    event log(uint, uint, string);
-
     function _stake(uint64 poolId) internal {
         if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
@@ -332,9 +333,6 @@ contract Hyper is IHyper {
 
     // ===== Swaps ===== //
 
-    event log(uint);
-    event log(bool);
-
     SwapState state;
 
     /** * @dev Swaps in direction (0 or 1) exact input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset) up to limit price. */
@@ -353,9 +351,7 @@ contract Hyper is IHyper {
 
         Iteration memory _swap;
         {
-            console.log("sync");
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
-            console.log("done");
             uint internalBalance = getBalance(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote);
             remainder = args.useMax == 1 ? internalBalance : args.input;
             remainder = remainder * 10 ** (MAX_DECIMALS - (state.sell ? pair.decimalsAsset : pair.decimalsQuote)); // WAD
@@ -370,13 +366,13 @@ contract Hyper is IHyper {
             });
         }
 
-        Price.Expiring memory expiring;
+        Price.RMM memory expiring;
         {
-            uint tau = computeLastTau(args.poolId);
+            uint tau = pool.lastTau();
             if (tau == 0) revert PoolExpired(); // todo: fix this with buffer too
 
             uint strike = Price.computePriceWithTick(pool.params.maxTick);
-            expiring = Price.Expiring({strike: strike, sigma: pool.params.volatility, tau: tau});
+            expiring = Price.RMM({strike: strike, sigma: pool.params.volatility, tau: tau});
         }
 
         // =---= Effects =---= //
@@ -803,7 +799,7 @@ contract Hyper is IHyper {
     // ===== View ===== //
 
     function isMutable(uint64 poolId) public view returns (bool) {
-        return pools[poolId].controller != address(0);
+        return pools[poolId].isMutable();
     }
 
     function exists(uint64 poolId) public view returns (bool) {
@@ -861,9 +857,9 @@ contract Hyper is IHyper {
         // TODO: Make a note of the importance of using the pool's _unchanged_ timestamp.
         // If the lastTimestamp of a pool changes, it will change the pool's price.
         // This lastTimestamp variable should be updated in swaps, not liquidity provision or removing.
-        uint tau = computeLastTau(poolId);
         HyperPool storage pool = pools[poolId];
-        Price.Expiring memory info = Price.Expiring({
+        uint tau = pool.lastTau();
+        Price.RMM memory info = Price.RMM({
             strike: Price.computePriceWithTick(pool.params.maxTick),
             sigma: pool.params.volatility,
             tau: tau
@@ -885,10 +881,5 @@ contract Hyper is IHyper {
         uint256 previous = positions[account][poolId].lastTimestamp;
         timestamp = _blockTimestamp();
         distance = timestamp - previous;
-    }
-
-    /** @dev TODO: Do we want to expose this? */
-    function getNetBalance(address token) public view returns (int) {
-        return __account__.getNetBalance(token, address(this));
     }
 }
