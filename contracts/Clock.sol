@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 using {
+    syncEpoch,
     getStartTime,
     getEpochsPassed,
     getLastUpdatedId,
@@ -16,6 +17,12 @@ struct Epoch {
     uint256 interval;
 }
 
+function syncEpoch(Epoch storage epoch, uint timestamp) returns (uint passed) {
+    passed = epoch.getEpochsPassed(timestamp);
+    epoch.id += passed;
+    epoch.endTime += (epoch.interval + (passed * epoch.interval));
+}
+
 function getStartTime(Epoch memory epoch) pure returns (uint256 startTime) {
     if (epoch.endTime < epoch.interval)
         startTime = 0; // todo: fix, avoids underflow
@@ -23,7 +30,11 @@ function getStartTime(Epoch memory epoch) pure returns (uint256 startTime) {
 }
 
 function getEpochsPassed(Epoch memory epoch, uint256 lastUpdatedTimestamp) pure returns (uint256 epochsPassed) {
-    if (epoch.interval != 0) epochsPassed = lastUpdatedTimestamp / epoch.interval + 1; // todo: fix, starts at 1 epoch
+    // If timestamp is not greater than end time, no epochs have passed.
+    if (lastUpdatedTimestamp < epoch.endTime) return 0;
+    if (epoch.interval == 0) return 0;
+
+    epochsPassed = (lastUpdatedTimestamp - epoch.endTime) / epoch.interval + 1;
 }
 
 function getLastUpdatedId(Epoch memory epoch, uint256 epochsPassed) pure returns (uint256 lastUpdateId) {

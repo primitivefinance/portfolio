@@ -127,7 +127,14 @@ struct SwapState {
     uint256 feeGrowthGlobal;
 }
 
-using {changePoolLiquidity, changePoolParameters, exists, syncPoolTimestamp} for HyperPool global;
+using {
+    changePoolLiquidity,
+    changePoolParameters,
+    exists,
+    syncPoolTimestamp,
+    computeStrike,
+    computePriceChangeWithTime
+} for HyperPool global;
 using {changePositionLiquidity, syncPositionFees} for HyperPosition global;
 
 function exists(HyperPool memory self) view returns (bool) {
@@ -158,6 +165,20 @@ function changePoolParameters(HyperPool storage pool, HyperCurve memory updated)
     if (updated.volatility != 0) pool.params.volatility = updated.volatility;
     if (updated.duration != 0) pool.params.duration = updated.duration;
     if (updated.priorityFee != 0) pool.params.priorityFee = updated.priorityFee;
+}
+
+function computeStrike(HyperPool memory pool) view returns (uint strike) {
+    strike = Price.computePriceWithTick(pool.params.maxTick);
+}
+
+function computePriceChangeWithTime(
+    HyperPool memory pool,
+    uint tau,
+    uint epsilon
+) view returns (uint price, int24 tick) {
+    uint strike = Price.computePriceWithTick(pool.params.maxTick);
+    price = Price.computePriceWithChangeInTau(strike, pool.params.volatility, pool.lastPrice, tau, epsilon);
+    tick = Price.computeTickWithPrice(price);
 }
 
 function syncPositionFees(

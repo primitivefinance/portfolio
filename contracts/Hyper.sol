@@ -90,6 +90,7 @@ contract Hyper is IHyper {
     constructor(address weth) {
         WETH = weth;
         __account__.settled = true;
+        globalEpoch = Clock.Epoch({id: 0, endTime: _blockTimestamp() + EPOCH_INTERVAL, interval: EPOCH_INTERVAL});
     }
 
     /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
@@ -340,33 +341,6 @@ contract Hyper is IHyper {
 
     // ===== Swaps ===== //
 
-    /**
-     * @dev Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.
-     *
-     * @custom:reverts If pool does not exist.
-     * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
-     * @custom:reverts Underflows if current reserves of output token is less then next reserves.
-     */
-    function _syncPoolPrice(uint64 poolId) internal returns (uint256 price, int24 tick) {
-        if (!pools[poolId].exists()) revert NonExistentPool(poolId);
-
-        HyperPool storage pool = pools[poolId];
-
-        uint timestamp = _blockTimestamp();
-        Clock.Epoch memory epoch = epochs[poolId];
-        uint passed = epoch.getEpochsPassed(timestamp);
-        if (passed > 0) {
-            uint256 tauSeconds = computeTau(poolId);
-            uint256 elapsedSeconds = passed * epoch.interval;
-            uint strike = Price.computePriceWithTick(pool.params.maxTick);
-            Price.Expiring memory expiring = Price.Expiring(strike, pool.params.volatility, tauSeconds);
-
-            price = expiring.computePriceWithChangeInTau(pool.lastPrice, elapsedSeconds);
-            tick = Price.computeTickWithPrice(price);
-            _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
-        }
-    }
-
     event log(uint);
     event log(bool);
 
@@ -417,7 +391,7 @@ contract Hyper is IHyper {
             Clock.Epoch memory epoch = epochs[poolId];
             uint timestamp = _blockTimestamp();
             emit log("computing tau");
-            uint tau = computeTau(poolId);
+            uint tau = computeLastTau(poolId);
             emit log(tau);
             if (tau == 0) revert PoolExpired();
 
@@ -515,6 +489,32 @@ contract Hyper is IHyper {
 
         (poolId, remainder, input, output) = (args.poolId, _swap.remainder, _swap.input, _swap.output);
         emit Swap(args.poolId, _swap.input, _swap.output, pair.tokenAsset, pair.tokenQuote);
+    }
+
+    Clock.Epoch public globalEpoch;
+
+    /**
+     * @dev Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.
+     *
+     * @custom:reverts If pool does not exist.
+     * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
+     * @custom:reverts Underflows if current reserves of output token is less then next reserves.
+     */
+    function _syncPoolPrice(uint64 poolId) internal returns (uint256 price, int24 tick) {
+        if (!pools[poolId].exists()) revert NonExistentPool(poolId);
+
+        uint timestamp = _blockTimestamp();
+        uint passed = globalEpoch.syncEpoch(timestamp);
+
+        if (passed > 0) {
+            HyperPool storage pool = pools[poolId];
+            uint256 tau = computeLastTau(poolId); // must be the non-updated tau.
+            uint256 elapsedSeconds = passed * globalEpoch.interval;
+
+            (price, tick) = pool.computePriceChangeWithTime(tau, elapsedSeconds);
+
+            _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        }
     }
 
     /**
@@ -694,15 +694,32 @@ contract Hyper is IHyper {
         // TODO: emit an event
     }
 
-    function computeTau(uint64 poolId) public view returns (uint) {
+    // todo: maybe add lastTau to pool struct
+    /** @dev Duration remaining in pool in seconds based on last pool update. */
+    function computeLastTau(uint64 poolId) public view returns (uint tau) {
         HyperPool storage pool = pools[poolId];
-        Clock.Epoch memory epoch = epochs[poolId];
-        uint timestamp = _blockTimestamp();
-        uint current = epoch.getEpochsPassed(timestamp);
-        //if (current > pool.params.duration) return 0; // expired
 
-        uint computedTau = uint(pool.params.duration - current) * EPOCH_INTERVAL;
-        return computedTau;
+        uint timestamp = pool.lastTimestamp;
+        // getting last epoch, block.timestamp - (globalEpoch.id * interval)
+        uint passed = globalEpoch.getEpochsPassed(timestamp);
+        uint end = pool.params.duration + pool.params.startEpoch;
+        uint present = globalEpoch.id; // todo: reconsider global pool updates...
+
+        if (present > end) return 0;
+        tau = (end - present) * EPOCH_INTERVAL;
+    }
+
+    // todo: fix, do we need this?
+    function computeCurrentTau(uint64 poolId) public view returns (uint tau) {
+        HyperPool storage pool = pools[poolId];
+
+        uint timestamp = _blockTimestamp();
+        uint passed = globalEpoch.getEpochsPassed(timestamp);
+        uint end = pool.params.duration + pool.params.startEpoch;
+        uint present = globalEpoch.id + passed;
+        if (present > end) return 0;
+
+        tau = end - globalEpoch.id * EPOCH_INTERVAL;
     }
 
     /** @dev Overridable in tests.  */

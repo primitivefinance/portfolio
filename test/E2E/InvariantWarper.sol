@@ -12,11 +12,11 @@ contract InvariantWarper is InvariantTargetContract {
 
     function warpAfterMaturity(uint amount) external {
         amount = bound(amount, 1 days, 700 days);
-        uint tau = HyperTau(address(__hyper__)).computeTau(__poolId__);
+        uint tau = HyperTau(address(__hyper__)).computeCurrentTau(__poolId__);
         ctx.customWarp(block.timestamp + tau + amount);
     }
 }
 
 interface HyperTau {
-    function computeTau(uint64 poolId) external view returns (uint);
+    function computeCurrentTau(uint64 poolId) external view returns (uint);
 }

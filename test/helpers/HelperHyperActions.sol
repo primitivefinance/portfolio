@@ -2,8 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "contracts/CPU.sol" as ProcessingLib;
-
-uint16 constant DEFAULT_HOURLY_EPOCH_ONE_YEAR = 8766;
+import "./HelperHyperProfiles.sol";
 
 contract HelperHyperActions {
     /** @dev Encodes jump process for creating a pair + curve + pool in one tx. */
@@ -25,8 +24,8 @@ contract HelperHyperActions {
                 uint24(0x000000), // magic variable for pairId
                 address(0),
                 uint16(1), // priorityFee, 1bps
-                uint16(30), // fee, 30 bps
-                uint16(1e4), // default sigma of 1e4
+                uint16(DEFAULT_FEE), // fee, 30 bps
+                uint16(DEFAULT_SIGMA), // default sigma of 1e4
                 uint16(DEFAULT_HOURLY_EPOCH_ONE_YEAR), // default dur of 1 year
                 uint16(0), // jit
                 int24(23027), // default tick
