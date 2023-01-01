@@ -38,25 +38,18 @@ contract Hyper is IHyper {
     using FixedPointMathLib for uint256;
     using Price for Price.RMM;
 
-    /// @dev If balanceOf token < getReserve of token, you win.
     OS.AccountSystem public __account__;
-    /// @dev Make sure this is equal to v1.0.0 on production networks.
+
     string public constant VERSION = "beta-v0.0.1";
-    /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
-    /// @dev Reentrancy guard initialized to state
+
     uint256 private locked = 1;
-    /// @dev A value incremented by one on pair creation. Reduces calldata.
     uint256 public getPairNonce;
-    /// @dev A value incremented by one on curve creation. Reduces calldata.
     uint32 public getPoolNonce;
-    /// @dev Pool id -> Pair of a Pool.
+
     mapping(uint24 => Pair) public pairs;
-    /// @dev Pool id -> HyperPool Data Structure.
     mapping(uint64 => HyperPool) public pools;
-    /// @dev Base Token -> Quote Token -> Pair id
     mapping(address => mapping(address => uint24)) public getPairId;
-    /// @dev User -> Position Id -> Liquidity Position.
     mapping(address => mapping(uint64 => HyperPosition)) public positions;
 
     /** @dev Used on every external function and external entrypoint. */
@@ -113,7 +106,7 @@ contract Hyper is IHyper {
     // ===== Actions ===== //
 
     /// @inheritdoc IHyperActions
-    function syncPool(uint64 poolId) external override lock returns (uint128 lastTimestamp) {
+    function syncPool(uint64 poolId) external override lock interactions returns (uint128 lastTimestamp) {
         _syncPoolPrice(poolId);
         return _blockTimestamp();
     }
@@ -238,7 +231,7 @@ contract Hyper is IHyper {
 
         _changePosition(args);
         if (feeAsset > 0 || feeQuote > 0)
-            emit FeesEarned(args.owner, args.poolId, feeAsset, args.tokenAsset, feeQuote, args.tokenQuote);
+            emit EarnFees(args.owner, args.poolId, feeAsset, args.tokenAsset, feeQuote, args.tokenQuote);
     }
 
     /** @dev Changes position liquidity and timestamp. */
@@ -320,8 +313,6 @@ contract Hyper is IHyper {
     }
 
     function _unstake(uint64 poolId) internal {
-        _syncPoolPrice(poolId); // Reverts if pool does not exist.
-
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.stakeTimestamp == 0 || pos.unstakeTimestamp != 0) revert PositionNotStaked(poolId);
 
@@ -476,10 +467,6 @@ contract Hyper is IHyper {
         emit Swap(args.poolId, _swap.input, _swap.output, pair.tokenAsset, pair.tokenQuote);
     }
 
-    function getTimePassed(uint64 poolId) public view returns (uint) {
-        return _blockTimestamp() - pools[poolId].lastTimestamp;
-    }
-
     /**
      * @dev Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.
      *
@@ -567,13 +554,13 @@ contract Hyper is IHyper {
         if (!Assembly.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsQuote);
 
         unchecked {
-            pairId = uint16(++getPairNonce); // TODO: change to uint24 probably. Good chance this overflows on higher TPS networks.
+            pairId = uint24(++getPairNonce);
         }
 
         getPairId[asset][quote] = pairId; // note: order of tokens matters!
         pairs[pairId] = Pair({
             tokenAsset: asset,
-            decimalsAsset: decimalsAsset, // TODO: change pair struct to decimalsAsset
+            decimalsAsset: decimalsAsset,
             tokenQuote: quote,
             decimalsQuote: decimalsQuote
         });
@@ -581,15 +568,7 @@ contract Hyper is IHyper {
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
     }
 
-    /**
-     * @dev Uses a pair and set of parameters to instantiate a pool at a price.
-     *
-     *
-     * @custom:magic If pairId is 0, uses current pair nonce.
-     * @custom:reverts If price is 0.
-     * @custom:reverts If pool with same pairId, isMutable, and poolNonce has already been created.
-     * @custom:reverts If an rmm pool and the current timestamp is beyond the pool's maturity parameter.
-     */
+    /** @dev If pairId == 0, its a magic variable that uses current pair nonce. */
     function _createPool(
         uint24 pairId,
         address controller,
@@ -605,7 +584,7 @@ contract Hyper is IHyper {
         if (vol == 0) revert InvalidVolatility(vol);
         if (dur == 0) revert InvalidDuration(dur);
         if (max >= MAX_TICK) revert InvalidTick(max);
-        if (jit > JUST_IN_TIME_LIQUIDITY_POLICY * 10) revert InvalidJit(jit); // todo: do proper jit range
+        if (jit > JUST_IN_TIME_MAX) revert InvalidJit(jit);
         if (!Assembly.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert InvalidFee(fee);
         if (!Assembly.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert InvalidFee(priorityFee);
 
@@ -617,34 +596,38 @@ contract Hyper is IHyper {
         }
 
         bool isMutable = controller != address(0);
-        uint32 timestamp = uint(_blockTimestamp()).safeCastTo32();
-        HyperPool memory params = HyperPool({
-            lastTick: Price.computeTickWithPrice(price),
-            lastTimestamp: timestamp, // fix type
-            controller: controller,
-            feeGrowthGlobalAsset: 0,
-            feeGrowthGlobalQuote: 0,
-            lastPrice: price,
-            liquidity: 0,
-            stakedLiquidity: 0,
-            stakedLiquidityDelta: 0,
-            params: HyperCurve({
-                maxTick: max,
-                jit: isMutable ? jit : uint8(_liquidityPolicy()),
-                fee: fee,
-                duration: dur,
-                volatility: vol,
-                priorityFee: isMutable ? priorityFee : 0,
-                createdAt: timestamp
-            })
-        });
+        HyperPool memory params;
+        {
+            uint32 timestamp = uint(_blockTimestamp()).safeCastTo32();
+            params = HyperPool({
+                lastTick: Price.computeTickWithPrice(price),
+                lastTimestamp: timestamp, // fix type
+                controller: controller,
+                feeGrowthGlobalAsset: 0,
+                feeGrowthGlobalQuote: 0,
+                lastPrice: price,
+                liquidity: 0,
+                stakedLiquidity: 0,
+                stakedLiquidityDelta: 0,
+                params: HyperCurve({
+                    maxTick: max,
+                    jit: isMutable ? jit : uint8(_liquidityPolicy()),
+                    fee: fee,
+                    duration: dur,
+                    volatility: vol,
+                    priorityFee: isMutable ? priorityFee : 0,
+                    createdAt: timestamp
+                })
+            });
 
-        uint64 poolId = CPU.encodePoolId(pairId, isMutable, poolNonce);
+            poolId = CPU.encodePoolId(pairId, isMutable, poolNonce);
+        }
+
         if (pools[poolId].exists()) revert PoolExists();
-
         pools[poolId] = params;
 
-        emit CreatePool(poolId, uint16(pairId), 0x0, price); // todo: event
+        Pair memory pair = pairs[pairId];
+        emit CreatePool(poolId, isMutable, pair.tokenAsset, pair.tokenQuote, price);
     }
 
     function changeParameters(
@@ -731,10 +714,7 @@ contract Hyper is IHyper {
 
     /**
      * @dev Alternative entrypoint to execute functions.
-     *
      * @param data Encoded Enigma data. First byte must be an Enigma instruction.
-     *
-     * @custom:reverts If encoded data does not match the decoding format for the instruction specified.
      */
     function _process(bytes calldata data) internal {
         (, bytes1 instruction) = Assembly.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
@@ -777,6 +757,10 @@ contract Hyper is IHyper {
     }
 
     // ===== View ===== //
+
+    function getTimePassed(uint64 poolId) public view returns (uint) {
+        return _blockTimestamp() - pools[poolId].lastTimestamp;
+    }
 
     function getMaxLiquidity(
         uint64 poolId,

@@ -39,6 +39,7 @@ uint8 constant MAX_DECIMALS = 18;
 uint256 constant BUFFER = 300;
 uint256 constant MIN_POOL_FEE = 1;
 uint256 constant MAX_POOL_FEE = 1e3;
+uint256 constant JUST_IN_TIME_MAX = 600;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
 
 error DrawBalance();

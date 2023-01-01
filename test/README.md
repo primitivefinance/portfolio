@@ -147,7 +147,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The `balanceOf` Hyper for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
   - The `ChangePosition` event is emitted.
   - The `Allocate` event is emitted.
-  - The `FeesEarned` event was emitted if the `feeGrowth{}` values changed.
+  - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
 #### Unallocate
 
@@ -166,7 +166,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The `balanceOf` Hyper for the pool's tokens stays the same.
   - The `DecreasePosition` event is emitted.
   - The `Unallocate` event is emitted.
-  - The `FeesEarned` event was emitted if the `feeGrowth{}` values changed.
+  - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
 #### Swap
 

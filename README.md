@@ -4,7 +4,7 @@ Full vision of Primitive Replicating Market Maker.
 
 ## Notes
 
-- [ ] Investigate use of msg.value! (used in fund).
+- [x] Investigate use of msg.value! (used in fund).
 - [x] Improve/fix swap. Assigned to Clement.
 - [ ] Investigate gas costs of swaps.
 - [x] Investigate curve/pair nonces. Assigned to Alex.
@@ -36,3 +36,14 @@ Changing a position:
 #### Notes
 
 - Increasing reserves but paying entirely with internal balance leads to a deficit and therefore invariant failure.
+
+## todo
+
+- [ ] Fix tests, especially swaps.
+- [ ] Solstat tests.
+- [ ] Refactor accounting system!
+- [ ] Work on docs 1 pager for auditor
+- [ ] Light gas analysis/optimization
+- [ ] Finish stake/unstake
+- [ ] Add parameter validation to changeParameters function
+- [ ] Rename EnigmaTypes to HyperLib ?

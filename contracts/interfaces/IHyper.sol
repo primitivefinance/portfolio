@@ -4,6 +4,8 @@ pragma solidity 0.8.13;
 import {HyperCurve} from "../EnigmaTypes.sol";
 
 interface IHyperEvents {
+    event Deposit(address indexed account, uint amount);
+
     event Allocate(
         uint64 indexed poolId,
         address indexed asset,
@@ -32,13 +34,19 @@ interface IHyperEvents {
         uint8 decimalsQuote
     );
 
-    event CreatePool(uint64 indexed poolId, uint24 indexed pairId, uint32 indexed curveId, uint256 price);
+    event CreatePool(
+        uint64 indexed poolId,
+        bool isMutable,
+        address indexed asset,
+        address indexed quote,
+        uint256 price
+    );
     event DecreaseUserBalance(address indexed token, uint256 amount);
     event IncreaseUserBalance(address indexed token, uint256 amount);
     event IncreaseReserveBalance(address indexed token, uint256 amount);
     event DecreaseReserveBalance(address indexed token, uint256 amount);
     event ChangePosition(address indexed account, uint64 indexed poolId, int256 deltaLiquidity);
-    event FeesEarned(
+    event EarnFees(
         address indexed account,
         uint64 indexed poolId,
         uint256 feeAsset,
@@ -57,10 +65,6 @@ interface IHyperEvents {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     );
-
-    event UpdateLastTimestamp(uint64 indexed poolId);
-
-    event Deposit(address indexed account, uint amount);
 }
 
 interface IHyperGetters {
