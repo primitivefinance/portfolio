@@ -46,6 +46,6 @@ Changing a position:
 - [ ] Work on docs 1 pager for auditor
 - [ ] Light gas analysis/optimization
 - [ ] Finish stake/unstake
-- [ ] Add parameter validation to changeParameters function
+- [x] Add parameter validation to changeParameters function
 - [ ] Rename EnigmaTypes to HyperLib ?
 - [ ] TOKEN DECIMALS NOT HANDLED

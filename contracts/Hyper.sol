@@ -69,7 +69,7 @@ contract Hyper is IHyper {
         _;
         __account__.prepared = true;
 
-        __account__.settlement(OS.__dangerousTransferFrom__, address(this));
+        _settlement();
 
         if (!__account__.settled) revert InvalidSettlement();
     }
@@ -752,6 +752,64 @@ contract Hyper is IHyper {
         } else {
             revert InvalidInstruction();
         }
+    }
+
+    struct Payment {
+        address token;
+        uint amount;
+    }
+
+    /**
+        Be aware of these settlement invariants:
+
+        Invariant 1. Every token that is interacted with is cached and exists.
+        Invariant 2. Tokens are removed from cache, and cache is empty by end of settlement.
+        Invariant 3. Cached tokens cannot be carried over from previous transactions.
+        Invariant 4. Execution does not exit during the loops prematurely.
+        Invariant 5. Account `settled` bool is set to true at end of `settlement`.
+        Invariant 6. Debits reduce `reserves` of `token`.
+     */
+    function _settlement() internal {
+        if (!__account__.prepared) revert OS.NotPreparedToSettle();
+
+        address[] memory tokens = __account__.warm;
+        uint256 loops = tokens.length;
+        if (loops == 0) return __account__.reset(); // exit early.
+
+        Payment[] memory payments = new Payment[](loops);
+        // Loop backwards to pop tokens off.
+        uint x;
+        uint i = loops;
+        do {
+            address token = tokens[i - 1];
+            (uint credited, uint debited, uint remainder) = __account__.settle(token, address(this));
+            if (debited > 0) emit DecreaseUserBalance(token, debited);
+            if (credited > 0) emit IncreaseUserBalance(token, credited);
+            if (remainder > 0) payments[x] = Payment({token: token, amount: remainder});
+            __account__.warm.pop();
+            unchecked {
+                --i;
+                ++x;
+            }
+        } while (i != 0);
+
+        console.log("exited loop", __account__.warm.length);
+
+        console.log("entering payments loop", payments.length);
+
+        uint p = payments.length;
+        while (p != 0) {
+            uint index = p - 1;
+            console.log("paying", payments[index].token, payments[index].amount);
+            OS.__dangerousTransferFrom__(payments[index].token, address(this), payments[index].amount);
+            unchecked {
+                --p;
+            }
+        }
+
+        console.log("exiting payments loop", payments.length);
+
+        __account__.reset();
     }
 
     // ===== View ===== //

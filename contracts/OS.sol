@@ -18,10 +18,9 @@ using {
     credit,
     debit,
     settle,
-    settlement,
     reset,
-    getNetBalance,
-    touch
+    touch,
+    getNetBalance
 } for AccountSystem global;
 
 /** @dev Novel accounting mechanism to track internally held balances and settle differences with actual balances. */
@@ -90,14 +89,26 @@ function credit(AccountSystem storage self, address owner, address token, uint a
 }
 
 /** @dev Decreases an `owner`'s spendable balance. */
-function debit(AccountSystem storage self, address owner, address token, uint amount) returns (bool paid) {
+function debit(
+    AccountSystem storage self,
+    address owner,
+    address token,
+    uint256 owed
+) returns (uint paid, uint remainder) {
     uint balance = self.balances[owner][token];
     console.log("balance", balance);
-    console.log("amount", amount);
-    if (balance >= amount) {
-        self.balances[owner][token] -= amount;
-        paid = true;
+    console.log("owed", owed);
+    if (balance >= owed) {
+        paid = owed;
+        self.balances[owner][token] -= paid;
+        remainder = 0;
+    } else {
+        paid = balance;
+        self.balances[owner][token] -= paid;
+        remainder = owed - paid;
     }
+
+    console.log("remainder", remainder);
 }
 
 /** @dev Actives a token and increases the reserves. Settlement will pick up this activated token. */
@@ -116,56 +127,21 @@ function decrease(AccountSystem storage self, address token, uint amount) {
 }
 
 /** @notice Settles the difference in balance between tracked tokens and physically held tokens. */
-function settle(AccountSystem storage self, function(address, address, uint) pay, address token, address account) {
-    if (!self.prepared) revert NotPreparedToSettle();
-    delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of this internal fn.
+function settle(
+    AccountSystem storage self,
+    address token,
+    address account
+) returns (uint credited, uint debited, uint remainder) {
+    delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of the transaction.
 
     int net = self.getNetBalance(token, account);
     if (net > 0) {
         self.credit(msg.sender, token, uint(net));
     } else if (net < 0) {
-        uint amount = uint(-net);
-        bool paid = self.debit(msg.sender, token, amount);
-        if (!paid)
-            pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
-        else self.reserves[token] -= amount; // not taking external tokens in, so offset the increase.
+        remainder = uint(-net);
+        (debited, remainder) = self.debit(msg.sender, token, remainder);
+        if (debited > 0) self.reserves[token] -= debited; // using a balance means tokens are in contract already.
     }
-}
-
-/** @dev Settles the discrepency in all activated token balances so the net balance is zero or positive. */
-function settlement(AccountSystem storage self, function(address, address, uint) pay, address account) {
-    if (!self.prepared) revert NotPreparedToSettle();
-
-    // TODO: Write this into some documentation somewhere:
-    // if tokens are not appropriately cached, or do not exist in the warm array
-    // then its possible for the contract to become insolvent, meaning the physical balance
-    // is less than the contracts internally tracked balance.
-    // These next few functions are the most critical in the entire contract, and they are
-    // sort of obscure.
-    // I recently fixed two bugs:
-    // Token was not removed from cache at the end of settlement,
-    // which means it wasnt pushed to the warm address array,
-    // which means the contract assumes the token was completely paid for.
-    // It was paid for, when it was cached! But if you get to carry over the cached bool,
-    // you win.
-    // The other issue was with `return` statements in the for loop. This will exit
-    // the execution of the for loop, leading to some tokens not being paid for.
-    address[] memory tokens = self.warm;
-    uint loops = tokens.length;
-    if (loops == 0) return self.reset();
-
-    uint i = loops;
-    do {
-        address token = tokens[i - 1];
-        self.settle(pay, token, account);
-        console.log("poppin", i);
-        self.warm.pop();
-        --i;
-    } while (i != 0);
-
-    console.log("exited loop", self.warm.length);
-
-    self.reset();
 }
 
 /** @dev Interacting with a token will activate it, adding it to an array of interacted tokens for settlement to loop through. */
