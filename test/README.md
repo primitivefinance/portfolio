@@ -145,7 +145,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - Hyper's `reserves` value for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
   - The `balanceOf` Hyper for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
-  - The `IncreasePosition` event is emitted.
+  - The `ChangePosition` event is emitted.
   - The `Allocate` event is emitted.
   - The `FeesEarned` event was emitted if the `feeGrowth{}` values changed.
 

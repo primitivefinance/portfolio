@@ -15,7 +15,6 @@ using {
     decrease,
     credit,
     debit,
-    prepare,
     settle,
     settlement,
     reset,
@@ -34,7 +33,7 @@ struct AccountSystem {
 }
 
 error EtherTransferFail();
-error InsufficientBalance(uint amount, uint delta);
+error InsufficientReserve(uint amount, uint delta);
 error InvalidBalance();
 error NotPreparedToSettle();
 
@@ -108,14 +107,10 @@ function increase(AccountSystem storage self, address token, uint amount) {
 /** @dev Actives a token and decreases the reserves. Settlement will pick up this activated token. */
 function decrease(AccountSystem storage self, address token, uint amount) {
     uint balance = self.reserves[token];
-    if (amount > balance) revert InsufficientBalance(balance, amount);
+    if (amount > balance) revert InsufficientReserve(balance, amount);
+
     self.touch(token);
     self.reserves[token] -= amount;
-}
-
-/** @dev Must be called prior to settlement. */
-function prepare(AccountSystem storage self) {
-    self.prepared = true;
 }
 
 /** @notice Settles the difference in balance between tracked tokens and physically held tokens. */
@@ -155,11 +150,14 @@ function settlement(AccountSystem storage self, function(address, address, uint)
     uint loops = tokens.length;
     if (loops == 0) return self.reset();
 
-    uint i;
-    for (i; i != loops; ++i) {
-        address token = tokens[i];
+    uint i = loops;
+
+    do {
+        address token = tokens[i - 1];
         self.settle(pay, token, account);
-    }
+        --i;
+        self.warm.pop();
+    } while (i != 0);
 
     self.reset();
 }
@@ -175,6 +173,7 @@ function touch(AccountSystem storage self, address token) {
 
 /** @dev Account system is reset after settlement is successful. */
 function reset(AccountSystem storage self) {
+    assert(self.warm.length == 0);
     self.settled = true;
     delete self.warm;
     delete self.prepared;

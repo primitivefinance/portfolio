@@ -61,9 +61,7 @@ interface IHyperEvents {
     /**  @dev Emitted on any pool interaction which decreases one of the pool's reserves. */
     event DecreaseReserveBalance(address indexed token, uint256 amount);
     /**  @dev Emitted on increasing liquidity. */
-    event IncreasePosition(address indexed account, uint64 indexed poolId, uint256 deltaLiquidity);
-    /**  @dev Emitted on removing liquidity. */
-    event DecreasePosition(address indexed account, uint64 indexed poolId, uint256 deltaLiquidity);
+    event ChangePosition(address indexed account, uint64 indexed poolId, int256 deltaLiquidity);
     /**  @dev Emitted on syncing earned fees to a position's claimable balance. */
     event FeesEarned(
         address indexed account,

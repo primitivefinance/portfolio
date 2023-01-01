@@ -72,6 +72,10 @@ function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes 
     return payload;
 }
 
+function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24) {
+    return uint24(poolId >> 40);
+}
+
 function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64) {
     return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
 }
@@ -154,12 +158,9 @@ function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amou
     data = abi.encodePacked(Assembly.pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
 }
 
-/** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId=[pairId + 5 bytes] deltaLiquidity] */
-function decodeUnallocate(
-    bytes calldata data
-) pure returns (uint8 useMax, uint64 poolId, uint24 pairId, uint128 deltaLiquidity) {
+/** @dev [0x 1 byte 8 bytes 16 bytes] = [0x instruction+useMax poolId deltaLiquidity] */
+function decodeUnallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     useMax = uint8(data[0] >> 4);
-    pairId = uint16(bytes2(data[1:4]));
     poolId = uint64(bytes8(data[1:9]));
     deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }

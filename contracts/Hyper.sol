@@ -38,6 +38,7 @@ contract Hyper is IHyper {
 
     /// @dev If balanceOf token < getReserve of token, you win.
     OS.AccountSystem public __account__;
+    /// @dev Make sure this is equal to v1.0.0 on production networks.
     string public constant VERSION = "beta-v0.0.1";
     /// @dev Canonical Wrapped Ether contract.
     address public immutable WETH;
@@ -76,8 +77,11 @@ contract Hyper is IHyper {
     /** @dev Used on every external operation that touches tokens. */
     modifier interactions() {
         __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
+
+        __account__.prepared = false;
         _;
-        __account__.prepare();
+        __account__.prepared = true;
+
         __account__.settlement(OS.__dangerousTransferFrom__, address(this));
 
         if (!__account__.settled) revert InvalidSettlement();
@@ -88,6 +92,15 @@ contract Hyper is IHyper {
         __account__.settled = true;
     }
 
+    /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
+    fallback() external payable lock interactions {
+        CPU.__startProcess__(_process);
+    }
+
+    receive() external payable {
+        if (msg.sender != WETH) revert();
+    }
+
     /** @dev Fetches internally tracked amount of `token` owned by this contract. */
     function getReserve(address token) public view returns (uint) {
         return __account__.reserves[token];
@@ -96,15 +109,6 @@ contract Hyper is IHyper {
     /** @dev Fetches internally tracked amount of `token` owned by `owner`. */
     function getBalance(address owner, address token) public view returns (uint) {
         return __account__.balances[owner][token];
-    }
-
-    /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
-    fallback() external payable lock interactions {
-        CPU.__startProcess__(_process);
-    }
-
-    receive() external payable {
-        if (msg.sender != WETH) revert();
     }
 
     // ===== Actions ===== //
@@ -120,9 +124,8 @@ contract Hyper is IHyper {
         uint64 poolId,
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
-        bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = (useMax ? type(uint128).max : amount).safeCastTo128();
-        (deltaAsset, deltaQuote) = _allocate(useMax ? 1 : 0, poolId, input);
+        bool useMax = amount == type(uint).max;
+        (deltaAsset, deltaQuote) = _allocate(useMax, poolId, (useMax ? 0 : amount).safeCastTo128());
     }
 
     /// @inheritdoc IHyperActions
@@ -130,9 +133,8 @@ contract Hyper is IHyper {
         uint64 poolId,
         uint amount
     ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
-        bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = (useMax ? type(uint128).max : amount).safeCastTo128();
-        (deltaAsset, deltaQuote) = _unallocate(useMax ? 1 : 0, poolId, uint24(poolId >> 40), input);
+        bool useMax = amount == type(uint).max;
+        (deltaAsset, deltaQuote) = _unallocate(useMax, poolId, (useMax ? 0 : amount).safeCastTo128());
     }
 
     /// @inheritdoc IHyperActions
@@ -167,7 +169,8 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function draw(address token, uint256 amount, address to) external lock interactions {
-        if (__account__.balances[msg.sender][token] < amount) revert DrawBalance(); // Only withdraw if user has enough.
+        if (getBalance(msg.sender, token) < amount) revert DrawBalance(); // Only withdraw if user has enough.
+
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
 
@@ -188,48 +191,27 @@ contract Hyper is IHyper {
         emit Deposit(msg.sender, msg.value);
     }
 
-    // ===== Internal ===== //
-
-    /** @dev Overridable in tests.  */
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
-    }
-
-    /** @dev Overridable in tests.  */
-    function _liquidityPolicy() internal view virtual returns (uint256) {
-        return JUST_IN_TIME_LIQUIDITY_POLICY;
-    }
-
     // ===== Effects ===== //
 
-    /**
-     * @dev Adds liquidity to a position, therefore increasing liquidity in the pool and creating a "debit" balance in settlement.
-     *
-     * TODO: Document the requirement to ONLY change one value: liquidity or price.
-     *
-     * @custom:reverts If attempting to add zero liquidity.
-     * @custom:reverts If attempting to add liquidity to a pool that has not been created.
-     */
+    /** @dev Increases virtal reserves and liquidity. Debits `msg.sender`. */
     function _allocate(
-        uint8 useMax,
+        bool useMax,
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
-        if (deltaLiquidity == 0) revert ZeroLiquidity();
         if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
-        Pair memory pair = pairs[uint24(poolId >> 40)];
-        if (useMax == 1) {
-            // todo: consider using internal balances too, or in place of real balances.
+        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(poolId)];
+        if (useMax) {
             deltaLiquidity = getLiquidityMinted(
                 poolId,
-                OS.__balanceOf__(pair.tokenAsset, msg.sender),
-                OS.__balanceOf__(pair.tokenQuote, msg.sender)
+                getBalance(pair.tokenAsset, msg.sender),
+                getBalance(pair.tokenQuote, msg.sender)
             );
         }
 
-        // note: rounds token amounts up, so caller pays more. Prevents siphoning from unallocating rounded down amounts.
-        (deltaAsset, deltaQuote) = getAllocateAmounts(poolId, deltaLiquidity);
+        if (deltaLiquidity == 0) revert ZeroLiquidity();
+        (deltaAsset, deltaQuote) = getAllocateAmounts(poolId, deltaLiquidity); // note: rounds up.
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
@@ -241,23 +223,11 @@ contract Hyper is IHyper {
             pair.tokenQuote,
             int128(deltaLiquidity) // TODO: add better type safety for these conversions.
         );
-        _changeLiquidity(args);
 
+        _changeLiquidity(args);
         emit Allocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
-    /**
-     * @dev Changing liquidity has cascading effects that alter critical state.
-     *
-     *  changeLiquidity
-     *      syncPositionFees
-     *      changePositionLiquidity
-     *        syncPositionTimestamp
-     *          changePoolLiquidity
-     *            syncPoolTimestamp
-     *              changeReserves
-     *
-     */
     function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint feeAsset, uint feeQuote) {
         (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
@@ -266,42 +236,30 @@ contract Hyper is IHyper {
             pool.feeGrowthGlobalAsset,
             pool.feeGrowthGlobalQuote
         );
-        emit FeesEarned(args.owner, args.poolId, feeAsset, args.tokenAsset, feeQuote, args.tokenQuote);
 
         _changePosition(args);
+        if (feeAsset > 0 || feeQuote > 0)
+            emit FeesEarned(args.owner, args.poolId, feeAsset, args.tokenAsset, feeQuote, args.tokenQuote);
     }
 
-    /**
-     * @dev Syncs timestamp and liquidity for a position before triggering pool updates.
-     */
+    /** @dev Changes position liquidity and timestamp. */
     function _changePosition(ChangeLiquidityParams memory args) internal {
         if (args.deltaLiquidity < 0) {
             (uint256 distance, ) = getSecondsSincePositionUpdate(args.owner, args.poolId);
             if (_liquidityPolicy() > distance) revert JitLiquidity(distance);
-            emit DecreasePosition(args.owner, args.poolId, uint128(-args.deltaLiquidity)); // TODO: Should be an explict function, unary hard to see...
-        } else {
-            emit IncreasePosition(args.owner, args.poolId, uint128(args.deltaLiquidity));
         }
 
         positions[args.owner][args.poolId].changePositionLiquidity(args.timestamp, args.deltaLiquidity);
+
         _changePool(args);
+        emit ChangePosition(args.owner, args.poolId, args.deltaLiquidity);
     }
 
-    /**
-     * @dev Syncs timestamp and liquidity for a pool before adding debits (increase reserve) or credits (decrease reserve) to settlement.
-     */
+    /** @dev Changes virtual reserves and pool liquidity. Does not update timestamp of pool. */
     function _changePool(ChangeLiquidityParams memory args) internal {
-        pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
-
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
 
-        // todo: fix, was for debugging
-        emit TouchedTokens(
-            __account__.warm.length,
-            __account__.warm,
-            __account__.cached[asset],
-            __account__.cached[quote]
-        );
+        pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         if (args.deltaLiquidity < 0) {
             _decreaseReserves(asset, args.deltaAsset);
@@ -311,35 +269,21 @@ contract Hyper is IHyper {
             _increaseReserves(asset, args.deltaAsset);
             _increaseReserves(quote, args.deltaQuote);
         }
-
-        emit TouchedTokens(
-            __account__.warm.length,
-            __account__.warm,
-            __account__.cached[asset],
-            __account__.cached[quote]
-        );
     }
 
-    event TouchedTokens(uint amount, address[] warm, bool cachedAsset, bool cachedQuote);
-
-    /**
-     * @dev Subtracts liquidity from a position, therefore reducing liquidity in the pool and creating a "credit" balance in settlement.
-     */
+    /** @dev Reduces virtual reserves and liquidity. Credits `msg.sender`. */
     function _unallocate(
-        uint8 useMax,
+        bool useMax,
         uint64 poolId,
-        uint24 pairId,
         uint128 deltaLiquidity
     ) internal returns (uint deltaAsset, uint deltaQuote) {
-        pairId; // TODO
+        if (useMax) deltaLiquidity = positions[msg.sender][poolId].totalLiquidity;
         if (deltaLiquidity == 0) revert ZeroLiquidity();
         if (!pools[poolId].exists()) revert NonExistentPool(poolId);
-        if (useMax == 1) deltaLiquidity = positions[msg.sender][poolId].totalLiquidity;
 
-        // note: Reserves are referenced at end of processing to determine amounts of token to transfer.
-        (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity); // computed before changing liquidity
+        (deltaAsset, deltaQuote) = getUnallocateAmounts(poolId, deltaLiquidity); // rounds down
 
-        Pair memory pair = pairs[uint24(poolId >> 40)];
+        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(poolId)];
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
             poolId,
@@ -359,9 +303,6 @@ contract Hyper is IHyper {
     event log(int128);
     event log(uint, uint, string);
 
-    /**
-     * @dev Adds desired amount of liquidity to pending staked liquidity changes of a pool.
-     */
     function _stake(uint64 poolId) internal {
         if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
@@ -380,9 +321,6 @@ contract Hyper is IHyper {
         // emit Stake Position
     }
 
-    /**
-     * @dev Subtracts desired amount of liquidity from pending staked liquidity changes of a pool.
-     */
     function _unstake(uint64 poolId) internal {
         _syncPoolPrice(poolId); // Reverts if pool does not exist.
 
@@ -613,7 +551,7 @@ contract Hyper is IHyper {
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
 
-        Pair memory pair = pairs[uint24(poolId >> 40)];
+        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(poolId)];
         emit PoolUpdate(
             poolId,
             pool.lastPrice,
@@ -767,8 +705,14 @@ contract Hyper is IHyper {
         return computedTau;
     }
 
-    function isMutable(uint64 poolId) public view returns (bool) {
-        return pools[poolId].controller != address(0);
+    /** @dev Overridable in tests.  */
+    function _blockTimestamp() internal view virtual returns (uint128) {
+        return uint128(block.timestamp);
+    }
+
+    /** @dev Overridable in tests.  */
+    function _liquidityPolicy() internal view virtual returns (uint256) {
+        return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
 
     // ===== Accounting System ===== //
@@ -786,7 +730,7 @@ contract Hyper is IHyper {
      * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
      *
      * @custom:security Directly manipulates reserves.
-     * @custom:reverts With `InsufficientBalance` if current reserve balance for `token` iss less than `amount`.
+     * @custom:reverts With `InsufficientReserve` if current reserve balance for `token` iss less than `amount`.
      */
     function _decreaseReserves(address token, uint256 amount) internal {
         __account__.decrease(token, amount);
@@ -829,10 +773,10 @@ contract Hyper is IHyper {
 
         if (instruction == CPU.ALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = CPU.decodeAllocate(data);
-            _allocate(useMax, poolId, deltaLiquidity);
+            _allocate(useMax == 1, poolId, deltaLiquidity);
         } else if (instruction == CPU.UNALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint24 pairId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data);
-            _unallocate(useMax, poolId, pairId, deltaLiquidity);
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data);
+            _unallocate(useMax == 1, poolId, deltaLiquidity);
         } else if (instruction == CPU.SWAP) {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data);
@@ -865,6 +809,14 @@ contract Hyper is IHyper {
     }
 
     // ===== View ===== //
+
+    function isMutable(uint64 poolId) public view returns (bool) {
+        return pools[poolId].controller != address(0);
+    }
+
+    function exists(uint64 poolId) public view returns (bool) {
+        return pools[poolId].exists();
+    }
 
     /** @dev Computes amount of liquidity added to position and pool if token amounts were provided. */
     function getLiquidityMinted(

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+import "contracts/CPU.sol" as Processor;
 import "contracts/OS.sol" as Operating;
 import {Epoch} from "contracts/Clock.sol";
 import {Pair, HyperCurve, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
@@ -80,7 +81,7 @@ contract HelperHyperView {
         address caller,
         address[] memory owners
     ) public view returns (HyperState memory) {
-        Pair memory pair = getPair(hyper, uint24(poolId >> 40));
+        Pair memory pair = getPair(hyper, Processor.decodePairIdFromPoolId(poolId));
         address asset = pair.tokenAsset;
         address quote = pair.tokenQuote;
 
