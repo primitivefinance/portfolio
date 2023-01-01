@@ -31,7 +31,7 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testGetLiquidityMinted() public {
-        uint deltaLiquidity = __hyperTestingContract__.getLiquidityMinted(defaultScenario.poolId, 1, 1e19);
+        uint deltaLiquidity = __hyperTestingContract__.getMaxLiquidity(defaultScenario.poolId, 1, 1e19);
     }
 
     // ===== CPU ===== //
@@ -217,7 +217,13 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
 
         // move some time beyond maturity
-        customWarp(block.timestamp + __hyperTestingContract__.computeCurrentTau(defaultScenario.poolId) + 1);
+        customWarp(
+            block.timestamp +
+                getPool(address(__hyperTestingContract__), defaultScenario.poolId).tau(
+                    __hyperTestingContract__.timestamp()
+                ) +
+                1
+        );
 
         vm.expectRevert(PoolExpired.selector);
         __hyperTestingContract__.swap(defaultScenario.poolId, false, amount, limit);
@@ -339,7 +345,9 @@ contract TestHyperProcessing is TestHyperSetup {
     function testProcessAllocateFull() public postTestInvariantChecks {
         uint256 price = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastPrice;
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), (defaultScenario.poolId));
-        uint tau = __hyperTestingContract__.computeCurrentTau(defaultScenario.poolId);
+        uint tau = getPool(address(__hyperTestingContract__), defaultScenario.poolId).tau(
+            __hyperTestingContract__.timestamp()
+        );
         uint strike = Price.computePriceWithTick(curve.maxTick);
         console.log(tau, strike, curve.volatility);
         uint256 theoreticalR2 = Price.computeR2WithPrice(price, strike, curve.volatility, tau);

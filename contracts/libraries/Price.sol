@@ -3,6 +3,8 @@ pragma solidity 0.8.13;
 
 import "./Invariant.sol";
 
+using Price for Price.RMM global;
+
 /**
  * @dev Comprehensive library to compute reserves, prices, and changes in reserves over time.
  */

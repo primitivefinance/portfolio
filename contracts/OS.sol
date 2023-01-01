@@ -6,6 +6,8 @@ import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
 import "./Assembly.sol" as Assembly;
 
+import {console} from "forge-std/Test.sol";
+
 using {
     __wrapEther__,
     dangerousFund,
@@ -90,12 +92,12 @@ function credit(AccountSystem storage self, address owner, address token, uint a
 /** @dev Decreases an `owner`'s spendable balance. */
 function debit(AccountSystem storage self, address owner, address token, uint amount) returns (bool paid) {
     uint balance = self.balances[owner][token];
+    console.log("balance", balance);
+    console.log("amount", amount);
     if (balance >= amount) {
         self.balances[owner][token] -= amount;
         paid = true;
     }
-
-    paid = false; // for clarity
 }
 
 /** @dev Actives a token and increases the reserves. Settlement will pick up this activated token. */
@@ -124,7 +126,9 @@ function settle(AccountSystem storage self, function(address, address, uint) pay
     } else if (net < 0) {
         uint amount = uint(-net);
         bool paid = self.debit(msg.sender, token, amount);
-        if (!paid) pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
+        if (!paid)
+            pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
+        else self.reserves[token] -= amount; // not taking external tokens in, so offset the increase.
     }
 }
 
@@ -151,13 +155,15 @@ function settlement(AccountSystem storage self, function(address, address, uint)
     if (loops == 0) return self.reset();
 
     uint i = loops;
-
     do {
         address token = tokens[i - 1];
         self.settle(pay, token, account);
-        --i;
+        console.log("poppin", i);
         self.warm.pop();
+        --i;
     } while (i != 0);
+
+    console.log("exited loop", self.warm.length);
 
     self.reset();
 }

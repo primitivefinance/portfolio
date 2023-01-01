@@ -7,16 +7,28 @@ import "./Assembly.sol" as Assembly;
 import "./CPU.sol" as CPU;
 import "./OS.sol" as OS;
 
+import {console} from "forge-std/Test.sol";
+
 using {
     changePoolLiquidity,
     changePoolParameters,
     exists,
     syncPoolTimestamp,
-    computeStrike,
-    computePriceChangeWithTime
+    strike,
+    computePriceChangeWithTime,
+    isMutable,
+    getMaxLiquidity,
+    getVirtualReserves,
+    getLiquidityDeltas,
+    getAmounts,
+    lastTau,
+    tau
 } for HyperPool global;
 using {maturity} for HyperCurve global;
-using {changePositionLiquidity, syncPositionFees} for HyperPosition global;
+using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
+using Price for Price.RMM;
+using SafeCastLib for uint;
+using FixedPointMathLib for uint;
 
 int24 constant MAX_TICK = 25556; // todo: fix, Equal to 5x price at 1bps tick sizes.
 int24 constant TICK_SIZE = 256; // todo: use this?
@@ -165,21 +177,61 @@ function isMutable(HyperPool memory self) view returns (bool) {
     return self.controller != address(0);
 }
 
-function computeStrike(HyperPool memory pool) view returns (uint strike) {
-    strike = Price.computePriceWithTick(pool.params.maxTick);
+function strike(HyperPool memory self) view returns (uint strike) {
+    return Price.computePriceWithTick(self.params.maxTick);
 }
 
 function computePriceChangeWithTime(
-    HyperPool memory pool,
+    HyperPool memory self,
     uint tau,
     uint epsilon
 ) view returns (uint price, int24 tick) {
-    uint strike = Price.computePriceWithTick(pool.params.maxTick);
-    price = Price.computePriceWithChangeInTau(strike, pool.params.volatility, pool.lastPrice, tau, epsilon);
+    uint strike = Price.computePriceWithTick(self.params.maxTick);
+    price = Price.computePriceWithChangeInTau(strike, self.params.volatility, self.lastPrice, tau, epsilon);
     tick = Price.computeTickWithPrice(price);
 }
 
-function getVirtualAmounts(HyperPool memory self) view returns (uint, uint) {}
+function getMaxLiquidity(
+    HyperPool memory self,
+    uint deltaAsset,
+    uint deltaQuote
+) view returns (uint128 deltaLiquidity) {
+    (uint amountAsset, uint amountQuote) = self.getAmounts();
+    uint liquidity0 = deltaAsset.divWadDown(amountAsset);
+    uint liquidity1 = deltaQuote.divWadDown(amountQuote);
+    deltaLiquidity = (liquidity0 < liquidity1 ? liquidity0 : liquidity1).safeCastTo128();
+}
+
+function getVirtualReserves(HyperPool memory self) view returns (uint128 reserveAsset, uint128 reserveQuote) {
+    return self.getLiquidityDeltas(-int128(self.liquidity)); // rounds down
+}
+
+/** @dev Rounds positive deltas up. Rounds negative deltas down. */
+function getLiquidityDeltas(
+    HyperPool memory self,
+    int128 deltaLiquidity
+) view returns (uint128 deltaAsset, uint128 deltaQuote) {
+    if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
+    (uint amountAsset, uint amountQuote) = self.getAmounts();
+
+    uint delta;
+    if (deltaLiquidity > 0) {
+        delta = uint128(deltaLiquidity);
+        deltaAsset = amountAsset.mulWadUp(delta).safeCastTo128();
+        deltaQuote = amountQuote.mulWadUp(delta).safeCastTo128();
+    } else {
+        delta = uint128(-deltaLiquidity);
+        deltaAsset = amountAsset.mulWadDown(delta).safeCastTo128();
+        deltaQuote = amountQuote.mulWadDown(delta).safeCastTo128();
+    }
+}
+
+/** @dev Amounts per WAD of liquidity. */
+function getAmounts(HyperPool memory self) view returns (uint amountAsset, uint amountQuote) {
+    Price.RMM memory rmm = Price.RMM({strike: self.strike(), sigma: self.params.volatility, tau: self.lastTau()});
+    amountAsset = rmm.computeR2WithPrice(self.lastPrice);
+    amountQuote = rmm.computeR1WithR2(amountAsset);
+}
 
 function lastTau(HyperPool memory self) view returns (uint tau) {
     return self.tau(self.lastTimestamp);
@@ -192,7 +244,11 @@ function tau(HyperPool memory self, uint timestamp) view returns (uint) {
 }
 
 function maturity(HyperCurve memory self) view returns (uint endTimestamp) {
-    return Assembly.convertDaysToSeconds(params.duration) + params.createdAt;
+    return Assembly.convertDaysToSeconds(self.duration) + self.createdAt;
+}
+
+function getTimeSinceChanged(HyperPosition memory self, uint timestamp) view returns (uint distance) {
+    return timestamp - self.lastTimestamp;
 }
 
 function syncPositionFees(

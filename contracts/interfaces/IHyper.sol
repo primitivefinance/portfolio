@@ -144,24 +144,9 @@ interface IHyperGetters {
 
     function getPairNonce() external view returns (uint256);
 
-    function getSecondsSincePositionUpdate(
-        address account,
-        uint64 poolId
-    ) external view returns (uint256 distance, uint256 timestamp);
-
-    function getAllocateAmounts(
-        uint64 poolId,
-        uint256 deltaLiquidity
-    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
-
-    function getUnallocateAmounts(
-        uint64 poolId,
-        uint256 deltaLiquidity
-    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
-
     function getVirtualReserves(uint64 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
-    function getLiquidityMinted(
+    function getMaxLiquidity(
         uint64 poolId,
         uint deltaAsset,
         uint deltaQuote

@@ -44,7 +44,10 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
         // Amounts of tokens that will be allocated to pool.
-        (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getAllocateAmounts(__poolId__, deltaLiquidity);
+        (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getLiquidityDeltas(
+            __poolId__,
+            int128(uint128(deltaLiquidity))
+        );
 
         // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
         // They will be credited to the msg.sender of the next call.
@@ -142,7 +145,10 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             vm.warp(timestamp);
             __hyper__.setTimestamp(uint128(timestamp));
 
-            (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getUnallocateAmounts(__poolId__, deltaLiquidity);
+            (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getLiquidityDeltas(
+                __poolId__,
+                -int128(uint128(deltaLiquidity))
+            );
             prev = getState();
             (uint unallocatedAsset, uint unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
             HyperState memory end = getState();

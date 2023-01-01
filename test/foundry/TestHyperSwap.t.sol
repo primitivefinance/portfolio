@@ -23,7 +23,7 @@ contract TestHyperSwap is TestHyperSetup {
 
         assertEq(output, expected, "expected-output");
 
-        (uint amount0, uint amount1) = __hyperTestingContract__.amounts(defaultScenario.poolId);
+        (uint amount0, uint amount1) = getPool(address(__hyperTestingContract__), defaultScenario.poolId).getAmounts();
         console.log("amounts", amount0, amount1);
     }
 

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
+import "solmate/utils/SafeCastLib.sol";
 import "contracts/EnigmaTypes.sol";
 import "contracts/libraries/Price.sol";
 
@@ -26,6 +27,7 @@ struct TestScenario {
 contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHyperProfiles, HelperHyperView, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+    using SafeCastLib for uint;
 
     WETH public __weth__;
     Hyper public __hyper__; // Actual contract

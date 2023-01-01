@@ -32,3 +32,7 @@ Changing a position:
 - Position Liquidity is touched
   - Pool is touched
     - Reserves are touched
+
+#### Notes
+
+- Increasing reserves but paying entirely with internal balance leads to a deficit and therefore invariant failure.
