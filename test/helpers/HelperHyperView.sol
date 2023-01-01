@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import "contracts/CPU.sol" as Processor;
 import "contracts/OS.sol" as Operating;
-import {Epoch} from "contracts/Clock.sol";
 import {Pair, HyperCurve, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
 
 interface IHyperStruct {
@@ -12,8 +11,6 @@ interface IHyperStruct {
     function positions(address owner, uint64 positionId) external view returns (HyperPosition memory);
 
     function pools(uint64 poolId) external view returns (HyperPool memory);
-
-    function epochs(uint64 poolId) external view returns (Epoch memory);
 }
 
 interface HyperLike {
@@ -45,10 +42,6 @@ interface TokenLike {
 }
 
 contract HelperHyperView {
-    function getEpoch(address hyper, uint64 poolId) public view returns (Epoch memory) {
-        return IHyperStruct(hyper).epochs(poolId);
-    }
-
     function getPool(address hyper, uint64 poolId) public view returns (HyperPool memory) {
         return IHyperStruct(hyper).pools(poolId);
     }

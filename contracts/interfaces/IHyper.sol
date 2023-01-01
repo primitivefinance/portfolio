@@ -120,7 +120,7 @@ interface IHyperGetters {
             uint128 lastPrice,
             uint128 liquidity,
             uint128 stakedLiquidity,
-            int128 epochStakedLiquidityDelta,
+            int128 stakedLiquidityDelta,
             HyperCurve memory
         );
 
@@ -132,9 +132,9 @@ interface IHyperGetters {
         view
         returns (
             uint128 totalLiquidity,
-            uint256 blockTimestamp,
-            uint256 stakeEpochId,
-            uint256 unstakeEpochId,
+            uint256 lastTimestamp,
+            uint256 stakeTimestamp,
+            uint256 unstakeTimestamp,
             uint256 lastRewardGrowth,
             uint256 feeGrowthAssetLast,
             uint256 feeGrowthQuoteLast,
@@ -194,7 +194,7 @@ interface IHyperActions {
 
     function draw(address token, uint256 amount, address to) external;
 
-    function syncPool(uint64 poolId) external returns (uint128 blockTimestamp);
+    function syncPool(uint64 poolId) external returns (uint128 lastTimestamp);
 }
 
 /**

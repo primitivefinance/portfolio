@@ -369,7 +369,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).blockTimestamp;
+        ).lastTimestamp;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -381,7 +381,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).blockTimestamp;
+        ).lastTimestamp;
 
         assertTrue(prevPositionTimestamp == 0);
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
@@ -493,7 +493,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).blockTimestamp;
+        ).lastTimestamp;
 
         uint256 warpTimestamp = block.timestamp + 1;
         customWarp(warpTimestamp);
@@ -505,7 +505,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).blockTimestamp;
+        ).lastTimestamp;
 
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
     }
@@ -581,10 +581,10 @@ contract TestHyperProcessing is TestHyperSetup {
         __hyperTestingContract__.allocate(defaultScenario.poolId, amount);
 
         uint prevId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
-            .stakeEpochId;
+            .stakeTimestamp;
         __hyperTestingContract__.stake(defaultScenario.poolId);
         uint nextId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
-            .stakeEpochId;
+            .stakeTimestamp;
 
         assertTrue(nextId != prevId);
     }
@@ -601,13 +601,13 @@ contract TestHyperProcessing is TestHyperSetup {
         uint64 positionId = defaultScenario.poolId;
 
         bool prevPositionStaked = getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
-            .stakeEpochId != 0;
+            .stakeTimestamp != 0;
 
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
         bool nextPositionStaked = getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
-            .stakeEpochId != 0;
+            .stakeTimestamp != 0;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked, "Position staked is not true.");
@@ -678,10 +678,10 @@ contract TestHyperProcessing is TestHyperSetup {
         __hyperTestingContract__.stake(defaultScenario.poolId);
 
         uint prevId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
-            .unstakeEpochId;
+            .unstakeTimestamp;
         __hyperTestingContract__.unstake(defaultScenario.poolId);
         uint nextId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
-            .unstakeEpochId;
+            .unstakeTimestamp;
 
         assertTrue(nextId != prevId);
     }
@@ -699,7 +699,12 @@ contract TestHyperProcessing is TestHyperSetup {
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp(HyperTypes.EPOCH_INTERVAL + 1);
+        HyperPosition memory pos = getPosition(
+            address(__hyperTestingContract__),
+            address(this),
+            defaultScenario.poolId
+        );
+        customWarp(pos.unstakeTimestamp + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         data = CPU.encodeSwap(0, defaultScenario.poolId, 0x09, 0x01, 0x15, 0x01, 0);
@@ -709,7 +714,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).unstakeEpochId;
+        ).unstakeTimestamp;
 
         data = CPU.encodeUnstakePosition(positionId);
         success = __revertCatcher__.process(data);
@@ -718,7 +723,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).unstakeEpochId;
+        ).unstakeTimestamp;
 
         assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
         assertTrue(nextPositionStaked != 0, "Position staked is true.");
@@ -740,19 +745,20 @@ contract TestHyperProcessing is TestHyperSetup {
         data = CPU.encodeStakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp(HyperTypes.EPOCH_INTERVAL + 1);
+        HyperPosition memory pos = getPosition(address(__hyperTestingContract__), address(this), positionId);
+        customWarp(pos.unstakeTimestamp + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
-        data = CPU.encodeSwap(0, defaultScenario.poolId, 0x09, 0x01, 0x15, 0x01, 0);
+        data = CPU.encodeSwap(0, positionId, 0x09, 0x01, 0x15, 0x01, 0);
         success = __revertCatcher__.process(data);
 
-        uint256 prevPoolStakedLiquidity = getPool(address(__hyperTestingContract__), defaultScenario.poolId)
-            .stakedLiquidity;
+        uint256 prevPoolStakedLiquidity = getPool(address(__hyperTestingContract__), positionId).stakedLiquidity;
 
         data = CPU.encodeUnstakePosition(positionId);
         success = __revertCatcher__.process(data);
 
-        customWarp((HyperTypes.EPOCH_INTERVAL + 1) * 2);
+        pos = getPosition(address(__hyperTestingContract__), address(this), positionId);
+        customWarp((pos.unstakeTimestamp + 1) * 2);
 
         // TODO: FIX FAILING TEST
 

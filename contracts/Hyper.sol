@@ -108,8 +108,8 @@ contract Hyper is IHyper {
     // ===== Actions ===== //
 
     /// @inheritdoc IHyperActions
-    function syncPool(uint64 poolId) external override returns (uint128 blockTimestamp) {
-        blockTimestamp; // TODO
+    function syncPool(uint64 poolId) external override returns (uint128 lastTimestamp) {
+        lastTimestamp; // TODO
         _syncPoolPrice(poolId);
     }
 
@@ -301,15 +301,15 @@ contract Hyper is IHyper {
         if (!pools[poolId].exists()) revert NonExistentPool(poolId);
 
         HyperPosition storage pos = positions[msg.sender][poolId];
-        if (pos.stakeEpochId != 0) revert PositionStaked(poolId);
+        if (pos.stakeTimestamp != 0) revert PositionStaked(poolId);
         if (pos.totalLiquidity == 0) revert PositionZeroLiquidity(poolId);
 
         HyperPool storage pool = pools[poolId];
-        pool.epochStakedLiquidityDelta += int128(pos.totalLiquidity);
+        pool.stakedLiquidityDelta += int128(pos.totalLiquidity);
 
-        pos.stakeEpochId = _blockTimestamp(); // todo: fix
+        pos.stakeTimestamp = _blockTimestamp(); // todo: fix
 
-        // note: do we need to update position blockTimestamp?
+        // note: do we need to update position lastTimestamp?
 
         // emit Stake Position
     }
@@ -318,14 +318,14 @@ contract Hyper is IHyper {
         _syncPoolPrice(poolId); // Reverts if pool does not exist.
 
         HyperPosition storage pos = positions[msg.sender][poolId];
-        if (pos.stakeEpochId == 0 || pos.unstakeEpochId != 0) revert PositionNotStaked(poolId);
+        if (pos.stakeTimestamp == 0 || pos.unstakeTimestamp != 0) revert PositionNotStaked(poolId);
 
         HyperPool storage pool = pools[poolId];
-        pool.epochStakedLiquidityDelta -= int128(pos.totalLiquidity);
+        pool.stakedLiquidityDelta -= int128(pos.totalLiquidity);
 
-        pos.unstakeEpochId = _blockTimestamp(); // todo: fix
+        pos.unstakeTimestamp = _blockTimestamp(); // todo: fix
 
-        // note: do we need to update position blockTimestamp?
+        // note: do we need to update position lastTimestamp?
 
         // emit Unstake Position
     }
@@ -524,8 +524,8 @@ contract Hyper is IHyper {
 
         uint256 elapsed = getTimePassed(poolId);
         if (elapsed > 0) {
-            pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.epochStakedLiquidityDelta);
-            pool.epochStakedLiquidityDelta = int128(0);
+            pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
+            pool.stakedLiquidityDelta = int128(0);
         }
 
         uint256 timestamp = _blockTimestamp();
@@ -633,7 +633,7 @@ contract Hyper is IHyper {
             lastPrice: price,
             liquidity: 0,
             stakedLiquidity: 0,
-            epochStakedLiquidityDelta: 0,
+            stakedLiquidityDelta: 0,
             params: HyperCurve({
                 maxTick: max,
                 jit: isMutable ? jit : uint8(JUST_IN_TIME_LIQUIDITY_POLICY),
@@ -859,8 +859,8 @@ contract Hyper is IHyper {
     /** @dev Computes each side of a pool's reserves __per one unit of liquidity__. */
     function _getAmounts(uint64 poolId) internal view returns (uint256 deltaAsset, uint256 deltaQuote) {
         // TODO: Make a note of the importance of using the pool's _unchanged_ timestamp.
-        // If the blockTimestamp of a pool changes, it will change the pool's price.
-        // This blockTimestamp variable should be updated in swaps, not liquidity provision or removing.
+        // If the lastTimestamp of a pool changes, it will change the pool's price.
+        // This lastTimestamp variable should be updated in swaps, not liquidity provision or removing.
         uint tau = computeLastTau(poolId);
         HyperPool storage pool = pools[poolId];
         Price.Expiring memory info = Price.Expiring({
@@ -882,7 +882,7 @@ contract Hyper is IHyper {
         address account,
         uint64 poolId
     ) public view returns (uint256 distance, uint256 timestamp) {
-        uint256 previous = positions[account][poolId].blockTimestamp;
+        uint256 previous = positions[account][poolId].lastTimestamp;
         timestamp = _blockTimestamp();
         distance = timestamp - previous;
     }

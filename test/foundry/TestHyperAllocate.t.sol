@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY} from "contracts/EnigmaTypes.sol";
-import "contracts/Clock.sol";
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperAllocate is TestHyperSetup {
@@ -14,12 +13,8 @@ contract TestHyperAllocate is TestHyperSetup {
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
         Pair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
 
-        Epoch memory epoch = getEpoch(address(__hyperTestingContract__), defaultScenario.poolId);
-        uint elapsed = epoch.getEpochsPassed(block.timestamp) * 3600; // todo: fix epoch time
-        console.log(pool.params.duration);
-        console.log(elapsed);
-        uint tau = uint32((pool.params.duration - uint16(elapsed))) * 3600 seconds; // seconds
-        console.log(tau);
+        uint tau = __hyperTestingContract__.computeLastTau(defaultScenario.poolId); // seconds
+
         uint256 theoreticalR2 = Price.computeR2WithPrice(
             price,
             Price.computePriceWithTick(pool.params.maxTick),

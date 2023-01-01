@@ -133,7 +133,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 #### Allocate
 
 - Preconditions:
-  - The `pools` value for `poolId` must have a `lastPrice` != 0 and a `blockTimestamp` != 0.
+  - The `pools` value for `poolId` must have a `lastPrice` != 0 and a `lastTimestamp` != 0.
   - Caller must have approved and have a balance to spend equal to `amounts` returned by the function `getAmounts` for `deltaLiquidity` for `poolId`, or Caller must have an equivalent amount in their `balances` for both tokens.
 - During Execution:
   - n/a
@@ -153,7 +153,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 
 - Preconditions:
   - The Caller's `positions` `totalLiquidity` for `poolId` is greater than zero.
-  - The Caller's `positions` `blockTimestamp` for `poolId` is less than `block.timestamp` by at least (equal) `JIT_LIQUIDITY_POLICY` seconds.
+  - The Caller's `positions` `lastTimestamp` for `poolId` is less than `block.timestamp` by at least (equal) `JIT_LIQUIDITY_POLICY` seconds.
 - During Execution:
   - n/a
 - Postconditions:
@@ -173,7 +173,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - Preconditions:
   - For swaps with the argument `direction = 0` then the input token for `poolId` is the pair's `pair.tokenAsset`, else or swaps with the argument `direction = 1` then the input token for `poolId` is the pair's `pair.tokenQuote`
     - Caller must have approved token to be spent by Hyper and have `input` of tokens, or Caller must have `input` of tokens in their `balances`.
-  - The `pools` `poolId` value must return a `blockTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
+  - The `pools` `poolId` value must return a `lastTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
   - The `input` amount must be greater than zero.
   - The `poolId`'s `curve.maturity` value must be less than `block.timestamp`.
 - During Execution:

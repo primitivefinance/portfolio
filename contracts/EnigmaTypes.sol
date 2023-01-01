@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import "./OS.sol" as OS;
-import "./CPU.sol" as CPU;
-import "./Clock.sol" as Clock;
-import "./Assembly.sol" as Assembly;
-import "./libraries/Price.sol";
 import "solmate/utils/SafeCastLib.sol";
+import "./libraries/Price.sol";
+
+import "./Assembly.sol" as Assembly;
+import "./CPU.sol" as CPU;
+import "./OS.sol" as OS;
 
 int24 constant MAX_TICK = 25556; // todo: fix, Equal to 5x price at 1bps tick sizes.
 int24 constant TICK_SIZE = 256; // todo: use this?
@@ -15,7 +15,6 @@ uint8 constant MAX_DECIMALS = 18;
 uint256 constant BUFFER = 300;
 uint256 constant MIN_POOL_FEE = 1;
 uint256 constant MAX_POOL_FEE = 1e3;
-uint256 constant EPOCH_INTERVAL = 3600 seconds;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
 
 error DrawBalance();
@@ -75,16 +74,16 @@ struct HyperPool {
     uint128 lastPrice;
     uint128 liquidity; // available liquidity to remove
     uint128 stakedLiquidity; // locked liquidity
-    int128 epochStakedLiquidityDelta; // liquidity to be added or removed
+    int128 stakedLiquidityDelta; // liquidity to be added or removed
     HyperCurve params;
 }
 
 // todo: optimize slot
 struct HyperPosition {
     uint128 totalLiquidity;
-    uint256 blockTimestamp;
-    uint256 stakeEpochId;
-    uint256 unstakeEpochId;
+    uint256 lastTimestamp;
+    uint256 stakeTimestamp;
+    uint256 unstakeTimestamp;
     uint256 lastRewardGrowth;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
@@ -150,7 +149,7 @@ function syncPoolTimestamp(HyperPool storage self, uint timestamp) {
 }
 
 function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
-    self.blockTimestamp = timestamp;
+    self.lastTimestamp = timestamp;
     self.totalLiquidity = Assembly.addSignedDelta(self.totalLiquidity, liquidityDelta);
 }
 
