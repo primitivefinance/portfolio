@@ -22,7 +22,7 @@ pragma solidity 0.8.13;
 //                                                   //.-~~~--\                                     //
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-import "./EnigmaTypes.sol";
+import "./HyperLib.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IHyper.sol";
 import "./interfaces/IERC20.sol";
@@ -87,7 +87,7 @@ contract Hyper is IHyper {
 
     /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
     fallback() external payable lock interactions {
-        CPU.__startProcess__(_process);
+        Enigma.__startProcess__(_process);
     }
 
     /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
@@ -196,7 +196,7 @@ contract Hyper is IHyper {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
 
-        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(poolId)];
+        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
         if (useMax) {
             deltaLiquidity = pool.getMaxLiquidity(
                 getBalance(msg.sender, pair.tokenAsset),
@@ -281,7 +281,7 @@ contract Hyper is IHyper {
 
         (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(-int128(deltaLiquidity)); // rounds down
 
-        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(poolId)];
+        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
             poolId,
@@ -343,7 +343,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[args.poolId];
         if (!pool.exists()) revert NonExistentPool(args.poolId);
 
-        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(args.poolId)];
+        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(args.poolId)];
         state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
         state.fee = uint(pool.params.fee);
         state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
@@ -526,7 +526,7 @@ contract Hyper is IHyper {
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
 
-        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(poolId)];
+        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
         emit PoolUpdate(
             poolId,
             pool.lastPrice,
@@ -620,7 +620,7 @@ contract Hyper is IHyper {
                 poolNonce = uint32(++getPoolNonce);
             }
 
-            poolId = CPU.encodePoolId(pairNonce, isMutable, poolNonce);
+            poolId = Enigma.encodePoolId(pairNonce, isMutable, poolNonce);
             emit CreatePool(poolId, isMutable, pair.tokenAsset, pair.tokenQuote, price);
         }
 
@@ -716,23 +716,23 @@ contract Hyper is IHyper {
     function _process(bytes calldata data) internal {
         (, bytes1 instruction) = Assembly.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
-        if (instruction == CPU.ALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = CPU.decodeAllocate(data);
+        if (instruction == Enigma.ALLOCATE) {
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeAllocate(data);
             _allocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (instruction == CPU.UNALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = CPU.decodeUnallocate(data);
+        } else if (instruction == Enigma.UNALLOCATE) {
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeUnallocate(data);
             _unallocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (instruction == CPU.SWAP) {
+        } else if (instruction == Enigma.SWAP) {
             Order memory args;
-            (args.useMax, args.poolId, args.input, args.limit, args.direction) = CPU.decodeSwap(data);
+            (args.useMax, args.poolId, args.input, args.limit, args.direction) = Enigma.decodeSwap(data);
             _swapExactIn(args);
-        } else if (instruction == CPU.STAKE_POSITION) {
-            uint64 poolId = CPU.decodeStakePosition(data);
+        } else if (instruction == Enigma.STAKE_POSITION) {
+            uint64 poolId = Enigma.decodeStakePosition(data);
             _stake(poolId);
-        } else if (instruction == CPU.UNSTAKE_POSITION) {
-            uint64 poolId = CPU.decodeUnstakePosition(data);
+        } else if (instruction == Enigma.UNSTAKE_POSITION) {
+            uint64 poolId = Enigma.decodeUnstakePosition(data);
             _unstake(poolId);
-        } else if (instruction == CPU.CREATE_POOL) {
+        } else if (instruction == Enigma.CREATE_POOL) {
             (
                 uint24 pairId,
                 address controller,
@@ -743,10 +743,10 @@ contract Hyper is IHyper {
                 uint16 jit,
                 int24 max,
                 uint128 price
-            ) = CPU.decodeCreatePool(data);
+            ) = Enigma.decodeCreatePool(data);
             _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
-        } else if (instruction == CPU.CREATE_PAIR) {
-            (address asset, address quote) = CPU.decodeCreatePair(data);
+        } else if (instruction == Enigma.CREATE_PAIR) {
+            (address asset, address quote) = Enigma.decodeCreatePair(data);
             _createPair(asset, quote);
         } else {
             revert InvalidInstruction();
@@ -844,7 +844,7 @@ contract Hyper is IHyper {
     }
 
     function _getAmountOut(uint64 poolId, bool sellAsset, uint amountIn) internal view returns (uint output) {
-        uint24 pairId = CPU.decodePairIdFromPoolId(poolId);
+        uint24 pairId = Enigma.decodePairIdFromPoolId(poolId);
         HyperPool memory pool = pools[poolId];
         (output, ) = pool.getAmountOut({
             pair: pairs[pairId],

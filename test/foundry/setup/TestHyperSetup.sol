@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
 import "solmate/utils/SafeCastLib.sol";
-import "contracts/EnigmaTypes.sol";
+import "contracts/HyperLib.sol";
 import "contracts/libraries/Price.sol";
 
 import "forge-std/Test.sol";

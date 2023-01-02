@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "contracts/EnigmaTypes.sol" as HyperTypes;
-import "contracts/CPU.sol" as CPU;
+import "contracts/HyperLib.sol" as HyperTypes;
+import "contracts/Enigma.sol" as Enigma;
 import "./setup/InvariantTargetContract.sol";
 
 contract InvariantCreatePool is InvariantTargetContract {
@@ -85,11 +85,11 @@ contract InvariantCreatePool is InvariantTargetContract {
         uint24 pairId = __hyper__.getPairId(args.token0, args.token1);
         {
             // Pair not created? Push a create pair call to the stack.
-            if (pairId == 0) instructions.push(CPU.encodeCreatePair(args.token0, args.token1));
+            if (pairId == 0) instructions.push(Enigma.encodeCreatePair(args.token0, args.token1));
 
             // Push create pool to stack
             instructions.push(
-                CPU.encodeCreatePool(
+                Enigma.encodeCreatePool(
                     pairId,
                     address(this),
                     1, // priorityFee
@@ -102,7 +102,7 @@ contract InvariantCreatePool is InvariantTargetContract {
                 )
             ); // temp
         }
-        bytes memory payload = CPU.encodeJumpInstruction(instructions);
+        bytes memory payload = Enigma.encodeJumpInstruction(instructions);
         vm.prank(args.caller);
         console.logBytes(payload);
         (bool success, bytes memory reason) = address(__hyper__).call(payload);
@@ -118,7 +118,7 @@ contract InvariantCreatePool is InvariantTargetContract {
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = CPU.encodePoolId(pairId, isMutable, uint32(__hyper__.getPoolNonce()));
+        uint64 poolId = Enigma.encodePoolId(pairId, isMutable, uint32(__hyper__.getPoolNonce()));
 
         // Add the created pool to the list of pools.
         assertTrue(getPool(address(__hyper__), poolId).lastPrice != 0, "pool-price-zero");

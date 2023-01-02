@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "solmate/utils/SafeCastLib.sol";
 import "./libraries/Price.sol";
 import "./Assembly.sol" as Assembly;
-import "./CPU.sol" as CPU;
+import "./Enigma.sol" as Enigma;
 import "./OS.sol" as OS;
 
 import {console} from "forge-std/Test.sol";

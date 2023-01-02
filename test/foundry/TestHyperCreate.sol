@@ -9,7 +9,7 @@ contract TestHyperDeposit is TestHyperSetup {
         uint16 failureArg = 2 ** 16 - 10;
         // create a mutable pool
         uint24 pairId = uint24(1);
-        bytes memory createData = CPU.encodeCreatePool(
+        bytes memory createData = Enigma.encodeCreatePool(
             pairId, // assumes first pair is created
             address(this),
             DEFAULT_FEE,
@@ -22,7 +22,7 @@ contract TestHyperDeposit is TestHyperSetup {
         );
 
         bool success = __revertCatcher__.process(createData);
-        uint64 poolId = CPU.encodePoolId(pairId, true, uint32(__hyperTestingContract__.getPoolNonce()));
+        uint64 poolId = Enigma.encodePoolId(pairId, true, uint32(__hyperTestingContract__.getPoolNonce()));
 
         vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, failureArg));
         __hyperTestingContract__.changeParameters(

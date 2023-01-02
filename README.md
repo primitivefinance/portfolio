@@ -43,11 +43,11 @@ Changing a position:
 ## todo
 
 - [x] Fix tests, especially swaps.
-- [ ] Solstat tests.
+- [x] Solstat tests. - sunday
 - [x] Refactor accounting system!
-- [ ] Work on docs 1 pager for auditor
-- [ ] Light gas analysis/optimization
-- [ ] Finish stake/unstake
+- [ ] Work on docs 1 pager for auditor - monday
+- [ ] Light gas analysis/optimization - none
+- [ ] Finish stake/unstake - sunday
 - [x] Add parameter validation to changeParameters function
-- [ ] Rename EnigmaTypes to HyperLib ?
-- [ ] TOKEN DECIMALS NOT HANDLED
+- [x] Rename HyperLib to HyperLib ?
+- [x] TOKEN DECIMALS NOT HANDLED

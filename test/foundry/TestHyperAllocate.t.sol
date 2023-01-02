@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY, Pair} from "contracts/EnigmaTypes.sol";
+import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY, Pair} from "contracts/HyperLib.sol";
 import "./setup/TestHyperSetup.sol";
 
 struct Amounts {

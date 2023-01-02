@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "contracts/CPU.sol" as Processor;
+import "contracts/Enigma.sol" as Processor;
 import "contracts/OS.sol" as Operating;
-import {Pair, HyperCurve, HyperPool, HyperPosition} from "contracts/EnigmaTypes.sol";
+import {Pair, HyperCurve, HyperPool, HyperPosition} from "contracts/HyperLib.sol";
 
 interface IHyperStruct {
     function pairs(uint24 pairId) external view returns (Pair memory);

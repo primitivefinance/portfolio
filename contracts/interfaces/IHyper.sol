@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {HyperCurve, Pair} from "../EnigmaTypes.sol";
+import {HyperCurve, Pair} from "../HyperLib.sol";
 
 interface IHyperEvents {
     event Deposit(address indexed account, uint amount);
