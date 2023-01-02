@@ -125,3 +125,17 @@ function scaleFromWadDown(uint amountWad, uint decimals) pure returns (uint outp
         outputDec := div(amountWad, factor)
     }
 }
+
+function scaleFromWadUpSigned(int amountWad, uint decimals) pure returns (int outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := add(sdiv(amountWad, factor), 1)
+    }
+}
+
+function scaleFromWadDownSigned(int amountWad, uint decimals) pure returns (int outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := sdiv(amountWad, factor)
+    }
+}

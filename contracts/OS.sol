@@ -137,7 +137,8 @@ function settle(
 
     int net = self.getNetBalance(token, account);
     if (net > 0) {
-        self.credit(msg.sender, token, uint(net));
+        self.credit(msg.sender, token, uint(net)); // apply the difference to user
+        self.reserves[token] += uint(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {
         remainder = uint(-net);
         (debited, remainder) = self.debit(msg.sender, token, remainder);

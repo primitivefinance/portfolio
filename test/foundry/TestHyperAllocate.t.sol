@@ -195,6 +195,18 @@ contract TestHyperAllocate is TestHyperSetup {
             deltaLiquidity
         );
 
+        // remove all credits, since unallocate will increase this amount.
+        __hyperTestingContract__.draw(
+            address(defaultScenario.asset),
+            __hyperTestingContract__.getBalance(address(this), address(defaultScenario.asset)),
+            address(this)
+        );
+        __hyperTestingContract__.draw(
+            address(defaultScenario.quote),
+            __hyperTestingContract__.getBalance(address(this), address(defaultScenario.quote)),
+            address(this)
+        );
+
         {
             HyperState memory end = getState();
             assertApproxEqAbs(unallocatedAsset, deltaAsset, 1, "unallocate-delta-asset");

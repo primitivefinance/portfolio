@@ -209,7 +209,8 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success); */
         allocatePool(address(__hyperTestingContract__), defaultScenario.poolId, 10e19);
 
-        // move some time
+        // deposit first
+        __hyperTestingContract__.fund(address(defaultScenario.asset), amount);
         uint256 prev = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
         (uint output, ) = __hyperTestingContract__.swap(
@@ -227,8 +228,8 @@ contract TestHyperProcessing is TestHyperSetup {
         );
 
         uint256 next = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
-        assertTrue(next <= prev);
-        assertTrue(input < amount);
+        assertTrue(next <= prev, "invalid-user-gained-balance");
+        assertTrue(input < amount, "invalid-invariant-got-more-out");
     }
 
     function testSwapExpiredPoolReverts() public {
@@ -358,10 +359,10 @@ contract TestHyperProcessing is TestHyperSetup {
         uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
         data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
-        assertTrue(success);
+        assertTrue(success, "swap failed");
 
         uint256 next = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
-        assertTrue(next < prev);
+        assertTrue(next == prev, "reserves-changed");
     }
 
     // --- Allocate --- //
@@ -603,8 +604,6 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testUnallocateGlobalAssetDecreases() public postTestInvariantChecks {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
         uint8 power = 0x05; // if this is low enough, it will revert because token amounts rounded down to zero.
         bytes memory data = Enigma.encodeAllocate(0, defaultScenario.poolId, power, amount);
@@ -617,7 +616,7 @@ contract TestHyperProcessing is TestHyperSetup {
         success = __revertCatcher__.process(data);
 
         uint256 next = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
-        assertTrue(next < prev, "globalReserves did not change");
+        assertTrue(next == prev, "reserves-changed"); // unallocated amounts are credited to user
     }
 
     /// @dev IMPORTANT TEST. For low token decimals, be very aware of the amount of liquidity involved in each tx.
@@ -634,7 +633,7 @@ contract TestHyperProcessing is TestHyperSetup {
         success = __revertCatcher__.process(data);
 
         uint256 next = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
-        assertTrue(next < prev, "globalReserves did not change");
+        assertTrue(next == prev, "reserves-changed"); // unallocated amounts are credited to user
     }
 
     // --- Stake Position --- //

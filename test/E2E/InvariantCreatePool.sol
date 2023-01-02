@@ -26,8 +26,8 @@ contract InvariantCreatePool is InvariantTargetContract {
 
         maturity = uint32(block.timestamp + bound(maturity, 1, 365 days));
         price = uint128(bound(price, 1, 1e36));
-        gamma = uint32(bound(sigma, 1e4 - HyperTypes.MAX_POOL_FEE, 1e4 - HyperTypes.MIN_POOL_FEE));
-        priorityGamma = uint32(bound(sigma, gamma, 1e4 - HyperTypes.MIN_POOL_FEE));
+        gamma = uint32(bound(sigma, 1e4 - HyperTypes.MAX_FEE, 1e4 - HyperTypes.MIN_FEE));
+        priorityGamma = uint32(bound(sigma, gamma, 1e4 - HyperTypes.MIN_FEE));
 
         // Random user
         address caller = ctx.getRandomUser(index);

@@ -21,8 +21,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     uint expectedDeltaQuote;
     bool transferAssetIn;
     bool transferQuoteIn;
-    int netAssetBalance;
-    int netQuoteBalance;
+    int assetCredit;
+    int quoteCredit;
     uint deltaAsset;
     uint deltaQuote;
     uint userAssetBalance;
@@ -51,12 +51,12 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
         // They will be credited to the msg.sender of the next call.
-        netAssetBalance = __hyper__.getNetBalance(address(__asset__));
-        netQuoteBalance = __hyper__.getNetBalance(address(__quote__));
+        assetCredit = __hyper__.getNetBalance(address(__asset__));
+        quoteCredit = __hyper__.getNetBalance(address(__quote__));
 
         // Net balances should always be positive outside of execution.
-        assertTrue(netAssetBalance >= 0, "negative-net-asset-tokens");
-        assertTrue(netQuoteBalance >= 0, "negative-net-quote-tokens");
+        assertTrue(assetCredit >= 0, "negative-net-asset-tokens");
+        assertTrue(quoteCredit >= 0, "negative-net-quote-tokens");
 
         // Internal balance of tokens spendable by user.
         userAssetBalance = getBalance(address(__hyper__), address(this), address(__asset__));
@@ -64,17 +64,20 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // If there is a net balance, user can use it to pay their cost.
         // Total payment the user must make.
-        physicalAssetPayment = uint(netAssetBalance) > expectedDeltaAsset
+        physicalAssetPayment = uint(assetCredit) > expectedDeltaAsset ? 0 : expectedDeltaAsset - uint(assetCredit);
+        physicalQuotePayment = uint(quoteCredit) > expectedDeltaQuote ? 0 : expectedDeltaQuote - uint(quoteCredit);
+
+        physicalAssetPayment = uint(userAssetBalance) > physicalAssetPayment
             ? 0
-            : expectedDeltaAsset - uint(netAssetBalance);
-        physicalQuotePayment = uint(netQuoteBalance) > expectedDeltaQuote
+            : physicalAssetPayment - uint(userAssetBalance);
+        physicalQuotePayment = uint(userQuoteBalance) > physicalQuotePayment
             ? 0
-            : expectedDeltaQuote - uint(netQuoteBalance);
+            : physicalQuotePayment - uint(userQuoteBalance);
 
         // If user can pay for the allocate using their internal balance of tokens, don't need to transfer tokens in.
         // Won't need to transfer in tokens if user payment is zero.
-        if (userAssetBalance >= physicalAssetPayment) transferAssetIn = false;
-        if (userQuoteBalance >= physicalQuotePayment) transferQuoteIn = false;
+        if (physicalAssetPayment == 0) transferAssetIn = false;
+        if (physicalQuotePayment == 0) transferQuoteIn = false;
 
         // If the user has to pay externally, give them tokens.
         if (transferAssetIn) __asset__.mint(address(this), physicalAssetPayment);
@@ -97,8 +100,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             "position-liquidity-increases"
         );
 
-        assertEq(post.reserveAsset, prev.reserveAsset + physicalAssetPayment, "reserve-asset");
-        assertEq(post.reserveQuote, prev.reserveQuote + physicalQuotePayment, "reserve-quote");
+        assertEq(post.reserveAsset, prev.reserveAsset + physicalAssetPayment + uint(assetCredit), "reserve-asset");
+        assertEq(post.reserveQuote, prev.reserveQuote + physicalQuotePayment + uint(quoteCredit), "reserve-quote");
         assertEq(post.physicalBalanceAsset, prev.physicalBalanceAsset + physicalAssetPayment, "physical-asset");
         assertEq(post.physicalBalanceQuote, prev.physicalBalanceQuote + physicalQuotePayment, "physical-quote");
 

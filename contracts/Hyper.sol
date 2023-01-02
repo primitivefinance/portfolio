@@ -38,6 +38,7 @@ contract Hyper is IHyper {
     using FixedPointMathLib for uint256;
     using Price for Price.RMM;
     using {Assembly.scaleFromWadDown} for uint;
+    using {Assembly.scaleFromWadDownSigned} for int;
 
     OS.AccountSystem public __account__;
 
@@ -52,6 +53,8 @@ contract Hyper is IHyper {
     mapping(uint64 => HyperPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
     mapping(address => mapping(uint64 => HyperPosition)) public positions;
+
+    Payment[] private _payments;
 
     /** @dev Used on every external function and external entrypoint. */
     modifier lock() {
@@ -281,20 +284,19 @@ contract Hyper is IHyper {
 
         (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(-int128(deltaLiquidity)); // rounds down
 
-        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
         ChangeLiquidityParams memory args = ChangeLiquidityParams(
             msg.sender,
             poolId,
             _blockTimestamp(),
             deltaAsset,
             deltaQuote,
-            pair.tokenAsset,
-            pair.tokenQuote,
+            pool.pair.tokenAsset,
+            pool.pair.tokenQuote,
             -int128(deltaLiquidity)
         );
 
         _changeLiquidity(args);
-        emit Unallocate(poolId, pair.tokenAsset, pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
+        emit Unallocate(poolId, pool.pair.tokenAsset, pool.pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     function _stake(uint64 poolId) internal {
@@ -419,24 +421,26 @@ contract Hyper is IHyper {
         {
             uint256 nextPrice;
             uint256 limitPrice = args.limit;
-            int256 liveInvariant;
-            int256 nextInvariant;
+            int256 liveInvariantWad;
+            int256 nextInvariantWad;
 
             if (state.sell) {
-                liveInvariant = rmm.invariant(liveDependent, liveIndependent);
-                nextInvariant = rmm.invariant(nextDependent, nextIndependent);
+                liveInvariantWad = rmm.invariant(liveDependent, liveIndependent);
+                nextInvariantWad = rmm.invariant(nextDependent, nextIndependent);
                 nextPrice = rmm.computePriceWithR2(nextIndependent);
             } else {
-                liveInvariant = rmm.invariant(liveIndependent, liveDependent);
-                nextInvariant = rmm.invariant(nextIndependent, nextDependent);
+                liveInvariantWad = rmm.invariant(liveIndependent, liveDependent);
+                nextInvariantWad = rmm.invariant(nextIndependent, nextDependent);
                 nextPrice = rmm.computePriceWithR2(nextDependent);
             }
 
             if (!state.sell && nextPrice > limitPrice) revert SwapLimitReached();
             if (state.sell && limitPrice > nextPrice) revert SwapLimitReached();
 
+            liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
+            nextInvariantWad = nextInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
             // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision)?
-            if (nextInvariant < liveInvariant) revert InvalidInvariant(liveInvariant, nextInvariant);
+            if (nextInvariantWad < liveInvariantWad) revert InvalidInvariant(liveInvariantWad, nextInvariantWad);
 
             _swap.price = nextPrice;
         }
@@ -609,7 +613,7 @@ contract Hyper is IHyper {
                 fee: fee,
                 duration: dur,
                 volatility: vol,
-                priorityFee: isMutable ? priorityFee : uint16(MIN_POOL_FEE), // min fee
+                priorityFee: isMutable ? priorityFee : uint16(MIN_FEE), // min fee
                 createdAt: timestamp
             });
             params.revertOnInvalid();
@@ -770,7 +774,7 @@ contract Hyper is IHyper {
         uint256 loops = tokens.length;
         if (loops == 0) return __account__.reset(); // exit early.
 
-        Payment[] memory payments = new Payment[](loops);
+        /* Payment[] memory payments = new Payment[](loops); */
         // Loop backwards to pop tokens off.
         uint x;
         uint i = loops;
@@ -779,7 +783,7 @@ contract Hyper is IHyper {
             (uint credited, uint debited, uint remainder) = __account__.settle(token, address(this));
             if (debited > 0) emit DecreaseUserBalance(token, debited);
             if (credited > 0) emit IncreaseUserBalance(token, credited);
-            if (remainder > 0) payments[x] = Payment({token: token, amount: remainder});
+            if (remainder > 0) _payments.push(Payment({token: token, amount: remainder}));
             __account__.warm.pop();
             unchecked {
                 --i;
@@ -789,8 +793,8 @@ contract Hyper is IHyper {
 
         console.log("exited loop", __account__.warm.length);
 
+        Payment[] memory payments = _payments;
         console.log("entering payments loop", payments.length);
-
         uint p = payments.length;
         while (p != 0) {
             uint index = p - 1;
@@ -802,7 +806,7 @@ contract Hyper is IHyper {
         }
 
         console.log("exiting payments loop", payments.length);
-
+        delete _payments;
         __account__.reset();
     }
 

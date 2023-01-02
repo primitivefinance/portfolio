@@ -36,11 +36,15 @@ using {Assembly.scaleFromWadDown} for uint;
 
 int24 constant MAX_TICK = 25556; // todo: fix, Equal to 5x price at 1bps tick sizes.
 int24 constant TICK_SIZE = 256; // todo: use this?
-uint256 constant BUFFER = 300;
-uint256 constant MIN_POOL_FEE = 1;
-uint256 constant MAX_POOL_FEE = 1e3;
+uint256 constant BUFFER = 300 seconds;
+uint256 constant MIN_FEE = 1 wei;
+uint256 constant MAX_FEE = 1000 wei;
+uint256 constant MIN_VOLATILITY = 100; // 1%
+uint256 constant MAX_VOLATILITY = 25_000; // 250%
+uint256 constant MIN_DURATION = 1; // days, but without units
+uint256 constant MAX_DURATION = 500; // days, but without units
 uint256 constant JUST_IN_TIME_MAX = 600;
-uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4;
+uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
 error DrawBalance();
 error InvalidDecimals(uint8 decimals);
@@ -245,6 +249,22 @@ function getAmountsWad(HyperPool memory self) view returns (uint amountAssetWad,
     amountQuoteWad = rmm.computeR1WithR2(amountAssetWad);
 }
 
+function getMaxSwapAssetInWad(HyperPool memory self) view returns (uint) {
+    Price.RMM memory rmm = self.getRMM();
+    (, uint res1) = rmm.computeReserves(self.lastPrice);
+    uint maxInput = FixedPointMathLib.WAD - res1;
+    maxInput = maxInput.mulWadDown(self.liquidity);
+    return maxInput.scaleFromWadDown(self.pair.decimalsAsset);
+}
+
+function getMaxSwapQuoteInWad(HyperPool memory self) view returns (uint) {
+    Price.RMM memory rmm = self.getRMM();
+    (uint res0, ) = rmm.computeReserves(self.lastPrice);
+    uint maxInput = rmm.strike - res0;
+    maxInput = maxInput.mulWadDown(self.liquidity);
+    return maxInput.scaleFromWadDown(self.pair.decimalsQuote);
+}
+
 function getAmountOut(
     HyperPool memory self,
     Pair memory pair,
@@ -335,13 +355,15 @@ function maturity(HyperCurve memory self) view returns (uint endTimestamp) {
 
 /** @dev Invalid parameters should revert. */
 function checkParameters(HyperCurve memory self) view returns (bool, bytes memory) {
-    if (self.volatility == 0) return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));
-    if (self.duration == 0) return (false, abi.encodeWithSelector(InvalidDuration.selector, self.duration));
+    if (!Assembly.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
+        return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));
+    if (!Assembly.isBetween(self.duration, MIN_DURATION, MAX_DURATION))
+        return (false, abi.encodeWithSelector(InvalidDuration.selector, self.duration));
     if (self.maxTick >= MAX_TICK) return (false, abi.encodeWithSelector(InvalidTick.selector, self.maxTick));
     if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
-    if (!Assembly.isBetween(self.fee, MIN_POOL_FEE, MAX_POOL_FEE))
+    if (!Assembly.isBetween(self.fee, MIN_FEE, MAX_FEE))
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
-    if (!Assembly.isBetween(self.priorityFee, MIN_POOL_FEE, self.fee))
+    if (!Assembly.isBetween(self.priorityFee, MIN_FEE, self.fee))
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.priorityFee));
 
     return (true, "");
