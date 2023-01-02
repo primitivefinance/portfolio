@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 error CastOverflow(uint);
+error InvalidLiquidity();
 
 uint constant SECONDS_PER_DAY = 86_400 seconds;
 uint8 constant MIN_DECIMALS = 6;
@@ -26,45 +27,55 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
     }
 }
 
-error InvalidLiquidity();
-
-function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
-    /* assembly {
-        switch slt(input, 0) // input < 0 ? 1 : 0
-        case 0 {
-            output := add(input, delta)
-        }
-        case 1 {
-            output := sub(input, delta)
-        }
-    } */
-
+/** 
     if (delta < 0) {
         output = input - uint128(-delta);
-        // liquidity going down, input should be larger
         if (output >= input) revert InvalidLiquidity();
     } else {
         output = input + uint128(delta);
-        // liquidity going on, input should be smaller
         if (output < input) revert InvalidLiquidity();
     }
-}
-
-function computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) pure returns (uint256 nextCheckpoint) {
-    nextCheckpoint = liveCheckpoint;
-
-    if (checkpointChange != 0) {
-        // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
-        assembly {
-            nextCheckpoint := add(liveCheckpoint, checkpointChange)
+*/
+function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
+    bytes memory revertData = abi.encodeWithSelector(InvalidLiquidity.selector);
+    assembly {
+        switch slt(delta, 0) // delta < 0 ? 1 : 0
+        // negative delta
+        case 1 {
+            output := sub(input, add(not(delta), 1))
+            switch slt(output, input) // output < input ? 1 : 0
+            case 0 {
+                // not less than
+                revert(add(32, revertData), mload(revertData)) // 0x1fff9681
+            }
+        }
+        // position delta
+        case 0 {
+            output := add(input, delta)
+            switch slt(output, input) // (output < input ? 1 : 0) == 0 ? 1 : 0
+            case 1 {
+                // less than
+                revert(add(32, revertData), mload(revertData)) // 0x1fff9681
+            }
         }
     }
 }
 
-function computeCheckpointDistance(uint256 currentCheckpoint, uint256 prevCheckpoint) pure returns (uint256 distance) {
+function computeCheckpoint(uint256 present, uint256 delta) pure returns (uint256 checkpoint) {
+    checkpoint = present;
+
+    if (delta != 0) {
+        // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+        assembly {
+            checkpoint := add(present, delta)
+        }
+    }
+}
+
+function computeCheckpointDistance(uint256 present, uint256 past) pure returns (uint256 distance) {
     // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
     assembly {
-        distance := sub(currentCheckpoint, prevCheckpoint)
+        distance := sub(present, past)
     }
 }
 
@@ -74,7 +85,6 @@ function convertDaysToSeconds(uint amountDays) pure returns (uint amountSeconds)
     }
 }
 
-/** @dev Converts an array of bytes into a byte32. */
 function toBytes32(bytes memory raw) pure returns (bytes32 data) {
     assembly {
         data := mload(add(raw, 32))
@@ -83,7 +93,6 @@ function toBytes32(bytes memory raw) pure returns (bytes32 data) {
     }
 }
 
-/** @dev Converts an array of bytes into a bytes16. */
 function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     assembly {
         data := mload(add(raw, 32))
