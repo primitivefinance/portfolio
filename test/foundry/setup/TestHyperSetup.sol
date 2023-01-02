@@ -225,6 +225,15 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         return pool;
     }
 
+    function defaultRevertCatcherPosition() internal returns (HyperPosition memory) {
+        HyperPosition memory pos = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            defaultScenario.poolId
+        );
+        return pos;
+    }
+
     function defaultPosition() internal returns (HyperPosition memory) {
         HyperPosition memory pos = getPosition(
             address(__hyperTestingContract__),

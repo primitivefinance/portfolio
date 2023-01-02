@@ -49,6 +49,7 @@ uint256 constant JUST_IN_TIME_MAX = 600;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
 error DrawBalance();
+error InsufficientPosition(uint64 poolId);
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
@@ -56,6 +57,7 @@ error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
 error InvalidJit(uint16);
 error InvalidReentrancy();
+error InvalidReward();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
 error InvalidTick(int24);
@@ -72,6 +74,7 @@ error PositionStaked(uint96 positionId);
 error PositionZeroLiquidity(uint96 positionId);
 error PositionNotStaked(uint96 positionId);
 error SameTokenError();
+error StakeNotMature(uint64 poolId);
 error SwapLimitReached();
 error ZeroInput();
 error ZeroLiquidity();
@@ -99,6 +102,7 @@ struct HyperPool {
     int24 lastTick; // mutable so not optimized in slot.
     uint32 lastTimestamp; // updated on swaps
     address controller;
+    uint256 feeGrowthGlobalReward;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
     // single slot
@@ -117,11 +121,12 @@ struct HyperPosition {
     uint256 lastTimestamp;
     uint256 stakeTimestamp;
     uint256 unstakeTimestamp;
-    uint256 lastRewardGrowth;
+    uint256 feeGrowthRewardLast;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
     uint128 tokensOwedAsset;
     uint128 tokensOwedQuote;
+    uint128 tokensOwedReward;
 }
 
 struct ChangeLiquidityParams {
@@ -387,6 +392,7 @@ function getTimeSinceChanged(HyperPosition memory self, uint timestamp) view ret
     return timestamp - self.lastTimestamp;
 }
 
+/** @dev Liquidity must be altered after syncing positions and not before. */
 function syncPositionFees(
     HyperPosition storage self,
     uint liquidity,
@@ -409,8 +415,8 @@ function syncPositionFees(
 function syncPositionStakedFees(HyperPosition storage self, uint liquidity, uint feeGrowth) returns (uint feeEarned) {
     uint checkpoint = Assembly.computeCheckpointDistance(feeGrowth, self.feeGrowthAssetLast); //todo: add another var to pool
     feeEarned = FixedPointMathLib.mulWadDown(checkpoint, liquidity);
-    self.feeGrowthAssetLast = feeEarned;
-    self.tokensOwedAsset += SafeCastLib.safeCastTo128(feeEarned);
+    self.feeGrowthRewardLast = feeEarned;
+    self.tokensOwedReward += SafeCastLib.safeCastTo128(feeEarned);
 }
 
 function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {

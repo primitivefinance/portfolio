@@ -109,6 +109,7 @@ interface IHyperGetters {
             int24 lastTick,
             uint32 lastTimestamp,
             address controller,
+            uint256 feeGrowthGlobalReward,
             uint256 feeGrowthGlobalAsset,
             uint256 feeGrowthGlobalQuote,
             uint128 lastPrice,
@@ -131,11 +132,12 @@ interface IHyperGetters {
             uint256 lastTimestamp,
             uint256 stakeTimestamp,
             uint256 unstakeTimestamp,
-            uint256 lastRewardGrowth,
+            uint256 feeGrowthRewardLast,
             uint256 feeGrowthAssetLast,
             uint256 feeGrowthQuoteLast,
             uint128 tokensOwedAsset,
-            uint128 tokensOwedQuote
+            uint128 tokensOwedQuote,
+            uint128 tokensOwedReward
         );
 
     function getPairNonce() external view returns (uint256);
@@ -165,9 +167,9 @@ interface IHyperActions {
 
     function unallocate(uint64 poolId, uint amount) external returns (uint deltaAsset, uint deltaQuote);
 
-    function stake(uint64 poolId) external;
+    function stake(uint64 poolId, uint128 deltaLiquidity) external;
 
-    function unstake(uint64 poolId) external;
+    function unstake(uint64 poolId, uint128 deltaLiquidity) external;
 
     function swap(
         uint64 poolId,

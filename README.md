@@ -51,5 +51,10 @@ Changing a position:
 - [x] Add parameter validation to changeParameters function
 - [x] Rename HyperLib to HyperLib ?
 - [x] TOKEN DECIMALS NOT HANDLED
-- [ ] Claim fees working and tested
+- [x] Claim fees working and tested
 - [ ] Investigate price movements by swap.
+- [x] Finish SIMPLE stake.
+- [ ] Final cleanup of all console and logging.
+- [ ] Better swap tests.
+- [ ] Better account system tests.
+- [ ] Add priority fee growth for WETH only.

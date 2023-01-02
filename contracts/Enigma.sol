@@ -211,18 +211,20 @@ function decodeSwap(
     direction = uint8(data[data.length - 1]);
 }
 
-function encodeStakePosition(uint64 positionId) pure returns (bytes memory data) {
-    data = abi.encodePacked(STAKE_POSITION, positionId);
+function encodeStakePosition(uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+    data = abi.encodePacked(STAKE_POSITION, poolId, deltaLiquidity);
 }
 
-function decodeStakePosition(bytes calldata data) pure returns (uint64 poolId) {
+function decodeStakePosition(bytes calldata data) pure returns (uint64 poolId, uint128 deltaLiquidity) {
     poolId = uint64(bytes8(data[1:9]));
+    deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }
 
-function encodeUnstakePosition(uint64 positionId) pure returns (bytes memory data) {
-    data = abi.encodePacked(UNSTAKE_POSITION, positionId);
+function encodeUnstakePosition(uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+    data = abi.encodePacked(UNSTAKE_POSITION, poolId, deltaLiquidity);
 }
 
-function decodeUnstakePosition(bytes calldata data) pure returns (uint64 poolId) {
+function decodeUnstakePosition(bytes calldata data) pure returns (uint64 poolId, uint128 deltaLiquidity) {
     poolId = uint64(bytes8(data[1:9]));
+    deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }

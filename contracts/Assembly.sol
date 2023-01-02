@@ -26,8 +26,10 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
     }
 }
 
+error InvalidLiquidity();
+
 function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
-    assembly {
+    /* assembly {
         switch slt(input, 0) // input < 0 ? 1 : 0
         case 0 {
             output := add(input, delta)
@@ -35,6 +37,16 @@ function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 outpu
         case 1 {
             output := sub(input, delta)
         }
+    } */
+
+    if (delta < 0) {
+        output = input - uint128(-delta);
+        // liquidity going down, input should be larger
+        if (output >= input) revert InvalidLiquidity();
+    } else {
+        output = input + uint128(delta);
+        // liquidity going on, input should be smaller
+        if (output < input) revert InvalidLiquidity();
     }
 }
 

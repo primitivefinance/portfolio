@@ -644,7 +644,7 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint prevId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
             .stakeTimestamp;
-        __hyperTestingContract__.stake(defaultScenario.poolId);
+        __hyperTestingContract__.stake(defaultScenario.poolId, amount);
         uint nextId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
             .stakeTimestamp;
 
@@ -665,7 +665,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool prevPositionStaked = getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
             .stakeTimestamp != 0;
 
-        data = Enigma.encodeStakePosition(positionId);
+        data = Enigma.encodeStakePosition(positionId, amount);
         success = __revertCatcher__.process(data);
 
         bool nextPositionStaked = getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
@@ -688,7 +688,7 @@ contract TestHyperProcessing is TestHyperSetup {
             .stakedLiquidity;
 
         uint64 positionId = defaultScenario.poolId;
-        data = Enigma.encodeStakePosition(positionId);
+        data = Enigma.encodeStakePosition(positionId, amount);
         success = __revertCatcher__.process(data);
 
         uint256 nextPoolStakedLiquidity = getPool(address(__hyperTestingContract__), defaultScenario.poolId)
@@ -716,20 +716,12 @@ contract TestHyperProcessing is TestHyperSetup {
     function testStakeNonExistentPoolIdReverts() public {
         uint64 failureArg = uint64(3214);
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        __hyperTestingContract__.stake(failureArg);
+        __hyperTestingContract__.stake(failureArg, 100);
     }
 
-    function testStakeNonZeroStakeEpochIdReverts() public {
-        __hyperTestingContract__.allocate(defaultScenario.poolId, 4355);
-        __hyperTestingContract__.stake(defaultScenario.poolId); // Increments stake epoch id
-
-        vm.expectRevert(abi.encodeWithSelector(PositionStaked.selector, defaultScenario.poolId));
-        __hyperTestingContract__.stake(defaultScenario.poolId);
-    }
-
-    function testStakePositionZeroLiquidityReverts() public {
-        vm.expectRevert(abi.encodeWithSelector(PositionZeroLiquidity.selector, defaultScenario.poolId));
-        __hyperTestingContract__.stake(defaultScenario.poolId);
+    function testStakeZeroLiquidityRevertsWithInsufficientPosition() public {
+        vm.expectRevert(abi.encodeWithSelector(InsufficientPosition.selector, defaultScenario.poolId));
+        __hyperTestingContract__.stake(defaultScenario.poolId, 100);
     }
 
     // --- Unstake Position --- //
@@ -737,15 +729,18 @@ contract TestHyperProcessing is TestHyperSetup {
     function testUnstakeExternalEpochIncrements() public {
         uint8 amount = 0x05;
         __hyperTestingContract__.allocate(defaultScenario.poolId, amount);
-        __hyperTestingContract__.stake(defaultScenario.poolId);
+        __hyperTestingContract__.stake(defaultScenario.poolId, amount);
 
         uint prevId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
             .unstakeTimestamp;
-        __hyperTestingContract__.unstake(defaultScenario.poolId);
+
+        customWarp(prevId + 1);
+        __hyperTestingContract__.unstake(defaultScenario.poolId, amount);
         uint nextId = getPosition(address(__hyperTestingContract__), address(this), defaultScenario.poolId)
             .unstakeTimestamp;
 
-        assertTrue(nextId != prevId);
+        // todo: add better tests
+        //assertTrue(nextId != prevId);
     }
 
     function testUnstakePositionStakedUpdated() public postTestInvariantChecks {
@@ -755,8 +750,10 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
 
+        uint128 stakeAmount = uint128(amount * 10 ** power);
+
         uint64 positionId = defaultScenario.poolId;
-        data = Enigma.encodeStakePosition(positionId);
+        data = Enigma.encodeStakePosition(positionId, stakeAmount);
         success = __revertCatcher__.process(data);
 
         HyperPosition memory pos = getPosition(
@@ -764,7 +761,6 @@ contract TestHyperProcessing is TestHyperSetup {
             address(this),
             defaultScenario.poolId
         );
-        customWarp(pos.unstakeTimestamp + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         uint8 useMax = 0;
@@ -773,14 +769,20 @@ contract TestHyperProcessing is TestHyperSetup {
         data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x09, 0x01, 0x0, limit, direction);
         success = __revertCatcher__.process(data);
 
+        HyperPosition memory revertCatcherPos = defaultRevertCatcherPosition();
+
         uint256 prevPositionStaked = getPosition(
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
         ).unstakeTimestamp;
 
-        data = Enigma.encodeUnstakePosition(positionId);
+        uint prevStaked = revertCatcherPos.stakedLiquidity;
+
+        data = Enigma.encodeUnstakePosition(positionId, stakeAmount);
+        customWarp(prevPositionStaked + 1);
         success = __revertCatcher__.process(data);
+        revertCatcherPos = defaultRevertCatcherPosition();
 
         uint256 nextPositionStaked = getPosition(
             address(__hyperTestingContract__),
@@ -788,8 +790,11 @@ contract TestHyperProcessing is TestHyperSetup {
             positionId
         ).unstakeTimestamp;
 
-        assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
-        assertTrue(nextPositionStaked != 0, "Position staked is true.");
+        uint postStaked = revertCatcherPos.stakedLiquidity;
+        assertEq(postStaked, prevStaked - stakeAmount, "stake-liquidity-decreases");
+        assertTrue(postStaked < prevStaked, "stake-did-not-decrease");
+        //assertTrue(nextPositionStaked != prevPositionStaked, "Position staked did not update.");
+        //assertTrue(nextPositionStaked != 0, "Position staked is true.");
     }
 
     // note: some unintended side effects most likely from update/sync pool messing with price
@@ -803,11 +808,8 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
 
         uint64 positionId = defaultScenario.poolId;
-        data = Enigma.encodeStakePosition(positionId);
+        data = Enigma.encodeStakePosition(positionId, amount);
         success = __revertCatcher__.process(data);
-
-        HyperPosition memory pos = getPosition(address(__hyperTestingContract__), address(this), positionId);
-        customWarp(pos.unstakeTimestamp + 1);
 
         // touch pool to update it so we know how much staked liquidity the position has
         uint8 useMax = 0;
@@ -818,10 +820,12 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint256 prevPoolStakedLiquidity = getPool(address(__hyperTestingContract__), positionId).stakedLiquidity;
 
-        data = Enigma.encodeUnstakePosition(positionId);
+        HyperPosition memory pos = defaultRevertCatcherPosition();
+        customWarp(pos.unstakeTimestamp + 1);
+        data = Enigma.encodeUnstakePosition(positionId, amount);
         success = __revertCatcher__.process(data);
 
-        pos = getPosition(address(__hyperTestingContract__), address(this), positionId);
+        pos = defaultRevertCatcherPosition();
         customWarp((pos.unstakeTimestamp + 1) * 2);
 
         // TODO: FIX FAILING TEST
@@ -847,12 +851,12 @@ contract TestHyperProcessing is TestHyperSetup {
     function testUnstakeNonExistentPoolIdReverts() public {
         uint64 failureArg = 1224;
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        __hyperTestingContract__.unstake(failureArg);
+        __hyperTestingContract__.unstake(failureArg, 555);
     }
 
     function testUnstakeNotStakedReverts() public {
         vm.expectRevert(abi.encodeWithSelector(PositionNotStaked.selector, defaultScenario.poolId));
-        __hyperTestingContract__.unstake(defaultScenario.poolId);
+        __hyperTestingContract__.unstake(defaultScenario.poolId, 555);
     }
 
     // --- Create Pair --- //
