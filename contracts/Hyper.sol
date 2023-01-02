@@ -554,7 +554,7 @@ contract Hyper is IHyper {
         timeDelta = getTimePassed(poolId);
         if (timeDelta > 0) {
             pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
-            pool.stakedLiquidityDelta = int128(0);
+            pool.stakedLiquidityDelta = 0;
         }
 
         if (pool.lastTick != tick) pool.lastTick = tick;
