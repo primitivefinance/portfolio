@@ -7,7 +7,7 @@ contract TestPriceInvariant is TestPriceSetup {
     using Price for Price.RMM;
 
     function testInvariantReturnsZeroWithDefaultPool() public {
-        int actual = cases[0].invariant(DEFAULT_QUOTE_RESERVE, DEFAULT_ASSET_RESERVE);
+        int actual = cases[0].invariantOf(DEFAULT_QUOTE_RESERVE, DEFAULT_ASSET_RESERVE);
         assertEq(actual, 0);
     }
 }

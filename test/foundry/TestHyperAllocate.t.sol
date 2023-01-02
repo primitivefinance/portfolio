@@ -68,7 +68,7 @@ contract TestHyperAllocate is TestHyperSetup {
 
         uint tau = pool.lastTau(); // seconds
 
-        uint256 theoreticalR2 = Price.computeR2WithPrice(
+        uint256 theoreticalR2 = Price.getXWithPrice(
             price,
             Price.computePriceWithTick(pool.params.maxTick),
             pool.params.volatility,

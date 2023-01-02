@@ -447,8 +447,8 @@ contract Hyper is IHyper {
             }
 
             // Compute the output of the swap by computing the difference between the dependent reserves.
-            if (_state.sell) nextDependent = rmm.computeR1WithR2(nextIndependent);
-            else nextDependent = rmm.computeR2WithR1(nextIndependent);
+            if (_state.sell) nextDependent = rmm.getYWithX(nextIndependent);
+            else nextDependent = rmm.getXWithY(nextIndependent);
 
             // Apply swap amounts to swap _state.
             _swap.input += deltaInput;
@@ -462,13 +462,13 @@ contract Hyper is IHyper {
             int256 nextInvariantWad;
 
             if (_state.sell) {
-                liveInvariantWad = rmm.invariant(liveDependent, liveIndependent);
-                nextInvariantWad = rmm.invariant(nextDependent, nextIndependent);
-                nextPrice = rmm.computePriceWithR2(nextIndependent);
+                liveInvariantWad = rmm.invariantOf(liveDependent, liveIndependent);
+                nextInvariantWad = rmm.invariantOf(nextDependent, nextIndependent);
+                nextPrice = rmm.getPriceWithX(nextIndependent);
             } else {
-                liveInvariantWad = rmm.invariant(liveIndependent, liveDependent);
-                nextInvariantWad = rmm.invariant(nextIndependent, nextDependent);
-                nextPrice = rmm.computePriceWithR2(nextDependent);
+                liveInvariantWad = rmm.invariantOf(liveIndependent, liveDependent);
+                nextInvariantWad = rmm.invariantOf(nextIndependent, nextDependent);
+                nextPrice = rmm.getPriceWithX(nextDependent);
             }
 
             if (!_state.sell && nextPrice > limitPrice) revert SwapLimitReached();

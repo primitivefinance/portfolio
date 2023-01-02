@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {HyperCurve, Pair} from "../HyperLib.sol";
+import {HyperCurve, Pair} from "..//HyperLib.sol";
 
 interface IHyperEvents {
     event Deposit(address indexed account, uint amount);
@@ -14,7 +14,6 @@ interface IHyperEvents {
         uint256 deltaQuote,
         uint256 deltaLiquidity
     );
-
     event Unallocate(
         uint64 indexed poolId,
         address indexed asset,
@@ -23,12 +22,9 @@ interface IHyperEvents {
         uint256 deltaQuote,
         uint256 deltaLiquidity
     );
-
     event Swap(uint64 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
-
     event Stake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
     event Unstake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
-
     event CreatePair(
         uint24 indexed pairId,
         address indexed asset,
@@ -36,7 +32,6 @@ interface IHyperEvents {
         uint8 decimalsAsset,
         uint8 decimalsQuote
     );
-
     event CreatePool(
         uint64 indexed poolId,
         bool isMutable,
@@ -57,7 +52,6 @@ interface IHyperEvents {
         uint256 feeQuote,
         address quote
     );
-
     event Collect(
         uint64 indexed poolId,
         address account,
@@ -66,7 +60,6 @@ interface IHyperEvents {
         uint feeQuote,
         address indexed tokenQuote
     );
-
     event PoolUpdate(
         uint64 indexed poolId,
         uint256 price,
@@ -77,7 +70,6 @@ interface IHyperEvents {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote
     );
-
     event ChangeParameters(
         uint64 indexed poolId,
         uint16 priorityFee,
@@ -98,7 +90,7 @@ interface IHyperGetters {
 
     function pairs(
         uint24 pairId
-    ) external view returns (address tokenasset, uint8 decimalsasset, address tokenQuote, uint8 decimalsQuote);
+    ) external view returns (address tokenAsset, uint8 decimalsAsset, address tokenQuote, uint8 decimalsQuote);
 
     function pools(
         uint64 poolId

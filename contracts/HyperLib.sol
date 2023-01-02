@@ -254,8 +254,8 @@ function getAmounts(HyperPool memory self) view returns (uint amountAssetDec, ui
 /** @dev WAD Amounts per WAD of liquidity. */
 function getAmountsWad(HyperPool memory self) view returns (uint amountAssetWad, uint amountQuoteWad) {
     Price.RMM memory rmm = self.getRMM();
-    amountAssetWad = rmm.computeR2WithPrice(self.lastPrice);
-    amountQuoteWad = rmm.computeR1WithR2(amountAssetWad);
+    amountAssetWad = rmm.getXWithPrice(self.lastPrice);
+    amountQuoteWad = rmm.getYWithX(amountAssetWad);
 }
 
 function getMaxSwapAssetInWad(HyperPool memory self) view returns (uint) {
@@ -318,8 +318,8 @@ function getAmountOut(
         }
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
-        if (sellAsset) nextDep = rmm.computeR1WithR2(nextInd);
-        else nextDep = rmm.computeR2WithR1(nextInd);
+        if (sellAsset) nextDep = rmm.getYWithX(nextInd);
+        else nextDep = rmm.getXWithY(nextInd);
 
         data.input += delInput;
         data.output += (prevDep - nextDep);
