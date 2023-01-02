@@ -25,10 +25,12 @@ using {
     tau,
     getRMM,
     getAmountOut,
-    getAmountsWad
+    getAmountsWad,
+    getMaxSwapAssetInWad,
+    getMaxSwapQuoteInWad
 } for HyperPool global;
 using {maturity, checkParameters, revertOnInvalid} for HyperCurve global;
-using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
+using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged, syncPositionStakedFees} for HyperPosition global;
 using Price for Price.RMM;
 using SafeCastLib for uint;
 using FixedPointMathLib for uint;
@@ -110,7 +112,8 @@ struct HyperPool {
 
 // todo: optimize slot
 struct HyperPosition {
-    uint128 totalLiquidity;
+    uint128 freeLiquidity;
+    uint128 stakedLiquidity;
     uint256 lastTimestamp;
     uint256 stakeTimestamp;
     uint256 unstakeTimestamp;
@@ -400,10 +403,17 @@ function syncPositionFees(
     self.feeGrowthQuoteLast = feeGrowthQuote;
 
     self.tokensOwedAsset += SafeCastLib.safeCastTo128(feeAssetEarned);
-    self.tokensOwedQuote += SafeCastLib.safeCastTo128(feeAssetEarned);
+    self.tokensOwedQuote += SafeCastLib.safeCastTo128(feeQuoteEarned);
+}
+
+function syncPositionStakedFees(HyperPosition storage self, uint liquidity, uint feeGrowth) returns (uint feeEarned) {
+    uint checkpoint = Assembly.computeCheckpointDistance(feeGrowth, self.feeGrowthAssetLast); //todo: add another var to pool
+    feeEarned = FixedPointMathLib.mulWadDown(checkpoint, liquidity);
+    self.feeGrowthAssetLast = feeEarned;
+    self.tokensOwedAsset += SafeCastLib.safeCastTo128(feeEarned);
 }
 
 function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
     self.lastTimestamp = timestamp;
-    self.totalLiquidity = Assembly.addSignedDelta(self.totalLiquidity, liquidityDelta);
+    self.freeLiquidity = Assembly.addSignedDelta(self.freeLiquidity, liquidityDelta);
 }

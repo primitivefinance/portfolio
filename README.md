@@ -51,3 +51,5 @@ Changing a position:
 - [x] Add parameter validation to changeParameters function
 - [x] Rename HyperLib to HyperLib ?
 - [x] TOKEN DECIMALS NOT HANDLED
+- [ ] Claim fees working and tested
+- [ ] Investigate price movements by swap.

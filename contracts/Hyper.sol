@@ -37,7 +37,7 @@ contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using Price for Price.RMM;
-    using {Assembly.scaleFromWadDown} for uint;
+    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp} for uint;
     using {Assembly.scaleFromWadDownSigned} for int;
 
     OS.AccountSystem public __account__;
@@ -188,6 +188,18 @@ contract Hyper is IHyper {
         emit Deposit(msg.sender, msg.value);
     }
 
+    // todo: test
+    function claim(uint64 poolId, uint deltaAsset, uint deltaQuote) external lock interactions {
+        HyperPool memory pool = pools[poolId];
+        HyperPosition storage pos = positions[msg.sender][poolId];
+        pos.syncPositionFees(pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        pos.tokensOwedAsset -= deltaAsset.safeCastTo128();
+        pos.tokensOwedQuote -= deltaQuote.safeCastTo128();
+        if (deltaAsset > 0) _applyCredit(pool.pair.tokenAsset, deltaAsset); // todo: problem, what balance do fees accrue to?
+        if (deltaQuote > 0) _applyCredit(pool.pair.tokenQuote, deltaQuote); // todo: add debit to this contract?
+        emit Collect(poolId, msg.sender, deltaAsset, pool.pair.tokenAsset, deltaQuote, pool.pair.tokenQuote);
+    }
+
     // ===== Effects ===== //
 
     /** @dev Increases virtal reserves and liquidity. Debits `msg.sender`. */
@@ -276,7 +288,7 @@ contract Hyper is IHyper {
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint deltaAsset, uint deltaQuote) {
-        if (useMax) deltaLiquidity = positions[msg.sender][poolId].totalLiquidity;
+        if (useMax) deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
         if (deltaLiquidity == 0) revert ZeroLiquidity();
 
         HyperPool memory pool = pools[poolId];
@@ -304,16 +316,36 @@ contract Hyper is IHyper {
 
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.stakeTimestamp != 0) revert PositionStaked(poolId);
-        if (pos.totalLiquidity == 0) revert PositionZeroLiquidity(poolId);
+        if (pos.freeLiquidity == 0) revert PositionZeroLiquidity(poolId);
 
         HyperPool storage pool = pools[poolId];
-        pool.stakedLiquidityDelta += int128(pos.totalLiquidity);
+        uint128 deltaLiquidity = pos.freeLiquidity;
+        pos.freeLiquidity = 0;
+        pool.stakedLiquidityDelta += int128(deltaLiquidity); // adds to total stake
+        if (pos.stakeTimestamp == 0) pos.stakeTimestamp = _blockTimestamp();
+        //if (pos.unstakeTimestamp == 0) pos.unstakeTimestamp = pool.params.maturity();
 
-        pos.stakeTimestamp = _blockTimestamp(); // todo: fix
+        emit Stake(poolId, msg.sender, deltaLiquidity);
+    }
 
-        // note: do we need to update position lastTimestamp?
+    uint lastUpdated;
+    address reward;
 
-        // emit Stake Position
+    error InvalidReward();
+
+    function _changeStake(uint64 poolId, address owner) internal returns (uint feeEarned) {
+        HyperPool memory pool = pools[poolId];
+        HyperPosition storage pos = positions[owner][poolId];
+
+        feeEarned = pos.syncPositionStakedFees(pool.stakedLiquidity, pos.lastRewardGrowth);
+        _applyCredit(reward, feeEarned); // tokens must be already in this contract's reserves.
+        address controller = pool.controller;
+        if (getBalance(controller, reward) < feeEarned) revert InvalidReward();
+        __account__.debit(controller, reward, feeEarned); // tokens must be in controller account?
+    }
+
+    function lastTime(HyperPool memory pool) public view returns (uint) {
+        return computeMin(pool.params.maturity(), _blockTimestamp());
     }
 
     function _unstake(uint64 poolId) internal {
@@ -323,13 +355,19 @@ contract Hyper is IHyper {
         if (pos.stakeTimestamp == 0 || pos.unstakeTimestamp != 0) revert PositionNotStaked(poolId);
 
         HyperPool storage pool = pools[poolId];
-        pool.stakedLiquidityDelta -= int128(pos.totalLiquidity);
+        uint128 deltaLiquidity = pos.stakedLiquidity;
+        pool.stakedLiquidityDelta -= int128(deltaLiquidity);
+        pos.freeLiquidity += deltaLiquidity;
 
         pos.unstakeTimestamp = _blockTimestamp(); // todo: fix
 
         // note: do we need to update position lastTimestamp?
 
-        // emit Unstake Position
+        emit Unstake(poolId, msg.sender, deltaLiquidity);
+    }
+
+    function computeMin(uint x, uint y) private pure returns (uint) {
+        return x <= y ? x : y;
     }
 
     // ===== Swaps ===== //
@@ -437,12 +475,13 @@ contract Hyper is IHyper {
             if (!state.sell && nextPrice > limitPrice) revert SwapLimitReached();
             if (state.sell && limitPrice > nextPrice) revert SwapLimitReached();
 
+            emit log(nextInvariantWad, liveInvariantWad);
             liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
             nextInvariantWad = nextInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
             // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision)?
             if (nextInvariantWad < liveInvariantWad) revert InvalidInvariant(liveInvariantWad, nextInvariantWad);
 
-            _swap.price = nextPrice;
+            _swap.price = (nextPrice * 10_000_001) / 10_000_000; // todo: investigate, now have too much asset, actually thats dust
         }
 
         {
@@ -457,7 +496,7 @@ contract Hyper is IHyper {
                 outputDec = pair.decimalsAsset;
             }
 
-            _swap.input = _swap.input.scaleFromWadDown(inputDec);
+            _swap.input = _swap.input.scaleFromWadUp(inputDec);
             _swap.output = _swap.output.scaleFromWadDown(outputDec);
         }
 
@@ -478,6 +517,9 @@ contract Hyper is IHyper {
         (poolId, remainder, input, output) = (args.poolId, _swap.remainder, _swap.input, _swap.output);
         emit Swap(args.poolId, _swap.input, _swap.output, state.tokenInput, state.tokenOutput);
     }
+
+    event log(int, int);
+    event log(string);
 
     /**
      * @dev Computes the price of the pool, which changes over time. Syncs pool to new price if enough time has passed.

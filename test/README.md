@@ -140,7 +140,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - Postconditions:
   - The `pools` `liquidity` for `poolId` always increases by `deltaLiquidity`.
   - The `pools` `liquidity` for `poolId` never decreases.
-  - The Caller's `positions` `totalLiquidity` for `poolId` always increased by `deltaLiquidity`.
+  - The Caller's `positions` `freeLiquidity` for `poolId` always increased by `deltaLiquidity`.
   - Calling `unallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - Hyper's `reserves` value for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
@@ -152,14 +152,14 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 #### Unallocate
 
 - Preconditions:
-  - The Caller's `positions` `totalLiquidity` for `poolId` is greater than zero.
+  - The Caller's `positions` `freeLiquidity` for `poolId` is greater than zero.
   - The Caller's `positions` `lastTimestamp` for `poolId` is less than `block.timestamp` by at least (equal) `JIT_LIQUIDITY_POLICY` seconds.
 - During Execution:
   - n/a
 - Postconditions:
   - The `pools` `liquidity` for `poolId` always decreases by `deltaLiquidity`.
   - The `pools` `liquidity` for `poolId` never increases.
-  - The Caller's `positions` `totalLiquidity` for `poolId` always decreases by `deltaLiquidity`.
+  - The Caller's `positions` `freeLiquidity` for `poolId` always decreases by `deltaLiquidity`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - The Caller's `balances` value for the pool's tokens increases by respective amounts computed with `getAmounts`.
   - Hyper's `reserves` value for the pool's tokens stays the same.

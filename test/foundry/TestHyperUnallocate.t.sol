@@ -8,7 +8,7 @@ contract TestHyperUnallocate is TestHyperSetup {
         __hyperTestingContract__.allocate(defaultScenario.poolId, 1 ether);
 
         uint maxLiquidity = getPosition(address(__hyperTestingContract__), msg.sender, defaultScenario.poolId)
-            .totalLiquidity;
+            .freeLiquidity;
 
         __hyperTestingContract__.unallocate(defaultScenario.poolId, type(uint256).max);
 

@@ -26,6 +26,9 @@ interface IHyperEvents {
 
     event Swap(uint64 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
 
+    event Stake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
+    event Unstake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
+
     event CreatePair(
         uint24 indexed pairId,
         address indexed asset,
@@ -53,6 +56,15 @@ interface IHyperEvents {
         address asset,
         uint256 feeQuote,
         address quote
+    );
+
+    event Collect(
+        uint64 indexed poolId,
+        address account,
+        uint feeAsset,
+        address indexed tokenAsset,
+        uint feeQuote,
+        address indexed tokenQuote
     );
 
     event PoolUpdate(
@@ -114,7 +126,8 @@ interface IHyperGetters {
         external
         view
         returns (
-            uint128 totalLiquidity,
+            uint128 freeLiquidity,
+            uint128 stakedLiquidity,
             uint256 lastTimestamp,
             uint256 stakeTimestamp,
             uint256 unstakeTimestamp,
