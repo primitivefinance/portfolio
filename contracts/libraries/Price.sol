@@ -3,6 +3,8 @@ pragma solidity 0.8.13;
 
 import "./Invariant.sol";
 
+using Price for Price.RMM global;
+
 /**
  * @dev Comprehensive library to compute reserves, prices, and changes in reserves over time.
  */
@@ -23,7 +25,7 @@ library Price {
     /**
      * @notice Packaged data structure to easily compute single values from a set of parameters.
      */
-    struct Expiring {
+    struct RMM {
         uint256 strike;
         uint256 sigma;
         uint256 tau;
@@ -31,35 +33,35 @@ library Price {
 
     // ===== Class Methods ===== //
 
-    function invariant(Expiring memory args, uint R1, uint R2) internal pure returns (int256) {
+    function invariant(RMM memory args, uint R1, uint R2) internal pure returns (int256) {
         return Invariant.invariant(R1, R2, args.strike, convertPercentageToWad(args.sigma), args.tau);
     }
 
-    function computeR2WithPrice(Expiring memory args, uint256 price) internal pure returns (uint256 R2) {
+    function computeR2WithPrice(RMM memory args, uint256 price) internal pure returns (uint256 R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
     }
 
-    function computePriceWithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 price) {
+    function computePriceWithR2(RMM memory args, uint256 R2) internal pure returns (uint256 price) {
         price = computePriceWithR2(R2, args.strike, args.sigma, args.tau);
     }
 
-    function computeR1WithR2(Expiring memory args, uint256 R2) internal pure returns (uint256 R1) {
+    function computeR1WithR2(RMM memory args, uint256 R2) internal pure returns (uint256 R1) {
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, 0);
     }
 
-    function computeR2WithR1(Expiring memory args, uint256 R1) internal pure returns (uint256 R2) {
+    function computeR2WithR1(RMM memory args, uint256 R1) internal pure returns (uint256 R2) {
         R2 = computeR2WithR1(R1, args.strike, args.sigma, args.tau, 0);
     }
 
     function computePriceWithChangeInTau(
-        Expiring memory args,
+        RMM memory args,
         uint256 prc,
         uint256 epsilon
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, epsilon);
     }
 
-    function computeReserves(Expiring memory args, uint price) internal pure returns (uint R1, uint R2) {
+    function computeReserves(RMM memory args, uint price) internal pure returns (uint R1, uint R2) {
         R2 = computeR2WithPrice(price, args.strike, args.sigma, args.tau);
         R1 = computeR1WithR2(R2, args.strike, args.sigma, args.tau, 0);
     }
@@ -80,8 +82,9 @@ library Price {
         uint256 epsilon
     ) internal pure returns (uint256) {
         if (epsilon == 0) return prc;
+        if (epsilon > tau) return stk;
 
-        Expiring memory params = Expiring(stk, vol, tau);
+        RMM memory params = RMM(stk, vol, tau);
 
         uint256 tauYears;
         assembly {
@@ -107,10 +110,9 @@ library Price {
             uint256 tausSqrt = tauYears.sqrt() * (currentTau).sqrt(); // sqrt(1e18) = 1e9, so 1e9 * 1e9 = 1e18
             uint256 term_4 = tausSqrt - currentTau; // WAD - WAD = WAD
 
-            uint256 sigmaWad = (uint256(params.sigma) * UNIT_WAD) / 1e4;
+            uint256 sigmaWad = convertPercentageToWad(uint256(params.sigma));
 
             uint256 term_5 = (sigmaWad * sigmaWad) / UNIT_DOUBLE_WAD; // 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
-
             uint256 term_6 = uint256((int256(term_5.mulWadDown(term_4))).expWad()); // exp(WAD * WAD / WAD)
             term_7 = uint256(params.strike).mulWadDown(term_6); // WAD * WAD / WAD
         }

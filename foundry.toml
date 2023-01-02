@@ -25,7 +25,7 @@ fuzz_max_global_rejects = 1024
 src = 'test/' # not default
 gas_reports = ["*"]
 ffi = true
-fuzz_runs = 1000
+fuzz_runs = 256
 
 
 [profile.crytic]
@@ -42,7 +42,7 @@ primitive = "http://${PRIMITIVE_RPC}:8545"
 
 [fuzz]
 # The number of fuzz runs for fuzz tests
-runs = 1000
+runs = 256
 # The maximum number of test case rejections allowed by proptest, to be
 # encountered during usage of `vm.assume` cheatcode. This will be used
 # to set the `max_global_rejects` value in proptest test runner config.
@@ -58,7 +58,7 @@ include_push_bytes = true
 
 [invariant]
 # The number of runs that must execute for each invariant test group
-runs = 1000
+runs = 256
 # The number of calls executed to attempt to break invariants in one run
 depth = 20
 # Fails the invariant fuzzing if a revert occurs

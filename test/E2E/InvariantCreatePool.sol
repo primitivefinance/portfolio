@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "contracts/CPU.sol" as CPU;
+import "contracts/HyperLib.sol" as HyperTypes;
+import "contracts/Enigma.sol" as Enigma;
 import "./setup/InvariantTargetContract.sol";
 
 contract InvariantCreatePool is InvariantTargetContract {
@@ -25,8 +26,8 @@ contract InvariantCreatePool is InvariantTargetContract {
 
         maturity = uint32(block.timestamp + bound(maturity, 1, 365 days));
         price = uint128(bound(price, 1, 1e36));
-        gamma = uint32(bound(sigma, 1e4 - __hyper__.MAX_POOL_FEE(), 1e4 - __hyper__.MIN_POOL_FEE()));
-        priorityGamma = uint32(bound(sigma, gamma, 1e4 - __hyper__.MIN_POOL_FEE()));
+        gamma = uint32(bound(sigma, 1e4 - HyperTypes.MAX_FEE, 1e4 - HyperTypes.MIN_FEE));
+        priorityGamma = uint32(bound(sigma, gamma, 1e4 - HyperTypes.MIN_FEE));
 
         // Random user
         address caller = ctx.getRandomUser(index);
@@ -80,37 +81,35 @@ contract InvariantCreatePool is InvariantTargetContract {
     bytes[] instructions;
 
     function _assertCreatePool(CreateArgs memory args) internal {
-        uint16 pairId = __hyper__.getPairId(args.token0, args.token1);
+        bool isMutable = true;
+        uint24 pairId = __hyper__.getPairId(args.token0, args.token1);
+        {
+            // Pair not created? Push a create pair call to the stack.
+            if (pairId == 0) instructions.push(Enigma.encodeCreatePair(args.token0, args.token1));
 
-        // Pair not created? Push a create pair call to the stack.
-        if (pairId == 0) instructions.push(CPU.encodeCreatePair(args.token0, args.token1));
-
-        uint16 fee = uint16(1e4 - args.gamma);
-        uint16 priorityFee = uint16(1e4 - args.priorityGamma);
-        bytes32 rawCurveId = CPU.toBytes32(abi.encodePacked(args.sigma, args.maturity, fee, priorityFee, args.strike));
-        uint32 curveId = __hyper__.getCurveId(rawCurveId);
-
-        // Curve not created? Push create curve to stack.
-        if (curveId == 0)
-            instructions.push(CPU.encodeCreateCurve(args.sigma, args.maturity, fee, priorityFee, args.strike));
-
-        // Push create pool to stack
-        uint48 poolId = CPU.encodePoolId(pairId, curveId);
-        instructions.push(CPU.encodeCreatePool(poolId, args.price));
-
-        bytes memory payload = CPU.encodeJumpInstruction(instructions);
+            // Push create pool to stack
+            instructions.push(
+                Enigma.encodeCreatePool(
+                    pairId,
+                    address(this),
+                    1, // priorityFee
+                    1, // fee
+                    1, // vol
+                    1, // dur
+                    5,
+                    int24(20_000),
+                    args.price
+                )
+            ); // temp
+        }
+        bytes memory payload = Enigma.encodeJumpInstruction(instructions);
         vm.prank(args.caller);
         console.logBytes(payload);
         (bool success, bytes memory reason) = address(__hyper__).call(payload);
         assembly {
             log0(add(32, reason), mload(reason))
         }
-        /*  string memory message;
-        assembly {
-            message := mload(add(32, reason))
-        }
 
-        console.log(message); */
         //bool success = forwarder.forward(address(__hyper__), payload); // TODO: Fallback function does not bubble up custom errors.
         assertTrue(success, "hyper-call-failed");
 
@@ -118,10 +117,8 @@ contract InvariantCreatePool is InvariantTargetContract {
         pairId = __hyper__.getPairId(args.token0, args.token1);
         assertTrue(pairId != 0, "pair-not-created");
 
-        curveId = __hyper__.getCurveId(rawCurveId);
-        assertTrue(curveId != 0, "curve-not-created");
-
-        poolId = CPU.encodePoolId(pairId, curveId);
+        // todo: make sure we create the last pool...
+        uint64 poolId = Enigma.encodePoolId(pairId, isMutable, uint32(__hyper__.getPoolNonce()));
 
         // Add the created pool to the list of pools.
         assertTrue(getPool(address(__hyper__), poolId).lastPrice != 0, "pool-price-zero");

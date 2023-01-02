@@ -1,83 +1,75 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
+import "contracts/HyperLib.sol" as HyperTypes;
 import "./setup/TestHyperSetup.sol";
+import "test/helpers/HelperHyperProfiles.sol";
 
 contract TestHyperSwap is TestHyperSetup {
     modifier allocateFirst() {
-        __hyperTestingContract__.allocate(defaultScenario.poolId, 1e18);
+        __hyperTestingContract__.allocate(defaultScenario.poolId, 10 ether);
         _;
     }
 
-    function testSwap_should_succeed() public allocateFirst() {
+    function testSwap_should_succeed() public allocateFirst {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
+        uint input = DEFAULT_SWAP_INPUT;
+        uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
+        (uint out, ) = pool.getAmountOut(
+            getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40)),
+            true,
+            input,
+            0
+        );
+
         (uint output, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
-            false,
-            10000,
-            type(uint256).max
+            true,
+            input,
+            0 // limit
         );
+
+        assertEq(output, expected, "expected-output");
+
+        (uint amount0, uint amount1) = pool.getAmounts();
+        console.log("amounts", amount0, amount1);
+        console.log("outputs, actual, expected", output, out);
     }
 
-    function testSwap_back_and_forth_outputs_less() public allocateFirst() {
+    function testSwap_back_and_forth_outputs_less() public allocateFirst {
         uint256 start = 10000;
 
+        bool direction = false;
         (uint output, ) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
-            false,
+            direction,
             start,
-            type(uint256).max
+            direction ? 0 : type(uint128).max
         );
 
+        direction = true;
         (uint finalOutput, ) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
-            true,
+            direction,
             output,
-            type(uint256).max
+            direction ? 0 : type(uint128).max
         );
 
         assertGt(start, finalOutput);
     }
 
-    function testSwap_revert_PoolExpiredError() public allocateFirst() {
-        (
-            uint256 lastPrice,
-            int24 lastTick,
-            uint256 blockTimestamp,
-            uint256 liquidity,
-            uint256 stakedLiquidity,
-            uint256 borrowableLiquidity,
-            int256 epochStakedLiquidityDelta,
-            address prioritySwapper,
-            uint256 priorityPaymentPerSecond,
-            uint256 feeGrowthGlobalAsset,
-            uint256 feeGrowthGlobalQuote
-        ) = __hyperTestingContract__.pools(
-            defaultScenario.poolId
-        );
-
-        Curve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
-
-        // assumes curve.maturity is passed block.timestamp
-        customWarp(curve.maturity + __hyperTestingContract__.BUFFER() + 1);
-
-        vm.expectRevert(PoolExpiredError.selector);
-
-        __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            false,
-            10000,
-            50
-        );
+    function testSwap_revert_PoolExpired() public allocateFirst {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint end = pool.params.createdAt + Assembly.convertDaysToSeconds(pool.params.duration);
+        customWarp(end + 1);
+        vm.expectRevert(PoolExpired.selector);
+        __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, type(uint128).max);
     }
 
     function testSwap_revert_ZeroInput() public {
         vm.expectRevert(ZeroInput.selector);
-        __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            true,
-            0,
-            0
-        );
+        __hyperTestingContract__.swap(defaultScenario.poolId, true, 0, 0);
     }
 
     /*

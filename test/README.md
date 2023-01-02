@@ -133,47 +133,47 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 #### Allocate
 
 - Preconditions:
-  - The `pools` value for `poolId` must have a `lastPrice` != 0 and a `blockTimestamp` != 0.
+  - The `pools` value for `poolId` must have a `lastPrice` != 0 and a `lastTimestamp` != 0.
   - Caller must have approved and have a balance to spend equal to `amounts` returned by the function `getAmounts` for `deltaLiquidity` for `poolId`, or Caller must have an equivalent amount in their `balances` for both tokens.
 - During Execution:
   - n/a
 - Postconditions:
   - The `pools` `liquidity` for `poolId` always increases by `deltaLiquidity`.
   - The `pools` `liquidity` for `poolId` never decreases.
-  - The Caller's `positions` `totalLiquidity` for `poolId` always increased by `deltaLiquidity`.
+  - The Caller's `positions` `freeLiquidity` for `poolId` always increased by `deltaLiquidity`.
   - Calling `unallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - Hyper's `reserves` value for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
   - The `balanceOf` Hyper for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
-  - The `IncreasePosition` event is emitted.
+  - The `ChangePosition` event is emitted.
   - The `Allocate` event is emitted.
-  - The `FeesEarned` event was emitted if the `feeGrowth{}` values changed.
+  - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
 #### Unallocate
 
 - Preconditions:
-  - The Caller's `positions` `totalLiquidity` for `poolId` is greater than zero.
-  - The Caller's `positions` `blockTimestamp` for `poolId` is less than `block.timestamp` by at least (equal) `JIT_LIQUIDITY_POLICY` seconds.
+  - The Caller's `positions` `freeLiquidity` for `poolId` is greater than zero.
+  - The Caller's `positions` `lastTimestamp` for `poolId` is less than `block.timestamp` by at least (equal) `JIT_LIQUIDITY_POLICY` seconds.
 - During Execution:
   - n/a
 - Postconditions:
   - The `pools` `liquidity` for `poolId` always decreases by `deltaLiquidity`.
   - The `pools` `liquidity` for `poolId` never increases.
-  - The Caller's `positions` `totalLiquidity` for `poolId` always decreases by `deltaLiquidity`.
+  - The Caller's `positions` `freeLiquidity` for `poolId` always decreases by `deltaLiquidity`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - The Caller's `balances` value for the pool's tokens increases by respective amounts computed with `getAmounts`.
   - Hyper's `reserves` value for the pool's tokens stays the same.
   - The `balanceOf` Hyper for the pool's tokens stays the same.
   - The `DecreasePosition` event is emitted.
   - The `Unallocate` event is emitted.
-  - The `FeesEarned` event was emitted if the `feeGrowth{}` values changed.
+  - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
 #### Swap
 
 - Preconditions:
   - For swaps with the argument `direction = 0` then the input token for `poolId` is the pair's `pair.tokenAsset`, else or swaps with the argument `direction = 1` then the input token for `poolId` is the pair's `pair.tokenQuote`
     - Caller must have approved token to be spent by Hyper and have `input` of tokens, or Caller must have `input` of tokens in their `balances`.
-  - The `pools` `poolId` value must return a `blockTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
+  - The `pools` `poolId` value must return a `lastTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
   - The `input` amount must be greater than zero.
   - The `poolId`'s `curve.maturity` value must be less than `block.timestamp`.
 - During Execution:

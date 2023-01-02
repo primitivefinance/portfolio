@@ -2,10 +2,11 @@
 pragma solidity 0.8.13;
 
 import "solmate/utils/SafeTransferLib.sol";
-
 import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
-import {BalanceError, EtherTransferFail} from "./EnigmaTypes.sol";
+import "./Assembly.sol" as Assembly;
+
+import {console} from "forge-std/Test.sol";
 
 using {
     __wrapEther__,
@@ -16,12 +17,10 @@ using {
     decrease,
     credit,
     debit,
-    prepare,
     settle,
-    settlement,
-    clear,
-    getNetBalance,
-    touch
+    reset,
+    touch,
+    getNetBalance
 } for AccountSystem global;
 
 /** @dev Novel accounting mechanism to track internally held balances and settle differences with actual balances. */
@@ -34,22 +33,23 @@ struct AccountSystem {
     bool settled; // Must be true outside of execution.
 }
 
-error InsufficientBalance(uint amount, uint delta);
+error EtherTransferFail();
+error InsufficientReserve(uint amount, uint delta);
+error InvalidBalance();
 error NotPreparedToSettle();
 
 /** @dev Gas optimized. */
 function __balanceOf__(address token, address account) view returns (uint256) {
     (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
-    if (!success || data.length != 32) revert BalanceError();
+    if (!success || data.length != 32) revert InvalidBalance();
     return abi.decode(data, (uint256));
 }
 
-/** @dev Sends ether in `deposit` function to target address. Must validate `weth`. */
+/** @dev Must validate `weth`. */
 function __wrapEther__(AccountSystem storage self, address weth) {
-    // todo: be careful with this, since it uses msg.value
     if (msg.value > 0) {
-        IWETH(weth).deposit{value: msg.value}();
         self.touch(weth);
+        IWETH(weth).deposit{value: msg.value}();
     }
 }
 
@@ -65,16 +65,18 @@ function __dangerousTransferEther__(address to, uint256 value) {
     if (!success) revert EtherTransferFail();
 }
 
-/** @dev Used in a for loop in the `settlement` function. */
+/** @dev External call to the `to` address is dangerous. */
 function __dangerousTransferFrom__(address token, address to, uint amount) {
     SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
 }
 
+/** @dev External call to the `to` address is dangerous. */
 function dangerousFund(AccountSystem storage self, address token, address to, uint amount) {
     self.increase(token, amount);
     __dangerousTransferFrom__(token, to, amount);
 }
 
+/** @dev Dangerously sends ether or tokens to `to` in a low-level call. */
 function dangerousDraw(AccountSystem storage self, address weth, address token, uint amount, address to) {
     self.decrease(token, amount);
     if (token == weth) __dangerousUnwrapEther__(weth, to, amount);
@@ -87,14 +89,27 @@ function credit(AccountSystem storage self, address owner, address token, uint a
 }
 
 /** @dev Decreases an `owner`'s spendable balance. */
-function debit(AccountSystem storage self, address owner, address token, uint amount) returns (bool paid) {
+function debit(
+    AccountSystem storage self,
+    address owner,
+    address token,
+    uint256 owed
+) returns (uint paid, uint remainder) {
     uint balance = self.balances[owner][token];
-    if (balance >= amount) {
-        self.balances[owner][token] -= amount;
-        paid = true;
+    console.log("balance", balance);
+    console.log("owed", owed);
+    if (balance >= owed) {
+        paid = owed;
+        self.balances[owner][token] -= paid;
+        remainder = 0;
+    } else {
+        paid = balance;
+        self.balances[owner][token] -= paid;
+        remainder = owed - paid;
     }
 
-    paid = false; // for clarity
+    console.log("paid", paid);
+    console.log("remainder", remainder);
 }
 
 /** @dev Actives a token and increases the reserves. Settlement will pick up this activated token. */
@@ -106,60 +121,29 @@ function increase(AccountSystem storage self, address token, uint amount) {
 /** @dev Actives a token and decreases the reserves. Settlement will pick up this activated token. */
 function decrease(AccountSystem storage self, address token, uint amount) {
     uint balance = self.reserves[token];
-    if (amount > balance) revert InsufficientBalance(balance, amount);
+    if (amount > balance) revert InsufficientReserve(balance, amount);
+
     self.touch(token);
     self.reserves[token] -= amount;
 }
 
-/** @dev Must be called prior to settlement. */
-function prepare(AccountSystem storage self) {
-    self.prepared = true;
-}
-
 /** @notice Settles the difference in balance between tracked tokens and physically held tokens. */
-function settle(AccountSystem storage self, function(address, address, uint) pay, address token, address account) {
-    if (!self.prepared) revert NotPreparedToSettle();
-    delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of this internal fn.
+function settle(
+    AccountSystem storage self,
+    address token,
+    address account
+) returns (uint credited, uint debited, uint remainder) {
+    delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of the transaction.
 
     int net = self.getNetBalance(token, account);
     if (net > 0) {
-        self.credit(msg.sender, token, uint(net));
+        self.credit(msg.sender, token, uint(net)); // apply the difference to user
+        self.reserves[token] += uint(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {
-        uint amount = uint(-net);
-        bool paid = self.debit(msg.sender, token, amount);
-        if (!paid) pay(token, account, amount); // todo: fix this, seems dangerous using an anonymous function?
+        remainder = uint(-net);
+        (debited, remainder) = self.debit(msg.sender, token, remainder);
+        if (debited > 0) self.reserves[token] -= debited; // using a balance means tokens are in contract already.
     }
-}
-
-/** @dev Settles the discrepency in all activated token balances so the net balance is zero or positive. */
-function settlement(AccountSystem storage self, function(address, address, uint) pay, address account) {
-    if (!self.prepared) revert NotPreparedToSettle();
-
-    // TODO: Write this into some documentation somewhere:
-    // if tokens are not appropriately cached, or do not exist in the warm array
-    // then its possible for the contract to become insolvent, meaning the physical balance
-    // is less than the contracts internally tracked balance.
-    // These next few functions are the most critical in the entire contract, and they are
-    // sort of obscure.
-    // I recently fixed two bugs:
-    // Token was not removed from cache at the end of settlement,
-    // which means it wasnt pushed to the warm address array,
-    // which means the contract assumes the token was completely paid for.
-    // It was paid for, when it was cached! But if you get to carry over the cached bool,
-    // you win.
-    // The other issue was with `return` statements in the for loop. This will exit
-    // the execution of the for loop, leading to some tokens not being paid for.
-    address[] memory tokens = self.warm;
-    uint loops = tokens.length;
-    if (loops == 0) return self.clear();
-
-    uint i;
-    for (i; i != loops; ++i) {
-        address token = tokens[i];
-        self.settle(pay, token, account);
-    }
-
-    self.clear();
 }
 
 /** @dev Interacting with a token will activate it, adding it to an array of interacted tokens for settlement to loop through. */
@@ -172,7 +156,8 @@ function touch(AccountSystem storage self, address token) {
 }
 
 /** @dev Account system is reset after settlement is successful. */
-function clear(AccountSystem storage self) {
+function reset(AccountSystem storage self) {
+    assert(self.warm.length == 0);
     self.settled = true;
     delete self.warm;
     delete self.prepared;

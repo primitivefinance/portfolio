@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
 import "contracts/libraries/Price.sol";
-import "contracts/EnigmaTypes.sol";
+import "contracts/HyperLib.sol";
 import "test/helpers/HelperHyperActions.sol";
 import "test/helpers/HelperHyperInvariants.sol";
 import "test/helpers/HelperHyperProfiles.sol";

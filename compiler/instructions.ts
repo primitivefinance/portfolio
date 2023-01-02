@@ -216,9 +216,9 @@ export function encodeAllocate(
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
   const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const { amount: encodedAmount, decimals: decimalsBase } = trailingRunLengthEncode(liquidity.toString())
+  const { amount: encodedAmount, decimals: decimalsAsset } = trailingRunLengthEncode(liquidity.toString())
   const amountBytes = hexToBytes(BigNumber.from(encodedAmount)._hex)
-  const powerByte = decimalsBase
+  const powerByte = decimalsAsset
 
   const bytes = [firstByte, ...hexToBytes(poolIdBytes), powerByte, ...amountBytes]
 

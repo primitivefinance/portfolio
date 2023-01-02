@@ -4,10 +4,10 @@ Full vision of Primitive Replicating Market Maker.
 
 ## Notes
 
-- [ ] Investigate use of msg.value! (used in fund).
-- [ ] Improve/fix swap. Assigned to Clement.
+- [x] Investigate use of msg.value! (used in fund).
+- [x] Improve/fix swap. Assigned to Clement.
 - [ ] Investigate gas costs of swaps.
-- [ ] Investigate curve/pair nonces. Assigned to Alex.
+- [x] Investigate curve/pair nonces. Assigned to Alex.
 - [ ] Add utility functions to fetch all data. Assigned to Alex.
 - [ ] Add random swaps to invariant testing.
 - [ ] Investigate typecasting.
@@ -33,10 +33,28 @@ Changing a position:
   - Pool is touched
     - Reserves are touched
 
-### Epochs
+#### Notes
 
-Every curve parameter set has a "maturity" date. Once this timestamp is eclipsed, the curve becomes unusable in new pools. This creates waste + limits the reusability of curve parameters.
+- Increasing reserves but paying entirely with internal balance leads to a deficit and therefore invariant failure.
+- Be careful about `storage` or `memory` when using the library types. If a pool is computing important values, it should always be from storage, else it might not have the updates in the transaction. There was a bug where I was using the `lastTau` method on a pool in memory, and this was not updated even though the same `storage` pool was updated.
+- Unbounded loops in free functions (for view ones at least) will revert with "EVM Error: Stack overflow"
+- For tokens with lower decimals, there is a minimum amount of liquidity that can be allocated/removed. This is because liquidity is in WAD units while token amounts could be smaller, if they have low decimals.
 
-One idea is to introduce an epoch system in the contracts (which we've had at one point in time before, and kept it in this version). With an epoch system, pools can "ride along" with the epoch, instead of rely on it being a parameter in the curve parameter explicitly. It could be a parameter in the curve, but it would be more dynamic, e.g. "10 epoch cycles" instead of "January 21, 2023 at 3pm UTC".
+## todo
 
-A pool can not have its epoch cycle reset. This is an assumption though, it might be possible, but we don't know that yet.
+- [x] Fix tests, especially swaps.
+- [x] Solstat tests. - sunday
+- [x] Refactor accounting system!
+- [ ] Work on docs 1 pager for auditor - monday
+- [ ] Light gas analysis/optimization - none
+- [x] Finish stake/unstake - sunday
+- [x] Add parameter validation to changeParameters function
+- [x] Rename HyperLib to HyperLib ?
+- [x] TOKEN DECIMALS NOT HANDLED
+- [x] Claim fees working and tested
+- [ ] Investigate price movements by swap.
+- [x] Finish SIMPLE stake.
+- [ ] Final cleanup of all console and logging.
+- [ ] Better swap tests.
+- [ ] Better account system tests.
+- [ ] Add priority fee growth for WETH only.

@@ -2,7 +2,8 @@
 pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
-import "contracts/EnigmaTypes.sol";
+import "solmate/utils/SafeCastLib.sol";
+import "contracts/HyperLib.sol";
 import "contracts/libraries/Price.sol";
 
 import "forge-std/Test.sol";
@@ -18,7 +19,7 @@ uint constant STARTING_BALANCE = 4000e18;
 struct TestScenario {
     TestERC20 asset;
     TestERC20 quote;
-    uint48 poolId;
+    uint64 poolId;
     string label;
 }
 
@@ -26,6 +27,7 @@ struct TestScenario {
 contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHyperProfiles, HelperHyperView, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+    using SafeCastLib for uint;
 
     WETH public __weth__;
     Hyper public __hyper__; // Actual contract
@@ -120,11 +122,13 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         bytes memory data = createPool(
             address(__token_18__),
             address(__usdc__),
-            DEFAULT_SIGMA,
-            uint32(block.timestamp) + DEFAULT_MATURITY,
-            uint16(1e4 - DEFAULT_GAMMA),
+            address(0),
             uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
-            DEFAULT_STRIKE,
+            uint16(1e4 - DEFAULT_GAMMA),
+            uint16(DEFAULT_SIGMA),
+            uint16(DEFAULT_DURATION_DAYS),
+            DEFAULT_JIT,
+            DEFAULT_TICK,
             DEFAULT_PRICE
         );
 
@@ -132,9 +136,11 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         assertTrue(success, "__revertCatcher__ call failed");
 
         // Create default scenario and add to all scenarios.
-        defaultScenario = TestScenario(__token_18__, __usdc__, 0x000100000001, "Default");
+        defaultScenario = TestScenario(__token_18__, __usdc__, FIRST_POOL, "Default");
         scenarios.push(defaultScenario);
     }
+
+    uint64 public constant FIRST_POOL = 0x0000010000000001;
 
     /** @dev Requires tokens to be spent and spenders to be approved. */
     function initPrerequisites() internal {
@@ -179,5 +185,61 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     function customWarp(uint time) internal {
         vm.warp(time);
         __hyperTestingContract__.setTimestamp(uint128(time));
+    }
+
+    function basicSwap() internal {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        (uint output, ) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            true,
+            (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether,
+            1
+        );
+
+        assertTrue(output > 0, "no swap happened!");
+    }
+
+    function basicAllocate() internal {
+        __hyperTestingContract__.allocate(defaultScenario.poolId, 1 ether);
+    }
+
+    function basicUnallocate() internal {
+        __hyperTestingContract__.unallocate(defaultScenario.poolId, type(uint).max); // max
+    }
+
+    function maxDraw() internal {
+        __hyperTestingContract__.draw(
+            address(defaultScenario.asset),
+            __hyperTestingContract__.getBalance(address(this), address(defaultScenario.asset)),
+            address(this)
+        );
+        __hyperTestingContract__.draw(
+            address(defaultScenario.quote),
+            __hyperTestingContract__.getBalance(address(this), address(defaultScenario.quote)),
+            address(this)
+        );
+    }
+
+    function defaultPool() internal returns (HyperPool memory) {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        return pool;
+    }
+
+    function defaultRevertCatcherPosition() internal returns (HyperPosition memory) {
+        HyperPosition memory pos = getPosition(
+            address(__hyperTestingContract__),
+            address(__revertCatcher__),
+            defaultScenario.poolId
+        );
+        return pos;
+    }
+
+    function defaultPosition() internal returns (HyperPosition memory) {
+        HyperPosition memory pos = getPosition(
+            address(__hyperTestingContract__),
+            address(this),
+            defaultScenario.poolId
+        );
+        return pos;
     }
 }

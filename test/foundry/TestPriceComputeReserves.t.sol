@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestPriceSetup.sol";
 
 contract TestPriceComputeReserves is TestPriceSetup {
-    using Price for Price.Expiring;
+    using Price for Price.RMM;
 
     function testComputedAssetReserveWithDefaultPrice() public {
         uint actual = cases[0].computeR2WithPrice(DEFAULT_PRICE);

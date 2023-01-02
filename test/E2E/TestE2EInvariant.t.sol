@@ -20,7 +20,7 @@ bytes32 constant SLOT_LOCKED = bytes32(uint(5));
  * Invariant 2. AccountSystem.settled == true.
  * Invariant 3. AccountSystem.prepared == false.
  * Invariant 4. (balanceOf(asset), balanceOf(quote)) >= hyper.getVirtualReserves, for all pools.
- * Invariant 5. ∑ hyper.positions(owner, poolId).totalLiquidity == hyper.pools(poolId).liquidity, for all pools.
+ * Invariant 5. ∑ hyper.positions(owner, poolId).freeLiquidity == hyper.pools(poolId).liquidity, for all pools.
  */
 contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     InvariantAllocateUnallocate internal _allocateUnallocate;
@@ -30,7 +30,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     InvariantWarper internal _warper;
     InvariantCreatePool internal _createPool;
 
-    uint48[] public __poolIds__;
+    uint64[] public __poolIds__;
 
     function setUp() public override {
         super.setUp();
@@ -111,7 +111,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         uint sum;
         for (uint i; i != __users__.length; ++i) {
             HyperPosition memory pos = getPosition(address(__hyper__), __users__[i], __poolId__);
-            sum += pos.totalLiquidity;
+            sum += pos.freeLiquidity;
         }
 
         assertTrue(sum == pool.liquidity, "invariant-liquidity-sum");
@@ -131,7 +131,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         balances = getBalanceSum(address(__hyper__), token, __users__);
     }
 
-    function addPoolId(uint48 poolId) public {
+    function addPoolId(uint64 poolId) public {
         assertTrue(poolId != 0, "zero poolId");
         __poolIds__.push(poolId);
     }
@@ -143,10 +143,10 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         return user;
     }
 
-    function getRandomPoolId(uint id) public returns (uint48) {
+    function getRandomPoolId(uint id) public returns (uint64) {
         assertTrue(__poolIds__.length > 0);
         uint index = id % __poolIds__.length;
-        uint48 poolId = __poolIds__[index];
+        uint64 poolId = __poolIds__[index];
         return poolId;
     }
 }

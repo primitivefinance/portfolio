@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "contracts/Hyper.sol";
-import "contracts/EnigmaTypes.sol";
+import "contracts/HyperLib.sol";
 import "contracts/test/TestERC20.sol";
 
 contract HyperTimeOverride is Hyper {
@@ -29,13 +29,9 @@ contract HyperTimeOverride is Hyper {
         timestamp = time;
     }
 
-    function getAmounts(uint48 poolId) public view returns (uint, uint) {
-        return _getAmounts(poolId);
-    }
-
     /** @dev Temp jump override for invariant tests. */
     function doJumpProcess(bytes calldata data) external payable lock interactions {
-        CPU._jumpProcess(data, super._process);
+        Enigma._jumpProcess(data, super._process);
     }
 }
 
@@ -47,7 +43,7 @@ contract HyperCatchReverts is HyperTimeOverride {
 
     /** @dev This is an implemented function to test process, so it has to have settle and re-entrancy guard. */
     function jumpProcess(bytes calldata data) external payable lock interactions {
-        CPU._jumpProcess(data, super._process);
+        Enigma._jumpProcess(data, super._process);
     }
 
     /** @dev This is an implemented function to test process, so it has to have settle and re-entrancy guard. */
@@ -57,8 +53,8 @@ contract HyperCatchReverts is HyperTimeOverride {
 
     /** @dev Solidity does not support error catching with the fallback function, so we use this external function. */
     function mockFallback(bytes calldata data) external payable lock interactions {
-        if (data[0] != CPU.INSTRUCTION_JUMP) super._process(data);
-        else CPU._jumpProcess(data, super._process);
+        if (data[0] != Enigma.INSTRUCTION_JUMP) super._process(data);
+        else Enigma._jumpProcess(data, super._process);
     }
 }
 

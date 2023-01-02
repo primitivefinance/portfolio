@@ -5,8 +5,10 @@ import "./setup/TestHyperSetup.sol";
 
 contract TestHyperUnallocate is TestHyperSetup {
     function testUnallocateUseMax() public postTestInvariantChecks {
+        __hyperTestingContract__.allocate(defaultScenario.poolId, 1 ether);
+
         uint maxLiquidity = getPosition(address(__hyperTestingContract__), msg.sender, defaultScenario.poolId)
-            .totalLiquidity;
+            .freeLiquidity;
 
         __hyperTestingContract__.unallocate(defaultScenario.poolId, type(uint256).max);
 

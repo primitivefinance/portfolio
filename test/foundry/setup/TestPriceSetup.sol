@@ -6,14 +6,14 @@ import "contracts/libraries/Price.sol";
 import "test/helpers/HelperHyperProfiles.sol";
 
 contract TestPriceSetup is HelperHyperProfiles, Test {
-    Price.Expiring[] cases;
+    Price.RMM[] cases;
 
     function setUp() public {
         addTestCase(DEFAULT_STRIKE, DEFAULT_SIGMA, DEFAULT_MATURITY);
     }
 
-    function addTestCase(uint strike, uint sigma, uint tau) internal returns (Price.Expiring memory) {
-        Price.Expiring memory info = Price.Expiring(strike, sigma, tau);
+    function addTestCase(uint strike, uint sigma, uint tau) internal returns (Price.RMM memory) {
+        Price.RMM memory info = Price.RMM(strike, sigma, tau);
         cases.push(info);
         return info;
     }

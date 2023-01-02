@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
-import "contracts/EnigmaTypes.sol";
+import "contracts/HyperLib.sol";
 import "contracts/libraries/Price.sol";
 
 import "forge-std/Test.sol";
@@ -23,7 +23,7 @@ contract TestE2ESetup is Helpers, Test {
     using FixedPointMathLib for int256;
 
     // ===== Global Variables ===== //
-    uint48 public __poolId__ = 0x000100000001;
+    uint64 public __poolId__ = 0x0000010000000001;
     address[] public __users__;
 
     WETH public __weth__;
@@ -109,11 +109,13 @@ contract TestE2ESetup is Helpers, Test {
         bytes memory data = createPool(
             address(__asset__),
             address(__quote__),
-            DEFAULT_SIGMA,
-            uint32(block.timestamp) + DEFAULT_MATURITY,
-            uint16(1e4 - DEFAULT_GAMMA),
+            address(0),
             uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
-            DEFAULT_STRIKE,
+            uint16(1e4 - DEFAULT_GAMMA),
+            uint16(DEFAULT_SIGMA),
+            uint16(DEFAULT_DURATION_DAYS),
+            DEFAULT_JIT,
+            DEFAULT_TICK,
             DEFAULT_PRICE
         );
 
@@ -145,13 +147,13 @@ contract TestE2ESetup is Helpers, Test {
         __hyper__.setTimestamp(uint128(time));
     }
 
-    event SetNewPoolId(uint48);
+    event SetNewPoolId(uint64);
 
     /** @dev Sets the pool id and assets in TestE2ESetup state. Affects all tests! */
-    function setPoolId(uint48 poolId) public {
+    function setPoolId(uint64 poolId) public {
         __poolId__ = poolId;
 
-        Pair memory pair = getPair(address(__hyper__), uint16(poolId >> 32));
+        Pair memory pair = getPair(address(__hyper__), Enigma.decodePairIdFromPoolId(poolId));
         __asset__ = TestERC20(pair.tokenAsset);
         __quote__ = TestERC20(pair.tokenQuote);
 

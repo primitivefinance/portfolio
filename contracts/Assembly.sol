@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+error CastOverflow(uint);
+
+uint constant SECONDS_PER_DAY = 86_400 seconds;
+uint8 constant MIN_DECIMALS = 6;
+uint8 constant MAX_DECIMALS = 18;
+
 function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     return __between(value, lower, upper);
 }
@@ -20,29 +26,10 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
     }
 }
 
-error CastOverflow(uint);
+error InvalidLiquidity();
 
-/// @notice reverts if x > type(uint128).max
-function toUint128(uint256 x) pure returns (uint128 z) {
-    bytes memory revertData = abi.encodeWithSelector(CastOverflow.selector, x);
-    uint128 max = type(uint128).max;
-    assembly {
-        switch iszero(gt(x, max)) // if x > max, if iszero(1) == case = 0, else iszero(0) == case = 1
-        case 0 {
-            let revertDataSize := mload(revertData)
-            revert(add(32, revertData), revertDataSize)
-        }
-        case 1 {
-            z := x
-        }
-    }
-}
-
-/**
- * todo: verify this is good to go
- */
-function __computeDelta(uint256 input, int256 delta) pure returns (uint256 output) {
-    assembly {
+function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
+    /* assembly {
         switch slt(input, 0) // input < 0 ? 1 : 0
         case 0 {
             output := add(input, delta)
@@ -50,10 +37,20 @@ function __computeDelta(uint256 input, int256 delta) pure returns (uint256 outpu
         case 1 {
             output := sub(input, delta)
         }
+    } */
+
+    if (delta < 0) {
+        output = input - uint128(-delta);
+        // liquidity going down, input should be larger
+        if (output >= input) revert InvalidLiquidity();
+    } else {
+        output = input + uint128(delta);
+        // liquidity going on, input should be smaller
+        if (output < input) revert InvalidLiquidity();
     }
 }
 
-function __computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) pure returns (uint256 nextCheckpoint) {
+function computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) pure returns (uint256 nextCheckpoint) {
     nextCheckpoint = liveCheckpoint;
 
     if (checkpointChange != 0) {
@@ -64,19 +61,20 @@ function __computeCheckpoint(uint256 liveCheckpoint, uint256 checkpointChange) p
     }
 }
 
-function __computeCheckpointDistance(
-    uint256 currentCheckpoint,
-    uint256 prevCheckpoint
-) pure returns (uint256 distance) {
+function computeCheckpointDistance(uint256 currentCheckpoint, uint256 prevCheckpoint) pure returns (uint256 distance) {
     // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
     assembly {
         distance := sub(currentCheckpoint, prevCheckpoint)
     }
 }
 
-/// @dev           Converts an array of bytes into a byte32
-/// @param raw     Array of bytes to convert
-/// @return data   Converted data
+function convertDaysToSeconds(uint amountDays) pure returns (uint amountSeconds) {
+    assembly {
+        amountSeconds := mul(amountDays, SECONDS_PER_DAY)
+    }
+}
+
+/** @dev Converts an array of bytes into a byte32. */
 function toBytes32(bytes memory raw) pure returns (bytes32 data) {
     assembly {
         data := mload(add(raw, 32))
@@ -85,9 +83,7 @@ function toBytes32(bytes memory raw) pure returns (bytes32 data) {
     }
 }
 
-/// @dev           Converts an array of bytes into a bytes16.
-/// @param raw     Array of bytes to convert.
-/// @return data   Converted data.
+/** @dev Converts an array of bytes into a bytes16. */
 function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     assembly {
         data := mload(add(raw, 32))
@@ -96,4 +92,62 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     }
 }
 
-using {toUint128} for uint;
+function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
+    upper = data >> 4;
+    lower = data & 0x0f;
+}
+
+function pack(bytes1 upper, bytes1 lower) pure returns (bytes1 data) {
+    data = (upper << 4) | lower;
+}
+
+/**
+ * @dev             Converts an array of bytes into an uint128, the array must adhere
+ *                  to the the following format:
+ *                  - First byte: Amount of trailing zeros.
+ *                  - Rest of the array: A hexadecimal number.
+ */
+function toAmount(bytes calldata raw) pure returns (uint128 amount) {
+    uint8 power = uint8(raw[0]);
+    amount = uint128(toBytes16(raw[1:raw.length]));
+    if (power != 0) amount = amount * uint128(10 ** power);
+}
+
+function computeScalar(uint decimals) pure returns (uint scalar) {
+    return 10 ** (MAX_DECIMALS - decimals);
+}
+
+function scaleToWad(uint amountDec, uint decimals) pure returns (uint outputWad) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputWad := mul(amountDec, factor)
+    }
+}
+
+function scaleFromWadUp(uint amountWad, uint decimals) pure returns (uint outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := add(div(amountWad, factor), 1)
+    }
+}
+
+function scaleFromWadDown(uint amountWad, uint decimals) pure returns (uint outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := div(amountWad, factor)
+    }
+}
+
+function scaleFromWadUpSigned(int amountWad, uint decimals) pure returns (int outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := add(sdiv(amountWad, factor), 1)
+    }
+}
+
+function scaleFromWadDownSigned(int amountWad, uint decimals) pure returns (int outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := sdiv(amountWad, factor)
+    }
+}
