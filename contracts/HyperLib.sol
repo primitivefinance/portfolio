@@ -34,7 +34,7 @@ using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged, syncPosit
 using Price for Price.RMM;
 using SafeCastLib for uint;
 using FixedPointMathLib for uint;
-using {Assembly.scaleFromWadDown} for uint;
+using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint;
 
 int24 constant MAX_TICK = 25556; // todo: fix, Equal to 5x price at 1bps tick sizes.
 int24 constant TICK_SIZE = 256; // todo: use this?
@@ -164,6 +164,7 @@ struct SwapState {
     address tokenOutput;
     uint256 fee;
     uint256 feeGrowthGlobal;
+    uint256 priorityFeeGrowthGlobal;
 }
 
 struct Payment {
@@ -283,7 +284,7 @@ function getAmountOut(
     Iteration memory data;
     Price.RMM memory rmm = self.getRMM();
     (data.price, data.tick) = self.computePriceChangeWithTime(self.lastTau(), timeSinceUpdate);
-    data.remainder = amountIn * 10 ** (Assembly.MAX_DECIMALS - (sellAsset ? pair.decimalsAsset : pair.decimalsQuote));
+    data.remainder = amountIn.scaleToWad(sellAsset ? pair.decimalsAsset : pair.decimalsQuote);
     data.liquidity = self.liquidity;
 
     uint prevInd;
@@ -326,18 +327,18 @@ function getAmountOut(
 
     {
         // Scale down amounts from WAD.
-        uint inputScale;
-        uint outputScale;
+        uint inputDec;
+        uint outputDec;
         if (sellAsset) {
-            inputScale = Assembly.MAX_DECIMALS - pair.decimalsAsset;
-            outputScale = Assembly.MAX_DECIMALS - pair.decimalsQuote;
+            inputDec = pair.decimalsAsset;
+            outputDec = pair.decimalsQuote;
         } else {
-            inputScale = Assembly.MAX_DECIMALS - pair.decimalsQuote;
-            outputScale = Assembly.MAX_DECIMALS - pair.decimalsAsset;
+            inputDec = pair.decimalsQuote;
+            outputDec = pair.decimalsAsset;
         }
 
-        data.input = data.input / (10 ** inputScale);
-        data.output = data.output / (10 ** outputScale);
+        data.input = data.input.scaleFromWadUp(inputDec);
+        data.output = data.output.scaleFromWadDown(outputDec);
     }
 
     return (data.output, data.remainder);
@@ -371,7 +372,8 @@ function checkParameters(HyperCurve memory self) view returns (bool, bytes memor
     if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
     if (!Assembly.isBetween(self.fee, MIN_FEE, MAX_FEE))
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
-    if (!Assembly.isBetween(self.priorityFee, MIN_FEE, self.fee))
+    // 0 priority fee == no controller
+    if (!Assembly.isBetween(self.priorityFee, 0, self.fee))
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.priorityFee));
 
     return (true, "");

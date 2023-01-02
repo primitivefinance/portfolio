@@ -47,7 +47,7 @@ Changing a position:
 - [x] Refactor accounting system!
 - [ ] Work on docs 1 pager for auditor - monday
 - [ ] Light gas analysis/optimization - none
-- [ ] Finish stake/unstake - sunday
+- [x] Finish stake/unstake - sunday
 - [x] Add parameter validation to changeParameters function
 - [x] Rename HyperLib to HyperLib ?
 - [x] TOKEN DECIMALS NOT HANDLED

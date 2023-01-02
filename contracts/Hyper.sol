@@ -37,7 +37,7 @@ contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using Price for Price.RMM;
-    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp} for uint;
+    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint;
     using {Assembly.scaleFromWadDownSigned} for int;
 
     OS.AccountSystem public __account__;
@@ -381,7 +381,7 @@ contract Hyper is IHyper {
 
         Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(args.poolId)];
         _state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
-        _state.fee = uint(pool.params.fee);
+        _state.fee = msg.sender == pool.controller ? pool.params.priorityFee : uint(pool.params.fee);
         _state.feeGrowthGlobal = _state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
         _state.tokenInput = _state.sell ? pair.tokenAsset : pair.tokenQuote;
         _state.tokenOutput = _state.sell ? pair.tokenQuote : pair.tokenAsset;
@@ -391,9 +391,7 @@ contract Hyper is IHyper {
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
             uint internalBalance = getBalance(msg.sender, _state.sell ? pair.tokenAsset : pair.tokenQuote);
             remainder = args.useMax == 1 ? internalBalance : args.input;
-            remainder =
-                remainder *
-                10 ** (Assembly.MAX_DECIMALS - (_state.sell ? pair.decimalsAsset : pair.decimalsQuote)); // WAD
+            remainder = remainder.scaleToWad(_state.sell ? pair.decimalsAsset : pair.decimalsQuote); // WAD
             _swap = Iteration({
                 price: price,
                 tick: tick,
@@ -415,6 +413,7 @@ contract Hyper is IHyper {
         uint256 nextIndependent;
         uint256 liveDependent;
         uint256 nextDependent;
+        uint priorityFeeAmount;
 
         {
             uint256 maxInput;
@@ -429,8 +428,12 @@ contract Hyper is IHyper {
                 maxInput = (rmm.strike - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            _swap.feeAmount = ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * _state.fee) / 10_000;
+            priorityFeeAmount = msg.sender == pool.controller ? (pool.liquidity * _state.fee) / 10_000 : 0;
+            _swap.feeAmount = priorityFeeAmount != 0
+                ? 0
+                : ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * _state.fee) / 10_000;
             _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
+            if (priorityFeeAmount != 0) _state.priorityFeeGrowthGlobal = priorityFeeAmount.divWadDown(_swap.liquidity);
 
             if (_swap.remainder > maxInput) {
                 deltaInput = maxInput - _swap.feeAmount;
@@ -471,7 +474,7 @@ contract Hyper is IHyper {
             if (!_state.sell && nextPrice > limitPrice) revert SwapLimitReached();
             if (_state.sell && limitPrice > nextPrice) revert SwapLimitReached();
 
-            liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
+            liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote); // default inv is WAD units.
             nextInvariantWad = nextInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
             // TODO: figure out invariant stuff, reverse swaps have 1e3 error (invariant goes negative by 1e3 precision)?
             if (nextInvariantWad < liveInvariantWad) revert InvalidInvariant(liveInvariantWad, nextInvariantWad);
@@ -502,16 +505,18 @@ contract Hyper is IHyper {
             _swap.price,
             _swap.liquidity,
             _state.sell ? _state.feeGrowthGlobal : 0,
-            _state.sell ? 0 : _state.feeGrowthGlobal
+            _state.sell ? 0 : _state.feeGrowthGlobal,
+            _state.priorityFeeGrowthGlobal
         );
 
         // Apply reserve effects.
+        if (priorityFeeAmount != 0) _increaseReserves(WETH, priorityFeeAmount);
         _increaseReserves(_state.tokenInput, _swap.input);
         _decreaseReserves(_state.tokenOutput, _swap.output);
 
-        (poolId, remainder, input, output) = (args.poolId, _swap.remainder, _swap.input, _swap.output);
         emit Swap(args.poolId, _swap.input, _swap.output, _state.tokenInput, _state.tokenOutput);
         delete _state;
+        return (args.poolId, _swap.remainder, _swap.input, _swap.output);
     }
 
     /**
@@ -531,7 +536,15 @@ contract Hyper is IHyper {
         if (passed > 0) {
             uint256 tau = pool.lastTau(); // uses pool's last update timestamp.
             (price, tick) = pool.computePriceChangeWithTime(tau, passed);
-            _syncPool(poolId, tick, price, pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+            _syncPool(
+                poolId,
+                tick,
+                price,
+                pool.liquidity,
+                pool.feeGrowthGlobalAsset,
+                pool.feeGrowthGlobalQuote,
+                pool.feeGrowthGlobalReward
+            );
         }
     }
 
@@ -546,7 +559,8 @@ contract Hyper is IHyper {
         uint256 price,
         uint256 liquidity,
         uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote
+        uint256 feeGrowthGlobalQuote,
+        uint feeGrowthGlobalReward
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
@@ -564,6 +578,7 @@ contract Hyper is IHyper {
 
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
+        pool.feeGrowthGlobalReward = Assembly.computeCheckpoint(pool.feeGrowthGlobalReward, feeGrowthGlobalReward);
 
         Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
         emit PoolUpdate(
@@ -638,6 +653,7 @@ contract Hyper is IHyper {
 
         uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable
         bool isMutable = pool.controller != address(0);
+        if (isMutable && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
         Pair memory pair = pairs[pairNonce];
         pool.pair = pair;
 
@@ -647,7 +663,7 @@ contract Hyper is IHyper {
             fee: fee,
             duration: dur,
             volatility: vol,
-            priorityFee: isMutable ? priorityFee : uint16(MIN_FEE), // min fee
+            priorityFee: isMutable ? priorityFee : 0, // min fee
             createdAt: timestamp
         });
         params.revertOnInvalid();
