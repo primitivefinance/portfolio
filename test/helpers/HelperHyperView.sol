@@ -29,7 +29,7 @@ struct HyperState {
     uint totalBalanceAsset; // sum of all balances from getBalance
     uint totalBalanceQuote; // sum of all balances from getBalance
     uint totalPositionLiquidity; // sum of all position liquidity
-    uint callerPositionLiquidity; // position.totalLiquidity
+    uint callerPositionLiquidity; // position.freeLiquidity
     uint totalPoolLiquidity; // pool.liquidity
     uint feeGrowthAssetPool; // getPool
     uint feeGrowthQuotePool; // getPool
@@ -89,7 +89,7 @@ contract HelperHyperView {
             getBalanceSum(hyper, asset, owners),
             getBalanceSum(hyper, quote, owners),
             getPositionLiquiditySum(hyper, poolId, owners),
-            position.totalLiquidity,
+            position.freeLiquidity,
             pool.liquidity,
             pool.feeGrowthGlobalAsset,
             pool.feeGrowthGlobalQuote,
@@ -121,7 +121,7 @@ contract HelperHyperView {
     function getPositionLiquiditySum(address hyper, uint64 poolId, address[] memory owners) public view returns (uint) {
         uint sum;
         for (uint i; i != owners.length; ++i) {
-            sum += getPosition(hyper, owners[i], poolId).totalLiquidity;
+            sum += getPosition(hyper, owners[i], poolId).freeLiquidity;
         }
 
         return sum;

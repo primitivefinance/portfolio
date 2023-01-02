@@ -436,14 +436,14 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == block.timestamp);
     }
 
-    function testAllocatePositionTotalLiquidityIncreases() public postTestInvariantChecks {
+    function testAllocatePositionfreeLiquidityIncreases() public postTestInvariantChecks {
         uint64 positionId = defaultScenario.poolId;
 
-        uint256 prevPositionTotalLiquidity = getPosition(
+        uint256 prevPositionfreeLiquidity = getPosition(
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).totalLiquidity;
+        ).freeLiquidity;
 
         uint8 amount = 0x01;
         uint8 power = 0x01;
@@ -451,14 +451,14 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "forwarder call failed");
 
-        uint256 nextPositionTotalLiquidity = getPosition(
+        uint256 nextPositionfreeLiquidity = getPosition(
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).totalLiquidity;
+        ).freeLiquidity;
 
-        assertTrue(prevPositionTotalLiquidity == 0);
-        assertTrue(nextPositionTotalLiquidity > prevPositionTotalLiquidity);
+        assertTrue(prevPositionfreeLiquidity == 0);
+        assertTrue(nextPositionfreeLiquidity > prevPositionfreeLiquidity);
     }
 
     function testAllocateGlobalAssetIncreases() public postTestInvariantChecks {
@@ -575,7 +575,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(nextPositionTimestamp > prevPositionTimestamp && nextPositionTimestamp == warpTimestamp);
     }
 
-    function testUnallocatePositionTotalLiquidityDecreases() public postTestInvariantChecks {
+    function testUnallocatePositionfreeLiquidityDecreases() public postTestInvariantChecks {
         int24 hiTick = DEFAULT_TICK;
         int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
@@ -589,7 +589,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).totalLiquidity;
+        ).freeLiquidity;
 
         data = Enigma.encodeUnallocate(0, defaultScenario.poolId, power, amount);
         success = __revertCatcher__.process(data);
@@ -598,7 +598,7 @@ contract TestHyperProcessing is TestHyperSetup {
             address(__hyperTestingContract__),
             address(__revertCatcher__),
             positionId
-        ).totalLiquidity;
+        ).freeLiquidity;
 
         assertTrue(nextPositionLiquidity < prevPositionLiquidity);
     }
@@ -702,7 +702,7 @@ contract TestHyperProcessing is TestHyperSetup {
             assertTrue(
                 nextPoolStakedLiquidity ==
                     getPosition(address(__hyperTestingContract__), address(__revertCatcher__), positionId)
-                        .totalLiquidity,
+                        .freeLiquidity,
                 "Pool staked liquidity not equal to liquidity of staked position."
             );
         } else {

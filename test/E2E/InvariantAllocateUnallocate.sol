@@ -135,9 +135,9 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // Get some liquidity.
         HyperPosition memory pos = getPosition(address(__hyper__), address(this), __poolId__);
-        require(pos.totalLiquidity >= deltaLiquidity, "Not enough liquidity");
+        require(pos.freeLiquidity >= deltaLiquidity, "Not enough liquidity");
 
-        if (pos.totalLiquidity >= deltaLiquidity) {
+        if (pos.freeLiquidity >= deltaLiquidity) {
             // Preconditions
             HyperPool memory pool = getPool(address(__hyper__), __poolId__);
             assertTrue(pool.lastTimestamp != 0, "Pool not initialized");

@@ -186,4 +186,51 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         vm.warp(time);
         __hyperTestingContract__.setTimestamp(uint128(time));
     }
+
+    function basicSwap() internal {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        (uint output, ) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            true,
+            (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether,
+            1
+        );
+
+        assertTrue(output > 0, "no swap happened!");
+    }
+
+    function basicAllocate() internal {
+        __hyperTestingContract__.allocate(defaultScenario.poolId, 1 ether);
+    }
+
+    function basicUnallocate() internal {
+        __hyperTestingContract__.unallocate(defaultScenario.poolId, type(uint).max); // max
+    }
+
+    function maxDraw() internal {
+        __hyperTestingContract__.draw(
+            address(defaultScenario.asset),
+            __hyperTestingContract__.getBalance(address(this), address(defaultScenario.asset)),
+            address(this)
+        );
+        __hyperTestingContract__.draw(
+            address(defaultScenario.quote),
+            __hyperTestingContract__.getBalance(address(this), address(defaultScenario.quote)),
+            address(this)
+        );
+    }
+
+    function defaultPool() internal returns (HyperPool memory) {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        return pool;
+    }
+
+    function defaultPosition() internal returns (HyperPosition memory) {
+        HyperPosition memory pos = getPosition(
+            address(__hyperTestingContract__),
+            address(this),
+            defaultScenario.poolId
+        );
+        return pos;
+    }
 }

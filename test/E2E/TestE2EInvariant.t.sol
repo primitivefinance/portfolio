@@ -20,7 +20,7 @@ bytes32 constant SLOT_LOCKED = bytes32(uint(5));
  * Invariant 2. AccountSystem.settled == true.
  * Invariant 3. AccountSystem.prepared == false.
  * Invariant 4. (balanceOf(asset), balanceOf(quote)) >= hyper.getVirtualReserves, for all pools.
- * Invariant 5. ∑ hyper.positions(owner, poolId).totalLiquidity == hyper.pools(poolId).liquidity, for all pools.
+ * Invariant 5. ∑ hyper.positions(owner, poolId).freeLiquidity == hyper.pools(poolId).liquidity, for all pools.
  */
 contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     InvariantAllocateUnallocate internal _allocateUnallocate;
@@ -111,7 +111,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         uint sum;
         for (uint i; i != __users__.length; ++i) {
             HyperPosition memory pos = getPosition(address(__hyper__), __users__[i], __poolId__);
-            sum += pos.totalLiquidity;
+            sum += pos.freeLiquidity;
         }
 
         assertTrue(sum == pool.liquidity, "invariant-liquidity-sum");
