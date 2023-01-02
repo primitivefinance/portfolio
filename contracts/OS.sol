@@ -108,6 +108,7 @@ function debit(
         remainder = owed - paid;
     }
 
+    console.log("paid", paid);
     console.log("remainder", remainder);
 }
 

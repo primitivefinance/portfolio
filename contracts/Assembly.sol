@@ -4,6 +4,8 @@ pragma solidity 0.8.13;
 error CastOverflow(uint);
 
 uint constant SECONDS_PER_DAY = 86_400 seconds;
+uint8 constant MIN_DECIMALS = 6;
+uint8 constant MAX_DECIMALS = 18;
 
 function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     return __between(value, lower, upper);
@@ -97,4 +99,29 @@ function toAmount(bytes calldata raw) pure returns (uint128 amount) {
     uint8 power = uint8(raw[0]);
     amount = uint128(toBytes16(raw[1:raw.length]));
     if (power != 0) amount = amount * uint128(10 ** power);
+}
+
+function computeScalar(uint decimals) pure returns (uint scalar) {
+    return 10 ** (MAX_DECIMALS - decimals);
+}
+
+function scaleToWad(uint amountDec, uint decimals) pure returns (uint outputWad) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputWad := mul(amountDec, factor)
+    }
+}
+
+function scaleFromWadUp(uint amountWad, uint decimals) pure returns (uint outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := add(div(amountWad, factor), 1)
+    }
+}
+
+function scaleFromWadDown(uint amountWad, uint decimals) pure returns (uint outputDec) {
+    uint factor = computeScalar(decimals);
+    assembly {
+        outputDec := div(amountWad, factor)
+    }
 }

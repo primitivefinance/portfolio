@@ -37,6 +37,7 @@ contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using Price for Price.RMM;
+    using {Assembly.scaleFromWadDown} for uint;
 
     OS.AccountSystem public __account__;
 
@@ -63,6 +64,7 @@ contract Hyper is IHyper {
 
     /** @dev Used on every external operation that touches tokens. */
     modifier interactions() {
+        if (__account__.prepared) revert InvalidReentrancy();
         __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
 
         __account__.prepared = false;
@@ -341,17 +343,21 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[args.poolId];
         if (!pool.exists()) revert NonExistentPool(args.poolId);
 
+        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(args.poolId)];
         state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
         state.fee = uint(pool.params.fee);
         state.feeGrowthGlobal = state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
+        state.tokenInput = state.sell ? pair.tokenAsset : pair.tokenQuote;
+        state.tokenOutput = state.sell ? pair.tokenQuote : pair.tokenAsset;
 
-        Pair memory pair = pairs[CPU.decodePairIdFromPoolId(args.poolId)];
         Iteration memory _swap;
         {
             (uint256 price, int24 tick) = _syncPoolPrice(args.poolId);
             uint internalBalance = getBalance(msg.sender, state.sell ? pair.tokenAsset : pair.tokenQuote);
             remainder = args.useMax == 1 ? internalBalance : args.input;
-            remainder = remainder * 10 ** (MAX_DECIMALS - (state.sell ? pair.decimalsAsset : pair.decimalsQuote)); // WAD
+            remainder =
+                remainder *
+                10 ** (Assembly.MAX_DECIMALS - (state.sell ? pair.decimalsAsset : pair.decimalsQuote)); // WAD
             _swap = Iteration({
                 price: price,
                 tick: tick,
@@ -437,18 +443,18 @@ contract Hyper is IHyper {
 
         {
             // Scale down amounts from WAD.
-            uint inputScale;
-            uint outputScale;
+            uint inputDec;
+            uint outputDec;
             if (state.sell) {
-                inputScale = MAX_DECIMALS - pair.decimalsAsset;
-                outputScale = MAX_DECIMALS - pair.decimalsQuote;
+                inputDec = pair.decimalsAsset;
+                outputDec = pair.decimalsQuote;
             } else {
-                inputScale = MAX_DECIMALS - pair.decimalsQuote;
-                outputScale = MAX_DECIMALS - pair.decimalsAsset;
+                inputDec = pair.decimalsQuote;
+                outputDec = pair.decimalsAsset;
             }
 
-            _swap.input = _swap.input / (10 ** inputScale);
-            _swap.output = _swap.output / (10 ** outputScale);
+            _swap.input = _swap.input.scaleFromWadDown(inputDec);
+            _swap.output = _swap.output.scaleFromWadDown(outputDec);
         }
 
         // Apply pool effects.
@@ -462,11 +468,11 @@ contract Hyper is IHyper {
         );
 
         // Apply reserve effects.
-        _increaseReserves(pair.tokenAsset, _swap.input);
-        _decreaseReserves(pair.tokenQuote, _swap.output);
+        _increaseReserves(state.tokenInput, _swap.input);
+        _decreaseReserves(state.tokenOutput, _swap.output);
 
         (poolId, remainder, input, output) = (args.poolId, _swap.remainder, _swap.input, _swap.output);
-        emit Swap(args.poolId, _swap.input, _swap.output, pair.tokenAsset, pair.tokenQuote);
+        emit Swap(args.poolId, _swap.input, _swap.output, state.tokenInput, state.tokenOutput);
     }
 
     /**
@@ -549,8 +555,10 @@ contract Hyper is IHyper {
         if (pairId != 0) revert PairExists(pairId);
 
         (uint8 decimalsAsset, uint8 decimalsQuote) = (IERC20(asset).decimals(), IERC20(quote).decimals());
-        if (!Assembly.isBetween(decimalsAsset, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsAsset);
-        if (!Assembly.isBetween(decimalsQuote, MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsQuote);
+        if (!Assembly.isBetween(decimalsAsset, Assembly.MIN_DECIMALS, Assembly.MAX_DECIMALS))
+            revert InvalidDecimals(decimalsAsset);
+        if (!Assembly.isBetween(decimalsQuote, Assembly.MIN_DECIMALS, Assembly.MAX_DECIMALS))
+            revert InvalidDecimals(decimalsQuote);
 
         unchecked {
             pairId = uint24(++getPairNonce);
@@ -580,53 +588,44 @@ contract Hyper is IHyper {
         uint128 price
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
-        if (vol == 0) revert InvalidVolatility(vol);
-        if (dur == 0) revert InvalidDuration(dur);
-        if (max >= MAX_TICK) revert InvalidTick(max);
-        if (jit > JUST_IN_TIME_MAX) revert InvalidJit(jit);
-        if (!Assembly.isBetween(fee, MIN_POOL_FEE, MAX_POOL_FEE)) revert InvalidFee(fee);
-        if (!Assembly.isBetween(priorityFee, MIN_POOL_FEE, fee)) revert InvalidFee(priorityFee);
 
-        if (pairId == 0) pairId = uint24(getPairNonce); // magic variable
+        HyperPool memory pool;
 
-        uint32 poolNonce;
-        unchecked {
-            poolNonce = uint32(++getPoolNonce);
-        }
-
-        bool isMutable = controller != address(0);
-        HyperPool memory params;
         {
             uint32 timestamp = uint(_blockTimestamp()).safeCastTo32();
-            params = HyperPool({
-                lastTick: Price.computeTickWithPrice(price),
-                lastTimestamp: timestamp, // fix type
-                controller: controller,
-                feeGrowthGlobalAsset: 0,
-                feeGrowthGlobalQuote: 0,
-                lastPrice: price,
-                liquidity: 0,
-                stakedLiquidity: 0,
-                stakedLiquidityDelta: 0,
-                params: HyperCurve({
-                    maxTick: max,
-                    jit: isMutable ? jit : uint8(_liquidityPolicy()),
-                    fee: fee,
-                    duration: dur,
-                    volatility: vol,
-                    priorityFee: isMutable ? priorityFee : 0,
-                    createdAt: timestamp
-                })
-            });
+            pool.controller = controller;
+            pool.lastTimestamp = timestamp;
+            pool.lastPrice = price;
+            pool.lastTick = Price.computeTickWithPrice(pool.lastPrice);
 
-            poolId = CPU.encodePoolId(pairId, isMutable, poolNonce);
+            uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable
+            bool isMutable = pool.controller != address(0);
+            Pair memory pair = pairs[pairNonce];
+            pool.pair = pair;
+
+            HyperCurve memory params = HyperCurve({
+                maxTick: max,
+                jit: isMutable ? jit : uint8(_liquidityPolicy()),
+                fee: fee,
+                duration: dur,
+                volatility: vol,
+                priorityFee: isMutable ? priorityFee : uint16(MIN_POOL_FEE), // min fee
+                createdAt: timestamp
+            });
+            params.revertOnInvalid();
+            pool.params = params;
+
+            uint32 poolNonce;
+            unchecked {
+                poolNonce = uint32(++getPoolNonce);
+            }
+
+            poolId = CPU.encodePoolId(pairNonce, isMutable, poolNonce);
+            emit CreatePool(poolId, isMutable, pair.tokenAsset, pair.tokenQuote, price);
         }
 
         if (pools[poolId].exists()) revert PoolExists();
-        pools[poolId] = params;
-
-        Pair memory pair = pairs[pairId];
-        emit CreatePool(poolId, isMutable, pair.tokenAsset, pair.tokenQuote, price);
+        pools[poolId] = pool;
     }
 
     function changeParameters(
@@ -752,11 +751,6 @@ contract Hyper is IHyper {
         } else {
             revert InvalidInstruction();
         }
-    }
-
-    struct Payment {
-        address token;
-        uint amount;
     }
 
     /**

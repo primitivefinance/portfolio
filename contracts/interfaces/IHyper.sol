@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {HyperCurve} from "../EnigmaTypes.sol";
+import {HyperCurve, Pair} from "../EnigmaTypes.sol";
 
 interface IHyperEvents {
     event Deposit(address indexed account, uint amount);
@@ -103,7 +103,8 @@ interface IHyperGetters {
             uint128 liquidity,
             uint128 stakedLiquidity,
             int128 stakedLiquidityDelta,
-            HyperCurve memory
+            HyperCurve memory,
+            Pair memory
         );
 
     function positions(

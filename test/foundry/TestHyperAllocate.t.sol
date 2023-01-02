@@ -1,11 +1,62 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY} from "contracts/EnigmaTypes.sol";
+import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY, Pair} from "contracts/EnigmaTypes.sol";
 import "./setup/TestHyperSetup.sol";
+
+struct Amounts {
+    uint expectedDelta0;
+    uint expectedDelta1;
+    uint computedDelta0;
+    uint computedDelta1;
+    uint prevReserve0;
+    uint prevReserve1;
+    uint postReserve0;
+    uint postReserve1;
+}
 
 contract TestHyperAllocate is TestHyperSetup {
     using SafeCastLib for uint;
+
+    Amounts _amounts;
+
+    modifier afterTest() {
+        _;
+        delete _amounts;
+    }
+
+    function testAllocateNonStandardDecimals() public postTestInvariantChecks afterTest {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        assertTrue(pool.lastTimestamp != 0, "pool-created");
+
+        Pair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
+
+        address hyper = address(__hyperTestingContract__);
+        uint64 poolId = defaultScenario.poolId;
+
+        uint128 liquidity = DEFAULT_LIQUIDITY;
+        (_amounts.computedDelta0, _amounts.computedDelta1) = pool.getAmountsWad(); // one liquidity wad
+
+        (_amounts.expectedDelta0, _amounts.expectedDelta1) = (
+            Assembly.scaleFromWadDown(_amounts.computedDelta0, pair.decimalsAsset),
+            Assembly.scaleFromWadDown(_amounts.computedDelta1, pair.decimalsQuote)
+        );
+
+        (_amounts.prevReserve0, _amounts.prevReserve1) = (
+            getReserve(hyper, pair.tokenAsset),
+            getReserve(hyper, pair.tokenQuote)
+        );
+
+        __hyperTestingContract__.allocate(poolId, liquidity);
+
+        (_amounts.postReserve0, _amounts.postReserve1) = (
+            getReserve(hyper, pair.tokenAsset),
+            getReserve(hyper, pair.tokenQuote)
+        );
+
+        assertEq(_amounts.postReserve0, _amounts.prevReserve0 + _amounts.expectedDelta0, "asset-reserves");
+        assertEq(_amounts.postReserve1, _amounts.prevReserve1 + _amounts.expectedDelta1, "quote-reserves");
+    }
 
     function testAllocateFull() public postTestInvariantChecks {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);

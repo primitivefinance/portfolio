@@ -24,18 +24,18 @@ using {
     lastTau,
     tau,
     getRMM,
-    getAmountOut
+    getAmountOut,
+    getAmountsWad
 } for HyperPool global;
 using {maturity, checkParameters, revertOnInvalid} for HyperCurve global;
 using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
 using Price for Price.RMM;
 using SafeCastLib for uint;
 using FixedPointMathLib for uint;
+using {Assembly.scaleFromWadDown} for uint;
 
 int24 constant MAX_TICK = 25556; // todo: fix, Equal to 5x price at 1bps tick sizes.
 int24 constant TICK_SIZE = 256; // todo: use this?
-uint8 constant MIN_DECIMALS = 6;
-uint8 constant MAX_DECIMALS = 18;
 uint256 constant BUFFER = 300;
 uint256 constant MIN_POOL_FEE = 1;
 uint256 constant MAX_POOL_FEE = 1e3;
@@ -101,6 +101,7 @@ struct HyperPool {
     uint128 stakedLiquidity; // locked liquidity
     int128 stakedLiquidityDelta; // liquidity to be added or removed
     HyperCurve params;
+    Pair pair;
 }
 
 // todo: optimize slot
@@ -147,8 +148,15 @@ struct Iteration {
 
 struct SwapState {
     bool sell;
+    address tokenInput;
+    address tokenOutput;
     uint256 fee;
     uint256 feeGrowthGlobal;
+}
+
+struct Payment {
+    address token;
+    uint amount;
 }
 
 function syncPoolTimestamp(HyperPool storage self, uint timestamp) {
@@ -223,11 +231,18 @@ function getLiquidityDeltas(
     }
 }
 
+/** @dev Decimal amounts per WAD of liquidity, rounded down... */
+function getAmounts(HyperPool memory self) view returns (uint amountAssetDec, uint amountQuoteDec) {
+    (uint amountAssetWad, uint amountQuoteWad) = self.getAmountsWad();
+    amountAssetDec = amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset);
+    amountQuoteDec = amountQuoteWad.scaleFromWadDown(self.pair.decimalsQuote);
+}
+
 /** @dev WAD Amounts per WAD of liquidity. */
-function getAmounts(HyperPool memory self) view returns (uint amountAsset, uint amountQuote) {
+function getAmountsWad(HyperPool memory self) view returns (uint amountAssetWad, uint amountQuoteWad) {
     Price.RMM memory rmm = self.getRMM();
-    amountAsset = rmm.computeR2WithPrice(self.lastPrice);
-    amountQuote = rmm.computeR1WithR2(amountAsset);
+    amountAssetWad = rmm.computeR2WithPrice(self.lastPrice);
+    amountQuoteWad = rmm.computeR1WithR2(amountAssetWad);
 }
 
 function getAmountOut(
@@ -240,7 +255,7 @@ function getAmountOut(
     Iteration memory data;
     Price.RMM memory rmm = self.getRMM();
     (data.price, data.tick) = self.computePriceChangeWithTime(self.lastTau(), timeSinceUpdate);
-    data.remainder = amountIn * 10 ** (MAX_DECIMALS - (sellAsset ? pair.decimalsAsset : pair.decimalsQuote));
+    data.remainder = amountIn * 10 ** (Assembly.MAX_DECIMALS - (sellAsset ? pair.decimalsAsset : pair.decimalsQuote));
     data.liquidity = self.liquidity;
 
     uint prevInd;
@@ -286,11 +301,11 @@ function getAmountOut(
         uint inputScale;
         uint outputScale;
         if (sellAsset) {
-            inputScale = MAX_DECIMALS - pair.decimalsAsset;
-            outputScale = MAX_DECIMALS - pair.decimalsQuote;
+            inputScale = Assembly.MAX_DECIMALS - pair.decimalsAsset;
+            outputScale = Assembly.MAX_DECIMALS - pair.decimalsQuote;
         } else {
-            inputScale = MAX_DECIMALS - pair.decimalsQuote;
-            outputScale = MAX_DECIMALS - pair.decimalsAsset;
+            inputScale = Assembly.MAX_DECIMALS - pair.decimalsQuote;
+            outputScale = Assembly.MAX_DECIMALS - pair.decimalsAsset;
         }
 
         data.input = data.input / (10 ** inputScale);

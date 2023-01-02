@@ -29,8 +29,18 @@ contract TestHyperProcessing is TestHyperSetup {
         HyperCurve memory curve = pool.params;
         (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getAmounts(defaultScenario.poolId);
         uint maxDelta = 0.001 ether; // 1ether = 100%, 0.001 ether = 0.10%
-        assertApproxEqRel(deltaAsset, DEFAULT_ASSET_RESERVE, maxDelta, "asset-reserve"); // todo: fix default amounts
-        assertApproxEqRel(deltaQuote, DEFAULT_QUOTE_RESERVE, maxDelta, "quote-reserve");
+        assertApproxEqRel(
+            deltaAsset,
+            Assembly.scaleFromWadDown(DEFAULT_ASSET_RESERVE, pool.pair.decimalsAsset),
+            maxDelta,
+            "asset-reserve"
+        ); // todo: fix default amounts
+        assertApproxEqRel(
+            deltaQuote,
+            Assembly.scaleFromWadDown(DEFAULT_QUOTE_RESERVE, pool.pair.decimalsQuote),
+            maxDelta,
+            "quote-reserve"
+        );
     }
 
     function testGetLiquidityMinted() public {
@@ -596,7 +606,7 @@ contract TestHyperProcessing is TestHyperSetup {
         int24 lo = DEFAULT_TICK - 256;
         int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
-        uint8 power = 0x02; // if this is low enough, it will revert because token amounts rounded down to zero.
+        uint8 power = 0x05; // if this is low enough, it will revert because token amounts rounded down to zero.
         bytes memory data = CPU.encodeAllocate(0, defaultScenario.poolId, power, amount);
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
@@ -610,11 +620,10 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next < prev, "globalReserves did not change");
     }
 
+    /// @dev IMPORTANT TEST. For low token decimals, be very aware of the amount of liquidity involved in each tx.
     function testUnallocateGlobalQuoteDecreases() public postTestInvariantChecks {
-        int24 lo = DEFAULT_TICK - 256;
-        int24 hi = DEFAULT_TICK;
         uint8 amount = 0x01;
-        uint8 power = 0x01;
+        uint8 power = 0x0c; // 1e12 liquidity
         bytes memory data = CPU.encodeAllocate(0, defaultScenario.poolId, power, amount);
         bool success = __revertCatcher__.process(data);
         assertTrue(success);

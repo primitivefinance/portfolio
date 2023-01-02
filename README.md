@@ -37,12 +37,14 @@ Changing a position:
 
 - Increasing reserves but paying entirely with internal balance leads to a deficit and therefore invariant failure.
 - Be careful about `storage` or `memory` when using the library types. If a pool is computing important values, it should always be from storage, else it might not have the updates in the transaction. There was a bug where I was using the `lastTau` method on a pool in memory, and this was not updated even though the same `storage` pool was updated.
+- Unbounded loops in free functions (for view ones at least) will revert with "EVM Error: Stack overflow"
+- For tokens with lower decimals, there is a minimum amount of liquidity that can be allocated/removed. This is because liquidity is in WAD units while token amounts could be smaller, if they have low decimals.
 
 ## todo
 
 - [x] Fix tests, especially swaps.
 - [ ] Solstat tests.
-- [ ] Refactor accounting system!
+- [x] Refactor accounting system!
 - [ ] Work on docs 1 pager for auditor
 - [ ] Light gas analysis/optimization
 - [ ] Finish stake/unstake
