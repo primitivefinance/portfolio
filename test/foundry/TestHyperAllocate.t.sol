@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY, Pair} from "contracts/HyperLib.sol";
+import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY, HyperPair} from "contracts/HyperLib.sol";
 import "./setup/TestHyperSetup.sol";
 
 struct Amounts {
@@ -29,7 +29,7 @@ contract TestHyperAllocate is TestHyperSetup {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         assertTrue(pool.lastTimestamp != 0, "pool-created");
 
-        Pair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
+        HyperPair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
 
         address hyper = address(__hyperTestingContract__);
         uint64 poolId = defaultScenario.poolId;
@@ -64,7 +64,7 @@ contract TestHyperAllocate is TestHyperSetup {
 
         uint256 price = pool.lastPrice;
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
-        Pair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
+        HyperPair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
 
         uint tau = pool.lastTau(); // seconds
 

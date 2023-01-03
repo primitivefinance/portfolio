@@ -84,7 +84,7 @@ contract InvariantCreatePool is InvariantTargetContract {
         bool isMutable = true;
         uint24 pairId = __hyper__.getPairId(args.token0, args.token1);
         {
-            // Pair not created? Push a create pair call to the stack.
+            // HyperPair not created? Push a create pair call to the stack.
             if (pairId == 0) instructions.push(Enigma.encodeCreatePair(args.token0, args.token1));
 
             // Push create pool to stack
