@@ -238,7 +238,7 @@ contract Hyper is IHyper {
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(int128(deltaLiquidity)); // note: rounds up.
+        (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(toInt128(deltaLiquidity)); // note: rounds up.
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -248,7 +248,7 @@ contract Hyper is IHyper {
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
             tokenQuote: pool.pair.tokenQuote,
-            deltaLiquidity: int128(deltaLiquidity) // TODO: add better type safety for these conversions, or tests to make sure its not an issue.
+            deltaLiquidity: toInt128(deltaLiquidity) // TODO: add better type safety for these conversions, or tests to make sure its not an issue.
         });
 
         _changeLiquidity(args);
@@ -267,7 +267,7 @@ contract Hyper is IHyper {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
 
-        (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(-int128(deltaLiquidity)); // rounds down
+        (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(-toInt128(deltaLiquidity)); // rounds down
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -277,7 +277,7 @@ contract Hyper is IHyper {
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
             tokenQuote: pool.pair.tokenQuote,
-            deltaLiquidity: -int128(deltaLiquidity)
+            deltaLiquidity: -toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
@@ -334,8 +334,8 @@ contract Hyper is IHyper {
         if (deltaLiquidity == 0) revert ZeroLiquidity();
         if (pos.freeLiquidity < deltaLiquidity) revert InsufficientPosition(poolId);
 
-        uint feeEarned = _changeStake(poolId, int128(deltaLiquidity));
-        pool.stakedLiquidityDelta += int128(deltaLiquidity); // adds to total stake
+        uint feeEarned = _changeStake(poolId, toInt128(deltaLiquidity));
+        pool.stakedLiquidityDelta += toInt128(deltaLiquidity); // adds to total stake
         emit Stake(poolId, msg.sender, deltaLiquidity);
     }
 
@@ -348,8 +348,8 @@ contract Hyper is IHyper {
         if (pos.stakeTimestamp == 0) revert PositionNotStaked(poolId);
         if (pos.unstakeTimestamp > timestamp) revert StakeNotMature(poolId); // todo: Investigate if its okay to unstake whenever.
 
-        feeEarned = _changeStake(poolId, -int128(deltaLiquidity));
-        pool.stakedLiquidityDelta -= int128(deltaLiquidity);
+        feeEarned = _changeStake(poolId, -toInt128(deltaLiquidity));
+        pool.stakedLiquidityDelta -= toInt128(deltaLiquidity);
         emit Unstake(poolId, msg.sender, deltaLiquidity);
     }
 
