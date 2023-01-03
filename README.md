@@ -8,7 +8,7 @@ Full vision of Primitive Replicating Market Maker.
 - [x] Improve/fix swap. Assigned to Clement.
 - [ ] Investigate gas costs of swaps.
 - [x] Investigate curve/pair nonces. Assigned to Alex.
-- [ ] Add utility functions to fetch all data. Assigned to Alex.
+- [x] Add utility functions to fetch all data. Assigned to Alex.
 - [ ] Add random swaps to invariant testing.
 - [ ] Investigate typecasting.
 - [ ] Investiate assembly usage.
@@ -54,7 +54,7 @@ Changing a position:
 - [x] Claim fees working and tested
 - [ ] Investigate price movements by swap.
 - [x] Finish SIMPLE stake.
-- [ ] Final cleanup of all console and logging.
+- [x] Final cleanup of all console and logging.
 - [ ] Better swap tests.
 - [ ] Better account system tests.
-- [ ] Add priority fee growth for WETH only.
+- [x] Add priority fee growth for WETH only.

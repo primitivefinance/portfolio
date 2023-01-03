@@ -6,10 +6,8 @@ import { HardhatUserConfig } from 'hardhat/types'
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
 import '@nomicfoundation/hardhat-chai-matchers'
-import 'hardhat-gas-reporter'
 import 'hardhat-preprocessor'
 import 'hardhat-dependency-compiler'
-// import '@primitivefi/hardhat-dodoc' note: breaks with the preprocessor for foundry imports
 
 dotenv.config()
 
