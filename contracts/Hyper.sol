@@ -186,8 +186,6 @@ contract Hyper is IHyper {
         emit Deposit(msg.sender, msg.value);
     }
 
-    event log(uint);
-
     // todo: test
     function claim(uint64 poolId, uint deltaAsset, uint deltaQuote) external lock interactions {
         HyperPool memory pool = pools[poolId];
@@ -201,16 +199,22 @@ contract Hyper is IHyper {
         if (deltaAsset > 0) _applyCredit(pool.pair.tokenAsset, deltaAsset); // todo: problem, what balance do fees accrue to?
         if (deltaQuote > 0) _applyCredit(pool.pair.tokenQuote, deltaQuote); // todo: add debit to this contract?
 
-        emit log(pool.stakedLiquidity);
         pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalReward);
         uint128 deltaReward = pos.tokensOwedReward;
         pos.tokensOwedReward -= deltaReward;
+
+        // todo: a hack that utilizes Hyper contract as a fee bucket for priority swaps.
+        // Currently uses WETH as the reward token. However, these priority fees
+        // are paid based on liquidity.
+        // If 1 WAD of liquidity is worth a small amount, the priority fee cost
+        // a lot relative to the liquidity's value.
+        // A better change is making this reward token configurable.
         if (deltaReward > 0) {
             _applyCredit(WETH, deltaReward); // gift to `msg.sender`.
-            address controller = pool.controller; // todo: should this be taken from controller?
             if (getBalance(address(this), WETH) < deltaReward) revert InvalidReward();
-            __account__.debit(address(this), WETH, deltaReward); // tokens must be in controller account?
+            __account__.debit(address(this), WETH, deltaReward); // only place hyper's balance is used
         }
+
         emit Collect(
             poolId,
             msg.sender,
@@ -508,14 +512,19 @@ contract Hyper is IHyper {
             _state.priorityFeeGrowthGlobal
         );
 
-        // Apply reserve effects.
-        if (priorityFeeAmount != 0) {
-            _increaseReserves(WETH, priorityFeeAmount);
-            emit IncreaseUserBalance(address(this), WETH, priorityFeeAmount);
-            __account__.credit(address(this), WETH, priorityFeeAmount); // using this self's internal balance!
-        }
+        
         _increaseReserves(_state.tokenInput, _swap.input);
         _decreaseReserves(_state.tokenOutput, _swap.output);
+
+        // Apply reserve effects.
+        if (priorityFeeAmount != 0) {
+            // Uses hyper's internal balance as a fee bucket for priority swaps.
+            // todo: investigate two different pools accruing priority rewards in the same bucket,
+            // and if it's possible to "steal" another pool's accrued priority rewards.
+            _increaseReserves(WETH, priorityFeeAmount);
+            emit IncreaseUserBalance(address(this), WETH, priorityFeeAmount);
+            __account__.credit(address(this), WETH, priorityFeeAmount);
+        }
 
         emit Swap(args.poolId, _swap.price, _state.tokenInput, _swap.input, _state.tokenOutput, _swap.output);
 
