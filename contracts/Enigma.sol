@@ -2,27 +2,40 @@
 pragma solidity 0.8.13;
 
 /**
+
+  -------------
   
   This is called the Enigma, it's an alternative ABI.
   Originally, it was designed to compress calldata and therefore
   save gas on optimistic rollup networks.
 
   There are levels to the optimizations that can be made for it,
-  but this one focuses on the alternative multicall.
+  but this one focuses on the alternative multicall: jump process.
 
   Multicalls will pad all calls to a full bytes32.
   This means two calls are at least 64 bytes.
   This alternative multicall can process over 10 calls in the same 64 bytes.
   The smallest bytes provided by a call is for allocate and unallocate, at 11 bytes.
 
-  Be aware of a function selector hash collisions.
+  Multicalls also process transactions sequentially.
+  State cannot be carried over transiently between transactions.
+  With Enigma, we can transiently set state (only specific state),
+  and use it across "instructions".
+
+  Without jump instruction, this alternative encoding is overkill.
+
+  Be aware of function selector hash collisions.
   Data is delivered via the `fallback` function.
+
+  -------------
+
+  primitive.xyz
 
  */
 
 import "./Assembly.sol" as Assembly;
 
-uint8 constant JUMP_PROCESS_START_POINTER = 2; // points to first pointer
+uint8 constant JUMP_PROCESS_START_POINTER = 2;
 bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET00 = 0x02;
@@ -35,11 +48,11 @@ bytes1 constant UNSET02 = 0x08;
 bytes1 constant UNSET03 = 0x09;
 bytes1 constant CREATE_POOL = 0x0B;
 bytes1 constant CREATE_PAIR = 0x0C;
-bytes1 constant CREATE_CURVE = 0x0D;
+bytes1 constant UNSET04 = 0x0D;
 bytes1 constant INSTRUCTION_JUMP = 0xAA;
 
-error InvalidJump(uint256 pointer);
-error InvalidPairBytes(uint256 expected, uint256 length);
+error InvalidJump(uint256 pointer); // 0x80f63bd1
+error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
 
 function __startProcess__(function(bytes calldata) _process) {
     if (msg.data[0] != INSTRUCTION_JUMP) _process(msg.data);
@@ -100,6 +113,7 @@ function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure retu
 function decodePoolId(
     bytes calldata data
 ) pure returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) {
+    if (data.length != 8) revert InvalidBytesLength(8, data.length);
     poolId = uint64(bytes8(data));
     pairId = uint16(bytes2(data[:3]));
     isMutable = uint8(bytes1(data[3:4]));
@@ -111,7 +125,7 @@ function encodeCreatePair(address token0, address token1) pure returns (bytes me
 }
 
 function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
-    if (data.length != 41) revert InvalidPairBytes(41, data.length);
+    if (data.length != 41) revert InvalidBytesLength(41, data.length);
     tokenAsset = address(bytes20(data[1:21]));
     tokenQuote = address(bytes20(data[21:]));
 }
@@ -146,6 +160,7 @@ function decodeCreatePool(
         uint128 price
     )
 {
+    if (data.length != 53) revert InvalidBytesLength(53, data.length);
     pairId = uint24(bytes3(data[1:4]));
     controller = address(bytes20(data[4:24]));
     priorityFee = uint16(bytes2(data[24:26]));
@@ -153,8 +168,8 @@ function decodeCreatePool(
     vol = uint16(bytes2(data[28:30]));
     dur = uint16(bytes2(data[30:32]));
     jit = uint16(bytes2(data[32:34]));
-    max = int24(uint24(bytes3(data[34:37]))); // todo: fix, can overflow
-    price = uint128(bytes16(data[37:48]));
+    max = int24(uint24(bytes3(data[34:37])));
+    price = uint128(bytes16(data[37:]));
 }
 
 function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
@@ -162,6 +177,7 @@ function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount
 }
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+    if (data.length < 9) revert InvalidBytesLength(9, data.length);
     (bytes1 maxFlag, ) = Assembly.separate(data[0]);
     useMax = uint8(maxFlag);
     poolId = uint64(bytes8(data[1:9]));
@@ -173,6 +189,7 @@ function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amou
 }
 
 function decodeUnallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+    if (data.length < 9) revert InvalidBytesLength(9, data.length);
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
     deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
@@ -187,11 +204,12 @@ function encodeSwap(
     uint128 amount1,
     uint8 direction
 ) pure returns (bytes memory data) {
-    uint8 pointer = 0x0a + 0x0f + 0x02; // temp: fix: 0x02 for two additional poolId bytes // pointer of the second amount, pointer -> [power0, amount0, -> power1, amount1]
+    //    pointerToAmount1 = instruction, poolId, pointer, power0, amount0, power1 {pointer}->
+    uint8 pointerToAmount1 = 0x01 + 0x08 + 0x01 + 0x10 + 0x01;
     data = abi.encodePacked(
         Assembly.pack(bytes1(useMax), SWAP),
         poolId,
-        pointer,
+        pointerToAmount1,
         power0,
         amount0,
         power1,
@@ -207,7 +225,7 @@ function decodeSwap(
     poolId = uint64(bytes8(data[1:9]));
     uint8 pointer = uint8(data[9]);
     input = uint128(Assembly.toAmount(data[10:pointer]));
-    limit = uint128(Assembly.toAmount(data[pointer:data.length - 1])); // note: Up to but not including last byte.
+    limit = uint128(Assembly.toAmount(data[pointer:data.length - 1]));
     direction = uint8(data[data.length - 1]);
 }
 
@@ -216,6 +234,7 @@ function encodeStakePosition(uint64 poolId, uint128 deltaLiquidity) pure returns
 }
 
 function decodeStakePosition(bytes calldata data) pure returns (uint64 poolId, uint128 deltaLiquidity) {
+    if (data.length < 9) revert InvalidBytesLength(9, data.length);
     poolId = uint64(bytes8(data[1:9]));
     deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }
@@ -225,6 +244,7 @@ function encodeUnstakePosition(uint64 poolId, uint128 deltaLiquidity) pure retur
 }
 
 function decodeUnstakePosition(bytes calldata data) pure returns (uint64 poolId, uint128 deltaLiquidity) {
+    if (data.length < 9) revert InvalidBytesLength(9, data.length);
     poolId = uint64(bytes8(data[1:9]));
     deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }
