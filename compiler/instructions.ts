@@ -190,8 +190,6 @@ export function encodeCreatePool(pairId: number, curveId: number, price: BigNumb
 export function encodeUnallocate(
   useMax: boolean,
   poolId: number,
-  loTick: number,
-  hiTick: number,
   liquidity: BigNumber
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.UNALLOCATE
@@ -204,25 +202,13 @@ export function encodeUnallocate(
   const amountBytes = hexToBytes(BigNumber.from(amount)._hex)
   const powerByte = encodeSecondByte(0, decimals)
 
-  const loTickBytes = hexZeroPad(hexlify(loTick), 3)
-  const hiTickBytes = hexZeroPad(hexlify(hiTick), 3)
-
-  const bytes = [
-    firstByte,
-    ...hexToBytes(poolIdBytes),
-    ...hexToBytes(loTickBytes),
-    ...hexToBytes(hiTickBytes),
-    powerByte,
-    ...amountBytes,
-  ]
+  const bytes = [firstByte, ...hexToBytes(poolIdBytes), powerByte, ...amountBytes]
   return { bytes, hex: bytesToHex(bytes) }
 }
 
 export function encodeAllocate(
   useMax: boolean,
   poolId: number,
-  loTick: number,
-  hiTick: number,
   liquidity: BigNumber
 ): { bytes: number[]; hex: string } {
   const opcode = Instructions.ALLOCATE
@@ -230,20 +216,11 @@ export function encodeAllocate(
   if (useMax) return { bytes: [firstByte], hex: bytesToHex([firstByte]) }
 
   const poolIdBytes = hexZeroPad(hexlify(poolId), 6)
-  const { amount: encodedAmount, decimals: decimalsBase } = trailingRunLengthEncode(liquidity.toString())
+  const { amount: encodedAmount, decimals: decimalsAsset } = trailingRunLengthEncode(liquidity.toString())
   const amountBytes = hexToBytes(BigNumber.from(encodedAmount)._hex)
-  const powerByte = decimalsBase
-  const loTickBytes = hexZeroPad(hexlify(loTick), 3)
-  const hiTickBytes = hexZeroPad(hexlify(hiTick), 3)
+  const powerByte = decimalsAsset
 
-  const bytes = [
-    firstByte,
-    ...hexToBytes(poolIdBytes),
-    ...hexToBytes(loTickBytes),
-    ...hexToBytes(hiTickBytes),
-    powerByte,
-    ...amountBytes,
-  ]
+  const bytes = [firstByte, ...hexToBytes(poolIdBytes), powerByte, ...amountBytes]
 
   return { bytes, hex: bytesToHex(bytes) }
 }
@@ -310,7 +287,6 @@ export function encodeJumpInstruction(instructions: number[][]): { bytes: number
   })
 
   const bytes = [opcode, length, ...instructionBytesPacked]
-  const actualLength = bytes.length
   return { bytes, hex: bytesToHex(bytes) }
 }
 

@@ -1,25 +1,49 @@
-# Primitive Hyper RMM
+# Primitive Hyper
 
-Full vision of Primitive Replicating Market Maker.
+Hyper is a replicating market maker.
 
-## Notes
+## System Invariants
 
-Investigate use of msg.value! (used in fund)
+The system is designed around a single invariant:
 
-#### Allocate
+```
+Balance >= Reserve
+```
 
-Adding liquidity increases pool and position liquidity balances, and charges the caller the virtual balances of tokens required to back that liquidity.
+Exposed via: `hyper.getNetBalance(token)`
 
-Virtual balances depend on price.
+For more invariants, [read this](./test/README.md).
 
-Price should not change when adding liquidity.
+## Installation
 
-If liquidity changes, virtual balances need to be updated, which would require tokens to be paid to the contract.
+Required:
 
-Changing a position:
+- Foundry
+- Ganache
+- Node >=v16.x
+- Python (if running echidna)
 
-- Timestamp synced
-- Fees are synced
-- Position Liquidity is touched
-  - Pool is touched
-    - Reserves are touched
+### 1. Install foundry. [source](https://github.com/foundry-rs/foundry)
+
+`curl -L https://foundry.paradigm.xyz | bash`
+
+### 2. Restart terminal or reload `PATH`, then run:
+
+`foundryup`
+
+### 3. Install deps
+
+`forge install`
+
+### 4. Test
+
+`yarn test`
+
+## Resources
+
+- [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
+- [Original codebase](https://github.com/primitivefinance/rmm-core)
+- [solstat](https://github.com/primitivefinance/solstat)
+- [Replicating Market Makers](https://github.com/angeris/angeris.github.io/blob/master/papers/rmms.pdf)
+- [RMM whitepaper](https://primitive.xyz/whitepaper)
+- [High precision calculator](https://keisan.casio.com/calculator)

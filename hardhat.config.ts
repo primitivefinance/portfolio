@@ -3,12 +3,10 @@ import fs from 'fs'
 import { subtask } from 'hardhat/config'
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/task-names'
 import { HardhatUserConfig } from 'hardhat/types'
-import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
 import '@nomicfoundation/hardhat-chai-matchers'
-import 'hardhat-gas-reporter'
 import 'hardhat-preprocessor'
-// import '@primitivefi/hardhat-dodoc' note: breaks with the preprocessor for foundry imports
+import 'hardhat-dependency-compiler'
 
 dotenv.config()
 
@@ -51,14 +49,14 @@ const config: HardhatUserConfig = {
       allowUnlimitedContractSize: true,
       blockGasLimit: 30_000_000,
     },
+    ganache: {
+      url: 'http://localhost:8545',
+      chainId: 1337,
+    },
     primitive: {
       url: `http://${PRIMITIVE_RPC}:8545`,
       chainId: 1337,
     },
-  },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
-    currency: 'USD',
   },
   // Avoid foundry cache conflict.
   paths: { sources: './contracts', cache: 'hh-cache' },
@@ -75,6 +73,9 @@ const config: HardhatUserConfig = {
         return line
       },
     }),
+  },
+  dependencyCompiler: {
+    paths: ['solmate/tokens/WETH.sol'],
   },
 }
 

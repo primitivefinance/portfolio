@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
 interface IERC20 {
@@ -31,18 +32,14 @@ contract HyperForwarderHelper {
         }
     }
 
-    function getPoolId(uint16 pairId, uint32 curveId) public pure returns (uint48) {
-        return uint48(bytes6(abi.encodePacked(pairId, curveId)));
+    function getPoolId(uint24 pairId, uint32 curveId) public pure returns (uint64) {
+        return uint64(bytes8(abi.encodePacked(pairId, curveId)));
     }
 }
 
 /// @dev msg.sender in Hyper calls.
 contract Caller {
-    function approve(
-        address token,
-        address to,
-        uint256 amount
-    ) external {
+    function approve(address token, address to, uint256 amount) external {
         IERC20(token).approve(to, amount);
     }
 
