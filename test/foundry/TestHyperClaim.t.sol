@@ -12,7 +12,7 @@ contract TestHyperClaim is TestHyperSetup {
         uint real1 = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
         (uint res0, uint res1) = pool.getVirtualReserves();
 
-        //int inv = Invariant.invariant(res1, res0, pool.params.strike(), pool.params.volatility(), pool.lastTau());
+        //int inv = Invariant.invariantOf(res1, res0, pool.params.strike(), pool.params.volatility(), pool.lastTau());
         console.log("real0", real0);
         console.log("real1", real1);
         console.log("res0", res0);

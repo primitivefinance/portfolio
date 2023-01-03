@@ -153,7 +153,7 @@ contract TestE2ESetup is Helpers, Test {
     function setPoolId(uint64 poolId) public {
         __poolId__ = poolId;
 
-        Pair memory pair = getPair(address(__hyper__), Enigma.decodePairIdFromPoolId(poolId));
+        HyperPair memory pair = getPair(address(__hyper__), Enigma.decodePairIdFromPoolId(poolId));
         __asset__ = TestERC20(pair.tokenAsset);
         __quote__ = TestERC20(pair.tokenQuote);
 

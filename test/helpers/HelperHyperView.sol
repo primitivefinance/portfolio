@@ -3,10 +3,10 @@ pragma solidity ^0.8.0;
 
 import "contracts/Enigma.sol" as Processor;
 import "contracts/OS.sol" as Operating;
-import {Pair, HyperCurve, HyperPool, HyperPosition} from "contracts/HyperLib.sol";
+import {HyperPair, HyperCurve, HyperPool, HyperPosition} from "contracts/HyperLib.sol";
 
 interface IHyperStruct {
-    function pairs(uint24 pairId) external view returns (Pair memory);
+    function pairs(uint24 pairId) external view returns (HyperPair memory);
 
     function positions(address owner, uint64 positionId) external view returns (HyperPosition memory);
 
@@ -51,7 +51,7 @@ contract HelperHyperView {
         return pool.params;
     }
 
-    function getPair(address hyper, uint24 pairId) public view returns (Pair memory) {
+    function getPair(address hyper, uint24 pairId) public view returns (HyperPair memory) {
         return IHyperStruct(hyper).pairs(pairId);
     }
 
@@ -74,7 +74,7 @@ contract HelperHyperView {
         address caller,
         address[] memory owners
     ) public view returns (HyperState memory) {
-        Pair memory pair = getPair(hyper, Processor.decodePairIdFromPoolId(poolId));
+        HyperPair memory pair = getPair(hyper, Processor.decodePairIdFromPoolId(poolId));
         address asset = pair.tokenAsset;
         address quote = pair.tokenQuote;
 

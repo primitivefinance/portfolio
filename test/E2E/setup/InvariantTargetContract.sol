@@ -52,7 +52,7 @@ contract InvariantTargetContract is HelperHyperView, Test {
     function setPoolId(uint64 poolId) internal {
         ctx.setPoolId(poolId); // TODO: duplicating for now...
 
-        Pair memory pair = getPair(address(__hyper__), Processor.decodePairIdFromPoolId(poolId));
+        HyperPair memory pair = getPair(address(__hyper__), Processor.decodePairIdFromPoolId(poolId));
         __asset__ = TestERC20(pair.tokenAsset);
         __quote__ = TestERC20(pair.tokenQuote);
     }

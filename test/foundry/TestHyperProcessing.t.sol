@@ -57,7 +57,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
 
         uint24 pairId = uint16(__hyperTestingContract__.getPairNonce());
-        Pair memory pair = getPair(address(__hyperTestingContract__), pairId);
+        HyperPair memory pair = getPair(address(__hyperTestingContract__), pairId);
         assertTrue(pair.tokenAsset != address(0));
         assertTrue(pair.tokenQuote != address(0));
     }
@@ -73,11 +73,6 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     // ===== Effects ===== //
-
-    function testSyncPool() public {
-        customWarp(1);
-        __hyperTestingContract__.syncPool(defaultScenario.poolId);
-    }
 
     // --- Swap --- //
 
@@ -391,7 +386,7 @@ contract TestHyperProcessing is TestHyperSetup {
         );
         uint strike = Price.computePriceWithTick(curve.maxTick);
         console.log(tau, strike, curve.volatility);
-        uint256 theoreticalR2 = Price.computeR2WithPrice(price, strike, curve.volatility, tau);
+        uint256 theoreticalR2 = Price.getXWithPrice(price, strike, curve.volatility, tau);
 
         uint8 power = uint8(0x06); // 6 zeroes
         uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
@@ -859,7 +854,7 @@ contract TestHyperProcessing is TestHyperSetup {
         __hyperTestingContract__.unstake(defaultScenario.poolId, 555);
     }
 
-    // --- Create Pair --- //
+    // --- Create HyperPair --- //
 
     function testCreatePairSameTokensReverts() public {
         address token = address(new TestERC20("t", "t", 18));
@@ -934,7 +929,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bytes memory data = Enigma.encodeCreatePair(address(token0), address(token1));
         bool success = __revertCatcher__.process(data);
         uint24 pairId = __hyperTestingContract__.getPairId(token0, token1);
-        Pair memory pair = getPair(address(__hyperTestingContract__), pairId);
+        HyperPair memory pair = getPair(address(__hyperTestingContract__), pairId);
         assertEq(pair.tokenAsset, token0);
         assertEq(pair.tokenQuote, token1);
         assertEq(pair.decimalsAsset, 18);

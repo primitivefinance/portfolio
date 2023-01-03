@@ -7,7 +7,7 @@ contract TestPriceComputePrice is TestPriceSetup {
     using Price for Price.RMM;
 
     function testComputedPriceWithDefaultAssetReserve() public {
-        uint actual = cases[0].computePriceWithR2(DEFAULT_ASSET_RESERVE);
+        uint actual = cases[0].getPriceWithX(DEFAULT_ASSET_RESERVE);
         uint err = 1e4; // TODO: Fix for error...
         assertTrue(actual <= DEFAULT_PRICE + err && actual >= DEFAULT_PRICE - err);
     }

@@ -7,17 +7,17 @@ contract TestPriceComputeReserves is TestPriceSetup {
     using Price for Price.RMM;
 
     function testComputedAssetReserveWithDefaultPrice() public {
-        uint actual = cases[0].computeR2WithPrice(DEFAULT_PRICE);
+        uint actual = cases[0].getXWithPrice(DEFAULT_PRICE);
         assertEq(actual, DEFAULT_ASSET_RESERVE);
     }
 
     function testComputedQuoteReserveWithDefaultAssetReserve() public {
-        uint actual = cases[0].computeR1WithR2(DEFAULT_ASSET_RESERVE);
+        uint actual = cases[0].getYWithX(DEFAULT_ASSET_RESERVE);
         assertEq(actual, DEFAULT_QUOTE_RESERVE);
     }
 
     function testComputedAssetReserveWithDefaultQuoteReserve() public {
-        uint actual = cases[0].computeR2WithR1(DEFAULT_QUOTE_RESERVE);
+        uint actual = cases[0].getXWithY(DEFAULT_QUOTE_RESERVE);
         assertEq(actual, DEFAULT_ASSET_RESERVE);
     }
 
