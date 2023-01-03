@@ -182,14 +182,15 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function deposit() external payable override lock interactions {
         if (msg.value == 0) revert ZeroValue();
-        // interactions modifier does the work.
         emit Deposit(msg.sender, msg.value);
+        // interactions modifier does the work.
     }
 
     // todo: test
     function claim(uint64 poolId, uint deltaAsset, uint deltaQuote) external lock interactions {
         HyperPool memory pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
+        if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
         pos.syncPositionFees(pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
         pos.tokensOwedAsset -= deltaAsset.safeCastTo128();
@@ -198,15 +199,22 @@ contract Hyper is IHyper {
         if (deltaAsset > 0) _applyCredit(pool.pair.tokenAsset, deltaAsset); // todo: problem, what balance do fees accrue to?
         if (deltaQuote > 0) _applyCredit(pool.pair.tokenQuote, deltaQuote); // todo: add debit to this contract?
 
-        pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalAsset);
+        pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalReward);
         uint128 deltaReward = pos.tokensOwedReward;
         pos.tokensOwedReward -= deltaReward;
+
+        // todo: a hack that utilizes Hyper contract as a fee bucket for priority swaps.
+        // Currently uses WETH as the reward token. However, these priority fees
+        // are paid based on liquidity.
+        // If 1 WAD of liquidity is worth a small amount, the priority fee cost
+        // a lot relative to the liquidity's value.
+        // A better change is making this reward token configurable.
         if (deltaReward > 0) {
-            _applyCredit(WETH, deltaReward);
-            address controller = pool.controller; // todo: should this be taken from controller?
-            if (getBalance(controller, WETH) < deltaReward) revert InvalidReward();
-            __account__.debit(controller, WETH, deltaReward); // tokens must be in controller account?
+            _applyCredit(WETH, deltaReward); // gift to `msg.sender`.
+            if (getBalance(address(this), WETH) < deltaReward) revert InvalidReward();
+            __account__.debit(address(this), WETH, deltaReward); // only place hyper's balance is used
         }
+
         emit Collect(
             poolId,
             msg.sender,
@@ -248,7 +256,7 @@ contract Hyper is IHyper {
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
             tokenQuote: pool.pair.tokenQuote,
-            deltaLiquidity: toInt128(deltaLiquidity) // TODO: add better type safety for these conversions, or tests to make sure its not an issue.
+            deltaLiquidity: toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
@@ -335,7 +343,7 @@ contract Hyper is IHyper {
         if (pos.freeLiquidity < deltaLiquidity) revert InsufficientPosition(poolId);
 
         uint feeEarned = _changeStake(poolId, toInt128(deltaLiquidity));
-        pool.stakedLiquidityDelta += toInt128(deltaLiquidity); // adds to total stake
+        pool.stakedLiquidityDelta += toInt128(deltaLiquidity);
         emit Stake(poolId, msg.sender, deltaLiquidity);
     }
 
@@ -447,7 +455,6 @@ contract Hyper is IHyper {
             if (_state.sell) nextDependent = rmm.getYWithX(nextIndependent);
             else nextDependent = rmm.getXWithY(nextIndependent);
 
-            // Apply swap amounts to swap _state.
             _swap.input += deltaInput;
             _swap.output += (liveDependent - nextDependent);
         }
@@ -504,10 +511,18 @@ contract Hyper is IHyper {
             _state.priorityFeeGrowthGlobal
         );
 
-        // Apply reserve effects.
-        if (priorityFeeAmount != 0) _increaseReserves(WETH, priorityFeeAmount);
         _increaseReserves(_state.tokenInput, _swap.input);
         _decreaseReserves(_state.tokenOutput, _swap.output);
+
+        // Apply reserve effects.
+        if (priorityFeeAmount != 0) {
+            // Uses hyper's internal balance as a fee bucket for priority swaps.
+            // todo: investigate two different pools accruing priority rewards in the same bucket,
+            // and if it's possible to "steal" another pool's accrued priority rewards.
+            _increaseReserves(WETH, priorityFeeAmount);
+            emit IncreaseUserBalance(address(this), WETH, priorityFeeAmount);
+            __account__.credit(address(this), WETH, priorityFeeAmount);
+        }
 
         emit Swap(args.poolId, _swap.price, _state.tokenInput, _swap.input, _state.tokenOutput, _swap.output);
 
@@ -529,7 +544,7 @@ contract Hyper is IHyper {
 
         uint passed = getTimePassed(poolId);
         if (passed > 0) {
-            uint256 lastTau = pool.lastTau(); // uses pool's last update timestamp.
+            uint256 lastTau = pool.lastTau(); // pool.params.maturity() - pool.lastTimestamp.
             (price, tick) = pool.computePriceChangeWithTime(lastTau, passed);
         }
     }
@@ -544,13 +559,16 @@ contract Hyper is IHyper {
         uint256 liquidity,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote,
-        uint feeGrowthGlobalReward
+        uint256 feeGrowthGlobalReward
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
         uint256 timestamp = _blockTimestamp();
         timeDelta = getTimePassed(poolId);
-        if (timeDelta > 0) {
+
+        // todo: better configuration of this value?
+        uint requiredTimePassedForStake = 1;
+        if (timeDelta >= requiredTimePassedForStake) {
             pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
             pool.stakedLiquidityDelta = 0;
         }
@@ -872,7 +890,7 @@ contract Hyper is IHyper {
             pair: pairs[pairId],
             sellAsset: sellAsset,
             amountIn: amountIn,
-            timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp
+            timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp // invariant: should not underflow.
         });
     }
 }

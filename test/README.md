@@ -97,7 +97,6 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - The `__account__.settled` variable must always return true outside of execution.
 - The `__account__.prepared` variable must always return false outside of execution.
 - The `__account__.warm` variable must always be an empty array outside of execution.
-- The `address(this).balance` value must always be zero outside of execution.
 
 #### Deposit
 
@@ -139,6 +138,18 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - Hyper's `reserves` value for the `token` decreased by `amount`.
   - The `to` address received `amount` of token or `amount` of Ether, if `token === weth`.
   - Hyper's `balanceOf` value for `token` decreased by `amount`.
+
+#### Claim
+
+- Preconditions:
+  - Caller has a position.
+- During Execution:
+-
+- Postcondition:
+  - Fee growth values updated if different from pool growth checkpoints.
+  - If tokens were owed, decremented from position.
+  - If tokens were owed, getBalance of token increased for Caller.
+  - Credit event emitted.
 
 #### Allocate
 

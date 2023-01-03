@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "contracts/Enigma.sol" as Processor;
 import "contracts/OS.sol" as Operating;
 import {HyperPair, HyperCurve, HyperPool, HyperPosition} from "contracts/HyperLib.sol";
+import {TestERC20} from "contracts/test/TestERC20.sol";
 
 interface IHyperStruct {
     function pairs(uint24 pairId) external view returns (HyperPair memory);
@@ -65,6 +66,26 @@ contract HelperHyperView {
 
     function getBalance(address hyper, address owner, address token) public view returns (uint) {
         return HyperLike(hyper).getBalance(owner, token);
+    }
+
+    function _getPool(IHyperStruct hyper, uint64 poolId) public view returns (HyperPool memory) {
+        return (hyper).pools(poolId);
+    }
+
+    function _getPosition(
+        IHyperStruct hyper,
+        address owner,
+        uint64 positionId
+    ) public view returns (HyperPosition memory) {
+        return hyper.positions(owner, positionId);
+    }
+
+    function _getReserve(HyperLike hyper, TestERC20 token) public view returns (uint) {
+        return hyper.getReserve(address(token));
+    }
+
+    function _getBalance(HyperLike hyper, address owner, TestERC20 token) public view returns (uint) {
+        return hyper.getBalance(owner, address(token));
     }
 
     /** @dev Fetches pool state and account state for a single pool's tokens. */

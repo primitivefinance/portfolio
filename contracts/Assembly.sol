@@ -40,7 +40,7 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
 
 /** 
 
-    Reference:
+    @dev Reference:
     
     if (delta < 0) {
         output = input - uint128(-delta);
@@ -137,7 +137,7 @@ function toAmount(bytes calldata raw) pure returns (uint128 amount) {
 }
 
 function computeScalar(uint decimals) pure returns (uint scalar) {
-    return 10 ** (MAX_DECIMALS - decimals);
+    return 10 ** (MAX_DECIMALS - decimals); // can revert on underflow
 }
 
 function scaleToWad(uint amountDec, uint decimals) pure returns (uint outputWad) {

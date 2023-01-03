@@ -108,6 +108,7 @@ function dangerousFund(AccountSystem storage self, address token, address to, ui
 
 /** @dev Increases an `owner`'s spendable balance. */
 function credit(AccountSystem storage self, address owner, address token, uint amount) {
+    self.touch(token);
     self.balances[owner][token] += amount;
 }
 
@@ -118,6 +119,7 @@ function debit(
     address token,
     uint256 owed
 ) returns (uint paid, uint remainder) {
+    self.touch(token);
     uint balance = self.balances[owner][token];
     if (balance >= owed) {
         paid = owed;

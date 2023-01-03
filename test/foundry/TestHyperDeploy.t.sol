@@ -15,5 +15,9 @@ contract TestHyperDeploy is TestHyperSetup {
         emit Deployed("Deployed weth at: ", weth);
         emit Deployed("Deployed hyper at: ", address(hyper));
         emit Deployed("Deployed usdc at: ", usdc);
+
+        assertEq(hyper.WETH(), weth, "weth address");
+        (, bool settled) = hyper.__account__();
+        assertTrue(settled, "settled");
     }
 }
