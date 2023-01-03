@@ -1,9 +1,8 @@
-@primitivefi/=node_modules/@primitivefi/
+hardhat=/node_modules/hardhat
 @rari-capital/=node_modules/@rari-capital/
 contracts/=contracts/
-eth-gas-reporter/=node_modules/eth-gas-reporter/
+ds-test/=lib/solmate/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
-hardhat/=node_modules/hardhat/
 lib/=lib/
 solmate/=lib/solmate/src/
-solstat/=lib/solstat/contracts/
+solstat/=lib/solstat/src/

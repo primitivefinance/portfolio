@@ -1,60 +1,49 @@
-# Primitive Hyper RMM
+# Primitive Hyper
 
-Full vision of Primitive Replicating Market Maker.
+Hyper is a replicating market maker.
 
-## Notes
+## System Invariants
 
-- [x] Investigate use of msg.value! (used in fund).
-- [x] Improve/fix swap. Assigned to Clement.
-- [ ] Investigate gas costs of swaps.
-- [x] Investigate curve/pair nonces. Assigned to Alex.
-- [ ] Add utility functions to fetch all data. Assigned to Alex.
-- [ ] Add random swaps to invariant testing.
-- [ ] Investigate typecasting.
-- [ ] Investiate assembly usage.
-- [ ] Explore refactor of free functions. I like free functions but they are so new that not many testing frameworks have good support yet.
-- [ ] Explore implications of time movement creating price changes. Cannot change price and liquidity at the same time, thats an invariant!
+The system is designed around a single invariant:
 
-#### Allocate
+```
+Balance >= Reserve
+```
 
-Adding liquidity increases pool and position liquidity balances, and charges the caller the virtual balances of tokens required to back that liquidity.
+Exposed via: `hyper.getNetBalance(token)`
 
-Virtual balances depend on price.
+For more invariants, [read this](./test/README.md).
 
-Price should not change when adding liquidity.
+## Installation
 
-If liquidity changes, virtual balances need to be updated, which would require tokens to be paid to the contract.
+Required:
 
-Changing a position:
+- Foundry
+- Ganache
+- Node >=v16.x
+- Python (if running echidna)
 
-- Timestamp synced
-- Fees are synced
-- Position Liquidity is touched
-  - Pool is touched
-    - Reserves are touched
+### 1. Install foundry. [source](https://github.com/foundry-rs/foundry)
 
-#### Notes
+`curl -L https://foundry.paradigm.xyz | bash`
 
-- Increasing reserves but paying entirely with internal balance leads to a deficit and therefore invariant failure.
-- Be careful about `storage` or `memory` when using the library types. If a pool is computing important values, it should always be from storage, else it might not have the updates in the transaction. There was a bug where I was using the `lastTau` method on a pool in memory, and this was not updated even though the same `storage` pool was updated.
-- Unbounded loops in free functions (for view ones at least) will revert with "EVM Error: Stack overflow"
-- For tokens with lower decimals, there is a minimum amount of liquidity that can be allocated/removed. This is because liquidity is in WAD units while token amounts could be smaller, if they have low decimals.
+### 2. Restart terminal or reload `PATH`, then run:
 
-## todo
+`foundryup`
 
-- [x] Fix tests, especially swaps.
-- [x] Solstat tests. - sunday
-- [x] Refactor accounting system!
-- [ ] Work on docs 1 pager for auditor - monday
-- [ ] Light gas analysis/optimization - none
-- [x] Finish stake/unstake - sunday
-- [x] Add parameter validation to changeParameters function
-- [x] Rename HyperLib to HyperLib ?
-- [x] TOKEN DECIMALS NOT HANDLED
-- [x] Claim fees working and tested
-- [ ] Investigate price movements by swap.
-- [x] Finish SIMPLE stake.
-- [ ] Final cleanup of all console and logging.
-- [ ] Better swap tests.
-- [ ] Better account system tests.
-- [ ] Add priority fee growth for WETH only.
+### 3. Install deps
+
+`forge install`
+
+### 4. Test
+
+`yarn test`
+
+## Resources
+
+- [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
+- [Original codebase](https://github.com/primitivefinance/rmm-core)
+- [solstat](https://github.com/primitivefinance/solstat)
+- [Replicating Market Makers](https://github.com/angeris/angeris.github.io/blob/master/papers/rmms.pdf)
+- [RMM whitepaper](https://primitive.xyz/whitepaper)
+- [High precision calculator](https://keisan.casio.com/calculator)

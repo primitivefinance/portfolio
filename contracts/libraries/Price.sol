@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: GPL-3.0-only
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.13;
 
-import "./Invariant.sol";
+import "solstat/Invariant.sol";
 
 using Price for Price.RMM global;
 

@@ -3,13 +3,10 @@ import fs from 'fs'
 import { subtask } from 'hardhat/config'
 import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/task-names'
 import { HardhatUserConfig } from 'hardhat/types'
-import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
 import '@nomicfoundation/hardhat-chai-matchers'
-import 'hardhat-gas-reporter'
 import 'hardhat-preprocessor'
 import 'hardhat-dependency-compiler'
-// import '@primitivefi/hardhat-dodoc' note: breaks with the preprocessor for foundry imports
 
 dotenv.config()
 
@@ -60,10 +57,6 @@ const config: HardhatUserConfig = {
       url: `http://${PRIMITIVE_RPC}:8545`,
       chainId: 1337,
     },
-  },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
-    currency: 'USD',
   },
   // Avoid foundry cache conflict.
   paths: { sources: './contracts', cache: 'hh-cache' },
