@@ -1,8 +1,11 @@
 {
   "name": "hyper",
+  "license": "AGPL-3.0-only",
   "version": "beta-v0.0.1",
-  "license": "GPL-3.0-or-later",
-  "description": "Enigma Virtual Machine processes instructions for interacting with liquidity pools.",
+  "description": "Gas optimized automated market maker.",
+  "files": [
+    "contracts/**/*.sol"
+  ],
   "scripts": {
     "build": "yarn build:forge",
     "build:crytic": "crytic-compile . --compile-force-framework foundry --compile-custom-build='yarn build:forge:crytic --extra-output abi --extra-output userdoc --extra-output devdoc --extra-output evm.methodIdentifiers --force'",
@@ -26,15 +29,11 @@
     "url": "git+https://github.com/primitivefinance/hyper.git"
   },
   "keywords": [
-    "hardhat",
+    "forge",
     "solidity",
     "primitive"
   ],
   "author": "Primitive™",
-  "bugs": {
-    "url": "https://github.com/primitivefinance/hyper/issues"
-  },
-  "homepage": "https://github.com/primitivefinance/hyper#readme",
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.5",
