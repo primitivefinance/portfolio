@@ -12,7 +12,7 @@ pragma solidity 0.8.13;
 
   -------------
 
-  primitive.xyz
+  Primitive™
 
  */
 
@@ -22,10 +22,6 @@ error InvalidLiquidity();
 uint constant SECONDS_PER_DAY = 86_400 seconds;
 uint8 constant MIN_DECIMALS = 6;
 uint8 constant MAX_DECIMALS = 18;
-
-function isBetween(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
-    return __between(value, lower, upper);
-}
 
 function isBetween(uint256 value, uint256 lower, uint256 upper) pure returns (bool valid) {
     return __between(int256(value), int256(lower), int256(upper));
@@ -43,6 +39,9 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
 }
 
 /** 
+
+    Reference:
+    
     if (delta < 0) {
         output = input - uint128(-delta);
         if (output >= input) revert InvalidLiquidity();

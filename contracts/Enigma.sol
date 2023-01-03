@@ -29,7 +29,7 @@ pragma solidity 0.8.13;
 
   -------------
 
-  primitive.xyz
+  Primitive™
 
  */
 

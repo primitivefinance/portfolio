@@ -9,11 +9,10 @@ contract TestHyperFund is TestHyperSetup {
         __hyperTestingContract__.fund(address(defaultScenario.asset), 4000);
         uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
-        assertTrue(nextBalance > prevBalance);
+        assertTrue(nextBalance > prevBalance, "increase-internal-bal");
     }
 
-    function testFuzzFundDrawSuccessful(uint amount) public {
-        vm.assume(amount < type(uint).max);
+    function testFuzzFundDrawSuccessful(uint128 amount) public {
         vm.assume(amount > 0);
         _assertFundDraw(amount);
     }

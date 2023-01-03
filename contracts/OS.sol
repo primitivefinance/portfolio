@@ -25,7 +25,7 @@ pragma solidity 0.8.13;
 
   -------------
 
-  primitive.xyz
+  Primitive™
 
  */
 
@@ -102,8 +102,8 @@ function __dangerousTransferFrom__(address token, address to, uint amount) {
 
 /** @dev External call to the `to` address is dangerous. */
 function dangerousFund(AccountSystem storage self, address token, address to, uint amount) {
-    self.increase(token, amount);
-    __dangerousTransferFrom__(token, to, amount);
+    self.touch(token);
+    __dangerousTransferFrom__(token, to, amount); // Settlement gifts tokens to msg.sender.
 }
 
 /** @dev Increases an `owner`'s spendable balance. */
@@ -153,10 +153,12 @@ function settle(
 ) returns (uint credited, uint debited, uint remainder) {
     int net = self.getNetBalance(token, account);
     if (net > 0) {
+        credited = uint(net);
         // unaccounted for tokens, e.g. transferred directly into Hyper.
-        self.credit(msg.sender, token, uint(net)); // gift the `msg.sender`.
+        self.credit(msg.sender, token, uint(net)); // gift to `msg.sender`.
         self.reserves[token] += uint(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {
+        // missing tokens that must be paid for or transferred in.
         remainder = uint(-net);
         (debited, remainder) = self.debit(msg.sender, token, remainder);
         if (debited > 0) self.reserves[token] -= debited; // using a balance means tokens are in contract already.

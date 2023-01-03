@@ -10,7 +10,7 @@ pragma solidity 0.8.13;
 
   -------------
 
-  primitive.xyz
+  Primitive™
 
  */
 
@@ -71,6 +71,7 @@ error InvalidReward();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
 error InvalidTick(int24);
+error InvalidTransfer();
 error InvalidVolatility(uint24 sigma);
 error JitLiquidity(uint256 distance);
 error MaxFee(uint16 fee);
@@ -89,6 +90,7 @@ error SwapLimitReached();
 error ZeroInput();
 error ZeroLiquidity();
 error ZeroPrice();
+error ZeroValue();
 
 struct HyperPair {
     address tokenAsset;
@@ -320,8 +322,8 @@ function strike(HyperCurve memory self) view returns (uint strike) {
     return Price.computePriceWithTick(self.maxTick);
 }
 
-function maturity(HyperCurve memory self) view returns (uint endTimestamp) {
-    return Assembly.convertDaysToSeconds(self.duration) + self.createdAt;
+function maturity(HyperCurve memory self) view returns (uint32 endTimestamp) {
+    return (Assembly.convertDaysToSeconds(self.duration) + self.createdAt).safeCastTo32();
 }
 
 function validateParameters(HyperCurve memory self) view returns (bool, bytes memory) {

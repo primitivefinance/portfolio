@@ -1,11 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.13;
 
-import {HyperCurve, HyperPair} from "..//HyperLib.sol";
+import {HyperCurve, HyperPair} from "../HyperLib.sol";
 
 interface IHyperEvents {
     event Deposit(address indexed account, uint amount);
-
+    event DecreaseUserBalance(address indexed account, address indexed token, uint256 amount);
+    event DecreaseReserveBalance(address indexed token, uint256 amount);
+    event IncreaseUserBalance(address indexed account, address indexed token, uint256 amount);
+    event IncreaseReserveBalance(address indexed token, uint256 amount);
+    event Swap(
+        uint64 indexed poolId,
+        uint256 price,
+        address indexed tokenIn,
+        uint256 input,
+        address indexed tokenOut,
+        uint256 output
+    );
+    event Stake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
+    event Unstake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
     event Allocate(
         uint64 indexed poolId,
         address indexed asset,
@@ -22,9 +35,26 @@ interface IHyperEvents {
         uint256 deltaQuote,
         uint256 deltaLiquidity
     );
-    event Swap(uint64 indexed poolId, uint256 input, uint256 output, address indexed tokenIn, address indexed tokenOut);
-    event Stake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
-    event Unstake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
+
+    event ChangeParameters(
+        uint64 indexed poolId,
+        uint16 priorityFee,
+        uint16 indexed fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        int24 indexed maxTick
+    );
+    event Collect(
+        uint64 poolId,
+        address account,
+        uint feeAsset,
+        address indexed tokenAsset,
+        uint feeQuote,
+        address indexed tokenQuote,
+        uint feeReward,
+        address indexed tokenReward
+    );
     event CreatePair(
         uint24 indexed pairId,
         address indexed asset,
@@ -38,46 +68,6 @@ interface IHyperEvents {
         address indexed asset,
         address indexed quote,
         uint256 price
-    );
-    event DecreaseUserBalance(address indexed token, uint256 amount);
-    event IncreaseUserBalance(address indexed token, uint256 amount);
-    event IncreaseReserveBalance(address indexed token, uint256 amount);
-    event DecreaseReserveBalance(address indexed token, uint256 amount);
-    event ChangePosition(address indexed account, uint64 indexed poolId, int256 deltaLiquidity);
-    event EarnFees(
-        address indexed account,
-        uint64 indexed poolId,
-        uint256 feeAsset,
-        address asset,
-        uint256 feeQuote,
-        address quote
-    );
-    event Collect(
-        uint64 indexed poolId,
-        address account,
-        uint feeAsset,
-        address indexed tokenAsset,
-        uint feeQuote,
-        address indexed tokenQuote
-    );
-    event PoolUpdate(
-        uint64 indexed poolId,
-        uint256 price,
-        int24 indexed tick,
-        uint256 liquidity,
-        address tokenAsset,
-        address tokenQuote,
-        uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote
-    );
-    event ChangeParameters(
-        uint64 indexed poolId,
-        uint16 priorityFee,
-        uint16 indexed fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        int24 indexed maxTick
     );
 }
 
@@ -134,24 +124,24 @@ interface IHyperGetters {
 
     function getPairNonce() external view returns (uint256);
 
+    function getAmounts(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    function getAmountOut(uint64 poolId, bool sellAsset, uint amountIn) external view returns (uint);
+
+    function getVirtualReserves(uint64 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
+
     function getMaxLiquidity(
         uint64 poolId,
         uint deltaAsset,
         uint deltaQuote
     ) external view returns (uint128 deltaLiquidity);
 
-    function getVirtualReserves(uint64 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
-
     function getLiquidityDeltas(
         uint64 poolId,
         int128 deltaLiquidity
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
-    function getAmounts(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
-
-    function getAssetAmountOut(uint64 poolId, uint amountIn) external view returns (uint);
-
-    function getQuoteAmountOut(uint64 poolId, uint amountIn) external view returns (uint);
+    function getLatestPrice(uint64 poolId) external view returns (uint price);
 }
 
 interface IHyperActions {
@@ -175,8 +165,6 @@ interface IHyperActions {
     function draw(address token, uint256 amount, address to) external;
 
     function deposit() external payable;
-
-    function syncPool(uint64 poolId) external returns (uint128 lastTimestamp);
 
     function changeParameters(
         uint64 poolId,

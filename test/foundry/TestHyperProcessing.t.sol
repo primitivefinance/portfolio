@@ -74,11 +74,6 @@ contract TestHyperProcessing is TestHyperSetup {
 
     // ===== Effects ===== //
 
-    function testSyncPool() public {
-        customWarp(1);
-        __hyperTestingContract__.syncPool(defaultScenario.poolId);
-    }
-
     // --- Swap --- //
 
     function testSwapExactInNonExistentPoolIdReverts() public {
