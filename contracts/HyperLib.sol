@@ -284,11 +284,11 @@ function getAmountsWad(HyperPool memory self) view returns (uint amountAssetWad,
 
 function computePriceChangeWithTime(
     HyperPool memory self,
-    uint tau,
+    uint timeRemaining,
     uint epsilon
 ) pure returns (uint price, int24 tick) {
-    uint strike = Price.computePriceWithTick(self.params.maxTick);
-    price = Price.computePriceWithChangeInTau(strike, self.params.volatility, self.lastPrice, tau, epsilon);
+    uint maxPrice = Price.computePriceWithTick(self.params.maxTick);
+    price = Price.computePriceWithChangeInTau(maxPrice, self.params.volatility, self.lastPrice, timeRemaining, epsilon);
     tick = Price.computeTickWithPrice(price);
 }
 
@@ -308,7 +308,7 @@ function getRMM(HyperPool memory self) view returns (Price.RMM memory) {
     return Price.RMM({strike: self.params.strike(), sigma: self.params.volatility, tau: self.lastTau()});
 }
 
-function lastTau(HyperPool memory self) view returns (uint tau) {
+function lastTau(HyperPool memory self) view returns (uint) {
     return self.tau(self.lastTimestamp);
 }
 
@@ -318,7 +318,7 @@ function tau(HyperPool memory self, uint timestamp) view returns (uint) {
     return end - timestamp;
 }
 
-function strike(HyperCurve memory self) view returns (uint strike) {
+function strike(HyperCurve memory self) view returns (uint) {
     return Price.computePriceWithTick(self.maxTick);
 }
 

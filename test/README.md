@@ -60,15 +60,25 @@ The setup is a little complicated... here&#39;s what is going on:
 
 At this point, you should be setup to interact with the test suites.
 
-### 6. `yarn install`
+### 6. Install deps
 
-### 7. `forge install`
+`yarn install`
 
-### 8. `yarn test`, `yarn test:hardhat`, `yarn test:echidna`.
+### 7. Install submodules
 
-### 9. Clean up cached builds with `yarn clean`.
+`forge install`
 
-### 10. Get gas report with `yarn profile`
+### 8. Test
+
+`yarn test`, `yarn test:echidna`.
+
+### 9. Clean up cached builds
+
+`yarn clean`.
+
+### 10. Get gas report
+
+`yarn profile`
 
 ---
 

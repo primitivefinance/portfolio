@@ -529,8 +529,8 @@ contract Hyper is IHyper {
 
         uint passed = getTimePassed(poolId);
         if (passed > 0) {
-            uint256 tau = pool.lastTau(); // uses pool's last update timestamp.
-            (price, tick) = pool.computePriceChangeWithTime(tau, passed);
+            uint256 lastTau = pool.lastTau(); // uses pool's last update timestamp.
+            (price, tick) = pool.computePriceChangeWithTime(lastTau, passed);
         }
     }
 
@@ -614,19 +614,19 @@ contract Hyper is IHyper {
         pool.lastTimestamp = timestamp;
         pool.lastPrice = price;
         pool.lastTick = Price.computeTickWithPrice(pool.lastPrice);
-        bool isMutable = pool.controller != address(0);
-        if (isMutable && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
+        bool hasController = pool.controller != address(0);
+        if (hasController && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
 
         uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable
         pool.pair = pairs[pairNonce];
 
         HyperCurve memory params = HyperCurve({
             maxTick: max,
-            jit: isMutable ? jit : uint8(_liquidityPolicy()),
+            jit: hasController ? jit : uint8(_liquidityPolicy()),
             fee: fee,
             duration: dur,
             volatility: vol,
-            priorityFee: isMutable ? priorityFee : 0, // min fee
+            priorityFee: hasController ? priorityFee : 0, // min fee
             createdAt: timestamp
         });
         params.validateParameters();
@@ -637,12 +637,12 @@ contract Hyper is IHyper {
             poolNonce = uint32(++getPoolNonce);
         }
 
-        poolId = Enigma.encodePoolId(pairNonce, isMutable, poolNonce);
+        poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
         if (pools[poolId].exists()) revert PoolExists();
 
         pools[poolId] = pool; // effect
 
-        emit CreatePool(poolId, isMutable, pool.pair.tokenAsset, pool.pair.tokenQuote, price);
+        emit CreatePool(poolId, hasController, pool.pair.tokenAsset, pool.pair.tokenQuote, price);
     }
 
     function changeParameters(
