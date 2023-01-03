@@ -6,4 +6,4 @@ forge-std/=lib/forge-std/src/
 hardhat/=node_modules/hardhat/
 lib/=lib/
 solmate/=lib/solmate/src/
-solstat/=lib/solstat/contracts/
+solstat/=lib/solstat/src/
