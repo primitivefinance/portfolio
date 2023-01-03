@@ -49,11 +49,11 @@ interface IHyperEvents {
         uint64 poolId,
         address account,
         uint feeAsset,
-        address indexed tokenAsset,
+        address indexed asset,
         uint feeQuote,
-        address indexed tokenQuote,
+        address indexed quote,
         uint feeReward,
-        address indexed tokenReward
+        address indexed reward
     );
     event CreatePair(
         uint24 indexed pairId,

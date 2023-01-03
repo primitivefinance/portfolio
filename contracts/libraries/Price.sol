@@ -6,7 +6,13 @@ import "solstat/Invariant.sol";
 using Price for Price.RMM global;
 
 /**
- * @dev Library for RMM to compute reserves, prices, and changes in reserves over time.
+ * @dev     Library for RMM to compute reserves, prices, and changes in reserves over time.
+ * @notice  Units Glossary:
+ *
+ *          wad - `1 ether` == 1e18
+ *          seconds - `1 seconds` == 1
+ *          percentage - 10_000 == 100%
+ *
  */
 library Price {
     using FixedPointMathLib for uint256;
@@ -62,6 +68,11 @@ library Price {
 
     /**
      * @dev Computes change in price given a change in time in seconds.
+     * @param stk WAD
+     * @param vol percentage
+     * @param prc WAD
+     * @param tau seconds
+     * @param epsilon seconds
      * @custom:math P(τ - ε) = ( P(τ)^(√(1 - ε/τ)) / K^2 )e^((1/2)(t^2)(√(τ)√(τ- ε) - (τ - ε)))
      */
     function computePriceWithChangeInTau(
@@ -111,6 +122,12 @@ library Price {
 
     /**
      * @dev R_y = tradingFunction(R_x, ...)
+     * @param R_x WAD
+     * @param stk WAD
+     * @param vol percentage
+     * @param tau seconds
+     * @param inv WAD
+     * @return R_y WAD
      */
     function getYWithX(
         uint256 R_x,
@@ -124,6 +141,12 @@ library Price {
 
     /**
      * @dev R_x = tradingFunction(R_y, ...)
+     * @param R_y WAD
+     * @param stk WAD
+     * @param vol percentage
+     * @param tau seconds
+     * @param inv WAD
+     * @return R_x WAD
      */
     function getXWithY(
         uint256 R_y,
@@ -137,6 +160,11 @@ library Price {
 
     /**
      * @dev Used in `getAmounts` to compute the virtual amount of assets at the pool's price.
+     * @param prc WAD
+     * @param stk WAD
+     * @param vol percentage
+     * @param tau seconds
+     * @return R_x WAD
      * @custom:math R_x = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
     function getXWithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 R_x) {
@@ -158,6 +186,11 @@ library Price {
 
     /**
      * @dev price(R_x) = Ke^(Φ^-1(1 - R_x)σ√τ - 1/2σ^2τ)
+     * @param R_x WAD
+     * @param stk WAD
+     * @param vol percentage
+     * @param tau seconds
+     * @return prc WAD
      */
     function getPriceWithX(uint256 R_x, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 prc) {
         uint256 tauYears = convertSecondsToWadYears(tau);
@@ -184,7 +217,7 @@ library Price {
      * @custom:math price = e^(ln(1.0001) * tick)
      *
      * @param tick Key of a slot in a price/liquidity grid.
-     * @return price Value on a key (tick) value pair of a price grid.
+     * @return price WAD Value on a key (tick) value pair of a price grid.
      */
     function computePriceWithTick(int24 tick) internal pure returns (uint256 price) {
         int256 tickWad = int256(tick) * int256(FixedPointMathLib.WAD);
@@ -196,7 +229,7 @@ library Price {
      *
      * @custom:math tick = ln(price) / ln(1.0001)
      *
-     * @param price Value on a key (tick) value pair of a price grid.
+     * @param price WAD Value on a key (tick) value pair of a price grid.
      * @return tick Key of a slot in a price/liquidity grid.
      */
     function computeTickWithPrice(uint256 price) internal pure returns (int24 tick) {

@@ -182,8 +182,8 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function deposit() external payable override lock interactions {
         if (msg.value == 0) revert ZeroValue();
-        // interactions modifier does the work.
         emit Deposit(msg.sender, msg.value);
+        // interactions modifier does the work.
     }
 
     // todo: test
@@ -256,7 +256,7 @@ contract Hyper is IHyper {
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
             tokenQuote: pool.pair.tokenQuote,
-            deltaLiquidity: toInt128(deltaLiquidity) // TODO: add better type safety for these conversions, or tests to make sure its not an issue.
+            deltaLiquidity: toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
@@ -343,7 +343,7 @@ contract Hyper is IHyper {
         if (pos.freeLiquidity < deltaLiquidity) revert InsufficientPosition(poolId);
 
         uint feeEarned = _changeStake(poolId, toInt128(deltaLiquidity));
-        pool.stakedLiquidityDelta += toInt128(deltaLiquidity); // adds to total stake
+        pool.stakedLiquidityDelta += toInt128(deltaLiquidity);
         emit Stake(poolId, msg.sender, deltaLiquidity);
     }
 
@@ -455,7 +455,6 @@ contract Hyper is IHyper {
             if (_state.sell) nextDependent = rmm.getYWithX(nextIndependent);
             else nextDependent = rmm.getXWithY(nextIndependent);
 
-            // Apply swap amounts to swap _state.
             _swap.input += deltaInput;
             _swap.output += (liveDependent - nextDependent);
         }
@@ -545,7 +544,7 @@ contract Hyper is IHyper {
 
         uint passed = getTimePassed(poolId);
         if (passed > 0) {
-            uint256 lastTau = pool.lastTau(); // uses pool's last update timestamp.
+            uint256 lastTau = pool.lastTau(); // pool.params.maturity() - pool.lastTimestamp.
             (price, tick) = pool.computePriceChangeWithTime(lastTau, passed);
         }
     }
@@ -567,7 +566,7 @@ contract Hyper is IHyper {
         uint256 timestamp = _blockTimestamp();
         timeDelta = getTimePassed(poolId);
 
-        // todo: better configuration of this value
+        // todo: better configuration of this value?
         uint requiredTimePassedForStake = 1;
         if (timeDelta >= requiredTimePassedForStake) {
             pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
@@ -891,7 +890,7 @@ contract Hyper is IHyper {
             pair: pairs[pairId],
             sellAsset: sellAsset,
             amountIn: amountIn,
-            timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp
+            timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp // invariant: should not underflow.
         });
     }
 }
