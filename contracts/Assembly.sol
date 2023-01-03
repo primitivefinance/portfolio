@@ -1,6 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+/**
+
+  -------------
+  
+  Using yul to handle low-level coversions
+  can easily be a foot shotgun.
+
+  We like the gas reductions.
+
+  -------------
+
+  primitive.xyz
+
+ */
+
 error CastOverflow(uint);
 error InvalidLiquidity();
 

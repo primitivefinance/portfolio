@@ -1,42 +1,72 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity 0.8.13;
 
+/**
+
+  -------------
+  
+  This is a custom account system to support Enigma's
+  jump processing. Without jump processing, the benefits 
+  are marginal at best. Combining the two reduces the 
+  marginal cost of aditional operations to only ~20% of a single operation. 
+  This is by design, in order to support a system that interacts with a lot
+  of different parameters, tokens, actors, and pools.
+
+  -------------
+
+  Glossary:
+
+  Virtual Reserves  - Expected balance of tokens.
+  Physical Reserves - Actual balance of tokens.
+  Net Balance       - Difference of physical reserve and virtual reserve.
+  Credit            - Increase (+) spendable tokens.
+  Debit             - Decrease (-) spendable tokens.
+  Settle            - Apply net balance (+/-) as credit (+) or debit (-) to user.
+
+  -------------
+
+  primitive.xyz
+
+ */
+
 import "solmate/utils/SafeTransferLib.sol";
 import "./interfaces/IWETH.sol";
 import "./interfaces/IERC20.sol";
 import "./Assembly.sol" as Assembly;
 
-import {console} from "forge-std/Test.sol";
-
 using {
     __wrapEther__,
     dangerousFund,
-    dangerousDraw,
     cache,
-    increase,
-    decrease,
     credit,
     debit,
-    settle,
+    decrease,
+    increase,
     reset,
+    settle,
     touch,
     getNetBalance
 } for AccountSystem global;
 
-/** @dev Novel accounting mechanism to track internally held balances and settle differences with actual balances. */
-struct AccountSystem {
-    mapping(address => mapping(address => uint)) balances; // Internal user balances.
-    mapping(address => uint) reserves; // Global balance of tokens held by a contract.
-    mapping(address => bool) cached; // Tokens interacted with that must be settled. TODO: Make it a bitmap.
-    address[] warm; // Transiently stored, must be length zero outside of execution.
-    bool prepared; // Must be false outside of execution.
-    bool settled; // Must be true outside of execution.
-}
+error EtherTransferFail(); // 0x75f42683
+error InsufficientReserve(uint amount, uint delta); // 0x315276c9
+error InvalidBalance(); // 0xc52e3eff
+error NotPreparedToSettle(); // 0xf7cede50
 
-error EtherTransferFail();
-error InsufficientReserve(uint amount, uint delta);
-error InvalidBalance();
-error NotPreparedToSettle();
+struct AccountSystem {
+    // user -> token -> internal balance.
+    mapping(address => mapping(address => uint)) balances;
+    // token -> virtual reserve.
+    mapping(address => uint) reserves;
+    // token -> cached status. todo: make this a bitmap
+    mapping(address => bool) cached;
+    // Transiently stored cached tokens, must be length zero outside of execution.
+    address[] warm;
+    // Must be `false` outside of execution.
+    bool prepared;
+    // Must be `true` outside of execution.
+    bool settled;
+}
 
 /** @dev Gas optimized. */
 function __balanceOf__(address token, address account) view returns (uint256) {
@@ -45,7 +75,7 @@ function __balanceOf__(address token, address account) view returns (uint256) {
     return abi.decode(data, (uint256));
 }
 
-/** @dev Must validate `weth`. */
+/** @dev Must validate `weth` is real weth. */
 function __wrapEther__(AccountSystem storage self, address weth) {
     if (msg.value > 0) {
         self.touch(weth);
@@ -76,13 +106,6 @@ function dangerousFund(AccountSystem storage self, address token, address to, ui
     __dangerousTransferFrom__(token, to, amount);
 }
 
-/** @dev Dangerously sends ether or tokens to `to` in a low-level call. */
-function dangerousDraw(AccountSystem storage self, address weth, address token, uint amount, address to) {
-    self.decrease(token, amount);
-    if (token == weth) __dangerousUnwrapEther__(weth, to, amount);
-    else SafeTransferLib.safeTransfer(ERC20(token), to, amount);
-}
-
 /** @dev Increases an `owner`'s spendable balance. */
 function credit(AccountSystem storage self, address owner, address token, uint amount) {
     self.balances[owner][token] += amount;
@@ -96,8 +119,6 @@ function debit(
     uint256 owed
 ) returns (uint paid, uint remainder) {
     uint balance = self.balances[owner][token];
-    console.log("balance", balance);
-    console.log("owed", owed);
     if (balance >= owed) {
         paid = owed;
         self.balances[owner][token] -= paid;
@@ -107,9 +128,6 @@ function debit(
         self.balances[owner][token] -= paid;
         remainder = owed - paid;
     }
-
-    console.log("paid", paid);
-    console.log("remainder", remainder);
 }
 
 /** @dev Actives a token and increases the reserves. Settlement will pick up this activated token. */
@@ -127,23 +145,24 @@ function decrease(AccountSystem storage self, address token, uint amount) {
     self.reserves[token] -= amount;
 }
 
-/** @notice Settles the difference in balance between tracked tokens and physically held tokens. */
+/** @notice Settles the difference in balance between virtual tokens and physically held tokens. */
 function settle(
     AccountSystem storage self,
     address token,
     address account
 ) returns (uint credited, uint debited, uint remainder) {
-    delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of the transaction.
-
     int net = self.getNetBalance(token, account);
     if (net > 0) {
-        self.credit(msg.sender, token, uint(net)); // apply the difference to user
+        // unaccounted for tokens, e.g. transferred directly into Hyper.
+        self.credit(msg.sender, token, uint(net)); // gift the `msg.sender`.
         self.reserves[token] += uint(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {
         remainder = uint(-net);
         (debited, remainder) = self.debit(msg.sender, token, remainder);
         if (debited > 0) self.reserves[token] -= debited; // using a balance means tokens are in contract already.
     }
+
+    delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of the transaction.
 }
 
 /** @dev Interacting with a token will activate it, adding it to an array of interacted tokens for settlement to loop through. */
@@ -153,11 +172,12 @@ function touch(AccountSystem storage self, address token) {
         self.warm.push(token);
         self.cache(token, true);
     }
+    // do nothing if already cached.
 }
 
 /** @dev Account system is reset after settlement is successful. */
 function reset(AccountSystem storage self) {
-    assert(self.warm.length == 0);
+    assert(self.warm.length == 0); // todo: this is a valid assertion, but should we use assert?
     self.settled = true;
     delete self.warm;
     delete self.prepared;
@@ -170,7 +190,7 @@ function cache(AccountSystem storage self, address token, bool status) {
 
 /** @dev Computes surplus (positive) or deficit (negative) in actual tokens compared to tracked amounts. */
 function getNetBalance(AccountSystem storage self, address token, address account) view returns (int256 net) {
-    uint internalBalance = self.reserves[token];
-    uint physicalBalance = __balanceOf__(token, account);
+    uint256 internalBalance = self.reserves[token];
+    uint256 physicalBalance = __balanceOf__(token, account);
     net = int256(physicalBalance) - int256(internalBalance);
 }

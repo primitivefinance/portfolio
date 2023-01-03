@@ -49,7 +49,7 @@ contract Hyper is IHyper {
     uint256 public getPairNonce;
     uint256 public getPoolNonce;
 
-    mapping(uint24 => Pair) public pairs;
+    mapping(uint24 => HyperPair) public pairs;
     mapping(uint64 => HyperPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
     mapping(address => mapping(uint64 => HyperPosition)) public positions;
@@ -222,7 +222,7 @@ contract Hyper is IHyper {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
 
-        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
+        HyperPair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
         if (useMax) {
             deltaLiquidity = pool.getMaxLiquidity(
                 getBalance(msg.sender, pair.tokenAsset),
@@ -379,7 +379,7 @@ contract Hyper is IHyper {
         HyperPool storage pool = pools[args.poolId];
         if (!pool.exists()) revert NonExistentPool(args.poolId);
 
-        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(args.poolId)];
+        HyperPair memory pair = pairs[Enigma.decodePairIdFromPoolId(args.poolId)];
         _state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
         _state.fee = msg.sender == pool.controller ? pool.params.priorityFee : uint(pool.params.fee);
         _state.feeGrowthGlobal = _state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
@@ -403,7 +403,11 @@ contract Hyper is IHyper {
             });
         }
 
-        Price.RMM memory rmm = Price.RMM({strike: pool.strike(), sigma: pool.params.volatility, tau: pool.lastTau()});
+        Price.RMM memory rmm = Price.RMM({
+            strike: pool.params.strike(),
+            sigma: pool.params.volatility,
+            tau: pool.lastTau()
+        });
         if (rmm.tau == 0) revert PoolExpired();
 
         // =---= Effects =---= //
@@ -574,13 +578,13 @@ contract Hyper is IHyper {
         if (pool.lastTick != tick) pool.lastTick = tick;
         if (pool.lastPrice != price) pool.lastPrice = price.safeCastTo128();
         if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
-        if (pool.lastTimestamp != timestamp) pool.lastTimestamp = uint32(timestamp);
+        if (pool.lastTimestamp != timestamp) pool.syncPoolTimestamp(timestamp);
 
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
         pool.feeGrowthGlobalReward = Assembly.computeCheckpoint(pool.feeGrowthGlobalReward, feeGrowthGlobalReward);
 
-        Pair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
+        HyperPair memory pair = pairs[Enigma.decodePairIdFromPoolId(poolId)];
         emit PoolUpdate(
             poolId,
             pool.lastPrice,
@@ -619,7 +623,7 @@ contract Hyper is IHyper {
         }
 
         getPairId[asset][quote] = pairId; // note: order of tokens matters!
-        pairs[pairId] = Pair({
+        pairs[pairId] = HyperPair({
             tokenAsset: asset,
             decimalsAsset: decimalsAsset,
             tokenQuote: quote,
@@ -654,7 +658,7 @@ contract Hyper is IHyper {
         uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable
         bool isMutable = pool.controller != address(0);
         if (isMutable && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
-        Pair memory pair = pairs[pairNonce];
+        HyperPair memory pair = pairs[pairNonce];
         pool.pair = pair;
 
         HyperCurve memory params = HyperCurve({
@@ -666,7 +670,7 @@ contract Hyper is IHyper {
             priorityFee: isMutable ? priorityFee : 0, // min fee
             createdAt: timestamp
         });
-        params.revertOnInvalid();
+        params.validateParameters();
         pool.params = params;
 
         uint32 poolNonce;
