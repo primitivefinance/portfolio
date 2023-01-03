@@ -512,7 +512,6 @@ contract Hyper is IHyper {
             _state.priorityFeeGrowthGlobal
         );
 
-        
         _increaseReserves(_state.tokenInput, _swap.input);
         _decreaseReserves(_state.tokenOutput, _swap.output);
 
@@ -569,8 +568,8 @@ contract Hyper is IHyper {
         timeDelta = getTimePassed(poolId);
 
         // todo: better configuration of this value
-        uint requiredTimePassedForStake = 0;
-        if (timeDelta > requiredTimePassedForStake) {
+        uint requiredTimePassedForStake = 1;
+        if (timeDelta >= requiredTimePassedForStake) {
             pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
             pool.stakedLiquidityDelta = 0;
         }

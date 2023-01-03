@@ -119,6 +119,7 @@ function debit(
     address token,
     uint256 owed
 ) returns (uint paid, uint remainder) {
+    self.touch(token);
     uint balance = self.balances[owner][token];
     if (balance >= owed) {
         paid = owed;
