@@ -5,3 +5,7 @@
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
 	branch = v7
+[submodule "lib/solstat"]
+	path = lib/solstat
+	url = https://github.com/primitivefinance/solstat
+	branch = beta-v0.0.1
