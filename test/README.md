@@ -97,7 +97,6 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - The `__account__.settled` variable must always return true outside of execution.
 - The `__account__.prepared` variable must always return false outside of execution.
 - The `__account__.warm` variable must always be an empty array outside of execution.
-- The `address(this).balance` value must always be zero outside of execution.
 
 #### Deposit
 
