@@ -1,5 +1,5 @@
 {
-  "name": "hyper",
+  "name": "@primitivefi/hyper",
   "license": "AGPL-3.0-only",
   "version": "beta-v0.0.1",
   "description": "Gas optimized automated market maker.",
@@ -7,10 +7,6 @@
     "contracts/**/*.sol"
   ],
   "scripts": {
-    "build": "yarn build:forge",
-    "build:crytic": "crytic-compile . --compile-force-framework foundry --compile-custom-build='yarn build:forge:crytic --extra-output abi --extra-output userdoc --extra-output devdoc --extra-output evm.methodIdentifiers --force'",
-    "build:forge": "FOUNDRY_PROFILE=optimized forge build",
-    "build:forge:crytic": "FOUNDRY_PROFILE=crytic forge build",
     "clean": "hardhat clean && forge clean && rm -f crytic-export/*",
     "coverage": "FOUNDRY_PROFILE=test forge coverage",
     "coverage:report": "FOUNDRY_PROFILE=test forge coverage --report lcov",
@@ -29,9 +25,10 @@
     "url": "git+https://github.com/primitivefinance/hyper.git"
   },
   "keywords": [
-    "forge",
-    "solidity",
-    "primitive"
+    "rmm",
+    "hyper",
+    "primitive",
+    "forge"
   ],
   "author": "Primitive™",
   "devDependencies": {
@@ -63,18 +60,6 @@
     "*.ts": "prettier --write"
   },
   "dependencies": {
-    "@primitivefi/rmm-core": "^1.0.0",
-    "@rari-capital/solmate": "7.0.0-alpha.3",
-    "@typechain/ethers-v5": "^10.0.0",
-    "@typechain/hardhat": "^6.0.0",
-    "typechain": "^8.0.0"
-  },
-  "resolutions": {
-    "async": ">=2.6.4",
-    "cross-fetch": ">=3.1.5",
-    "lodash": ">=4.17.21",
-    "node-fetch": ">=2.6.7",
-    "underscore": ">=1.12.1",
-    "yargs-parser": ">=5.0.1"
+    "@rari-capital/solmate": "^7.0.0-alpha.3"
   }
 }
