@@ -425,3 +425,13 @@ function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, 
     self.lastTimestamp = timestamp;
     self.freeLiquidity = Assembly.addSignedDelta(self.freeLiquidity, liquidityDelta);
 }
+
+function toInt128(uint128 a) view returns (int128 b) {
+    assembly {
+        if gt(a, 0x7fffffffffffffffffffffffffffffff) {
+            revert(0, 0)
+        }
+
+        b := a
+    }
+}
