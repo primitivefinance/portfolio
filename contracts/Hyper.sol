@@ -186,10 +186,13 @@ contract Hyper is IHyper {
         emit Deposit(msg.sender, msg.value);
     }
 
+    event log(uint);
+
     // todo: test
     function claim(uint64 poolId, uint deltaAsset, uint deltaQuote) external lock interactions {
         HyperPool memory pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
+        if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
         pos.syncPositionFees(pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
         pos.tokensOwedAsset -= deltaAsset.safeCastTo128();
@@ -198,14 +201,15 @@ contract Hyper is IHyper {
         if (deltaAsset > 0) _applyCredit(pool.pair.tokenAsset, deltaAsset); // todo: problem, what balance do fees accrue to?
         if (deltaQuote > 0) _applyCredit(pool.pair.tokenQuote, deltaQuote); // todo: add debit to this contract?
 
-        pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalAsset);
+        emit log(pool.stakedLiquidity);
+        pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalReward);
         uint128 deltaReward = pos.tokensOwedReward;
         pos.tokensOwedReward -= deltaReward;
         if (deltaReward > 0) {
-            _applyCredit(WETH, deltaReward);
+            _applyCredit(WETH, deltaReward); // gift to `msg.sender`.
             address controller = pool.controller; // todo: should this be taken from controller?
-            if (getBalance(controller, WETH) < deltaReward) revert InvalidReward();
-            __account__.debit(controller, WETH, deltaReward); // tokens must be in controller account?
+            if (getBalance(address(this), WETH) < deltaReward) revert InvalidReward();
+            __account__.debit(address(this), WETH, deltaReward); // tokens must be in controller account?
         }
         emit Collect(
             poolId,
@@ -505,7 +509,11 @@ contract Hyper is IHyper {
         );
 
         // Apply reserve effects.
-        if (priorityFeeAmount != 0) _increaseReserves(WETH, priorityFeeAmount);
+        if (priorityFeeAmount != 0) {
+            _increaseReserves(WETH, priorityFeeAmount);
+            emit IncreaseUserBalance(address(this), WETH, priorityFeeAmount);
+            __account__.credit(address(this), WETH, priorityFeeAmount); // using this self's internal balance!
+        }
         _increaseReserves(_state.tokenInput, _swap.input);
         _decreaseReserves(_state.tokenOutput, _swap.output);
 
@@ -544,13 +552,16 @@ contract Hyper is IHyper {
         uint256 liquidity,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote,
-        uint feeGrowthGlobalReward
+        uint256 feeGrowthGlobalReward
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
         uint256 timestamp = _blockTimestamp();
         timeDelta = getTimePassed(poolId);
-        if (timeDelta > 0) {
+
+        // todo: better configuration of this value
+        uint requiredTimePassedForStake = 0;
+        if (timeDelta > requiredTimePassedForStake) {
             pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
             pool.stakedLiquidityDelta = 0;
         }

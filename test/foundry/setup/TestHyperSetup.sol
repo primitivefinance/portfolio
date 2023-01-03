@@ -141,6 +141,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     }
 
     uint64 public constant FIRST_POOL = 0x0000010000000001;
+    uint64 public constant SECOND_POOL_FIRST_PAIR = 0x0000010000000002;
 
     /** @dev Requires tokens to be spent and spenders to be approved. */
     function initPrerequisites() internal {
@@ -187,6 +188,28 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         __hyperTestingContract__.setTimestamp(uint128(time));
     }
 
+    function createControlledPool() internal {
+        bytes memory data = Enigma.encodeCreatePool(
+            uint24(1), // first pair, is it good in this test?
+            address(this),
+            100,
+            DEFAULT_FEE,
+            DEFAULT_VOLATILITY,
+            DEFAULT_DURATION,
+            DEFAULT_JIT,
+            DEFAULT_MAX_TICK,
+            DEFAULT_PRICE
+        );
+
+        bool success = __revertCatcher__.process(data);
+        assertTrue(success, "controlled pool not created");
+
+        // assumes second pool has not been created...
+        // can be fixed by getting pool nonce and encoding pool id.
+        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(__hyperTestingContract__.getPoolNonce()));
+        scenarios.push(TestScenario(__token_18__, __usdc__, poolId, "Controlled"));
+    }
+
     function basicSwap() internal {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         (uint output, ) = __hyperTestingContract__.swap(
@@ -199,8 +222,30 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         assertTrue(output > 0, "no swap happened!");
     }
 
+    function _swap(uint64 id) internal {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), id);
+        (uint output, ) = __hyperTestingContract__.swap(id, true, (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether, 1);
+        assertTrue(output > 0, "no swap happened!");
+    }
+
+    function basicSwapQuoteIn() internal {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        (uint output, ) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            false,
+            (pool.getMaxSwapQuoteInWad() * 1 ether) / 2 ether,
+            type(uint256).max
+        );
+
+        assertTrue(output > 0, "no swap happened!");
+    }
+
     function basicAllocate() internal {
         __hyperTestingContract__.allocate(defaultScenario.poolId, 1 ether);
+    }
+
+    function _alloc(uint64 id) internal {
+        __hyperTestingContract__.allocate(id, 1 ether);
     }
 
     function basicUnallocate() internal {
@@ -241,5 +286,14 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             defaultScenario.poolId
         );
         return pos;
+    }
+
+    /** @dev Casted to returns structs as memory */
+    function hs() internal view returns (IHyperStruct) {
+        return IHyperStruct(address(__hyperTestingContract__));
+    }
+
+    function hx() internal view returns (HyperLike) {
+        return HyperLike(address(__hyperTestingContract__));
     }
 }

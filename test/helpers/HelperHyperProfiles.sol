@@ -16,5 +16,8 @@ int24 constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
 uint constant DEFAULT_SWAP_INPUT = 0.1 ether;
 uint constant DEFAULT_SWAP_OUTPUT = 97_627 wei;
 uint16 constant DEFAULT_JIT = 4;
+uint16 constant DEFAULT_VOLATILITY = 10_000;
+uint16 constant DEFAULT_DURATION = 365;
+int24 constant DEFAULT_MAX_TICK = int24(23027);
 
 contract HelperHyperProfiles {}

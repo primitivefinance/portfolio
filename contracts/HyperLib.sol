@@ -77,6 +77,7 @@ error JitLiquidity(uint256 distance);
 error MaxFee(uint16 fee);
 error NotController();
 error NonExistentPool(uint64 poolId);
+error NonExistentPosition(address owner, uint64 poolId);
 error PairExists(uint24 pairId);
 error PerLiquidityError(uint256 deltaAsset);
 error PoolExists();
@@ -223,7 +224,7 @@ function syncPositionFees(
 }
 
 function syncPositionStakedFees(HyperPosition storage self, uint liquidity, uint feeGrowth) returns (uint feeEarned) {
-    uint checkpoint = Assembly.computeCheckpointDistance(feeGrowth, self.feeGrowthAssetLast); //todo: add another var to pool
+    uint checkpoint = Assembly.computeCheckpointDistance(feeGrowth, self.feeGrowthRewardLast); //todo: add another var to pool
     feeEarned = FixedPointMathLib.mulWadDown(checkpoint, liquidity);
     self.feeGrowthRewardLast = feeEarned;
     self.tokensOwedReward += SafeCastLib.safeCastTo128(feeEarned);
