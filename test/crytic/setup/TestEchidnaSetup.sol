@@ -23,6 +23,14 @@ contract TestEchidnaEvents {
     event AssertionFailed(int);
 }
 
+contract Addresses {
+    User public __user__;
+    WETH public __weth__;
+    HyperTimeOverride public __hyper__;
+    TestERC20 public __usdc__;
+    TestERC20 public __token_18__;
+}
+
 contract User {}
 
 contract TestEchidnaSetup is
@@ -30,16 +38,11 @@ contract TestEchidnaSetup is
     HelperHyperActions,
     HelperHyperInvariants,
     HelperHyperProfiles,
-    HelperHyperView
+    HelperHyperView,
+    Addresses
 {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
-
-    User public __user__;
-    WETH public __weth__;
-    HyperTimeOverride public __hyper__;
-    TestERC20 public __usdc__;
-    TestERC20 public __token_18__;
 
     constructor() {
         initContracts();

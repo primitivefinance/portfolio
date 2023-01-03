@@ -36,6 +36,7 @@ test = 'test/crytic' # not default
 
 [rpc_endpoints]
 primitive = "http://${PRIMITIVE_RPC}:8545"
+ganache = "http://127.0.0.1:8546"
 
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config

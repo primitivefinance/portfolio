@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Vm.sol";
 import "./setup/TestHyperSetup.sol";
 
-contract TestHyperDeposit is TestHyperSetup {
+contract TestHyperCreate is TestHyperSetup {
     function testChangeParametersInvalidFeeReverts() public {
         uint16 failureArg = 2 ** 16 - 10;
         // create a mutable pool

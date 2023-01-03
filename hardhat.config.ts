@@ -59,10 +59,6 @@ const config: HardhatUserConfig = {
       chainId: 1337,
     },
   },
-  gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
-    currency: 'USD',
-  },
   // Avoid foundry cache conflict.
   paths: { sources: './contracts', cache: 'hh-cache' },
   preprocess: {

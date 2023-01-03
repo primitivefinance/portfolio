@@ -6,8 +6,8 @@ import "solmate/tokens/WETH.sol";
 import "../contracts/Hyper.sol";
 
 contract Deploy is Script {
-    address public __weth__ = 0x575E4246f36a92bd88bcAAaEE2c51499B64116Ed;
-    address public __hyper__ = 0x03f22449978FD757e9081c9178B5c98546153465;
+    address public __weth__; //= 0x575E4246f36a92bd88bcAAaEE2c51499B64116Ed;
+    address public __hyper__; //= 0x03f22449978FD757e9081c9178B5c98546153465;
 
     event Deployed(address owner, address weth, address hyper);
 

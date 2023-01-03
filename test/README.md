@@ -36,7 +36,7 @@ This test suite is comprehensive. There are unit tests written using foundry and
 
 The setup is a little complicated... here&#39;s what is going on:
 
-### Pre-reqs: Must have python, node >=v16.0.0, and yarn.
+### Pre-reqs: Must have python, node >=v16.0.0, ganache, and yarn.
 
 ### 1. Install nix. [source](https://nixos.org/download.html#nix-install-linux)
 
