@@ -635,7 +635,7 @@ contract Hyper is IHyper {
         bool hasController = pool.controller != address(0);
         if (hasController && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
 
-        uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable
+        uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable todo: fix, possible to set 0 pairId if getPairNonce is 0
         pool.pair = pairs[pairNonce];
 
         HyperCurve memory params = HyperCurve({
@@ -656,7 +656,7 @@ contract Hyper is IHyper {
         }
 
         poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
-        if (pools[poolId].exists()) revert PoolExists();
+        if (pools[poolId].exists()) revert PoolExists(); // todo: poolNonce always increments, so this never gets hit, remove
 
         pools[poolId] = pool; // effect
 

@@ -5,6 +5,72 @@ import "forge-std/Vm.sol";
 import "./setup/TestHyperSetup.sol";
 
 contract TestHyperCreate is TestHyperSetup {
+    function testFuzzCreatePol(
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 jit,
+        uint16 duration,
+        uint16 volatility,
+        int24 maxTick,
+        uint128 price
+    ) public {
+        fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
+        priorityFee = uint16(bound(priorityFee, 1, fee));
+        jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
+        duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
+        volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
+        maxTick = int24(bound(maxTick, -MAX_TICK, MAX_TICK));
+        vm.assume(price > 0);
+        vm.assume(maxTick != 0); // todo: fix once maxTick fixes check for 0 tick.
+        bytes memory data = Enigma.encodeCreatePool(
+            uint24(1),
+            address(this),
+            priorityFee,
+            fee,
+            volatility,
+            duration,
+            jit,
+            maxTick,
+            price
+        );
+        bool success = __revertCatcher__.process(data);
+        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(2));
+
+        HyperPool memory pool = _getPool(hs(), poolId);
+        HyperCurve memory actual = pool.params;
+
+        assertTrue(success, "fuzz create pool failed");
+        assertEq(pool.controller, address(this), "controller");
+        assertEq(actual.priorityFee, priorityFee, "priorityFee");
+        assertEq(actual.fee, fee, "fee");
+        assertEq(actual.volatility, volatility, "volatility");
+        assertEq(actual.duration, duration, "duration");
+        assertEq(actual.jit, jit, "jit");
+        assertEq(actual.maxTick, maxTick, "maxTick");
+    }
+
+    function testCreatePoolNonControlledHasDefaultJit() public {
+        __hyperTestingContract__.setJitPolicy(JUST_IN_TIME_LIQUIDITY_POLICY); // for assertion below.
+        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
+        bool success = __revertCatcher__.process(data);
+        assertTrue(success, "create failed");
+        assertEq(_getPool(hs(), defaultScenario.poolId + 1).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY);
+    }
+
+    function testCreatePoolZeroPriceReverts() public {
+        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(this), 1, 1, 1, 1, 1, 1, 0);
+        vm.expectRevert(ZeroPrice.selector);
+        bool success = __revertCatcher__.process(data);
+        assertTrue(!success);
+    }
+
+    function testCreatePoolPriorityFeeInvalidFeeReverts() public {
+        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(this), 0, 1, 1, 1, 1, 1, 1);
+        vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, 0));
+        bool success = __revertCatcher__.process(data);
+        assertTrue(!success);
+    }
+
     function testFuzzChangeParameters(
         uint16 priorityFee,
         uint16 fee,

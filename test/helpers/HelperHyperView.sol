@@ -148,7 +148,7 @@ contract HelperHyperView {
         return sum;
     }
 
-    function getMaxSwapLimit(bool sellAsset) public view returns (uint) {
+    function getMaxSwapLimit(bool sellAsset) public pure returns (uint) {
         if (sellAsset) {
             // price goes down
             return 0;

@@ -443,7 +443,7 @@ function getAmountOut(
     return (data.output, data.remainder);
 }
 
-function toInt128(uint128 a) view returns (int128 b) {
+function toInt128(uint128 a) pure returns (int128 b) {
     assembly {
         if gt(a, 0x7fffffffffffffffffffffffffffffff) {
             revert(0, 0)
