@@ -72,7 +72,7 @@ error InvalidSettlement();
 error InvalidStrike(uint128 strike);
 error InvalidTick(int24);
 error InvalidTransfer();
-error InvalidVolatility(uint24 sigma);
+error InvalidVolatility(uint24 sigma); // todo: fix, use uint16 type.
 error JitLiquidity(uint256 distance);
 error MaxFee(uint16 fee);
 error NotController();
@@ -344,11 +344,11 @@ function checkParameters(HyperCurve memory self) view returns (bool, bytes memor
         return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));
     if (!Assembly.isBetween(self.duration, MIN_DURATION, MAX_DURATION))
         return (false, abi.encodeWithSelector(InvalidDuration.selector, self.duration));
-    if (self.maxTick >= MAX_TICK) return (false, abi.encodeWithSelector(InvalidTick.selector, self.maxTick));
+    if (self.maxTick >= MAX_TICK) return (false, abi.encodeWithSelector(InvalidTick.selector, self.maxTick)); //  todo: fix, min tick check?
     if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
     if (!Assembly.isBetween(self.fee, MIN_FEE, MAX_FEE))
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
-    // 0 priority fee == no controller
+    // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
     if (!Assembly.isBetween(self.priorityFee, 0, self.fee))
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.priorityFee));
 
