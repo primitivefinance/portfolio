@@ -438,7 +438,7 @@ contract Hyper is IHyper {
                 ? 0
                 : ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * _state.fee) / 10_000;
             _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
-            if (priorityFeeAmount != 0) _state.priorityFeeGrowthGlobal = priorityFeeAmount.divWadDown(_swap.liquidity);
+            if (priorityFeeAmount != 0) _state.priorityFeeGrowthGlobal = priorityFeeAmount.divWadDown(_swap.liquidity); // todo: change to staked liquidity
 
             if (_swap.remainder > maxInput) {
                 deltaInput = maxInput - _swap.feeAmount;
