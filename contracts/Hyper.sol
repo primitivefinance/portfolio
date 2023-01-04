@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 /**
 
   ------------------------------------
-  
+
   Hyper is a replicating market maker.
 
   ------------------------------------
@@ -28,18 +28,17 @@ contract Hyper is IHyper {
     using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint;
 
     function VERSION() public pure returns (string memory) {
-        // 33,089 bytes
         assembly {
             // Load 0x20 (32) in memory at slot 0x00, this corresponds to the
             // offset location of the next data.
             mstore(0x00, 0x20)
 
-            // Then we load both the length of our string (0x10) and its actual value
-            // (0x70726f746f747970652d76312e302e30) using the offset 0x30. Using this
+            // Then we load both the length of our string (11 bytes, 0x0b in hex) and its
+            // actual hex value (0x626574612d76302e302e31) using the offset 0x2b. Using this
             // particular offset value will right pad the length at the end of the slot
             // and left pad the string at the beginning of the next slot, assuring the
             // right ABI format to return a string.
-            mstore(0x30, 0x10626574612d76302e302e31) // "beta-v0.0.1"
+            mstore(0x2b, 0x0b626574612d76302e302e31) // "beta-v0.0.1"
 
             // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
@@ -789,7 +788,7 @@ contract Hyper is IHyper {
     }
 
     /**
-        
+
         Be aware of these settlement invariants:
 
         Invariant 1. Every token that is interacted with is cached and exists.
