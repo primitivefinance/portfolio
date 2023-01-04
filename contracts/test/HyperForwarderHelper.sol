@@ -32,8 +32,8 @@ contract HyperForwarderHelper {
         }
     }
 
-    function getPoolId(uint24 pairId, uint32 curveId) public pure returns (uint64) {
-        return uint64(bytes8(abi.encodePacked(pairId, curveId)));
+    function getPoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public pure returns (uint64) {
+        return uint64(bytes8(abi.encodePacked(pairId, isMutable ? 1 : 0, poolNonce)));
     }
 }
 

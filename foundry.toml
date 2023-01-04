@@ -8,9 +8,7 @@ cache = false # !important! breaks echidna if cache = true.
 remappings = [
     'forge-std/=lib/forge-std/src/',
     'solmate/=lib/solmate/src/',
-    'solstat/=lib/solstat/src/',
-    'contracts/=contracts/',
-    'lib/=lib/'
+    'solstat/=lib/solstat/src/'
 ]
 
 [profile.optimized] # uses via_ir and optimizer
