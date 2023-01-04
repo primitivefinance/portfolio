@@ -5,6 +5,7 @@ import { TASK_COMPILE_SOLIDITY_GET_SOURCE_PATHS } from 'hardhat/builtin-tasks/ta
 import { HardhatUserConfig } from 'hardhat/types'
 import '@nomiclabs/hardhat-ethers'
 import '@nomicfoundation/hardhat-chai-matchers'
+import '@nomicfoundation/hardhat-network-helpers'
 import 'hardhat-preprocessor'
 import 'hardhat-dependency-compiler'
 
@@ -51,6 +52,10 @@ const config: HardhatUserConfig = {
     },
     ganache: {
       url: 'http://localhost:8545',
+      chainId: 1337,
+    },
+    etheno: {
+      url: 'http://localhost:8546',
       chainId: 1337,
     },
     primitive: {
