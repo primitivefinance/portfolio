@@ -265,12 +265,12 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         );
     }
 
-    function defaultPool() internal returns (HyperPool memory) {
+    function defaultPool() internal view returns (HyperPool memory) {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         return pool;
     }
 
-    function defaultRevertCatcherPosition() internal returns (HyperPosition memory) {
+    function defaultRevertCatcherPosition() internal view returns (HyperPosition memory) {
         HyperPosition memory pos = getPosition(
             address(__hyperTestingContract__),
             address(__revertCatcher__),
@@ -279,7 +279,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         return pos;
     }
 
-    function defaultPosition() internal returns (HyperPosition memory) {
+    function defaultPosition() internal view returns (HyperPosition memory) {
         HyperPosition memory pos = getPosition(
             address(__hyperTestingContract__),
             address(this),
