@@ -1907,7 +1907,7 @@ event-target-shim@^5.0.0:
   resolved "https://registry.yarnpkg.com/event-target-shim/-/event-target-shim-5.0.1.tgz#5d4d3ebdf9583d63a5333ce2deb7480ab2b05789"
   integrity sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==
 
-evm-bn@^1.1.1:
+evm-bn@^1.1.1, evm-bn@^1.1.2:
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/evm-bn/-/evm-bn-1.1.2.tgz#0bfd19d13b18765eac6bdea51d286266cfeab2bc"
   integrity sha512-Lq8CT1EAjSeN+Yk0h1hpSwnZyMA4Xir6fQD4vlStljAuW2xr7qLOEGDLGsTa9sU2e40EYIumA4wYhMC/e+lyKw==
@@ -3099,6 +3099,13 @@ solidity-comments-extractor@^0.0.7:
   version "0.0.7"
   resolved "https://registry.yarnpkg.com/solidity-comments-extractor/-/solidity-comments-extractor-0.0.7.tgz#99d8f1361438f84019795d928b931f4e5c39ca19"
   integrity sha512-wciNMLg/Irp8OKGrh3S2tfvZiZ0NEyILfcRCXCD4mp7SgK/i9gzLfhY2hY7VMCQJ3kH9UB9BzNdibIVMchzyYw==
+
+solstat@^0.0.2-beta:
+  version "0.0.2-beta"
+  resolved "https://registry.yarnpkg.com/solstat/-/solstat-0.0.2-beta.tgz#35bc6c3ad9fc803a6780c3f5c678cb05056c0a6f"
+  integrity sha512-xrUIDIYeSvaIR3ZfrblQrYq5hH8sbchT/Q17oGyxvKSdq/xfHyl2WwY+gcAzjMCq8DD641Gh6q8VQuStNjR3Fw==
+  dependencies:
+    evm-bn "^1.1.2"
 
 source-map-support@^0.5.13:
   version "0.5.21"

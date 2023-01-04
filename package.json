@@ -31,6 +31,10 @@
     "forge"
   ],
   "author": "Primitive™",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^1.0.3",
     "@nomiclabs/hardhat-ethers": "^2.0.5",
@@ -60,6 +64,7 @@
     "*.ts": "prettier --write"
   },
   "dependencies": {
-    "@rari-capital/solmate": "^7.0.0-alpha.3"
+    "@rari-capital/solmate": "^7.0.0-alpha.3",
+    "solstat": "^0.0.2-beta"
   }
 }

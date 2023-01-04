@@ -22,7 +22,7 @@ function getRemappings() {
   return fs
     .readFileSync('remappings.txt', 'utf8')
     .split('\n')
-    .filter(Boolean) // remove empty lines
+    .filter(Boolean)
     .map((line) => line.trim().split('='))
 }
 
