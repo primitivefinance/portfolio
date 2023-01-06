@@ -1,0 +1,4 @@
+testMode: assertion
+multi-abi: true
+testMaxGas: 8000030
+codeSize: 0xfffffffffff
