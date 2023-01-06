@@ -56,7 +56,7 @@ contract Hyper is IHyper {
     mapping(address => mapping(address => uint24)) public getPairId;
     mapping(address => mapping(uint64 => HyperPosition)) public positions;
 
-    uint256 private locked = 1;
+    uint256 public locked = 1;
     Payment[] private _payments;
     SwapState private _state;
 

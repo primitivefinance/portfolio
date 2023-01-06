@@ -1,4 +1,6 @@
 testMode: assertion
 multi-abi: true
-testMaxGas: 8000030
+testMaxGas: 800000030
 codeSize: 0xfffffffffff
+coverage: true 
+corpusDir: hyper
