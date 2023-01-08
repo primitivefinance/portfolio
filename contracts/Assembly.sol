@@ -57,7 +57,7 @@ function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 outpu
         // negative delta
         case 1 {
             output := sub(input, add(not(delta), 1))
-            switch slt(output, input) // output < input ? 1 : 0
+            switch slt(output, input) // output < input ? 1 : 0 todo: change op to lt
             case 0 {
                 // not less than
                 revert(add(32, revertData), mload(revertData)) // 0x1fff9681
@@ -66,7 +66,7 @@ function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 outpu
         // position delta
         case 0 {
             output := add(input, delta)
-            switch slt(output, input) // (output < input ? 1 : 0) == 0 ? 1 : 0
+            switch slt(output, input) // (output < input ? 1 : 0) == 0 ? 1 : 0 todo: change op to lt
             case 1 {
                 // less than
                 revert(add(32, revertData), mload(revertData)) // 0x1fff9681

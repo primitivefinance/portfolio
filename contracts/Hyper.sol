@@ -455,7 +455,7 @@ contract Hyper is IHyper {
             else nextDependent = rmm.getXWithY(nextIndependent);
 
             _swap.input += deltaInput;
-            _swap.output += (liveDependent - nextDependent);
+            _swap.output += (liveDependent - nextDependent); // todo: multiply by liquidity
         }
 
         {
