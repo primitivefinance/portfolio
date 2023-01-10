@@ -14,6 +14,7 @@ contract EchidnaE2E is HelperHyperView
 	TestERC20 _asset;
 	Hyper _hyper;
 	uint24 pairId;
+	TestERC20[] hyperTokens;
 	uint64 [] poolIds;
 	bool isPairCreated;
 
@@ -36,6 +37,7 @@ contract EchidnaE2E is HelperHyperView
 		assert(address(_asset) != address(0));
 		assert(address(_hyper) != address(0));
 
+		// Note: This invariant may break with tokens on hooks. 
 		assert(_hyper.locked() == 1);
 
 		// Retrieve the OS.__account__
@@ -101,7 +103,11 @@ contract EchidnaE2E is HelperHyperView
 		assert(pair.decimalsAsset == TestERC20(asset).decimals());
 		assert(pair.tokenQuote == address(quote));
 		assert(pair.decimalsQuote == TestERC20(quote).decimals());
+
+		// save internal Echidna state to test against
 		isPairCreated = true;
+		hyperTokens.push(TestERC20(asset));
+		hyperTokens.push(TestERC20(quote));
 	}
 	function create_same_pair_should_fail() public {
 	 	bytes memory createPairData = ProcessingLib.encodeCreatePair(address(_quote), address(_quote));
@@ -134,7 +140,8 @@ contract EchidnaE2E is HelperHyperView
 	uint256 constant JUST_IN_TIME_MAX = 600 seconds;
 	uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;	
 
-	// Create a non controlled pool (controller address is 0)
+	// Create a non controlled pool (controller address is 0) with default pair
+	// Note: This function can be extended to choose from any created pair and create a pool on top of it
 	function create_non_controlled_pool(
 		uint16 fee, 
 		int24 maxTick,
