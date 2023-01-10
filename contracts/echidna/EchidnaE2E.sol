@@ -49,13 +49,30 @@ contract EchidnaE2E is HelperHyperView
 		assert(warmTokens.length == 0);
 	}
 	// ******************** System wide Invariants ********************
-	function non_zero_priority_fee_if_controlled(uint64 poolId) public {
-		HyperPool memory pool = retrieve_created_pool(poolId);
+	function non_zero_priority_fee_if_controlled(uint64 id) public {
+		(HyperPool memory pool,) = retrieve_created_pool(id);
 		// if the pool has a controller, the priority fee should never be zero
 		if (pool.controller != address(0)) { 
 			assert(pool.params.priorityFee != 0);
 		}
 	}
+	// The token balance of Hyper should be greater or equal to the reserve for all tokens 
+	// Note: assumption that pairs are created through create_pair invariant test 
+	// which will add the token to the hyperTokens list 
+	// this function is built so that extending the creation of new pairs should not require code changes here
+	function token_balance_greater_or_equal_reserves() public {
+		uint256 reserveBalance = 0;
+		uint256 tokenBalance = 0;
+		for (uint8 i=0; i<hyperTokens.length; i++){
+			TestERC20 token = hyperTokens[i];
+			// retrieve reserves of the token and add to tracked reserve balance
+			reserveBalance = getReserve(address(_hyper),address(token));
+			// get token balance and add to tracked token balance
+			tokenBalance += token.balanceOf(address(_hyper));
+		}
+		assert(tokenBalance >= reserveBalance);
+	}		
+		
 
 	// ******************** Create Pairs ********************
 	/** Future Invariant: This assumes that there is a single pair of _asset and _quote token 
@@ -69,6 +86,7 @@ contract EchidnaE2E is HelperHyperView
 	}
 	/* Future Invariant: This could be extended to create arbitrary pairs. 
     For now for complexity, I am leaving as is. 
+	Test overlapping token pairs
 	*/
 	function create_pair_with_default() public { 
 		// require that this specific pair ID does not exist (i.e: this function has not been invoked yet)
@@ -170,7 +188,7 @@ contract EchidnaE2E is HelperHyperView
 			price
 		);		
 		{ 
-			(uint64 poolId,HyperPool memory pool) = execute_create_pool(createPoolData, false);
+			(HyperPool memory pool,uint64 poolId) = execute_create_pool(createPoolData, false);
 			assert(!pool.isMutable());	
 			HyperCurve memory curve = pool.params;
 			assert(pool.lastTimestamp == block.timestamp);
@@ -217,7 +235,7 @@ contract EchidnaE2E is HelperHyperView
 			price
 		);		
 		{ 
-			(uint64 poolId, HyperPool memory pool) = execute_create_pool(createPoolData, true);		
+			(HyperPool memory pool,uint64 poolId) = execute_create_pool(createPoolData, true);		
 			assert(pool.isMutable());
 			HyperCurve memory curve = pool.params;
 			assert(pool.lastTimestamp == block.timestamp);
@@ -268,7 +286,7 @@ contract EchidnaE2E is HelperHyperView
 	function execute_create_pool(
 		bytes memory createPoolData, 
 		bool hasController
-	) private returns (uint64 poolId, HyperPool memory pool){
+	) private returns (HyperPool memory pool,uint64 poolId){
 		uint256 preCreationPoolNonce = _hyper.getPoolNonce();
 		(bool success, ) = address(_hyper).call(createPoolData);
 
@@ -284,13 +302,53 @@ contract EchidnaE2E is HelperHyperView
 		// save pools in Echidna
 		poolIds.push(poolId);
 	}
+	// ******************** Change Pool Parameters ********************	
+	function change_parameters(
+		uint256 id,
+		uint16 priorityFee,
+		uint16 fee, 
+		int24 maxTick,
+		uint16 volatility, 
+		uint16 duration, 
+		uint16 jit,
+		uint128 price
+	) public {
+		(HyperPool memory preChangeState,uint64 poolId) = retrieve_created_pool(id);
+		require(preChangeState.isMutable());
+		require(preChangeState.controller == address(this));
+		{ 
+			// scaling remaining pool creation values
+			fee = uint16(between(fee, MIN_FEE, MAX_FEE));
+			priorityFee = uint16(between(priorityFee, 1, fee));
+			emit LogUint256("priority fee", uint256(priorityFee));
+			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
+			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
+			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+			jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
+			price = uint128(between(price,1,type(uint128).max)); // price is between 1-uint256.max		
+		}
+
+		_hyper.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
+
+		(HyperPool memory postChangeState,) = retrieve_created_pool(id);
+		HyperCurve memory curve = postChangeState.params;
+		assert(postChangeState.lastTimestamp == block.timestamp);
+		assert(postChangeState.controller == address(this));
+		assert(curve.createdAt == block.timestamp);
+		assert(curve.priorityFee == priorityFee);
+		assert(curve.fee == fee);
+		assert(curve.volatility == volatility);
+		assert(curve.duration == duration);
+		assert(curve.jit == jit);
+		assert(curve.maxTick == maxTick);		
+	}
 	// ******************** Helper ********************	
     function between(uint256 random,uint256 low, uint256 high) private returns (uint256) {
         return low + (random % (high - low));
     }
-	function retrieve_created_pool(uint256 id) private returns (HyperPool memory pool) {
+	function retrieve_created_pool(uint256 id) private returns (HyperPool memory pool, uint64 poolId) {
 		require(poolIds.length > 0);
 		id = between(id,0,poolIds.length);
-		return getPool(address(_hyper),poolIds[id]);
+		return (getPool(address(_hyper),poolIds[id]),poolIds[id]);
 	}
 }
