@@ -453,19 +453,19 @@ contract EchidnaE2E is HelperHyperView
 		draw_token(address(_asset),assetAmount);
 		draw_token(address(_quote),quoteAmount);
 	}
-	function draw_token(address token, uint256 amount) private {
+	function draw_token(address token, uint256 amount, address recipient) private {
 		// make sure a user has funded already 
 		uint256 virtualBalancePreDraw = getBalance(address(_hyper),address(this),address(token));
 		require(virtualBalancePreDraw > 0);
 		// bound [1, user's balance]
 		amount = between(amount,1,virtualBalancePreDraw);
 
-		uint256 senderBalancePreFund = TestERC20(token).balanceOf(address(this));	
+		uint256 recipientBalancePreFund = TestERC20(token).balanceOf(address(this));	
 		uint256 reservePreFund = getReserve(address(_hyper),address(token));
 		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));		
 
 		// assume draw to our own account
-		_hyper.draw(token,amount,address(this));
+		_hyper.draw(token,amount,recipient);
 		
 		//-- Postconditions 
 		// caller balance should decrease 
@@ -477,8 +477,8 @@ contract EchidnaE2E is HelperHyperView
 		assert(reservePostFund == reservePreFund - amount);		
 		// to address should increase 
 		// pre-token balance = a; post-token = a + 100
-		uint256 senderBalancePostFund = TestERC20(token).balanceOf(address(this));			
-		assert(senderBalancePostFund  == senderBalancePreFund + amount);		
+		uint256 recipientBalancePostFund = TestERC20(token).balanceOf(address(this));			
+		assert(recipientBalancePostFund  == recipientBalancePreFund + amount);		
 		// hyper token's balance should decrease
 		uint256 tokenPostFund = TestERC20(token).balanceOf(address(_hyper));
 		assert(tokenPostFund == hyperBalancePreFund - amount);				

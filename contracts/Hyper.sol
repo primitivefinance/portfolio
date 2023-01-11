@@ -109,6 +109,12 @@ contract Hyper is IHyper {
     function getBalance(address owner, address token) public view returns (uint) {
         return __account__.balances[owner][token];
     }
+    
+    /** @dev Transient stored tokens */
+    function getWarm() public view returns (address[] memory warm) {
+        return __account__.warm;
+    }
+
 
     // ===== Actions ===== //
 
