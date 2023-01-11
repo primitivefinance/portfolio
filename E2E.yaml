@@ -3,5 +3,5 @@ multi-abi: true
 testMaxGas: 800000030
 codeSize: 0xfffffffffff
 coverage: true 
-corpusDir: hyper
-testLimit: 100000
+corpusDir: corpus
+# testLimit: 100000
