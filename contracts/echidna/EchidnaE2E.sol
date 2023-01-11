@@ -314,13 +314,14 @@ contract EchidnaE2E is HelperHyperView
 		uint128 price
 	) public {
 		(HyperPool memory preChangeState,uint64 poolId) = retrieve_created_pool(id);
+		emit LogUint256("created pools",poolIds.length);
+		emit LogUint256("pool ID",uint256(poolId));
 		require(preChangeState.isMutable());
 		require(preChangeState.controller == address(this));
 		{ 
 			// scaling remaining pool creation values
 			fee = uint16(between(fee, MIN_FEE, MAX_FEE));
 			priorityFee = uint16(between(priorityFee, 1, fee));
-			emit LogUint256("priority fee", uint256(priorityFee));
 			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
 			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
 			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
@@ -329,19 +330,175 @@ contract EchidnaE2E is HelperHyperView
 		}
 
 		_hyper.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
-
-		(HyperPool memory postChangeState,) = retrieve_created_pool(id);
-		HyperCurve memory curve = postChangeState.params;
-		assert(postChangeState.lastTimestamp == block.timestamp);
-		assert(postChangeState.controller == address(this));
-		assert(curve.createdAt == block.timestamp);
-		assert(curve.priorityFee == priorityFee);
-		assert(curve.fee == fee);
-		assert(curve.volatility == volatility);
-		assert(curve.duration == duration);
-		assert(curve.jit == jit);
-		assert(curve.maxTick == maxTick);		
+		{ 
+			(HyperPool memory postChangeState,) = retrieve_created_pool(id);
+			HyperCurve memory preChangeCurve = preChangeState.params;
+			HyperCurve memory postChangeCurve = postChangeState.params;
+			assert(postChangeState.lastTimestamp == preChangeState.lastTimestamp); 
+			assert(postChangeState.controller == address(this));
+			assert(postChangeCurve.createdAt == preChangeCurve.createdAt);
+			assert(postChangeCurve.priorityFee == priorityFee);
+			assert(postChangeCurve.fee == fee);
+			assert(postChangeCurve.volatility == volatility);
+			assert(postChangeCurve.duration == duration);
+			assert(postChangeCurve.jit == jit);
+			assert(postChangeCurve.maxTick == maxTick);		
+		}
 	}
+	// ******************** Funding ********************	
+	function funding_with_correct_preconditions_should_succeed(
+		uint256 assetAmount,
+		uint256 quoteAmount
+	) public {
+		// asset and quote amount > 1
+		assetAmount = between(assetAmount,1,type(uint64).max);
+		quoteAmount = between(quoteAmount,1,type(uint64).max);
+
+		emit LogUint256("assetAmount",assetAmount);
+		emit LogUint256("quoteAmount",quoteAmount);
+		setup_fund(assetAmount, quoteAmount);
+
+		if(_asset.balanceOf(address(this)) < assetAmount) {
+			emit LogUint256("asset balance",_asset.balanceOf(address(this)));
+		}
+		if (_quote.balanceOf(address(this)) < quoteAmount) {
+			emit LogUint256("quote balance",_quote.balanceOf(address(this)));			
+		}
+
+		fund_token(address(_asset), assetAmount);
+		fund_token(address(_quote), quoteAmount);
+	}	
+	function fund_with_insufficient_funds_should_fail(uint256 assetAmount, uint256 quoteAmount) public {
+		assetAmount = between(assetAmount,1,type(uint256).max);
+		quoteAmount = between(quoteAmount,1,type(uint256).max);
+
+		try _hyper.fund(address(_asset),assetAmount) {
+			emit AssertionFailed("funding with insufficient funds should fail");
+		} 
+		catch {}
+
+
+		try _hyper.fund(address(_quote),quoteAmount) {
+			emit AssertionFailed("funding with insufficient quote should fail");
+		}
+		catch {}
+	}
+	function fund_with_insufficient_allowance_should_fail(uint256 fundAmount) public {
+		uint256 smallAssetAllowance = between(fundAmount,1,fundAmount-1);
+
+		// mint the asset to address(this) and approve some amount < fund
+		_asset.mint(address(this),fundAmount);
+		_asset.approve(address(_hyper),smallAssetAllowance);
+		try _hyper.fund(address(_asset),fundAmount) {
+			emit LogUint256("small asset allowance", smallAssetAllowance);
+			emit AssertionFailed("insufficient allowance should fail.");
+		}
+		catch {} 
+
+		// mint the quote token to address(this), approve some amount < fund
+		_quote.mint(address(this),fundAmount);
+		_quote.approve(address(_hyper),smallAssetAllowance);
+		try _hyper.fund(address(_quote),fundAmount) {
+			emit LogUint256("small asset allowance", smallAssetAllowance);			
+			emit AssertionFailed("insufficient allownce should fail.");
+		}
+		catch {} 
+	}
+	function fund_with_zero() public {
+		setup_fund(0,0);
+		_hyper.fund(address(_asset),0);
+		_hyper.fund(address(_quote),0);		
+	}
+
+	function fund_token(address token, uint256 amount) private {
+		uint256 senderBalancePreFund = TestERC20(token).balanceOf(address(this));	
+		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(token));
+		uint256 reservePreFund = getReserve(address(_hyper),address(token));
+		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));
+
+		try _hyper.fund(address(token),amount) {
+		} catch (bytes memory error) {
+			emit LogBytes("error", error);
+			assert(false);
+		}
+
+		// sender's token balance should decrease 
+		// usdc sender pre token balance = 100 ; usdc sender post token = 100 - 1
+		uint256 senderBalancePostFund = TestERC20(token).balanceOf(address(this));			
+		emit LogUint256("postTransfer:", senderBalancePostFund); // 0 
+		emit LogUint256("preTransfer:", senderBalancePreFund); // 1
+		// assert(false);
+		assert(senderBalancePostFund == senderBalancePreFund - amount);
+		// hyper balance of the sender should increase 
+		// pre hyper balance = a; post hyperbalance + 100
+		uint256 virtualBalancePostFund = getBalance(address(_hyper),address(this),address(token));
+		assert(virtualBalancePostFund == virtualBalancePreFund + amount);
+		// hyper reserves for token should increase
+		// reserve balance = b; post reserves + 100
+		uint256 reservePostFund = getReserve(address(_hyper),address(token));
+		assert(reservePostFund == reservePreFund + amount);
+		// hyper's token balance should increase
+		// pre balance of usdc = y; post balance = y + 100
+		uint256 hyperBalancePostFund = TestERC20(token).balanceOf(address(_hyper));
+		assert(hyperBalancePostFund  == hyperBalancePreFund + amount);		
+	}
+	function setup_fund(uint256 assetAmount, uint256 quoteAmount) private {
+		_asset.mint(address(this),assetAmount);
+		_quote.mint(address(this),quoteAmount);
+		_asset.approve(address(_hyper),type(uint256).max);
+		_quote.approve(address(_hyper),type(uint256).max);
+	}
+	// ******************** Draw ********************	
+	function draw_should_succeed(uint256 assetAmount,uint256 quoteAmount) public {	
+		draw_token(address(_asset),assetAmount);
+		draw_token(address(_quote),quoteAmount);
+	}
+	function draw_token(address token, uint256 amount) private {
+		// make sure a user has funded already 
+		uint256 virtualBalancePreDraw = getBalance(address(_hyper),address(this),address(token));
+		require(virtualBalancePreDraw > 0);
+		// bound [1, user's balance]
+		amount = between(amount,1,virtualBalancePreDraw);
+
+		uint256 senderBalancePreFund = TestERC20(token).balanceOf(address(this));	
+		uint256 reservePreFund = getReserve(address(_hyper),address(token));
+		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));		
+
+		// assume draw to our own account
+		_hyper.draw(token,amount,address(this));
+		
+		//-- Postconditions 
+		// caller balance should decrease 
+		// pre caller balance = a; post caller balance = a - 100
+		uint256 virtualBalancePostDraw = getBalance(address(_hyper),address(this),address(token));
+		assert(virtualBalancePostDraw == virtualBalancePreDraw - amount);		
+		// reserves should decrease 
+		uint256 reservePostFund = getReserve(address(_hyper),address(token));
+		assert(reservePostFund == reservePreFund - amount);		
+		// to address should increase 
+		// pre-token balance = a; post-token = a + 100
+		uint256 senderBalancePostFund = TestERC20(token).balanceOf(address(this));			
+		assert(senderBalancePostFund  == senderBalancePreFund + amount);		
+		// hyper token's balance should decrease
+		uint256 tokenPostFund = TestERC20(token).balanceOf(address(_hyper));
+		assert(tokenPostFund == hyperBalancePreFund - amount);				
+
+	}
+	// ******************** Depositing ********************	
+	// function deposit_with_correct_preconditions_should_succeed() public payable {
+	// 	require(msg.value>0);
+
+	// 	uint256 ethBalancePreTransfer = address(this).balance;
+	// 	uint256 wethPreTransfer = _weth.balanceOf(address(_hyper));
+	// 	_hyper.deposit();
+	// 	uint256 ethBalancePostTransfer = address(this).balance;		
+	// 	uint256 wethPostTransfer = _weth.balanceOf(address(_hyper));
+
+	// 	// sender's eth balance should decrease 
+	// 	assert(ethBalancePostTransfer == ethBalancePreTransfer - msg.value);
+	// 	// weth balance of contract should increase
+	// 	assert(wethPostTransfer - msg.value == wethPreTransfer);
+	// }		
 	// ******************** Helper ********************	
     function between(uint256 random,uint256 low, uint256 high) private returns (uint256) {
         return low + (random % (high - low));
