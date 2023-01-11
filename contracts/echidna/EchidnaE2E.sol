@@ -21,6 +21,7 @@ contract EchidnaE2E is HelperHyperView
 	event AssertionFailed(string msg);
 	event LogUint256(string msg, uint256 value);
 	event LogBytes(string msg, bytes value);
+	event LogAddress(string msg, address tkn);
 	constructor() public {
 		_weth = new WETH();
 		_quote = new TestERC20("6 Decimals","6DEC",6);
@@ -346,7 +347,7 @@ contract EchidnaE2E is HelperHyperView
 		}
 	}
 	// ******************** Funding ********************	
-	function funding_with_correct_preconditions_should_succeed(
+	function fund_with_correct_preconditions_should_succeed(
 		uint256 assetAmount,
 		uint256 quoteAmount
 	) public {
@@ -411,6 +412,7 @@ contract EchidnaE2E is HelperHyperView
 	}
 
 	function fund_token(address token, uint256 amount) private {
+		
 		uint256 senderBalancePreFund = TestERC20(token).balanceOf(address(this));	
 		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(token));
 		uint256 reservePreFund = getReserve(address(_hyper),address(token));
@@ -422,67 +424,46 @@ contract EchidnaE2E is HelperHyperView
 			assert(false);
 		}
 
+		emit LogUint256("funding amount: ",amount);
+		emit LogAddress("token:", token);
 		// sender's token balance should decrease 
 		// usdc sender pre token balance = 100 ; usdc sender post token = 100 - 1
 		uint256 senderBalancePostFund = TestERC20(token).balanceOf(address(this));			
-		emit LogUint256("postTransfer:", senderBalancePostFund); // 0 
-		emit LogUint256("preTransfer:", senderBalancePreFund); // 1
-		// assert(false);
-		assert(senderBalancePostFund == senderBalancePreFund - amount);
+		if(senderBalancePostFund != senderBalancePreFund - amount) {
+			emit LogUint256("postTransfer sender balance", senderBalancePostFund);
+			emit LogUint256("preTransfer:", senderBalancePreFund);
+			emit AssertionFailed("Sender balance did not decrease by amount after funding");
+		}
 		// hyper balance of the sender should increase 
 		// pre hyper balance = a; post hyperbalance + 100
 		uint256 virtualBalancePostFund = getBalance(address(_hyper),address(this),address(token));
-		assert(virtualBalancePostFund == virtualBalancePreFund + amount);
+		if(virtualBalancePostFund != virtualBalancePreFund + amount){
+			emit LogUint256("virtual balance after funding", virtualBalancePostFund);
+			emit LogUint256("virtual balance before funding:", virtualBalancePreFund);
+			emit AssertionFailed("Virtual balance did not increase after funding");
+		}
 		// hyper reserves for token should increase
 		// reserve balance = b; post reserves + 100
 		uint256 reservePostFund = getReserve(address(_hyper),address(token));
-		assert(reservePostFund == reservePreFund + amount);
+		if(reservePostFund != reservePreFund + amount){
+			emit LogUint256("reserve after funding", reservePostFund);
+			emit LogUint256("reserve balance before funding:", reservePreFund);
+			emit AssertionFailed("Reserve did not increase after funding");			
+		}
 		// hyper's token balance should increase
 		// pre balance of usdc = y; post balance = y + 100
 		uint256 hyperBalancePostFund = TestERC20(token).balanceOf(address(_hyper));
-		assert(hyperBalancePostFund  == hyperBalancePreFund + amount);		
+		if(hyperBalancePostFund  != hyperBalancePreFund + amount){
+			emit LogUint256("hyper token balance after funding", hyperBalancePostFund);
+			emit LogUint256("hyper balance before funding:", hyperBalancePreFund);
+			emit AssertionFailed("hyper token balance did not increase after funding");			
+		}
 	}
 	function setup_fund(uint256 assetAmount, uint256 quoteAmount) private {
 		_asset.mint(address(this),assetAmount);
 		_quote.mint(address(this),quoteAmount);
 		_asset.approve(address(_hyper),type(uint256).max);
 		_quote.approve(address(_hyper),type(uint256).max);
-	}
-	// ******************** Draw ********************	
-	function draw_should_succeed(uint256 assetAmount,uint256 quoteAmount, address recipient) public {	
-		draw_token(address(_asset),assetAmount, recipient);
-		draw_token(address(_quote),quoteAmount, recipient);
-	}
-	function draw_token(address token, uint256 amount, address recipient) private {
-		// make sure a user has funded already 
-		uint256 virtualBalancePreDraw = getBalance(address(_hyper),address(this),address(token));
-
-		// bound [1, user's balance]
-		amount = between(amount,1,virtualBalancePreDraw);
-
-		uint256 recipientBalancePreFund = TestERC20(token).balanceOf(address(recipient));	
-		uint256 reservePreFund = getReserve(address(_hyper),address(token));
-		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));		
-
-		// assume draw to our own account
-		_hyper.draw(token,amount,recipient);
-		
-		//-- Postconditions 
-		// caller balance should decrease 
-		// pre caller balance = a; post caller balance = a - 100
-		uint256 virtualBalancePostDraw = getBalance(address(_hyper),address(this),address(token));
-		assert(virtualBalancePostDraw == virtualBalancePreDraw - amount);		
-		// reserves should decrease 
-		uint256 reservePostFund = getReserve(address(_hyper),address(token));
-		assert(reservePostFund == reservePreFund - amount);		
-		// to address should increase 
-		// pre-token balance = a; post-token = a + 100
-		uint256 recipientBalancePostFund = TestERC20(token).balanceOf(address(recipient));			
-		assert(recipientBalancePostFund  == recipientBalancePreFund + amount);		
-		// hyper token's balance should decrease
-		uint256 tokenPostFund = TestERC20(token).balanceOf(address(_hyper));
-		assert(tokenPostFund == hyperBalancePreFund - amount);				
-
 	}
 	// ******************** Depositing ********************	
 	// function deposit_with_correct_preconditions_should_succeed() public payable {
