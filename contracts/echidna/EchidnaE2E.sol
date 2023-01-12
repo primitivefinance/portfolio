@@ -1,4 +1,5 @@
 pragma solidity ^0.8.0;
+import "./Helper.sol";
 import "solmate/tokens/WETH.sol";
 import "../test/TestERC20.sol";
 import "../Hyper.sol";
@@ -7,7 +8,7 @@ import "../../test/helpers/HelperHyperProfiles.sol" as DefaultValues;
 import "../../test/helpers/HelperHyperView.sol";
 
 
-contract EchidnaE2E is HelperHyperView
+contract EchidnaE2E is HelperHyperView,Helper
 {
 	WETH _weth;
 	TestERC20 _quote;
@@ -18,10 +19,6 @@ contract EchidnaE2E is HelperHyperView
 	uint64 [] poolIds;
 	bool isPairCreated;
 
-	event AssertionFailed(string msg);
-	event LogUint256(string msg, uint256 value);
-	event LogBytes(string msg, bytes value);
-	event LogAddress(string msg, address tkn);
 	constructor() public {
 		_weth = new WETH();
 		_quote = new TestERC20("6 Decimals","6DEC",6);
@@ -84,6 +81,22 @@ contract EchidnaE2E is HelperHyperView
 
 			assert(pool.lastPrice <= curve.strike());
 		}
+	}
+	// Strike price for a pool should never be zero. 
+	// If it is, it suggests the mispricing and/or incorrect rounding of assets. 
+	function pool_strike_price_non_zero() public {
+		for (uint8 i = 0; i<poolIds.length; i++) {
+			uint64 poolId = poolIds[i];
+			HyperPool memory pool = getPool(address(_hyper),poolId);
+			HyperCurve memory curve = pool.params;
+
+			emit LogUint256("pool's last price",pool.lastPrice);
+			emit LogUint256("strike price",curve.strike());			
+
+			if(curve.strike() == 0) {
+				emit AssertionFailed("curve strike price is 0.");
+			}
+		}		
 	}
 
 	// ******************** Create Pairs ********************
@@ -186,6 +199,10 @@ contract EchidnaE2E is HelperHyperView
 			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
 			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
 			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+			if (maxTick == 0) {
+				maxTick+=1;
+			}
+			emit LogInt24("maxTick",maxTick);			
 			price = uint128(between(price,1,type(uint128).max)); // price is between 1-uint256.max		
 		}
 		bytes memory createPoolData = ProcessingLib.encodeCreatePool(
@@ -232,6 +249,10 @@ contract EchidnaE2E is HelperHyperView
 			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
 			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
 			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+			if (maxTick == 0) {
+				maxTick+=1;
+			}
+			emit LogInt24("maxTick",maxTick);
 			jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
 			price = uint128(between(price,1,type(uint128).max)); // price is between 1-uint256.max		
 		}
@@ -309,7 +330,9 @@ contract EchidnaE2E is HelperHyperView
 		// pool should be created and exist 
 		poolId = ProcessingLib.encodePoolId(pairId, hasController, uint32(poolNonce));
 		pool = getPool(address(_hyper),poolId);
-		assert(pool.exists());
+		if(!pool.exists()) { 
+			emit AssertionFailed("Pool should exist after being created.");
+		}
 
 		// save pools in Echidna
 		poolIds.push(poolId);
@@ -616,7 +639,28 @@ contract EchidnaE2E is HelperHyperView
 	}	
     using SafeCastLib for uint;
 	// Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool 
+	// ******************** Helper ********************	
+    function allocate_should_succeed_with_correct_preconditions(uint256 id, uint256 amount) public {
+		(HyperPool memory pool,uint64 poolId) = retrieve_created_pool(id);
+		require(pool.lastPrice !=0);
+		require(pool.lastTimestamp !=0);
 
+		amount = between(amount,1,type(uint256).max);
+		uint128 deltaLiquidity;
+		if (amount == type(uint256).max) {
+			deltaLiquidity = 1;
+		} else {
+			deltaLiquidity = amount.safeCastTo128();
+		}
+		require(deltaLiquidity != 0);
+
+		setup_fund(amount,amount);
+
+		(uint256 deltaAsset,uint256 deltaQuote) = _hyper.allocate(poolId,amount);
+
+	}
+	// allocate should fail on a nonexistent pool 
+	// allocate shoudl fail if deltaLiquidity = 0
 	// ******************** Helper ********************	
     function between(uint256 random,uint256 low, uint256 high) private returns (uint256) {
         return low + (random % (high - low));
