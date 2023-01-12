@@ -411,8 +411,7 @@ contract EchidnaE2E is HelperHyperView
 		_hyper.fund(address(_quote),0);		
 	}
 
-	function fund_token(address token, uint256 amount) private {
-		
+	function fund_token(address token, uint256 amount) private returns(bool) {
 		uint256 senderBalancePreFund = TestERC20(token).balanceOf(address(this));	
 		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(token));
 		uint256 reservePreFund = getReserve(address(_hyper),address(token));
@@ -424,8 +423,6 @@ contract EchidnaE2E is HelperHyperView
 			assert(false);
 		}
 
-		emit LogUint256("funding amount: ",amount);
-		emit LogAddress("token:", token);
 		// sender's token balance should decrease 
 		// usdc sender pre token balance = 100 ; usdc sender post token = 100 - 1
 		uint256 senderBalancePostFund = TestERC20(token).balanceOf(address(this));			
@@ -453,11 +450,12 @@ contract EchidnaE2E is HelperHyperView
 		// hyper's token balance should increase
 		// pre balance of usdc = y; post balance = y + 100
 		uint256 hyperBalancePostFund = TestERC20(token).balanceOf(address(_hyper));
+		if(hyperBalancePostFund  != hyperBalancePreFund + amount){
 			emit LogUint256("hyper token balance after funding", hyperBalancePostFund);
 			emit LogUint256("hyper balance before funding:", hyperBalancePreFund);
-		if(hyperBalancePostFund  != hyperBalancePreFund + amount){
 			emit AssertionFailed("hyper token balance did not increase after funding");			
 		}
+		return true;
 	}
 	function setup_fund(uint256 assetAmount, uint256 quoteAmount) private {
 		_asset.mint(address(this),assetAmount);
@@ -469,24 +467,25 @@ contract EchidnaE2E is HelperHyperView
 	function draw_should_succeed(uint256 assetAmount,uint256 quoteAmount, address recipient) public {	
 		assetAmount = between(assetAmount,1,type(uint64).max);
 		quoteAmount = between(quoteAmount,1,type(uint64).max);
+		emit LogUint256("asset amount: ", assetAmount);
+		emit LogUint256("quote amount:", quoteAmount);
+
 		require(recipient != address(_hyper));
 		require(recipient != address(0));
+
 		draw_token(address(_asset),assetAmount, recipient);
 		draw_token(address(_quote),quoteAmount, recipient);
 	}
 	function draw_token(address token, uint256 amount, address recipient) private {
 		// make sure a user has funded already 
 		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(token));
-		if (virtualBalancePreFund == 0) { 
-			setup_fund(amount,amount);
-			fund_token(token,amount);
-		}
+		require (virtualBalancePreFund>0);
+		amount = between(amount,1,virtualBalancePreFund);
 
 		uint256 recipientBalancePreFund = TestERC20(token).balanceOf(address(recipient));	
 		uint256 reservePreFund = getReserve(address(_hyper),address(token));
 		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));		
 
-		// assume draw to our own account
 		_hyper.draw(token,amount,recipient);
 		
 		//-- Postconditions 
@@ -522,17 +521,62 @@ contract EchidnaE2E is HelperHyperView
 		}
 	}	
 	function draw_to_zero_should_fail(uint256 assetAmount) public {
-		assetAmount = between(assetAmount,1,type(uint64).max);
 		// make sure a user has funded already 
 		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(_asset));
-		if (virtualBalancePreFund == 0) { 
-			setup_fund(assetAmount,assetAmount);
-			fund_token(address(_asset),assetAmount);
-		}
+		emit LogUint256("virtual balance pre fund",virtualBalancePreFund);
+		require (virtualBalancePreFund >= 0);
+		assetAmount = between(assetAmount,1,virtualBalancePreFund);
 
 		try _hyper.draw(address(_asset),assetAmount,address(0)) { 
 			emit AssertionFailed("draw should fail attempting to transfer to zero");
 		} catch { } 
+	}
+	function fund_then_draw(uint256 whichToken, uint256 amount) public {
+		// this can be extended to use the token list in `hyperTokens`
+		address token; 
+		if (whichToken%2==0) token = address(_asset);
+		else token = address(_quote);
+
+		setup_fund(amount,amount);
+		
+		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(token));
+		uint256 recipientBalancePreFund = TestERC20(token).balanceOf(address(this));	
+		uint256 reservePreFund = getReserve(address(_hyper),address(token));
+		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));		
+
+		// Call fund and draw
+		_hyper.fund(token,amount);
+		_hyper.draw(token,amount,address(this));
+
+		//-- Postconditions 
+		// caller balance should be equal 
+		uint256 virtualBalancePostFund = getBalance(address(_hyper),address(this),address(token));
+		if(virtualBalancePostFund != virtualBalancePreFund){
+			emit LogUint256("virtual balance post fund-draw",virtualBalancePostFund);
+			emit LogUint256("virtual balance pre fund-draw", virtualBalancePreFund);
+			emit AssertionFailed("virtual balance should be equal after fund-draw");
+		}
+		// reserves should be equal
+		uint256 reservePostFund = getReserve(address(_hyper),address(token));
+		if(reservePostFund != reservePreFund){
+			emit LogUint256("reserve post fund-draw",reservePostFund);
+			emit LogUint256("reserve pre fund-draw", reservePreFund);
+			emit AssertionFailed("reserve balance should be equal after fund-draw");
+		}
+		// recipient = sender balance should be equal
+		uint256 recipientBalancePostFund = TestERC20(token).balanceOf(address(this));			
+		if(recipientBalancePostFund  != recipientBalancePreFund){
+			emit LogUint256("recipient balance post fund-draw",recipientBalancePostFund);
+			emit LogUint256("recipient balance pre fund-draw", recipientBalancePreFund);
+			emit AssertionFailed("recipient balance should be equal after fund-draw");			
+		}
+		// hyper token's balance should be equal
+		uint256 tokenPostFund = TestERC20(token).balanceOf(address(_hyper));
+		if(tokenPostFund != hyperBalancePreFund){
+			emit LogUint256("token post fund-draw",tokenPostFund);
+			emit LogUint256("token pre fund-draw", hyperBalancePreFund);
+			emit AssertionFailed("hyper token balance should be equal after fund-draw");						
+		}		
 	}
 	// ******************** Depositing ********************	
 	// function deposit_with_correct_preconditions_should_succeed() public payable {
