@@ -172,17 +172,6 @@ contract EchidnaE2E is HelperHyperView,Helper
 		assert(!success);
 	}	
 	// ******************** Create Pool ********************
-	int24 constant MAX_TICK = 887272;
-	uint256 constant BUFFER = 300 seconds;
-	uint256 constant MIN_FEE = 1; // 0.01%
-	uint256 constant MAX_FEE = 1000; // 10%
-	uint256 constant MIN_VOLATILITY = 100; // 1%
-	uint256 constant MAX_VOLATILITY = 25_000; // 250%
-	uint256 constant MIN_DURATION = 1; // days, but without units
-	uint256 constant MAX_DURATION = 500; // days, but without units
-	uint256 constant JUST_IN_TIME_MAX = 600 seconds;
-	uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;	
-
 	// Create a non controlled pool (controller address is 0) with default pair
 	// Note: This function can be extended to choose from any created pair and create a pool on top of it
 	function create_non_controlled_pool(
@@ -198,7 +187,7 @@ contract EchidnaE2E is HelperHyperView,Helper
 			fee = uint16(between(fee, MIN_FEE, MAX_FEE));
 			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
 			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+			maxTick = (-MIN_TICK) + (maxTick % (MAX_TICK - (-MIN_TICK))); // [-MIN_TICK,MAX_TICK]
 			if (maxTick == 0) {
 				maxTick+=1;
 			}
@@ -221,6 +210,7 @@ contract EchidnaE2E is HelperHyperView,Helper
 			assert(!pool.isMutable());	
 			HyperCurve memory curve = pool.params;
 			assert(pool.lastTimestamp == block.timestamp);
+			assert(pool.lastPrice == price);
 			assert(curve.createdAt == block.timestamp);
 			assert(pool.controller == address(0));
 			assert(curve.priorityFee == 0);
@@ -248,7 +238,7 @@ contract EchidnaE2E is HelperHyperView,Helper
 			emit LogUint256("priority fee", uint256(priorityFee));
 			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
 			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+			maxTick = (-MIN_TICK) + (maxTick % (MAX_TICK - (-MIN_TICK))); // [-MIN_TICK,MAX_TICK]
 			if (maxTick == 0) {
 				maxTick+=1;
 			}
