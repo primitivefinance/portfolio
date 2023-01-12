@@ -73,7 +73,18 @@ contract EchidnaE2E is HelperHyperView
 		}
 		assert(tokenBalance >= reserveBalance);
 	}		
-		
+	function pool_last_price_not_greater_than_strike() public {
+		for (uint8 i = 0; i<poolIds.length; i++) {
+			uint64 poolId = poolIds[i];
+			HyperPool memory pool = getPool(address(_hyper),poolId);
+			HyperCurve memory curve = pool.params;
+
+			emit LogUint256("pool's last price",pool.lastPrice);
+			emit LogUint256("strike price",curve.strike());			
+
+			assert(pool.lastPrice <= curve.strike());
+		}
+	}
 
 	// ******************** Create Pairs ********************
 	/** Future Invariant: This assumes that there is a single pair of _asset and _quote token 
@@ -538,11 +549,13 @@ contract EchidnaE2E is HelperHyperView
 		else token = address(_quote);
 
 		setup_fund(amount,amount);
+
+		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));		
+		require(hyperBalancePreFund == 0);
 		
 		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(token));
 		uint256 recipientBalancePreFund = TestERC20(token).balanceOf(address(this));	
 		uint256 reservePreFund = getReserve(address(_hyper),address(token));
-		uint256 hyperBalancePreFund = TestERC20(token).balanceOf(address(_hyper));		
 
 		// Call fund and draw
 		_hyper.fund(token,amount);
@@ -579,20 +592,31 @@ contract EchidnaE2E is HelperHyperView
 		}		
 	}
 	// ******************** Depositing ********************	
-	// function deposit_with_correct_preconditions_should_succeed() public payable {
-	// 	require(msg.value>0);
+	function deposit_with_correct_preconditions_should_succeed() public payable {
+		require(msg.value>0);
+		emit LogUint256("msg.value",msg.value);
 
-	// 	uint256 ethBalancePreTransfer = address(this).balance;
-	// 	uint256 wethPreTransfer = _weth.balanceOf(address(_hyper));
-	// 	_hyper.deposit();
-	// 	uint256 ethBalancePostTransfer = address(this).balance;		
-	// 	uint256 wethPostTransfer = _weth.balanceOf(address(_hyper));
+		uint256 ethBalancePreTransfer = address(this).balance;
+		uint256 wethPreTransfer = _weth.balanceOf(address(_hyper));
 
-	// 	// sender's eth balance should decrease 
-	// 	assert(ethBalancePostTransfer == ethBalancePreTransfer - msg.value);
-	// 	// weth balance of contract should increase
-	// 	assert(wethPostTransfer - msg.value == wethPreTransfer);
-	// }		
+		try _hyper.deposit{value:msg.value}() {
+			uint256 ethBalancePostTransfer = address(this).balance;		
+			uint256 wethPostTransfer = _weth.balanceOf(address(_hyper));
+
+			// sender's eth balance should decrease 
+			assert(ethBalancePostTransfer == ethBalancePreTransfer - msg.value);
+			// weth balance of contract should increase
+			// pretransfer = b; post-transfer = b+msg.value
+			assert(wethPostTransfer == wethPreTransfer+msg.value);
+			
+		} catch (bytes memory err) {
+			emit LogBytes("error",err);
+			emit AssertionFailed("deposit should not have failed.");
+		}
+	}	
+    using SafeCastLib for uint;
+	// Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool 
+
 	// ******************** Helper ********************	
     function between(uint256 random,uint256 low, uint256 high) private returns (uint256) {
         return low + (random % (high - low));
