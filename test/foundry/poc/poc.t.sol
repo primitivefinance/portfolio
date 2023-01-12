@@ -4,26 +4,19 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 
 import "solmate/tokens/WETH.sol";
-import "contracts/Enigma.sol" as ProcessingLib;
 import "contracts/test/TestERC20.sol";
 
 import "./HyperHelper.sol";
 
 uint24 constant DEFAULT_SIGMA = 1e4;
-uint32 constant DEFAULT_MATURITY = 31556953; // adds 1
 uint16 constant DEFAULT_FEE = 100; // 100 bps = 1%
 uint32 constant DEFAULT_PRIORITY_FEE = 50; // 50 bps = 0.5%
 uint16 constant DEFAULT_DURATION_DAYS = 365;
-uint128 constant DEFAULT_QUOTE_RESERVE = 3085375116376210650;
-uint128 constant DEFAULT_ASSET_RESERVE = 308537516918601823; // 308596235182
 uint128 constant DEFAULT_LIQUIDITY = 1e18;
-uint128 constant DEFAULT_PRICE = 10e18;
+uint128 constant DEFAULT_PRICE = 8e18;
 int24 constant DEFAULT_TICK = int24(23027); // 10e18, rounded up! pay attention
-uint256 constant DEFAULT_SWAP_INPUT = 0.1 ether;
-uint256 constant DEFAULT_SWAP_OUTPUT = 97_627 wei;
 uint16 constant DEFAULT_JIT = 4;
 uint16 constant DEFAULT_VOLATILITY = 10_000; // same as DEFAULT_SIGMA but uint16
-int24 constant DEFAULT_MAX_TICK = int24(23027);
 uint256 constant STARTING_BALANCE = 4000e18;
 uint256 constant ERROR = 1e10;
 
@@ -49,28 +42,25 @@ contract Poc is Test {
         asset = new TestERC20("Asset Token", "AT", 18);
 
         // Create a pair and pool
-        bytes memory data = createPool(
-            address(asset),
-            address(quote),
-            address(0),
-            uint16(DEFAULT_PRIORITY_FEE),
-            uint16(DEFAULT_FEE),
-            uint16(DEFAULT_SIGMA),
-            uint16(DEFAULT_DURATION_DAYS),
-            DEFAULT_JIT,
-            DEFAULT_TICK,
-            DEFAULT_PRICE
-        );
-        
-        // Execute above instructions on hyper by triggering fallback function
+        uint24 pairId = createPair(address(asset), address(quote));
+        uint64 poolId = createDefaultPool(pairId, address(0));
+    }
+
+    function createPair(address token0, address token1) internal returns (uint24) {
+        bytes[] memory instructions = new bytes[](1);
+        uint24 magicPoolId = 0x000000;
+        instructions[0] = (Enigma.encodeCreatePair(token0, token1));
+        bytes memory data = Enigma.encodeJumpInstruction(instructions);
+
         (bool success, ) = address(hyper).call(data);
-        require(success, "Can not create pool");
+        require(success, "Can not create pair");
+
+        return uint24(hyper.getPairNonce());
     }
 
     /** @dev Encodes jump process for creating a pair + curve + pool in one tx. */
     function createPool(
-        address token0,
-        address token1,
+        uint24 pairId,
         address controller,
         uint16 priorityFee,
         uint16 fee,
@@ -79,13 +69,11 @@ contract Poc is Test {
         uint16 jit,
         int24 maxTick,
         uint128 price
-    ) internal pure returns (bytes memory data) {
-        bytes[] memory instructions = new bytes[](2);
-        uint24 magicPoolId = 0x000000;
-        instructions[0] = (ProcessingLib.encodeCreatePair(token0, token1));
-        instructions[1] = (
-            ProcessingLib.encodeCreatePool(
-                magicPoolId, // magic variable
+    ) internal returns (uint64) {
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = (
+            Enigma.encodeCreatePool(
+                pairId,
                 controller,
                 priorityFee,
                 fee,
@@ -96,7 +84,27 @@ contract Poc is Test {
                 price
             )
         );
-        data = ProcessingLib.encodeJumpInstruction(instructions);
+        bytes memory data = Enigma.encodeJumpInstruction(instructions);
+
+        (bool success, ) = address(hyper).call(data);
+        require(success, "Can not create pool");
+
+        bool isControlled = controller != address(0);
+        return Enigma.encodePoolId(pairId, isControlled, uint32(hyper.getPoolNonce()));
+    }
+
+    function createDefaultPool(uint24 pairId, address controller) internal returns (uint64 poolId) {
+        poolId = createPool(
+            pairId,
+            controller,
+            uint16(DEFAULT_PRIORITY_FEE),
+            uint16(DEFAULT_FEE),
+            uint16(DEFAULT_SIGMA),
+            uint16(DEFAULT_DURATION_DAYS),
+            DEFAULT_JIT,
+            DEFAULT_TICK,
+            DEFAULT_PRICE
+        );
     }
 
     function fundUsersAndApprove() public {
@@ -123,7 +131,7 @@ contract Poc is Test {
         vm.stopPrank();
     }
 
-    function test_poc_swap_fee_issue_25() public {
+    function test_poc_swap_fee_on_max_input() public {
         fundUsersAndApprove();
 
         // Allocate to the pool from Alice
@@ -172,7 +180,7 @@ contract Poc is Test {
         // console.log("error : %s", error);
     }
 
-    function test_poc_position_fee_issue_26() public {
+    function test_poc_position_fee() public {
         fundUsersAndApprove();
 
         // Allocate to the pool from Alice
@@ -211,5 +219,74 @@ contract Poc is Test {
         // Check if both alice and eve get total fee of the pool
         assertEq(aliceFeeGrowthAsset, poolFeeGrowthAsset);
         assertEq(eveFeeGrowthAsset, poolFeeGrowthAsset);
+    }
+
+    function test_poc_change_in_price_with_time() public {
+        /**
+        uint64 poolId,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        int24 maxTick */
+
+        // Get current price and price after some time without any changes in params
+        uint startingPrice = hyper.getLatestPrice(FIRST_POOL);
+        skip(182 days);
+        uint halfTimePrice = hyper.getLatestPrice(FIRST_POOL);
+        console.log("Price change without any other change:  %s, %s", startingPrice, halfTimePrice);
+
+        // Change in price with change in volatility
+        uint64 poolId = createDefaultPool(uint24(hyper.getPairNonce()), address(this));
+        uint startingPriceDS = hyper.getLatestPrice(poolId);
+        skip(182 days);
+        hyper.changeParameters(
+            poolId,
+            0,
+            0,
+            uint16(DEFAULT_SIGMA * 2),
+            0,
+            0,
+            0
+        );
+        uint halfTimePriceDS = hyper.getLatestPrice(poolId);
+        console.log("Price change with change in volatility: %s, %s", startingPriceDS, halfTimePriceDS);
+
+        // Change in price with change in strike price
+        poolId = createDefaultPool(uint24(hyper.getPairNonce()), address(this));
+        uint startingPriceKS = hyper.getLatestPrice(poolId);
+        skip(182 days);
+        hyper.changeParameters(
+            poolId,
+            0,
+            0,
+            0,
+            0,
+            0,
+            DEFAULT_TICK*2
+        );
+        uint halfTimePriceKS = hyper.getLatestPrice(poolId);
+        console.log("Price change with change in strike:     %s, %s", startingPriceKS, halfTimePriceKS);
+
+        // Change in price with change in maturity
+        poolId = createDefaultPool(uint24(hyper.getPairNonce()), address(this));
+        uint startingPriceTS = hyper.getLatestPrice(poolId);
+        skip(182 days);
+        hyper.changeParameters(
+            poolId,
+            0,
+            0,
+            0,
+            450,
+            0,
+            0
+        );
+        uint halfTimePriceTS = hyper.getLatestPrice(poolId);
+        console.log("Price change with change in maturity:   %s, %s", startingPriceTS, halfTimePriceTS);
+
+        assertFalse(halfTimePrice == halfTimePriceDS);
+        assertFalse(halfTimePrice == halfTimePriceKS);
+        assertFalse(halfTimePrice == halfTimePriceTS);
     }
 }

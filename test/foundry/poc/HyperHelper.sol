@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "contracts/Hyper.sol";
+import "contracts/libraries/Price.sol";
 
 contract HyperHelper is Hyper {
 
@@ -14,5 +15,13 @@ contract HyperHelper is Hyper {
 
     function getPosFeeGrowthAsset(address user, uint64 poolId) public returns (uint) {
         return positions[user][poolId].feeGrowthAssetLast;
+    }
+
+    function computePriceWithTick(int24 tick) public pure returns (uint256 price) {
+        return Price.computePriceWithTick(tick);
+    }
+
+    function computeTickWithPrice(uint256 price) public pure returns (int24 tick) {
+        return Price.computeTickWithPrice(price);
     }
 }
