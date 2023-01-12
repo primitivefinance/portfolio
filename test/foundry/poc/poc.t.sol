@@ -172,5 +172,44 @@ contract Poc is Test {
         // console.log("error : %s", error);
     }
 
-    
+    function test_poc_position_fee_issue_26() public {
+        fundUsersAndApprove();
+
+        // Allocate to the pool from Alice
+        vm.startPrank(alice);
+        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY/2);
+        vm.stopPrank();
+        // Stop alice
+
+        // Allocate to the pool from Eve
+        vm.startPrank(eve);
+        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY/2);
+        vm.stopPrank();
+        // Stop Eve
+
+        // Sell asset tokens from bob
+        vm.startPrank(bob);
+        uint128 input = 0.1 ether;
+        hyper.swap(FIRST_POOL, true, input, 0);
+        hyper.swap(FIRST_POOL, true, input, 0);
+        hyper.swap(FIRST_POOL, true, input, 0);
+        hyper.swap(FIRST_POOL, true, input, 0);
+        vm.stopPrank();
+        // Stop bob
+
+        uint poolFeeGrowthAsset = hyper.getPoolFeeGrowthAsset(FIRST_POOL);
+
+        vm.prank(eve);
+        hyper.claim(FIRST_POOL, 0, 0);
+
+        vm.prank(alice);
+        hyper.claim(FIRST_POOL, 0, 0);
+
+        uint aliceFeeGrowthAsset = hyper.getPosFeeGrowthAsset(alice, FIRST_POOL);
+        uint eveFeeGrowthAsset = hyper.getPosFeeGrowthAsset(eve, FIRST_POOL);
+
+        // Check if both alice and eve get total fee of the pool
+        assertEq(aliceFeeGrowthAsset, poolFeeGrowthAsset);
+        assertEq(eveFeeGrowthAsset, poolFeeGrowthAsset);
+    }
 }

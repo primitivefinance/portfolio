@@ -11,4 +11,8 @@ contract HyperHelper is Hyper {
     function getPoolFeeGrowthAsset(uint64 poolId) public returns (uint) {
         return pools[poolId].feeGrowthGlobalAsset;
     }
+
+    function getPosFeeGrowthAsset(address user, uint64 poolId) public returns (uint) {
+        return positions[user][poolId].feeGrowthAssetLast;
+    }
 }
