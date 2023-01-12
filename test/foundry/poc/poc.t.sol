@@ -222,15 +222,6 @@ contract Poc is Test {
     }
 
     function test_poc_change_in_price_with_time() public {
-        /**
-        uint64 poolId,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        int24 maxTick */
-
         // Get current price and price after some time without any changes in params
         uint startingPrice = hyper.getLatestPrice(FIRST_POOL);
         skip(182 days);
@@ -288,5 +279,38 @@ contract Poc is Test {
         assertFalse(halfTimePrice == halfTimePriceDS);
         assertFalse(halfTimePrice == halfTimePriceKS);
         assertFalse(halfTimePrice == halfTimePriceTS);
+    }
+
+    function test_poc_swap_output_scale() public {
+        fundUsersAndApprove();
+
+        // Allocate to the pool from Alice
+        vm.startPrank(alice);
+        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY);
+        vm.stopPrank();
+        // Stop alice
+
+        uint128 input = 0.1 ether;
+
+        vm.startPrank(bob);
+        (uint outputAt1, uint remainderAt1) = hyper.swap(FIRST_POOL, true, input, 0);
+        console.log("Swap output: %s and remainder: %s", outputAt1, remainderAt1);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY*9);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        (uint outputAt10, uint remainderAt10) = hyper.swap(FIRST_POOL, true, input, 0);
+        console.log("Swap output: %s and remainder: %s", outputAt10, remainderAt10);
+        vm.stopPrank();
+
+        // Checking that output at liquidity 1 is 10 times the output at liquidity 10 
+        // tells us that the input amount has been devided by liquidity amount but the
+        // output amount has not been multiplied by liquidity amount to scale it back.
+        // It shows that for same amount of input the output varies at same order at 
+        // which liquidity varies.
+        assertEq(true, outputAt1/outputAt10 >= 10);
     }
 }
