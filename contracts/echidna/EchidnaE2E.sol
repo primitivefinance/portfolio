@@ -506,6 +506,7 @@ contract EchidnaE2E is HelperHyperView,Helper
 	}
 
 	function fund_token(address token, uint256 amount) private returns(bool) {
+		// TODO Refactor: reuse the HelperHyperView.getState() keeps this cleaner 
 		uint256 senderBalancePreFund = TestERC20(token).balanceOf(address(this));	
 		uint256 virtualBalancePreFund = getBalance(address(_hyper),address(this),address(token));
 		uint256 reservePreFund = getReserve(address(_hyper),address(token));
@@ -646,6 +647,8 @@ contract EchidnaE2E is HelperHyperView,Helper
 
 		//-- Postconditions 
 		// caller balance should be equal 
+
+		//TODO Refactor: use HelperHyperView.getState() here 
 		uint256 virtualBalancePostFund = getBalance(address(_hyper),address(this),address(token));
 		if(virtualBalancePostFund != virtualBalancePreFund){
 			emit LogUint256("virtual balance post fund-draw",virtualBalancePostFund);
@@ -706,9 +709,12 @@ contract EchidnaE2E is HelperHyperView,Helper
 		}
 	}	
     using SafeCastLib for uint;
+
+
 	// Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool 
-	// ******************** Helper ********************	
+	// ******************** Allocate ********************	
     function allocate_should_succeed_with_correct_preconditions(uint256 id, uint256 deltaLiquidity) public {
+		address[] memory owners= new address[](1);		
 		(HyperPool memory pool,uint64 poolId) = retrieve_created_pool(id);
 		emit LogUint256("pool id:",uint256(poolId));
 
@@ -733,9 +739,31 @@ contract EchidnaE2E is HelperHyperView,Helper
 		// Caller must have a balance and have approved hyper 
 		setup_fund(deltaAsset,deltaQuote);
 
+		// Save pre allocation state
+		HyperState memory preState = getState(address(_hyper),poolId,address(this),owners);
+
 		(uint256 allocateAsset,uint256 allocateQuote) = _hyper.allocate(poolId,deltaLiquidity);
 
-		// Insert postconditions
+		HyperState memory postState = getState(address(_hyper),poolId,address(this),owners);
+		{ 
+			// Reserves in both tokens should increase
+			assert(preState.reserveAsset + deltaAsset == postState.reserveAsset);
+			assert(preState.reserveQuote + deltaQuote == postState.reserveQuote);
+			// Total pool liquidity should increase by deltaLiquidity
+			assert(preState.totalPoolLiquidity + deltaLiquidity == postState.totalPoolLiquidity); 
+			// Physical asset balance of both tokens should increase 
+			assert(preState.physicalBalanceAsset + deltaAsset == postState.physicalBalanceAsset);
+			assert(preState.physicalBalanceQuote + deltaQuote == postState.physicalBalanceQuote);
+			assert (preState.callerPositionLiquidity + deltaLiquidity == postState.callerPositionLiquidity);
+		}
+		{
+			if (preState.feeGrowthAssetPool != postState.feeGrowthAssetPool){
+				assert(postState.feeGrowthAssetPosition != 0);
+			}
+			if (preState.feeGrowthQuotePool != postState.feeGrowthQuotePool){
+				assert(postState.feeGrowthQuotePosition != 0);
+			}			
+		}
 
 	}
 	// allocate should fail on a nonexistent pool 
