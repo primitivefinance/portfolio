@@ -183,16 +183,13 @@ contract EchidnaE2E is HelperHyperView,Helper
 	) public {
 		if(!isPairCreated) { create_pair_with_default(); }
 		{ 
-			// scaling remaining pool creation values
-			fee = uint16(between(fee, MIN_FEE, MAX_FEE));
-			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-			maxTick = (-MIN_TICK) + (maxTick % (MAX_TICK - (-MIN_TICK))); // [-MIN_TICK,MAX_TICK]
-			if (maxTick == 0) {
-				maxTick+=1;
-			}
-			emit LogInt24("maxTick",maxTick);			
-			price = uint128(between(price,1,type(uint128).max)); // price is between 1-uint256.max		
+			(,
+			fee, 
+			maxTick, 
+			volatility, 
+			duration, 
+			,
+			price) = clam_safe_create_bounds(0, fee, maxTick, volatility, duration, 0, price);		
 		}
 		bytes memory createPoolData = ProcessingLib.encodeCreatePool(
 			pairId,
@@ -231,20 +228,15 @@ contract EchidnaE2E is HelperHyperView,Helper
 		uint128 price
 	) public {
 		if(!isPairCreated) { create_pair_with_default(); }
+		// TODO CLEAN: Move this into a helper function so the rest of the create functions can reuse it.
 		{ 
-			// scaling remaining pool creation values
-			fee = uint16(between(fee, MIN_FEE, MAX_FEE));
-			priorityFee = uint16(between(priorityFee, 1, fee));
-			emit LogUint256("priority fee", uint256(priorityFee));
-			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-			maxTick = (-MIN_TICK) + (maxTick % (MAX_TICK - (-MIN_TICK))); // [-MIN_TICK,MAX_TICK]
-			if (maxTick == 0) {
-				maxTick+=1;
-			}
-			emit LogInt24("maxTick",maxTick);
-			jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
-			price = uint128(between(price,1,type(uint128).max)); // price is between 1-uint256.max		
+			(priorityFee, 
+			fee, 
+			maxTick, 
+			volatility, 
+			duration, 
+			jit, 
+			price) = clam_safe_create_bounds(priorityFee, fee, maxTick, volatility, duration, jit, price);	
 		}
 		bytes memory createPoolData = ProcessingLib.encodeCreatePool(
 			pairId,
@@ -283,14 +275,13 @@ contract EchidnaE2E is HelperHyperView,Helper
 		if(!isPairCreated) { create_pair_with_default(); }
 		uint16 priorityFee = 0;
 		{ 
-			// scaling remaining pool creation values
-			fee = uint16(between(fee, MIN_FEE, MAX_FEE));
-			emit LogUint256("priority fee", uint256(priorityFee));
-			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
-			jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
-			price = uint128(between(price,1,type(uint128).max)); // price is between 1-uint256.max		
+			(, 
+			fee, 
+			maxTick, 
+			volatility, 
+			duration, 
+			jit, 
+			price) = clam_safe_create_bounds(priorityFee, fee, maxTick, volatility, duration, jit, price);		
 		}
 		bytes memory createPoolData = ProcessingLib.encodeCreatePool(
 			pairId,
@@ -305,6 +296,51 @@ contract EchidnaE2E is HelperHyperView,Helper
 		);		
 		(bool success, ) = address(_hyper).call(createPoolData);
 		assert(!success);
+	}
+	function create_pool_with_negative_max_tick_as_bounds(
+		uint16 priorityFee,
+		uint16 fee, 
+		int24 maxTick,
+		uint16 volatility, 
+		uint16 duration, 
+		uint16 jit,
+		uint128 price
+	) public {
+		if(!isPairCreated) { create_pair_with_default(); }
+		{ 
+			(priorityFee, 
+			fee, 
+			maxTick, 
+			volatility, 
+			duration, 
+			jit, 
+			price) = clam_safe_create_bounds(priorityFee, fee, maxTick, volatility, duration, jit, price);		
+		}
+		bytes memory createPoolData = ProcessingLib.encodeCreatePool(
+			pairId,
+			address(this), //controller
+			priorityFee, // no priority fee 
+			fee,
+			volatility,
+			duration,
+			jit, // no jit 
+			maxTick,
+			price
+		);		
+		{ 
+			(HyperPool memory pool,uint64 poolId) = execute_create_pool(createPoolData, true);		
+			assert(pool.isMutable());
+			HyperCurve memory curve = pool.params;
+			assert(pool.lastTimestamp == block.timestamp);
+			assert(curve.createdAt == block.timestamp);
+			assert(pool.controller == address(this));
+			assert(curve.priorityFee == priorityFee);
+			assert(curve.fee == fee);
+			assert(curve.volatility == volatility);
+			assert(curve.duration == duration);
+			assert(curve.jit == jit);
+			assert(curve.maxTick == maxTick);
+		}
 	}
 	function execute_create_pool(
 		bytes memory createPoolData, 
@@ -370,6 +406,40 @@ contract EchidnaE2E is HelperHyperView,Helper
 			assert(postChangeCurve.maxTick == maxTick);		
 		}
 	}
+	// Invariant: Attempting to change parameters of a nonmutable pool should fail 
+	function change_parameters_to_non_mutable_pool_should_fail(
+		uint256 id,
+		uint16 priorityFee,
+		uint16 fee, 
+		int24 maxTick,
+		uint16 volatility, 
+		uint16 duration, 
+		uint16 jit,
+		uint128 price
+	) public {
+		(HyperPool memory preChangeState,uint64 poolId) = retrieve_created_pool(id);
+		emit LogUint256("created pools",poolIds.length);
+		emit LogUint256("pool ID",uint256(poolId));
+		require(preChangeState.isMutable());
+		require(preChangeState.controller == address(this));
+		{ 
+			// scaling remaining pool creation values
+			fee = uint16(between(fee, MIN_FEE, MAX_FEE));
+			priorityFee = uint16(between(priorityFee, 1, fee));
+			volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
+			duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
+			maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+			jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
+			price = uint128(between(price,1,type(uint128).max)); // price is between 1-uint256.max		
+		}
+
+		try _hyper.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick){
+			emit AssertionFailed("changing pool parameters of a nonmutable pool should not be possible");
+		} catch { 
+		}
+		
+	}
+	// Invariant: Attempting to change parameters by a non-controller should fail
 	// ******************** Funding ********************	
 	function fund_with_correct_preconditions_should_succeed(
 		uint256 assetAmount,
@@ -617,10 +687,18 @@ contract EchidnaE2E is HelperHyperView,Helper
 			uint256 wethPostTransfer = _weth.balanceOf(address(_hyper));
 
 			// sender's eth balance should decrease 
-			assert(ethBalancePostTransfer == ethBalancePreTransfer - msg.value);
+			if(ethBalancePostTransfer != ethBalancePreTransfer-msg.value){
+				emit LogUint256("eth balance post transfer (sender)",ethBalancePostTransfer);
+				emit LogUint256("eth balance pre transfer (sender)",ethBalancePreTransfer);
+				emit AssertionFailed("sender's eth balance should decrease by added amount.");
+			}
 			// weth balance of contract should increase
 			// pretransfer = b; post-transfer = b+msg.value
-			assert(wethPostTransfer == wethPreTransfer+msg.value);
+			if(wethPostTransfer != wethPreTransfer+msg.value){
+				emit LogUint256("Weth balance post transfer Hyper",wethPostTransfer);
+				emit LogUint256("Weth balance pre transfer Hyper",wethPreTransfer);
+				emit AssertionFailed("BUG: Hyper's weth balance should increase by added amount");
+			}
 			
 		} catch (bytes memory err) {
 			emit LogBytes("error",err);
@@ -630,31 +708,39 @@ contract EchidnaE2E is HelperHyperView,Helper
     using SafeCastLib for uint;
 	// Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool 
 	// ******************** Helper ********************	
-    function allocate_should_succeed_with_correct_preconditions(uint256 id, uint256 amount) public {
+    function allocate_should_succeed_with_correct_preconditions(uint256 id, uint256 deltaLiquidity) public {
 		(HyperPool memory pool,uint64 poolId) = retrieve_created_pool(id);
+		emit LogUint256("pool id:",uint256(poolId));
+
 		require(pool.lastPrice !=0);
 		require(pool.lastTimestamp !=0);
 
-		amount = between(amount,1,type(uint256).max);
-		uint128 deltaLiquidity;
-		if (amount == type(uint256).max) {
+		deltaLiquidity = between(deltaLiquidity,1,type(uint256).max);
+		if (deltaLiquidity == type(uint256).max) {
 			deltaLiquidity = 1;
 		} else {
-			deltaLiquidity = amount.safeCastTo128();
+			deltaLiquidity = uint128(deltaLiquidity);
 		}
 		require(deltaLiquidity != 0);
 
-		setup_fund(amount,amount);
+		int128 deltaLiquidityInt = convertToInt128(uint128(deltaLiquidity));
+		(uint256 deltaAsset, uint256 deltaQuote) = _hyper.getLiquidityDeltas(poolId,deltaLiquidityInt);
 
-		(uint256 deltaAsset,uint256 deltaQuote) = _hyper.allocate(poolId,amount);
+		emit LogUint256("delta asset:", deltaAsset);
+		emit LogUint256("delta quote:",deltaQuote);
+		emit LogUint256("deltaLiquidity",deltaLiquidity);
+
+		// Caller must have a balance and have approved hyper 
+		setup_fund(deltaAsset,deltaQuote);
+
+		(uint256 allocateAsset,uint256 allocateQuote) = _hyper.allocate(poolId,deltaLiquidity);
+
+		// Insert postconditions
 
 	}
 	// allocate should fail on a nonexistent pool 
-	// allocate shoudl fail if deltaLiquidity = 0
-	// ******************** Helper ********************	
-    function between(uint256 random,uint256 low, uint256 high) private returns (uint256) {
-        return low + (random % (high - low));
-    }
+	// allocate should fail if deltaLiquidity = 0
+
 	function retrieve_created_pool(uint256 id) private returns (HyperPool memory pool, uint64 poolId) {
 		require(poolIds.length > 0);
 		id = between(id,0,poolIds.length);
