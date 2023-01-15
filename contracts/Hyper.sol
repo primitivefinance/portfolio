@@ -56,7 +56,7 @@ contract Hyper is IHyper {
     mapping(address => mapping(address => uint24)) public getPairId;
     mapping(address => mapping(uint64 => HyperPosition)) public positions;
 
-    uint256 private locked = 1;
+    uint256 public locked = 1;
     Payment[] private _payments;
     SwapState private _state;
 
@@ -109,6 +109,12 @@ contract Hyper is IHyper {
     function getBalance(address owner, address token) public view returns (uint) {
         return __account__.balances[owner][token];
     }
+    
+    /** @dev Transient stored tokens */
+    function getWarm() public view returns (address[] memory warm) {
+        return __account__.warm;
+    }
+
 
     // ===== Actions ===== //
 

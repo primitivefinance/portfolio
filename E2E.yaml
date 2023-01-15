@@ -1,0 +1,7 @@
+testMode: assertion
+multi-abi: true
+testMaxGas: 800000030
+codeSize: 0xfffffffffff
+coverage: true 
+corpusDir: corpus
+# testLimit: 100000
