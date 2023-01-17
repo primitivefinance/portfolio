@@ -52,6 +52,7 @@ struct Parameters {
 }
 
 /**
+    todo: currently broken, marginal price goes lower after a swap in, should go higher!
     @dev Marginal price to trade y (∆) for x (∆′).
     @custom:math ( d∆′ / d∆ ) (∆) = (K / γ) φ( Φ^(−1)( ( y + γ∆ − k) / K ) + σ√τ) × (Φ−1)′ ( (y + γ∆ − k) / K )
     @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
@@ -59,7 +60,6 @@ struct Parameters {
 function computeMarginalPriceQuoteIn(
     uint d_y,
     uint R_y,
-    uint R_x,
     uint stk,
     uint vol,
     uint tau,
@@ -75,7 +75,7 @@ function computeMarginalPriceQuoteIn(
         uint256 feeWad = Price.convertPercentageToWad(params.fee);
         uint256 sqrtTau = tauWadYears.sqrt();
         gamma = FixedPointMathLib.WAD - feeWad;
-        volSqrtTau = sqrtTau.mulWadDown(HALF_SCALAR).divWadDown(volWad);
+        volSqrtTau = (sqrtTau * HALF_SCALAR).mulWadDown(volWad);
     }
 
     uint256 part0 = R_y + d_y.mulWadDown(gamma); // ( y + γ∆)
@@ -96,7 +96,7 @@ function computeMarginalPriceQuoteIn(
 
     int256 part6 = d_ppf(int256(part1)); // (Φ−1)′ ( (y + γ∆ − k) / K )
 
-    uint256 d_x; // ( d∆′ / d∆ ) (∆)
+    uint256 d_x; // ( d∆′ / d∆ ) (∆) = part5 * part6
     assembly {
         d_x := mul(part5, part6)
         d_x := sdiv(d_x, WAD)
@@ -112,7 +112,6 @@ function computeMarginalPriceQuoteIn(
  */
 function computeMarginalPriceAssetIn(
     uint d_x,
-    uint R_y,
     uint R_x,
     uint stk,
     uint vol,
@@ -130,7 +129,7 @@ function computeMarginalPriceAssetIn(
         uint256 feeWad = Price.convertPercentageToWad(params.fee);
         gamma = FixedPointMathLib.WAD - feeWad;
         sqrtTau = tauWadYears.sqrt();
-        volSqrtTau = sqrtTau.mulWadDown(HALF_SCALAR).divWadDown(volWad);
+        volSqrtTau = (sqrtTau * HALF_SCALAR).mulWadDown(volWad);
     }
 
     uint256 part0 = WAD - R_x - d_x.mulWadDown(gamma); // 1 wad > x > 0 wad
