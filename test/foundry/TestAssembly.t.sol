@@ -6,7 +6,14 @@ import "forge-std/Test.sol";
 
 contract AddSignedDelta {
     function addSignedDelta(uint128 input, int128 delta) public pure returns (uint128 output) {
-        return addSignedDelta(input, delta);
+        bytes memory revertData = abi.encodeWithSelector(InvalidLiquidity.selector);
+        assembly {
+            output := add(input, delta)
+
+            if gt(output, 0xffffffffffffffffffffffffffffffff) {
+                revert(add(32, revertData), mload(revertData)) // 0x1fff9681
+            }
+        }
     }
 
     function addSignedDelta_ref(uint128 input, int128 delta) external pure returns (uint128 output) {
