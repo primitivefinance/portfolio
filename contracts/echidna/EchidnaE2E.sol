@@ -83,8 +83,12 @@ contract EchidnaE2E is HelperHyperView,Helper
 	function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
 		(HyperPool memory pool,,,) = retrieve_random_pool_and_tokens(id);
 		// if the pool has a controller, the priority fee should never be zero
+		emit LogBool("is mutable",pool.isMutable());
 		if (pool.controller != address(0)) { 
-			assert(pool.params.priorityFee != 0);
+			if(pool.params.priorityFee == 0){
+				emit LogUint256("priority feel value",pool.params.priorityFee);
+				emit AssertionFailed("BUG: Mutable pool has a non zero priority fee.");
+			}
 		}
 	}
 	function pool_last_price_not_greater_than_strike() public {
@@ -144,7 +148,10 @@ contract EchidnaE2E is HelperHyperView,Helper
 	// TODO: remove if it's a false invariant
 	// TODO: Add to iterate over all created-pools
 	function pool_liquidity_delta_never_returns_zeroes(uint id, int128 deltaLiquidity) public {
+		require(deltaLiquidity !=0);
 		(HyperPool memory pool, uint64 poolId, TestERC20 quote, TestERC20 asset) = retrieve_random_pool_and_tokens(id);
+
+		emit LogInt128("deltaLiquidity",deltaLiquidity);
 
 		(uint128 deltaAsset,uint128 deltaQuote) = _hyper.getLiquidityDeltas(poolId,deltaLiquidity);
 		if(deltaAsset == 0) {
@@ -1023,8 +1030,37 @@ contract EchidnaE2E is HelperHyperView,Helper
 	// A user should not be able to allocate more than they own 
 	
 	// ******************** Unallocate ********************	
-	// function unallocate_with_correct_preconditions_should_work() public {
-	// }
+	function unallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
+		address[] memory owners= new address[](1);		
+		(HyperPool memory pool,uint64 poolId, TestERC20 _asset, TestERC20 _quote) = retrieve_random_pool_and_tokens(id);
+
+		// Save pre unallocation state
+		HyperState memory preState = getState(address(_hyper),poolId,address(this),owners);
+		uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
+		uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
+		require(preState.callerPositionLiquidity > 0);
+		require(pool.lastTimestamp-block.timestamp<JUST_IN_TIME_LIQUIDITY_POLICY);
+
+		(uint256 deltaAsset,uint256 deltaQuote) = _hyper.getAmounts(poolId);
+
+		_hyper.unallocate(poolId,amount);
+
+		// Save post unallocation state
+		HyperState memory postState = getState(address(_hyper),poolId,address(this),owners);	
+		{
+			uint256 postUnallocateAssetBalance = _asset.balanceOf(address(this));			
+			uint256 postUnallocateQuoteBalance = _quote.balanceOf(address(this));			
+			assert(preUnallocateAssetBalance+deltaAsset == postUnallocateAssetBalance);
+			assert(preUnallocateQuoteBalance+deltaQuote == postUnallocateQuoteBalance);
+		}
+
+		assert(preState.totalPoolLiquidity - amount == postState.totalPoolLiquidity);
+		assert(preState.callerPositionLiquidity - amount == postState.callerPositionLiquidity);
+		assert(preState.reserveAsset == postState.reserveAsset);
+		assert(preState.reserveQuote == postState.reserveQuote);
+		assert(preState.physicalBalanceAsset == postState.physicalBalanceAsset);
+		assert(preState.physicalBalanceQuote == postState.physicalBalanceQuote);
+	}
 	// A user without a position should not be able to unallocate funds 
 	// A user attempting to unallocate a nonexistent pool should fail
 	// A user attempting to unallocate an expired pool should be successful 
