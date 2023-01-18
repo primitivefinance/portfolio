@@ -17,12 +17,7 @@ contract TestHyperSwap is TestHyperSetup {
 
         uint input = DEFAULT_SWAP_INPUT;
         uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
-        (uint out, ) = pool.getAmountOut(
-            getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40)),
-            true,
-            input,
-            0
-        );
+        (uint out, ) = pool.getAmountOut(true, input, 0);
 
         (uint output, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
@@ -92,12 +87,7 @@ contract TestHyperSwap is TestHyperSetup {
         uint maxInput = getMaxSwapAssetInWad(pool);
         uint extra = 1;
         console.log(maxInput);
-        (uint out, ) = pool.getAmountOut(
-            getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40)),
-            true,
-            maxInput + extra,
-            0
-        );
+        (uint out, ) = pool.getAmountOut(true, maxInput + extra, 0);
 
         uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
         (uint output, uint remainder) = __hyperTestingContract__.swap(
@@ -119,12 +109,7 @@ contract TestHyperSwap is TestHyperSetup {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
         uint maxInput = getMaxSwapAssetInWad(pool);
-        (uint out, ) = pool.getAmountOut(
-            getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40)),
-            true,
-            maxInput - 1,
-            0
-        );
+        (uint out, ) = pool.getAmountOut(true, maxInput - 1, 0);
 
         uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
         (uint output, uint remainder) = __hyperTestingContract__.swap(

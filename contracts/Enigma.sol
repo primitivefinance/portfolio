@@ -220,12 +220,12 @@ function encodeSwap(
 
 function decodeSwap(
     bytes calldata data
-) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 limit, uint8 direction) {
+) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 direction) {
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
     uint8 pointer = uint8(data[9]);
     input = uint128(Assembly.toAmount(data[10:pointer]));
-    limit = uint128(Assembly.toAmount(data[pointer:data.length - 1]));
+    output = uint128(Assembly.toAmount(data[pointer:data.length - 1]));
     direction = uint8(data[data.length - 1]);
 }
 

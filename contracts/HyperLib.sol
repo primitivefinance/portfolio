@@ -90,6 +90,7 @@ error StakeNotMature(uint64 poolId);
 error SwapLimitReached();
 error ZeroInput();
 error ZeroLiquidity();
+error ZeroOutput();
 error ZeroPrice();
 error ZeroValue();
 
@@ -156,7 +157,8 @@ struct Order {
     uint8 useMax;
     uint64 poolId;
     uint128 input;
-    uint128 limit;
+    // For swapExactIn or swapExactOut, output is the limit price.
+    uint128 output;
     uint8 direction;
 }
 
@@ -375,7 +377,6 @@ function getMaxSwapQuoteInWad(HyperPool memory self) view returns (uint) {
 
 function getAmountOut(
     HyperPool memory self,
-    HyperPair memory pair,
     bool sellAsset,
     uint amountIn,
     uint timeSinceUpdate
@@ -383,9 +384,10 @@ function getAmountOut(
     Iteration memory data;
     Price.RMM memory rmm = self.getRMM();
     (data.price, data.tick) = self.computePriceChangeWithTime(self.lastTau(), timeSinceUpdate);
-    data.remainder = amountIn.scaleToWad(sellAsset ? pair.decimalsAsset : pair.decimalsQuote);
+    data.remainder = amountIn.scaleToWad(sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote);
     data.liquidity = self.liquidity;
 
+    uint prioFee;
     uint prevInd;
     uint prevDep;
     uint nextInd;
@@ -397,29 +399,25 @@ function getAmountOut(
 
         if (sellAsset) {
             (prevDep, prevInd) = rmm.computeReserves(data.price);
-            maxInput = (FixedPointMathLib.WAD - prevInd).mulWadDown(self.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
+            maxInput = (FixedPointMathLib.WAD - prevInd).mulWadDown(data.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
         } else {
             (prevInd, prevDep) = rmm.computeReserves(data.price);
-            maxInput = (rmm.strike - prevInd).mulWadDown(self.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+            maxInput = (rmm.strike - prevInd).mulWadDown(data.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
         }
 
-        data.feeAmount = ((data.remainder > maxInput ? maxInput : data.remainder) * self.params.fee) / 10_000;
+        prioFee = msg.sender == self.controller ? (data.liquidity * self.params.fee) / 10_000 : 0;
+        data.feeAmount = prioFee != 0
+            ? 0
+            : ((data.remainder > maxInput ? maxInput : data.remainder) * self.params.fee) / 10_000;
 
-        if (data.remainder > maxInput) {
-            delInput = maxInput - data.feeAmount;
-            nextInd = prevInd + delInput.divWadDown(data.liquidity);
-            data.remainder -= (delInput + data.feeAmount);
-        } else {
-            delInput = data.remainder - data.feeAmount;
-            nextInd = prevInd + delInput.divWadDown(data.liquidity);
-            delInput = data.remainder; // Swap input amount including the fee payment.
-            data.remainder = 0; // Clear the remainder to zero, as the order has been filled.
-        }
+        delInput = data.remainder > maxInput ? maxInput : data.remainder;
+        nextInd = prevInd + (delInput - data.feeAmount).divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
         if (sellAsset) nextDep = rmm.getYWithX(nextInd);
         else nextDep = rmm.getXWithY(nextInd);
 
+        data.remainder -= delInput;
         data.input += delInput;
         data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
     }
@@ -429,11 +427,11 @@ function getAmountOut(
         uint inputDec;
         uint outputDec;
         if (sellAsset) {
-            inputDec = pair.decimalsAsset;
-            outputDec = pair.decimalsQuote;
+            inputDec = self.pair.decimalsAsset;
+            outputDec = self.pair.decimalsQuote;
         } else {
-            inputDec = pair.decimalsQuote;
-            outputDec = pair.decimalsAsset;
+            inputDec = self.pair.decimalsQuote;
+            outputDec = self.pair.decimalsAsset;
         }
 
         data.input = data.input.scaleFromWadUp(inputDec);

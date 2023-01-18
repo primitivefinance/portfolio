@@ -5,6 +5,7 @@ import "./setup/TestHyperSetup.sol";
 
 contract TestHyperClaim is TestHyperSetup {
     using FixedPointMathLib for uint;
+    using Price for Price.RMM;
 
     function testClaimNoPosition_reverts() public {
         vm.expectRevert(abi.encodeWithSelector(NonExistentPosition.selector, address(this), defaultScenario.poolId));
@@ -110,6 +111,7 @@ contract TestHyperClaim is TestHyperSetup {
         uint real0 = _getReserve(hx(), defaultScenario.asset);
         uint real1 = _getReserve(hx(), defaultScenario.quote);
         (uint res0, uint res1) = pool.getVirtualReserves();
+        uint liquidity = pool.liquidity;
 
         basicUnallocate();
         maxDraw(); // zero balance to ensure we aren't paying ourself.
@@ -120,6 +122,12 @@ contract TestHyperClaim is TestHyperSetup {
         assertTrue(fee0 > 0, "fee0-zero");
         assertTrue(pool.liquidity == 0, "non-zero-liquidity");
 
+        uint entitledAssetAmount = real0 - fee0;
+
+        Price.RMM memory rmm = pool.getRMM();
+        uint adjustedAmt = entitledAssetAmount.divWadDown(liquidity);
+        uint expectedPrice = rmm.getPriceWithX(adjustedAmt);
+
         // Claim
         uint prevReserve = _getReserve(hx(), defaultScenario.asset);
         uint prevBalance = _getBalance(hx(), address(this), defaultScenario.asset);
@@ -128,7 +136,12 @@ contract TestHyperClaim is TestHyperSetup {
 
         maxDraw(); // clear reserve
 
+        pos = defaultPosition();
+        (fee0, ) = (pos.tokensOwedAsset, pos.tokensOwedQuote);
+        assertEq(fee0, 0, "unclaimed-fees");
+
         uint nextReserve = _getReserve(hx(), defaultScenario.asset);
+        // todo: fix. Price deviation trick leaves dust, there should be no dust! assertEq(nextReserve, 0, "reserve-not-zero");
         assertTrue(nextBalance > prevBalance, "no fee claimed");
         assertTrue(nextReserve < prevReserve, "no fee removed");
     }

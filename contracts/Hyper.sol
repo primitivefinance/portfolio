@@ -160,7 +160,7 @@ contract Hyper is IHyper {
                 useMax: useMax ? 1 : 0,
                 poolId: poolId,
                 input: input,
-                limit: limit.safeCastTo128(),
+                output: limit.safeCastTo128(),
                 direction: sellAsset ? 0 : 1
             })
         );
@@ -379,8 +379,37 @@ contract Hyper is IHyper {
 
     // ===== Swaps ===== //
 
-    /** * @dev Swaps in direction (0 or 1) exact input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset) up to limit price. */
     function _swapExactIn(
+        Order memory args
+    ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
+        if (args.input == 0) revert ZeroInput();
+
+        uint limitPrice = args.output;
+        bool sellAsset = args.direction == 0;
+
+        HyperPool memory pool = pools[args.poolId];
+        if (args.useMax == 0) {
+            input = args.input;
+        } else {
+            address tokenInput = sellAsset ? pool.pair.tokenAsset : pool.pair.tokenQuote;
+            input = getBalance(msg.sender, tokenInput);
+        }
+
+        uint256 passed = getTimePassed(args.poolId);
+        (output, ) = pool.getAmountOut(sellAsset, input, passed);
+
+        args.input = input.safeCastTo128();
+        args.output = output.safeCastTo128();
+
+        (poolId, remainder, input, output) = _swap(args);
+
+        uint nextPrice = pools[args.poolId].lastPrice;
+        if (!sellAsset && nextPrice > limitPrice) revert SwapLimitReached();
+        if (sellAsset && limitPrice > nextPrice) revert SwapLimitReached();
+    }
+
+    /** @dev Swaps in direction (0 or 1) input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset). */
+    function _swap(
         Order memory args
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
@@ -402,7 +431,11 @@ contract Hyper is IHyper {
 
             uint internalBalance = getBalance(msg.sender, _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote);
             remainder = args.useMax == 1 ? internalBalance : args.input;
-            remainder = remainder.scaleToWad(_state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote); // WAD
+            remainder = remainder.scaleToWad(_state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote);
+            output = args.output;
+            output = output.scaleToWad(_state.sell ? pool.pair.decimalsQuote : pool.pair.decimalsAsset);
+
+            // Keeps WAD values
             _swap = Iteration({
                 price: price,
                 tick: tick,
@@ -410,10 +443,14 @@ contract Hyper is IHyper {
                 remainder: remainder,
                 liquidity: pool.liquidity,
                 input: 0,
-                output: 0
+                output: output
             });
         }
+
         if (rmm.tau == 0) revert PoolExpired();
+        if (_swap.output == 0) revert ZeroOutput();
+        if (_swap.remainder == 0) revert ZeroInput();
+        if (_swap.liquidity == 0) revert ZeroLiquidity();
 
         // =---= Effects =---= //
 
@@ -422,11 +459,13 @@ contract Hyper is IHyper {
         uint256 nextIndependent;
         uint256 liveDependent;
         uint256 nextDependent;
-        uint priorityFeeAmount;
+        uint256 priorityFeeAmount;
 
         {
             uint256 maxInput;
             uint256 deltaInput;
+            uint256 deltaInputLessFee;
+            uint256 deltaOutput = _swap.output;
 
             // Virtual reserves
             if (_state.sell) {
@@ -444,29 +483,18 @@ contract Hyper is IHyper {
             _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
             if (priorityFeeAmount != 0) _state.priorityFeeGrowthGlobal = priorityFeeAmount.divWadDown(_swap.liquidity); // todo: change to staked liquidity
 
-            if (_swap.remainder > maxInput) {
-                deltaInput = maxInput - _swap.feeAmount;
-                nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
-                deltaInput = maxInput;
-                _swap.remainder -= deltaInput;
-            } else {
-                deltaInput = _swap.remainder - _swap.feeAmount;
-                nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
-                deltaInput = _swap.remainder; // Swap input amount including the fee payment.
-                _swap.remainder = 0; // Clear the remainder to zero, as the order has been filled.
-            }
+            deltaInput = _swap.remainder > maxInput ? maxInput : _swap.remainder; // swaps up to the maximum input
+            deltaInputLessFee = deltaInput - _swap.feeAmount;
 
-            // Compute the output of the swap by computing the difference between the dependent reserves.
-            if (_state.sell) nextDependent = rmm.getYWithX(nextIndependent);
-            else nextDependent = rmm.getXWithY(nextIndependent);
+            nextIndependent = liveIndependent + deltaInputLessFee.divWadDown(_swap.liquidity);
+            nextDependent = liveDependent - deltaOutput.divWadDown(_swap.liquidity);
 
+            _swap.remainder -= deltaInput;
             _swap.input += deltaInput;
-            _swap.output += (liveDependent - nextDependent).mulWadDown(_swap.liquidity);
         }
 
         {
             uint256 nextPrice;
-            uint256 limitPrice = args.limit;
             int256 liveInvariantWad;
             int256 nextInvariantWad;
 
@@ -480,14 +508,11 @@ contract Hyper is IHyper {
                 nextPrice = rmm.getPriceWithX(nextDependent);
             }
 
-            if (!_state.sell && nextPrice > limitPrice) revert SwapLimitReached();
-            if (_state.sell && limitPrice > nextPrice) revert SwapLimitReached();
-
             liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote); // invariant is denominated in quote token.
             nextInvariantWad = nextInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
             if (nextInvariantWad < liveInvariantWad) revert InvalidInvariant(liveInvariantWad, nextInvariantWad);
 
-            _swap.price = (nextPrice * 10_000_001) / 10_000_000; // todo: this prevents failure in fuzz tests, investigate further. Related to precision.
+            _swap.price = (nextPrice * (0.001 ether + 1)) / 0.001 ether;
         }
 
         {
@@ -501,7 +526,7 @@ contract Hyper is IHyper {
                 outputDec = pool.pair.decimalsAsset;
             }
 
-            _swap.input = _swap.input.scaleFromWadUp(inputDec);
+            _swap.input = _swap.input.scaleFromWadDown(inputDec);
             _swap.output = _swap.output.scaleFromWadDown(outputDec);
         }
 
@@ -764,8 +789,8 @@ contract Hyper is IHyper {
             _unallocate(useMax == 1, poolId, deltaLiquidity);
         } else if (instruction == Enigma.SWAP) {
             Order memory args;
-            (args.useMax, args.poolId, args.input, args.limit, args.direction) = Enigma.decodeSwap(data);
-            _swapExactIn(args);
+            (args.useMax, args.poolId, args.input, args.output, args.direction) = Enigma.decodeSwap(data);
+            _swap(args);
         } else if (instruction == Enigma.STAKE_POSITION) {
             (uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeStakePosition(data);
             _stake(poolId, deltaLiquidity);
@@ -889,10 +914,8 @@ contract Hyper is IHyper {
     }
 
     function getAmountOut(uint64 poolId, bool sellAsset, uint amountIn) public view returns (uint output) {
-        uint24 pairId = Enigma.decodePairIdFromPoolId(poolId);
         HyperPool memory pool = pools[poolId];
         (output, ) = pool.getAmountOut({
-            pair: pairs[pairId],
             sellAsset: sellAsset,
             amountIn: amountIn,
             timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp // invariant: should not underflow.
