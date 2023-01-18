@@ -18,7 +18,6 @@ contract EchidnaE2E is HelperHyperView,Helper
 	constructor() public {
 		_weth = new WETH();
 		_hyper = new Hyper(address(_weth));
-		// create_pair_with_safe_preconditions(uint8(10),uint8(2));
 		TestERC20 _asset = create_token("Asset Token", "ADEC6",6);
 		TestERC20 _quote = create_token("Quote Token", "QDEC18",18);
 		hyperTokens.push(_asset);
@@ -131,7 +130,7 @@ contract EchidnaE2E is HelperHyperView,Helper
 	Test overlapping token pairs
 	*/
 	function create_pair_with_safe_preconditions(uint256 id1, uint256 id2) public { 
-		// retrieve an existing pair of tokens that were created with 6-18 decimals 
+		// retrieve an existing rpair of tokens that wee created with 6-18 decimals 
 		(TestERC20 asset, TestERC20 quote) = get_hyper_tokens(id1,id2);
 		// require that this pair ID does not exist yet 
 		require(_hyper.getPairId(address(asset),address(quote)) == 0);
@@ -909,7 +908,7 @@ contract EchidnaE2E is HelperHyperView,Helper
 	}
 
 	function get_hyper_tokens(uint256 id1,uint256 id2) private returns (TestERC20 asset, TestERC20 quote) {
-		require(hyperTokens.length > 2);
+		// This assumes that hyperTokens.length is always >2 
 		id1 = between(id1,0,hyperTokens.length);
 		id2 = between(id2,0,hyperTokens.length);
 		require(id1 != id2);
