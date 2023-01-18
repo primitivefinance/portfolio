@@ -268,6 +268,8 @@ contract EchidnaE2E is HelperHyperView,Helper
 		emit LogUint256("decimals quote", quote.decimals());
 		emit LogUint256("pair ID",uint256(_hyper.getPairId(address(asset),address(quote))));
 
+		require(asset.decimals() >=6 && asset.decimals() <=18);
+		require(quote.decimals() >=6 && quote.decimals() <=18);
 		// require that this pair ID does not exist yet 
 		if(_hyper.getPairId(address(asset),address(quote)) != 0){
 			return;
