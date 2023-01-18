@@ -447,7 +447,8 @@ contract Hyper is IHyper {
             if (_swap.remainder > maxInput) {
                 deltaInput = maxInput - _swap.feeAmount;
                 nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
-                _swap.remainder -= (deltaInput + _swap.feeAmount);
+                deltaInput = maxInput;
+                _swap.remainder -= deltaInput;
             } else {
                 deltaInput = _swap.remainder - _swap.feeAmount;
                 nextIndependent = liveIndependent + deltaInput.divWadDown(_swap.liquidity);
