@@ -109,12 +109,11 @@ contract Hyper is IHyper {
     function getBalance(address owner, address token) public view returns (uint) {
         return __account__.balances[owner][token];
     }
-    
+
     /** @dev Transient stored tokens */
     function getWarm() public view returns (address[] memory warm) {
         return __account__.warm;
     }
-
 
     // ===== Actions ===== //
 
@@ -461,7 +460,7 @@ contract Hyper is IHyper {
             else nextDependent = rmm.getXWithY(nextIndependent);
 
             _swap.input += deltaInput;
-            _swap.output += (liveDependent - nextDependent); // todo: multiply by liquidity
+            _swap.output += (liveDependent - nextDependent).mulWadDown(_swap.liquidity);
         }
 
         {

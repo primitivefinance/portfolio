@@ -421,7 +421,7 @@ function getAmountOut(
         else nextDep = rmm.getXWithY(nextInd);
 
         data.input += delInput;
-        data.output += (prevDep - nextDep); // todo: multiply by liquidity
+        data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
     }
 
     {
