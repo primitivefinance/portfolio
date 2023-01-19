@@ -1,4 +1,5 @@
 pragma solidity ^0.8.0;
+
 import "./Helper.sol";
 import "solmate/tokens/WETH.sol";
 import "../test/TestERC20.sol";
@@ -147,40 +148,43 @@ contract EchidnaE2E is HelperHyperView, Helper {
 
             HyperPool memory pool = getPool(address(_hyper), poolId);
 
-			if(pool.lastPrice != 0) {
-				emit LogUint256("pool's last price",pool.lastPrice);
-				if(pool.liquidity == 0){
-					emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
-				}
+            if (pool.lastPrice != 0) {
+                emit LogUint256("pool's last price", pool.lastPrice);
+                if (pool.liquidity == 0) {
+                    emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
+                }
+            }
+            //TODO: if pool.lastPrice == 0; pool.liquidity == 0?
+        }
+    }
 
-			}	
-			//TODO: if pool.lastPrice == 0; pool.liquidity == 0?
-		}
-	}
-	// TODO: remove if it's a false invariant
-	// TODO: Add to iterate over all created-pools
-	function pool_liquidity_delta_never_returns_zeroes(uint id, int128 deltaLiquidity) public {
-		require(deltaLiquidity !=0);
-		(HyperPool memory pool, uint64 poolId, TestERC20 quote, TestERC20 asset) = retrieve_random_pool_and_tokens(id);
+    // TODO: remove if it's a false invariant
+    // TODO: Add to iterate over all created-pools
+
+    function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
+        require(deltaLiquidity != 0);
+        (HyperPool memory pool, uint64 poolId, TestERC20 quote, TestERC20 asset) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
-		(uint128 deltaAsset,uint128 deltaQuote) = _hyper.getLiquidityDeltas(poolId,deltaLiquidity);
-		emit LogUint256("deltaAsset",deltaAsset);
-		if(deltaAsset == 0) {
-			emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaAsset");
-		}
-		emit LogUint256("deltaQuote",deltaQuote);
-		if(deltaQuote == 0) {
-			emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaQuote");
-		}		
-	}
-	// TODO: Find a better name here with `pool_` at the beginning
-	function check_hyper_curve_assumptions() public {
-		for (uint8 i =0; i<poolIds.length; i++){
-			uint64 poolId = poolIds[i];
-			HyperPool memory pool = getPool(address(_hyper),poolId);
-			HyperCurve memory curve = pool.params;
+        (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getLiquidityDeltas(poolId, deltaLiquidity);
+        emit LogUint256("deltaAsset", deltaAsset);
+        if (deltaAsset == 0) {
+            emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaAsset");
+        }
+        emit LogUint256("deltaQuote", deltaQuote);
+        if (deltaQuote == 0) {
+            emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaQuote");
+        }
+    }
+
+    // TODO: Find a better name here with `pool_` at the beginning
+
+    function check_hyper_curve_assumptions() public {
+        for (uint8 i = 0; i < poolIds.length; i++) {
+            uint64 poolId = poolIds[i];
+            HyperPool memory pool = getPool(address(_hyper), poolId);
+            HyperCurve memory curve = pool.params;
 
             assert(curve.fee != 0);
             assert(curve.priorityFee <= curve.fee);
@@ -203,8 +207,8 @@ contract EchidnaE2E is HelperHyperView, Helper {
             (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getVirtualReserves(poolId);
 
             // Hyper's `getReserve` function for each of the pool's pair
-            uint assetReserves = _hyper.getReserve(pair.tokenAsset);
-            uint quoteReserves = _hyper.getReserve(pair.tokenQuote);
+            uint256 assetReserves = _hyper.getReserve(pair.tokenAsset);
+            uint256 quoteReserves = _hyper.getReserve(pair.tokenQuote);
 
             if (deltaAsset > assetReserves) {
                 emit LogUint256("deltaAsset", deltaAsset);
@@ -227,7 +231,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            (uint amountAssetWad, uint amountQuoteWad) = pool.getAmountsWad();
+            (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
 
             if (amountAssetWad > 1e18) {
                 emit LogUint256("amountAssetWad", amountAssetWad);
@@ -249,9 +253,9 @@ contract EchidnaE2E is HelperHyperView, Helper {
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            (uint amountAssetDec, uint amountQuoteDec) = pool.getAmounts();
+            (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getAmounts();
 
-            (uint amountAssetWad, uint amountQuoteWad) = pool.getAmountsWad();
+            (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
 
             // Assumes inclusivity of bounds (i.e: equivalence is okay)
             if (amountAssetDec > amountAssetWad) {
@@ -269,11 +273,12 @@ contract EchidnaE2E is HelperHyperView, Helper {
     }
 
     // ******************** Create Pairs ********************
-    /** Future Invariant: This assumes that there is a single pair of _asset and _quote token 
-	        - In the future, can be extended to deploy tokens from here and save the address in a list 
-			which allows echidna to test against different pairs. 
-			- Assumption: 1 pair for now. 
-	 */
+    /**
+     * Future Invariant: This assumes that there is a single pair of _asset and _quote token
+     *      - In the future, can be extended to deploy tokens from here and save the address in a list
+     * 			which allows echidna to test against different pairs.
+     * 			- Assumption: 1 pair for now.
+     */
     function create_token(
         string memory tokenName,
         string memory shortform,
@@ -288,8 +293,8 @@ contract EchidnaE2E is HelperHyperView, Helper {
 
     /* Future Invariant: This could be extended to create arbitrary pairs. 
     For now for complexity, I am leaving as is. 
-	Test overlapping token pairs
-	*/
+    Test overlapping token pairs
+    */
     function create_pair_with_safe_preconditions(uint256 id1, uint256 id2) public {
         // retrieve an existing rpair of tokens that wee created with 6-18 decimals
         (TestERC20 asset, TestERC20 quote) = get_hyper_tokens(id1, id2);
@@ -320,7 +325,8 @@ contract EchidnaE2E is HelperHyperView, Helper {
         assert(pairNonce == preCreationNonce + 1);
     }
 
-    /** Future Invariant: This can likely be extended to ensure that pairID's must always match backwards to the tokens saved
+    /**
+     * Future Invariant: This can likely be extended to ensure that pairID's must always match backwards to the tokens saved
      */
     function pair_id_saved_properly(address asset, address quote) private {
         // retrieve recently created pair ID
@@ -776,7 +782,11 @@ contract EchidnaE2E is HelperHyperView, Helper {
     }
 
     // ******************** Draw ********************
-    function draw_should_succeed(uint256 assetAmount, uint256 quoteAmount, address recipient) public {
+    function draw_should_succeed(
+        uint256 assetAmount,
+        uint256 quoteAmount,
+        address recipient
+    ) public {
         (TestERC20 _asset, TestERC20 _quote) = get_hyper_tokens(assetAmount, quoteAmount);
 
         assetAmount = between(assetAmount, 1, type(uint64).max);
@@ -791,7 +801,11 @@ contract EchidnaE2E is HelperHyperView, Helper {
         draw_token(address(_quote), quoteAmount, recipient);
     }
 
-    function draw_token(address token, uint256 amount, address recipient) private {
+    function draw_token(
+        address token,
+        uint256 amount,
+        address recipient
+    ) private {
         // make sure a user has funded already
         uint256 virtualBalancePreFund = getBalance(address(_hyper), address(this), address(token));
         require(virtualBalancePreFund > 0);
@@ -972,7 +986,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
         }
     }
 
-    using SafeCastLib for uint;
+    using SafeCastLib for uint256;
 
     // Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool
     // ******************** Allocate ********************
@@ -1046,7 +1060,11 @@ contract EchidnaE2E is HelperHyperView, Helper {
         }
     }
 
-    function allocate_with_non_existent_pool_should_fail(uint256 id, uint64 poolId, uint256 deltaLiquidity) public {
+    function allocate_with_non_existent_pool_should_fail(
+        uint256 id,
+        uint64 poolId,
+        uint256 deltaLiquidity
+    ) public {
         (HyperPool memory pool, uint64 poolId, TestERC20 _asset, TestERC20 _quote) = retrieve_random_pool_and_tokens(
             id
         );
@@ -1155,11 +1173,17 @@ contract EchidnaE2E is HelperHyperView, Helper {
 
     // Helper Functions
 
-    function retrieve_random_pool_and_tokens(
-        uint256 id
-    ) private returns (HyperPool memory pool, uint64 poolId, TestERC20 quote, TestERC20 asset) {
+    function retrieve_random_pool_and_tokens(uint256 id)
+        private
+        returns (
+            HyperPool memory pool,
+            uint64 poolId,
+            TestERC20 quote,
+            TestERC20 asset
+        )
+    {
         require(poolIds.length > 0);
-        uint random = between(id, 0, poolIds.length);
+        uint256 random = between(id, 0, poolIds.length);
 
         pool = getPool(address(_hyper), poolIds[random]);
         poolId = poolIds[random];
