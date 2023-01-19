@@ -147,36 +147,40 @@ contract EchidnaE2E is HelperHyperView, Helper {
 
             HyperPool memory pool = getPool(address(_hyper), poolId);
 
-            if (pool.lastPrice != 0) {
-                assert(pool.liquidity != 0);
-            }
-            //TODO: if pool.lastPrice == 0; pool.liquidity == 0?
-        }
-    }
+			if(pool.lastPrice != 0) {
+				emit LogUint256("pool's last price",pool.lastPrice);
+				if(pool.liquidity == 0){
+					emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
+				}
 
-    // TODO: remove if it's a false invariant
-    // TODO: Add to iterate over all created-pools
-    function pool_liquidity_delta_never_returns_zeroes(uint id, int128 deltaLiquidity) public {
-        require(deltaLiquidity != 0);
-        (HyperPool memory pool, uint64 poolId, TestERC20 quote, TestERC20 asset) = retrieve_random_pool_and_tokens(id);
+			}	
+			//TODO: if pool.lastPrice == 0; pool.liquidity == 0?
+		}
+	}
+	// TODO: remove if it's a false invariant
+	// TODO: Add to iterate over all created-pools
+	function pool_liquidity_delta_never_returns_zeroes(uint id, int128 deltaLiquidity) public {
+		require(deltaLiquidity !=0);
+		(HyperPool memory pool, uint64 poolId, TestERC20 quote, TestERC20 asset) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
-        (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getLiquidityDeltas(poolId, deltaLiquidity);
-        if (deltaAsset == 0) {
-            emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaAsset");
-        }
-        if (deltaQuote == 0) {
-            emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaQuote");
-        }
-    }
-
-    // TODO: Find a better name here with `pool_` at the beginning
-    function check_hyper_curve_assumptions() public {
-        for (uint8 i = 0; i < poolIds.length; i++) {
-            uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+		(uint128 deltaAsset,uint128 deltaQuote) = _hyper.getLiquidityDeltas(poolId,deltaLiquidity);
+		emit LogUint256("deltaAsset",deltaAsset);
+		if(deltaAsset == 0) {
+			emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaAsset");
+		}
+		emit LogUint256("deltaQuote",deltaQuote);
+		if(deltaQuote == 0) {
+			emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaQuote");
+		}		
+	}
+	// TODO: Find a better name here with `pool_` at the beginning
+	function check_hyper_curve_assumptions() public {
+		for (uint8 i =0; i<poolIds.length; i++){
+			uint64 poolId = poolIds[i];
+			HyperPool memory pool = getPool(address(_hyper),poolId);
+			HyperCurve memory curve = pool.params;
 
             assert(curve.fee != 0);
             assert(curve.priorityFee <= curve.fee);
