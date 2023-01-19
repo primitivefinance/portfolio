@@ -7,20 +7,20 @@ import "../Hyper.sol";
 import "../Enigma.sol" as ProcessingLib;
 import "../../test/helpers/HelperHyperProfiles.sol" as DefaultValues;
 import "../../test/helpers/HelperHyperView.sol";
+import "./EchidnaStateHandling.sol";
 
-contract EchidnaE2E is HelperHyperView, Helper {
+contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     WETH _weth;
     Hyper _hyper;
-    EchidnaERC20[] hyperTokens;
-    uint64[] poolIds;
+
 
     constructor() public {
         _weth = new WETH();
         _hyper = new Hyper(address(_weth));
         EchidnaERC20 _asset = create_token("Asset Token", "ADEC6", 6);
         EchidnaERC20 _quote = create_token("Quote Token", "QDEC18", 18);
-        hyperTokens.push(_asset);
-        hyperTokens.push(_quote);
+        add_created_hyper_token(_asset);
+        add_created_hyper_token(_quote);
     }
 
     OS.AccountSystem hyperAccount;
@@ -50,8 +50,8 @@ contract EchidnaE2E is HelperHyperView, Helper {
     function global_token_balance_greater_or_equal_reserves() public {
         uint256 reserveBalance = 0;
         uint256 tokenBalance = 0;
-        for (uint8 i = 0; i < hyperTokens.length; i++) {
-            EchidnaERC20 token = hyperTokens[i];
+        for (uint8 i = 0; i < EchidnaStateHandling.hyperTokens.length; i++) {
+            EchidnaERC20 token = EchidnaStateHandling.get_token_at_index(i);
 
             // retrieve reserves of the token and add to tracked reserve balance
             reserveBalance = getReserve(address(_hyper), address(token));
@@ -86,12 +86,13 @@ contract EchidnaE2E is HelperHyperView, Helper {
 
     // ---------- Pool Properties -------
     function pool_fee_growth_greater_than_position_fee_growth() public {
-        for (uint8 i = 0; i < poolIds.length; i++) {
+        for (uint8 i = 0; i<poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
+            HyperPool memory pool = getPool(address(_hyper),poolId);
+
+
         }
     }
-
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
         (HyperPool memory pool, , , ) = retrieve_random_pool_and_tokens(id);
         // if the pool has a controller, the priority fee should never be zero
@@ -170,12 +171,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
 
     function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
         require(deltaLiquidity != 0);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 quote,
-            EchidnaERC20 asset
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId, EchidnaERC20 quote, EchidnaERC20 asset) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
@@ -296,11 +292,12 @@ contract EchidnaE2E is HelperHyperView, Helper {
         string memory shortform,
         uint8 decimals
     ) public returns (EchidnaERC20 token) {
-        EchidnaERC20 token = new EchidnaERC20(tokenName, shortform, decimals, address(_hyper));
+        token = new EchidnaERC20(tokenName, shortform, decimals,address(_hyper));
         assert(token.decimals() == decimals);
         if (decimals >= 6 && decimals <= 18) {
-            hyperTokens.push(token);
+            add_created_hyper_token(token);
         }
+        return token;
     }
 
     /* Future Invariant: This could be extended to create arbitrary pairs. 
@@ -436,7 +433,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
     }
 
     function create_controlled_pool(
-        uint256 pairId,
+        uint256 id,
         uint16 priorityFee,
         uint16 fee,
         int24 maxTick,
@@ -445,7 +442,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
         uint16 jit,
         uint128 price
     ) public {
-        uint24 pairId = retrieve_created_pair(pairId);
+        uint24 pairId = retrieve_created_pair(id);
         {
             (priorityFee, fee, maxTick, volatility, duration, jit, price) = clam_safe_create_bounds(
                 priorityFee,
@@ -590,7 +587,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
         }
 
         // save pools in Echidna
-        poolIds.push(poolId);
+        save_pool_id(poolId);
     }
 
     // ******************** Change Pool Parameters ********************
@@ -794,7 +791,11 @@ contract EchidnaE2E is HelperHyperView, Helper {
     }
 
     // ******************** Draw ********************
-    function draw_should_succeed(uint256 assetAmount, uint256 quoteAmount, address recipient) public {
+    function draw_should_succeed(
+        uint256 assetAmount,
+        uint256 quoteAmount,
+        address recipient
+    ) public {
         (EchidnaERC20 _asset, EchidnaERC20 _quote) = get_hyper_tokens(assetAmount, quoteAmount);
 
         assetAmount = between(assetAmount, 1, type(uint64).max);
@@ -809,7 +810,11 @@ contract EchidnaE2E is HelperHyperView, Helper {
         draw_token(address(_quote), quoteAmount, recipient);
     }
 
-    function draw_token(address token, uint256 amount, address recipient) private {
+    function draw_token(
+        address token,
+        uint256 amount,
+        address recipient
+    ) private {
         // make sure a user has funded already
         uint256 virtualBalancePreFund = getBalance(address(_hyper), address(this), address(token));
         require(virtualBalancePreFund > 0);
@@ -938,7 +943,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
             uint256 reserveBalancePost = getReserve(address(_hyper), address(_weth));
             uint256 wethBalancePost = _weth.balanceOf(address(_hyper));
             // Eth balance of this contract should decrease by the deposited amount
-            if (thisEthBalancePost != thisEthBalancePre - msg.value) {
+            if (thisEthBalancePost != thisEthBalancePre-msg.value) {
                 emit LogUint256("eth balance post transfer (sender)", thisEthBalancePost);
                 emit LogUint256("eth balance pre transfer (sender)", thisEthBalancePre);
                 emit AssertionFailed("sender's eth balance should not change.");
@@ -966,12 +971,9 @@ contract EchidnaE2E is HelperHyperView, Helper {
     // Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool
     // ******************** Allocate ********************
     function allocate_should_succeed_with_correct_preconditions(uint256 id, uint256 deltaLiquidity) public {
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(
+            id
+        );
         emit LogUint256("pool id:", uint256(poolId));
 
         require(pool.lastPrice != 0);
@@ -992,22 +994,14 @@ contract EchidnaE2E is HelperHyperView, Helper {
         emit LogUint256("delta quote:", deltaQuote);
         emit LogUint256("deltaLiquidity", deltaLiquidity);
 
-        execute_allocate_call(poolId, _asset, _quote, deltaAsset, deltaQuote, deltaLiquidity);
+        execute_allocate_call(poolId, _asset,_quote,deltaAsset,deltaQuote,deltaLiquidity);
     }
-
-    function execute_allocate_call(
-        uint64 poolId,
-        EchidnaERC20 _asset,
-        EchidnaERC20 _quote,
-        uint256 deltaAsset,
-        uint256 deltaQuote,
-        uint256 deltaLiquidity
-    ) internal {
+    function execute_allocate_call(uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote,uint256 deltaAsset, uint256 deltaQuote, uint256 deltaLiquidity) internal {
         // Caller must have a balance and have approved hyper
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        address[] memory owners = new address[](1);
+        address[] memory owners = new address[](1);        
 
         // Save pre allocation state
         HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
@@ -1047,16 +1041,17 @@ contract EchidnaE2E is HelperHyperView, Helper {
             if (preState.feeGrowthQuotePool != postState.feeGrowthQuotePool) {
                 assert(postState.feeGrowthQuotePosition != 0);
             }
-        }
+        }        
     }
 
-    function allocate_with_non_existent_pool_should_fail(uint256 id, uint64 poolId, uint256 deltaLiquidity) public {
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+    function allocate_with_non_existent_pool_should_fail(
+        uint256 id,
+        uint64 poolId,
+        uint256 deltaLiquidity
+    ) public {
+        (HyperPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(
+            id
+        );
 
         address[] memory owners = new address[](1);
         require(!is_created_pool(poolId)); // require pool does not exist
@@ -1090,12 +1085,9 @@ contract EchidnaE2E is HelperHyperView, Helper {
 
     function allocate_with_zero_delta_liquidity_should_fail(uint256 id) public {
         address[] memory owners = new address[](1);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(
+            id
+        );
         emit LogUint256("pool id:", uint256(poolId));
 
         require(pool.lastPrice != 0);
@@ -1124,12 +1116,9 @@ contract EchidnaE2E is HelperHyperView, Helper {
     // ******************** Unallocate ********************
     function unallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(
+            id
+        );
 
         // Save pre unallocation state
         HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
@@ -1162,12 +1151,9 @@ contract EchidnaE2E is HelperHyperView, Helper {
     // A user without a position should not be able to unallocate funds
     function unallocate_without_position_should_fail(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(
+            id
+        );
 
         // Save pre unallocation state
         HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
@@ -1175,24 +1161,22 @@ contract EchidnaE2E is HelperHyperView, Helper {
         uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
-        try _hyper.unallocate(poolId, amount) {
+        try _hyper.unallocate(poolId, amount){
             emit AssertionFailed("BUG: User was able to unallocate without prior allocation");
-        } catch {}
-    }
+        }catch {
+        }
 
+    }    
     // A user attempting to unallocate a nonexistent pool should fail
     // A user attempting to unallocate an expired pool should be successful
     // Caller position last timestamp <= block.timestamp, with JIT policy
     // A user should not be able to unallocate more than they own
-    // A user calling allocate then unallocate should succeed
+    // A user calling allocate then unallocate should succeed 
     function allocate_then_unallocate_should_succeed(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(
+            id
+        );
         emit LogUint256("pool id:", uint256(poolId));
 
         require(pool.lastPrice != 0);
@@ -1213,37 +1197,7 @@ contract EchidnaE2E is HelperHyperView, Helper {
         emit LogUint256("delta quote:", deltaQuote);
         emit LogUint256("amount", amount);
 
-        execute_allocate_call(poolId, _asset, _quote, deltaAsset, deltaQuote, amount);
+        execute_allocate_call(poolId,_asset,_quote,deltaAsset,deltaQuote,amount);
         _hyper.unallocate(poolId, amount);
-    }
-
-    // Helper Functions
-
-    function retrieve_random_pool_and_tokens(
-        uint256 id
-    ) private returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 quote, EchidnaERC20 asset) {
-        require(poolIds.length > 0);
-        uint256 random = between(id, 0, poolIds.length);
-
-        pool = getPool(address(_hyper), poolIds[random]);
-        poolId = poolIds[random];
-        HyperPair memory pair = pool.pair;
-        quote = EchidnaERC20(pair.tokenQuote);
-        asset = EchidnaERC20(pair.tokenAsset);
-    }
-
-    function is_created_pool(uint64 id) private returns (bool) {
-        for (uint8 i = 0; i < poolIds.length; i++) {
-            if (poolIds[i] == id) return true;
-        }
-        return false;
-    }
-
-    function get_hyper_tokens(uint256 id1, uint256 id2) private returns (EchidnaERC20 asset, EchidnaERC20 quote) {
-        // This assumes that hyperTokens.length is always >2
-        id1 = between(id1, 0, hyperTokens.length - 1);
-        id2 = between(id2, 0, hyperTokens.length - 1);
-        require(id1 != id2);
-        return (hyperTokens[id1], hyperTokens[id2]);
     }
 }
