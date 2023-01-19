@@ -4,7 +4,9 @@ contract Helper {
 	event LogUint256(string msg, uint256 value);
 	event LogBytes(string msg, bytes value);
 	event LogAddress(string msg, address tkn);
+	event LogBool(string msg, bool value);
 	event LogInt24(string msg,int24 value);
+	event LogInt128(string msg, int128 value);
 
 	int24 constant MAX_TICK = 887272;
 	int24 constant MIN_TICK = -414486;
@@ -56,5 +58,15 @@ contract Helper {
 			b := a
 		}
 	}
-	
+
+	uint24 [] pairIds;
+	function save_pair_id(uint24 pairId) internal {
+		pairIds.push(pairId);
+	}
+	function retrieve_created_pair(uint256 id) internal view returns (uint24 pairId) {
+		require(pairIds.length > 0);
+		id = between(id,0,pairIds.length);
+		return pairIds[id];
+	}		
+
 }
