@@ -73,7 +73,7 @@ library Price {
      * @param prc WAD
      * @param tau seconds
      * @param epsilon seconds
-     * @custom:math P(τ - ε) = ( P(τ)^(√(1 - ε/τ)) / K^2 )e^((1/2)(t^2)(√(τ)√(τ- ε) - (τ - ε)))
+     * @custom:math P(τ - ε) = ( ( P(τ) / K ) ^ ( √(1 - ε/τ) )) (K) (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) ))
      */
     function computePriceWithChangeInTau(
         uint256 stk,
@@ -97,23 +97,23 @@ library Price {
             epsilonYears := sdiv(mul(epsilon, WAD), YEAR) // epsilon * WAD / year = epsilon in years scaled to WAD
         }
 
-        uint256 term_0 = WAD - (epsilonYears.divWadUp(tauYears)); // WAD - ((epsilon * WAD) / tau rounded down), units are WAD - WAD, time units cancel out
-        uint256 term_1 = term_0.sqrt(); // this sqrts WAD, so we end up with SQRT_WAD units
+        uint256 term_0 = WAD - (epsilonYears.divWadUp(tauYears)); // 1 - ε/τ, WAD - ((epsilon * WAD) / tau rounded down), units are WAD - WAD, time units cancel out
+        uint256 term_1 = term_0.sqrt(); // √(1 - ε/τ)), this sqrts WAD, so we end up with SQRT_WAD units
 
-        uint256 term_2 = prc.divWadUp(params.strike); // p(t) / K, both units are already WAD
-        uint256 term_3 = uint256(int256(term_2).powWad(int256(term_1 * SQRT_WAD)));
+        uint256 term_2 = prc.divWadUp(params.strike); // P(t) / K, both units are already WAD
+        uint256 term_3 = uint256(int256(term_2).powWad(int256(term_1 * SQRT_WAD))); // ( P(τ) / K ) ^ ( √(1 - ε/τ) ))
 
         uint256 term_7;
         {
-            uint256 currentTau = tauYears - epsilonYears; // WAD - WAD = WAD
-            uint256 tausSqrt = tauYears.sqrt() * (currentTau).sqrt(); // sqrt(1e18) = 1e9, so 1e9 * 1e9 = 1e18
-            uint256 term_4 = tausSqrt - currentTau; // WAD - WAD = WAD
+            uint256 currentTau = tauYears - epsilonYears; // (τ- ε), WAD - WAD = WAD
+            uint256 tausSqrt = tauYears.sqrt() * (currentTau).sqrt(); // ( √(τ) √(τ- ε) ), sqrt(1e18) = 1e9, so 1e9 * 1e9 = 1e18
+            uint256 term_4 = tausSqrt - currentTau; // ( √(τ) √(τ- ε) - (τ - ε) ), WAD - WAD = WAD
 
             uint256 sigmaWad = convertPercentageToWad(uint256(params.sigma));
 
-            uint256 term_5 = (sigmaWad * sigmaWad) / DOUBLE_WAD; // 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
-            uint256 term_6 = uint256((int256(term_5.mulWadDown(term_4))).expWad()); // exp(WAD * WAD / WAD)
-            term_7 = uint256(params.strike).mulWadDown(term_6); // WAD * WAD / WAD
+            uint256 term_5 = (sigmaWad * sigmaWad) / DOUBLE_WAD; // ( 1 / 2 )(o^2), 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
+            uint256 term_6 = uint256((int256(term_5.mulWadDown(term_4))).expWad()); // (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) )), exp(WAD * WAD / WAD)
+            term_7 = uint256(params.strike).mulWadDown(term_6); // (K) (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) ), WAD * WAD / WAD
         }
 
         uint256 price = term_3.mulWadDown(term_7); // WAD * WAD / WAD = WAD
