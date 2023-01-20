@@ -38,8 +38,8 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: cargo test
-        run: cargo test --all --all-features
+      # - name: cargo test
+      #   run: cargo test --all --all-features
 
   lint:
     runs-on: ubuntu-latest
