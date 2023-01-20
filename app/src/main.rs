@@ -1,8 +1,12 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 // use tokio::*;
 use eyre::Result;
 // use ethers::providers::{Http, Provider};
-use ethers::{abi::Address, prelude::*, providers::{Provider,Middleware}};
+use ethers::{
+    abi::Address,
+    prelude::*,
+    providers::{Middleware, Provider},
+};
 use foundry_contracts::hyper::Hyper;
 
 // Need to get the correct address for the contract
@@ -16,7 +20,6 @@ async fn main() -> Result<()> {
     println!("block: {:#?}", block.unwrap());
     println!("hyper: {:#?}", hyper);
     Ok(())
-
 }
 
 pub async fn get_provider() -> Arc<Provider<Http>> {
