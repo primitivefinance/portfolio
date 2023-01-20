@@ -48,8 +48,8 @@ contract Hyper is IHyper {
     OS.AccountSystem public __account__;
 
     address public immutable WETH;
-    uint256 public getPairNonce;
-    uint256 public getPoolNonce;
+    uint24 public getPairNonce;
+    uint32 public getPoolNonce;
 
     mapping(uint24 => HyperPair) public pairs;
     mapping(uint64 => HyperPool) public pools;
@@ -638,9 +638,7 @@ contract Hyper is IHyper {
         if (!decimalsQuote.isBetween(Assembly.MIN_DECIMALS, Assembly.MAX_DECIMALS))
             revert InvalidDecimals(decimalsQuote);
 
-        unchecked {
-            pairId = uint24(++getPairNonce);
-        }
+        pairId = ++getPairNonce;
 
         getPairId[asset][quote] = pairId; // note: order of tokens matters!
         pairs[pairId] = HyperPair({
@@ -676,7 +674,7 @@ contract Hyper is IHyper {
         bool hasController = pool.controller != address(0);
         if (hasController && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
 
-        uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable todo: fix, possible to set 0 pairId if getPairNonce is 0
+        uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable todo: fix, possible to set 0 pairId if getPairNonce is 0
         pool.pair = pairs[pairNonce];
 
         HyperCurve memory params = HyperCurve({
@@ -691,10 +689,7 @@ contract Hyper is IHyper {
         params.validateParameters();
         pool.params = params;
 
-        uint32 poolNonce;
-        unchecked {
-            poolNonce = uint32(++getPoolNonce);
-        }
+        uint32 poolNonce = ++getPoolNonce;
 
         poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
         if (pools[poolId].exists()) revert PoolExists(); // todo: poolNonce always increments, so this never gets hit, remove

@@ -122,7 +122,9 @@ interface IHyperGetters {
             uint128 tokensOwedReward
         );
 
-    function getPairNonce() external view returns (uint256);
+    function getPairNonce() external view returns (uint24);
+
+    function getPoolNonce() external view returns (uint32);
 
     function getAmounts(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
 
