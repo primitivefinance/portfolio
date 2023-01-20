@@ -34,7 +34,7 @@ contract TestHyperCreate is TestHyperSetup {
             price
         );
         bool success = __revertCatcher__.process(data);
-        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(2));
+        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(__hyperTestingContract__.getPoolNonce()));
 
         HyperPool memory pool = _getPool(hs(), poolId);
         HyperCurve memory actual = pool.params;
@@ -54,7 +54,8 @@ contract TestHyperCreate is TestHyperSetup {
         bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "create failed");
-        assertEq(_getPool(hs(), defaultScenario.poolId + 1).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY);
+        uint64 poolId = Enigma.encodePoolId(uint24(1), false, uint32(__hyperTestingContract__.getPoolNonce()));
+        assertEq(_getPool(hs(), poolId).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY);
     }
 
     function testCreatePoolZeroPriceReverts() public {
@@ -255,6 +256,32 @@ contract TestHyperCreate is TestHyperSetup {
         bool success = __revertCatcher__.process(createData);
         assertTrue(success, "did not create pool");
 
-        poolId = Enigma.encodePoolId(pairId, true, uint32(2));
+        poolId = Enigma.encodePoolId(pairId, true, uint32(__hyperTestingContract__.getPoolNonce()));
+    }
+
+    bytes arithmeticError = abi.encodeWithSelector(0x4e487b71, 0x11); // 0x4e487b71 is Panic(uint256), and 0x11 is the panic code for arithmetic overflow.
+
+    function testCreateAboveMaxPairs_Reverts() public {
+        bytes32 slot = bytes32(uint(5)); // slot is packed so has the pair + pool nonces.
+        vm.store(address(__hyperTestingContract__), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
+        assertEq(__hyperTestingContract__.getPairNonce(), type(uint24).max, "not set to max value");
+        address token = address(new TestERC20("t", "t", 18));
+        bytes memory payload = Enigma.encodeCreatePair(address(defaultScenario.asset), token);
+        vm.expectRevert(arithmeticError);
+        bool success = __revertCatcher__.process(payload);
+        assertTrue(!success, "created a pair at max pairId");
+    }
+
+    function testCreateAboveMaxPools_Reverts() public {
+        bytes32 slot = bytes32(uint(5)); // slot is packed so has the pair + pool nonces.
+        vm.store(address(__hyperTestingContract__), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
+        assertEq(__hyperTestingContract__.getPoolNonce(), type(uint32).max, "not set to max value");
+
+        address token = address(new TestERC20("t", "t", 18));
+        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
+
+        vm.expectRevert(arithmeticError);
+        bool success = __revertCatcher__.process(data);
+        assertTrue(!success, "created a pool at max poolId");
     }
 }

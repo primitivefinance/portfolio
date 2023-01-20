@@ -48,8 +48,8 @@ contract Hyper is IHyper {
     OS.AccountSystem public __account__;
 
     address public immutable WETH;
-    uint256 public getPairNonce;
-    uint256 public getPoolNonce;
+    uint24 public getPairNonce;
+    uint32 public getPoolNonce;
 
     mapping(uint24 => HyperPair) public pairs;
     mapping(uint64 => HyperPool) public pools;
@@ -68,7 +68,25 @@ contract Hyper is IHyper {
         locked = 1;
     }
 
-    /** @dev Used on every external operation that touches tokens. */
+    /**
+     * @dev     
+     * Used on external functions to handle settlement of outstanding token balances.
+     * 
+     * @notice 
+     * Tokens sent to this contract are lost.
+     *
+     * @custom:guide
+     * Step 1. Enter `locked` re-entrancy guard.
+     * Step 2. Validate Hyper's account system has not already been entered.
+     * Step 3. Wrap the entire ether balance of this contract and credit the wrapped ether to the msg.sender account.
+     * Step 4. Enter the re-entrancy guard of Hyper's account system.
+     * Step 5. Execute the function logic.
+     * Step 6. Exit the re-entrancy guard of Hyper's account system.
+     * Step 7. Enter the settlement function, requesting token payments or sending them out to msg.sender.
+     * Step 8. Validate Hyper's account system was settled.
+     * Step 9. Exit interactions modifier.
+     * Step 10. Exit `locked` re-entrancy guard.
+     */
     modifier interactions() {
         if (__account__.prepared) revert InvalidReentrancy();
         __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
@@ -81,6 +99,14 @@ contract Hyper is IHyper {
         if (!__account__.settled) revert InvalidSettlement();
     }
 
+    /**
+     * @dev
+     * Failing to pass a valid WETH contract that implements the `deposit()` function,
+     * will cause all transactions with Hyper to fail once address(this).balance > 0.
+     *
+     * @notice 
+     * Tokens sent to this contract are lost.
+     */
     constructor(address weth) {
         WETH = weth;
         __account__.settled = true;
@@ -190,18 +216,23 @@ contract Hyper is IHyper {
         // interactions modifier does the work.
     }
 
-    // todo: test
     function claim(uint64 poolId, uint deltaAsset, uint deltaQuote) external lock interactions {
         HyperPool memory pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
-        pos.syncPositionFees(pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
-        pos.tokensOwedAsset -= deltaAsset.safeCastTo128();
-        pos.tokensOwedQuote -= deltaQuote.safeCastTo128();
+        uint256 positionLiquidity = pos.freeLiquidity + pos.stakedLiquidity;
+        pos.syncPositionFees(positionLiquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
 
-        if (deltaAsset > 0) _applyCredit(pool.pair.tokenAsset, deltaAsset); // todo: problem, what balance do fees accrue to?
-        if (deltaQuote > 0) _applyCredit(pool.pair.tokenQuote, deltaQuote); // todo: add debit to this contract?
+        // 2^256 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
+        uint256 claimedAssets = deltaAsset == type(uint256).max ? pos.tokensOwedAsset : deltaAsset;
+        uint256 claimedQuotes = deltaQuote == type(uint256).max ? pos.tokensOwedQuote : deltaQuote;
+
+        pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
+        pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
+
+        if (claimedAssets > 0) _applyCredit(pool.pair.tokenAsset, claimedAssets);
+        if (claimedQuotes > 0) _applyCredit(pool.pair.tokenQuote, claimedQuotes);
 
         pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalReward);
         uint128 deltaReward = pos.tokensOwedReward;
@@ -222,9 +253,9 @@ contract Hyper is IHyper {
         emit Collect(
             poolId,
             msg.sender,
-            deltaAsset,
+            claimedAssets,
             pool.pair.tokenAsset,
-            deltaQuote,
+            claimedQuotes,
             pool.pair.tokenQuote,
             deltaReward,
             WETH
@@ -299,8 +330,14 @@ contract Hyper is IHyper {
     function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint feeAsset, uint feeQuote) {
         (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
+        // Positions are broken up into "free" and "staked" liquidity buckets.
+        // The pool accrues fees to the sum of these buckets, so the same fees are earned
+        // for a position with 2 free and 0 staked as a position with 1 free and 1 staked.
+        // The purpose for staking is to access a new fee bucket, the "reward", in addition
+        // to the standard bucket.
+        uint256 positionLiquidity = pos.freeLiquidity + pos.stakedLiquidity;
         (feeAsset, feeQuote) = pos.syncPositionFees(
-            pool.liquidity,
+            positionLiquidity,
             pool.feeGrowthGlobalAsset,
             pool.feeGrowthGlobalQuote
         );
@@ -627,9 +664,7 @@ contract Hyper is IHyper {
         if (!decimalsQuote.isBetween(Assembly.MIN_DECIMALS, Assembly.MAX_DECIMALS))
             revert InvalidDecimals(decimalsQuote);
 
-        unchecked {
-            pairId = uint24(++getPairNonce);
-        }
+        pairId = ++getPairNonce;
 
         getPairId[asset][quote] = pairId; // note: order of tokens matters!
         pairs[pairId] = HyperPair({
@@ -665,7 +700,7 @@ contract Hyper is IHyper {
         bool hasController = pool.controller != address(0);
         if (hasController && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
 
-        uint24 pairNonce = pairId == 0 ? uint24(getPairNonce) : pairId; // magic variable todo: fix, possible to set 0 pairId if getPairNonce is 0
+        uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable todo: fix, possible to set 0 pairId if getPairNonce is 0
         pool.pair = pairs[pairNonce];
 
         HyperCurve memory params = HyperCurve({
@@ -680,10 +715,7 @@ contract Hyper is IHyper {
         params.validateParameters();
         pool.params = params;
 
-        uint32 poolNonce;
-        unchecked {
-            poolNonce = uint32(++getPoolNonce);
-        }
+        uint32 poolNonce = ++getPoolNonce;
 
         poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
         if (pools[poolId].exists()) revert PoolExists(); // todo: poolNonce always increments, so this never gets hit, remove

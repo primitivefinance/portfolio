@@ -125,4 +125,30 @@ contract TestHyperSwap is TestHyperSetup {
         assertEq(remainder, 0, "expected-output");
         assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
     }
+
+    /// todo: Fix this test! view this plot: `yarn plot --strike 1 --vol 1 --tau 365 --price 1 --epsilon 180 --swapAssetIn 0.1`
+    /* function testSwap_small_tau() public allocateFirst {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
+        customWarp(pool.params.maturity() - 100);
+
+        pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
+        uint maxInput = getMaxSwapAssetInWad(pool);
+        (uint out, ) = pool.getAmountOut(true, maxInput - 1, 0);
+
+        uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        (uint output, uint remainder) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            true,
+            maxInput - 1,
+            0 // limit
+        );
+
+        pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+
+        assertEq(remainder, 0, "expected-output");
+        assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
+    } */
 }

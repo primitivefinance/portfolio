@@ -9,10 +9,11 @@ import {
   computeMarginalPriceQuoteIn,
   getAmounts,
   computeMarginalPriceAssetIn,
+  computePriceWithChangeInTau,
 } from './swapMath'
 import type { Parameters } from './swapMath'
 
-export function plotReservesAndPricePoint(parameters: Parameters): Plot[] {
+export function plotReservesAndPricePoint(parameters: Parameters, names?: string[]): Plot[] {
   let _t = years(parameters.tau)
   let R_x = getXWithPrice(parameters.price, parameters.strike, parameters.vol, _t)
   let R_y = getYWithX(R_x, parameters.strike, parameters.vol, _t, 0)
@@ -23,7 +24,7 @@ export function plotReservesAndPricePoint(parameters: Parameters): Plot[] {
       y: [R_y],
       mode: 'text+markers',
       type: 'scatter',
-      name: 'Reserves',
+      name: names?.[0] ?? 'Reserves',
       text: [`(${R_x.toFixed(4)},${R_y.toFixed(4)})`],
       textfont: {
         family: 'Times New Roman',
@@ -35,7 +36,7 @@ export function plotReservesAndPricePoint(parameters: Parameters): Plot[] {
       y: [P_0],
       mode: 'text+markers',
       type: 'scatter',
-      name: 'Reported Price',
+      name: names?.[1] ?? 'Reported Price',
       text: [`(${R_x.toFixed(4)},${P_0.toFixed(4)})`],
       textfont: {
         family: 'Times New Roman',
@@ -101,6 +102,72 @@ export function plotMarginalPriceAssetIn(parameters: Parameters): Plot {
   }
 }
 
+function plotTauChangeInCurve(prevParams: Parameters, name: string): Plot[] {
+  if (!prevParams.epsilon) return []
+  let price = computePriceWithChangeInTau(
+    prevParams.strike,
+    prevParams.vol,
+    prevParams.price,
+    prevParams.tau,
+    prevParams.epsilon
+  )
+
+  let _tau_initial = years(prevParams.tau)
+  let R_x_initial = getXWithPrice(prevParams.price, prevParams.strike, prevParams.vol, _tau_initial)
+  let R_y_initial = getYWithX(R_x_initial, prevParams.strike, prevParams.vol, _tau_initial, 0)
+  let parameters = { ...prevParams, price, tau: prevParams.tau - prevParams.epsilon }
+
+  let _tau_post = years(parameters.tau)
+  let R_x_post = getXWithPrice(parameters.price, parameters.strike, parameters.vol, _tau_post)
+  let R_y_post = getYWithX(R_x_post, parameters.strike, parameters.vol, _tau_post, 0)
+  let invariant = R_y_initial - R_y_post
+  console.log('invariant', invariant)
+
+  let swapIn = {}
+  if (parameters.swapAssetIn) {
+    let R_x_trade = R_x_post + parameters.swapAssetIn
+    let R_x_withFee = R_x_post + parameters.swapAssetIn * 0.8
+    let R_y_trade = getYWithX(R_x_withFee, prevParams.strike, prevParams.vol, _tau_post, invariant)
+    swapIn = {
+      x: [R_x_trade],
+      y: [R_y_trade],
+      mode: 'text+markers',
+      type: 'scatter',
+      name: 'Res. swap in asset',
+      text: [`(${R_x_trade.toFixed(4)},${R_y_trade.toFixed(4)})`],
+      textfont: {
+        family: 'Times New Roman',
+      },
+      textposition: 'bottom center',
+    }
+  }
+
+  let xArray = new Array(101)
+  let yArray = new Array(101)
+  let priceArray = new Array(101)
+  let _t = years(parameters.tau)
+  for (let i = 0; i < yArray.length; i++) {
+    let _x = i / (yArray.length - 1) // between 0 and 1, so we divide by each step!
+    let _y = getYWithX(_x, parameters.strike, parameters.vol, _t, 0)
+    xArray[i] = _x
+    yArray[i] = _y
+    priceArray[i] = getPriceWithX(_x, parameters.strike, parameters.vol, _t)
+  }
+
+  let plot: Plot[] = []
+  plot.push({
+    x: xArray,
+    y: yArray,
+    type: 'scatter',
+    name,
+  })
+  plot.push(...plotReservesAndPricePoint(parameters, ['Res. epsilon', 'Rep. Price epsilon']))
+
+  if ((swapIn as any)?.x) plot.push(swapIn)
+
+  return plot
+}
+
 export function plotFromParameters(parameters: Parameters, LOG_ASCII = false) {
   // required parameters
   if (parameters['price'] === 0) throw new Error('missing --price argument')
@@ -148,6 +215,7 @@ export function plotFromParameters(parameters: Parameters, LOG_ASCII = false) {
         name: 'Reported Price',
       },
       ...plotReservesAndPricePoint(parameters),
+      ...plotTauChangeInCurve(parameters, 'epsilon'),
     ]
 
     if (parameters['swapAssetIn']) data.push(plotMarginalPriceAssetIn(parameters))

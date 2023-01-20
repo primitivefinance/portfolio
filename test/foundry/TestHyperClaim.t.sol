@@ -3,6 +3,20 @@ pragma solidity ^0.8.0;
 
 import "./setup/TestHyperSetup.sol";
 
+/**
+ @custom:docs 
+ 
+ Fee Buckets and Claiming
+    - Users allocate tokens to pools which issue liquidity represent their proportion of deposit.
+    - Users swap against the pool and pay the swap fee. Absolute fees per liquidity unit is tracked in the `feeGrowth` variables.
+    - Users can stake liquidity. Staking liquidity will increment their position's staked liquidity and decrement their "free liquidity".
+    - Staking liquidity does not alter pool liquidity. The `liquidity` variable of each pool is the total supply of liquidity, including staked.
+    - Fee growth is always based on `liquidity`, which is `freeLiquidity + stakedLiquidity`. 
+    - Positions liquidity is just split into `free` and `staked`. 
+    - The sum of all position's sums of free and staked liquidity is equal to the pool liquidity. 
+    - Fees accrue both to free and staked liquidity, because the pool treats it all as global liquidity.
+    - Positions sync their fees by computing the sum of their free and staked liquidity multiplied by the fee per liquidity growth variable.
+ */
 contract TestHyperClaim is TestHyperSetup {
     using FixedPointMathLib for uint;
     using Price for Price.RMM;
@@ -73,7 +87,7 @@ contract TestHyperClaim is TestHyperSetup {
         // Rewards only accrue to controlled pools
         createControlledPool();
 
-        TestScenario memory scenario = scenarios[1]; // assumes it was the second one...
+        TestScenario memory scenario = _scenario_controlled;
         assertTrue(
             keccak256(abi.encodePacked(scenario.label)) == keccak256(abi.encodePacked("Controlled")),
             "not controlled?"
@@ -144,5 +158,43 @@ contract TestHyperClaim is TestHyperSetup {
         // todo: fix. Price deviation trick leaves dust, there should be no dust! assertEq(nextReserve, 0, "reserve-not-zero");
         assertTrue(nextBalance > prevBalance, "no fee claimed");
         assertTrue(nextReserve < prevReserve, "no fee removed");
+    }
+
+    /// @custom:tob TOB-HYPR-7, Exploit Scenario 1
+    function testClaim_small_liquidity_does_not_steal_fees() public {
+        uint startLiquidity = 10_000;
+        __hyperTestingContract__.allocate(_scenario_18_18.poolId, startLiquidity);
+
+        address eve = address(0x4215);
+        deal(address(_scenario_18_18.asset), eve, 10000);
+        deal(address(_scenario_18_18.quote), eve, 100000);
+        vm.prank(eve);
+        _scenario_18_18.asset.approve(address(__hyperTestingContract__), 10000);
+        vm.prank(eve);
+        _scenario_18_18.quote.approve(address(__hyperTestingContract__), 100000);
+
+        // eve provides minimal liquidity to the pool
+        vm.prank(eve);
+        __hyperTestingContract__.allocate(_scenario_18_18.poolId, startLiquidity / 5); // 20% of pool, eve = 2000, total = 2000 + 10000
+
+        // eve waits for some swaps to happen. basicSwap will sell assets and increment asset fee growth.
+        __hyperTestingContract__.swap(_scenario_18_18.poolId, true, 1500, 1); // trade in 1500 * 1% fee = 15 / 12_000 = 0.00125 fee growth per liquidity
+
+        // save the total fee growth for the asset per liquidity.
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId);
+        uint totalLiquidity = pool.liquidity; // 12_000
+        uint totalFeeAssetPerLiquidity = pool.feeGrowthGlobalAsset; // 0.00125
+
+        // eve claims earned fees, which should be proportional to her share of the liquidity
+        vm.prank(eve);
+        __hyperTestingContract__.claim(_scenario_18_18.poolId, type(uint256).max, type(uint256).max);
+
+        uint evesShare = startLiquidity / 5; // 2000
+        uint evesClaimedFees = _getBalance(hx(), eve, _scenario_18_18.asset); // 2_000 / 12_000 = ~16% of 0.00125 fee growth = 0.0002 in fees
+
+        // check to make sure eve did not receive more than they were entitled to
+        assertTrue(evesClaimedFees != 0, "eve-zero-fees");
+        assertEq(evesClaimedFees, 2, "unexpected-fees"); // 2_000 * 0.00125 = 2.5, rounded down to integer of 2
+        assertEq((evesShare * totalFeeAssetPerLiquidity) / 1 ether, evesClaimedFees, "incorrect-fee");
     }
 }
