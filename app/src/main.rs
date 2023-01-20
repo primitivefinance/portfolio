@@ -28,9 +28,3 @@ pub async fn get_provider() -> Arc<Provider<Http>> {
             .unwrap(),
     )
 }
-// pub async fn get_provider() -> Arc<Provider<Http>> {
-//     Arc::new(
-//         Provider::try_from("http://44.204.200.97:8545/")
-//             .unwrap(),
-//     )
-// }
