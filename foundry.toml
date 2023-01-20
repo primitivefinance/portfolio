@@ -8,9 +8,7 @@ cache = false # !important! breaks echidna if cache = true.
 remappings = [
     'forge-std/=lib/forge-std/src/',
     'solmate/=lib/solmate/src/',
-    'solstat/=lib/solstat/src/',
-    'contracts/=contracts/',
-    'lib/=lib/'
+    'solstat/=lib/solstat/src/'
 ]
 
 [profile.optimized] # uses via_ir and optimizer
@@ -37,6 +35,7 @@ test = 'test/crytic' # not default
 [rpc_endpoints]
 primitive = "http://${PRIMITIVE_RPC}:8545"
 ganache = "http://127.0.0.1:8546"
+prod = "${MAINNET_URL}"
 
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config

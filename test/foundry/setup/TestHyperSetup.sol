@@ -38,6 +38,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     TestERC20 public __usdc__;
     TestERC20 public __token_8__;
     TestERC20 public __token_18__;
+    TestERC20 public __token_18__2;
     TestERC20 public __badToken__;
 
     address[] public __contracts__;
@@ -45,6 +46,8 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     address[] public __tokens__;
 
     TestScenario public defaultScenario;
+    TestScenario public _scenario_18_18;
+    TestScenario public _scenario_controlled;
     TestScenario[] public scenarios;
 
     modifier postTestInvariantChecks() virtual {
@@ -91,10 +94,12 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         __usdc__ = new TestERC20("USD Coin", "USDC", 6);
         __token_8__ = new TestERC20("8 Decimals", "8DEC", 8);
         __token_18__ = new TestERC20("18 Decimals", "18DEC", 18);
+        __token_18__2 = new TestERC20("18 Decimals #2", "18DEC_2", 18);
         __badToken__ = new TestERC20("Non-standard ERC20", "BAD", 18); // TODO: Add proper bad token.
         __tokens__.push(address(__usdc__));
         __tokens__.push(address(__token_8__));
         __tokens__.push(address(__token_18__));
+        __tokens__.push(address(__token_18__2));
         __tokens__.push(address(__badToken__));
 
         setLabels();
@@ -138,9 +143,38 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         // Create default scenario and add to all scenarios.
         defaultScenario = TestScenario(__token_18__, __usdc__, FIRST_POOL, "Default");
         scenarios.push(defaultScenario);
+
+        data = createPool(
+            address(__token_18__),
+            address(__token_18__2),
+            address(0),
+            uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
+            uint16(1e4 - DEFAULT_GAMMA),
+            uint16(DEFAULT_SIGMA),
+            uint16(DEFAULT_DURATION_DAYS),
+            DEFAULT_JIT,
+            DEFAULT_TICK,
+            DEFAULT_PRICE
+        );
+
+        success = __revertCatcher__.jumpProcess(data);
+        assertTrue(success, "__revertCatcher__ call failed");
+
+        _scenario_18_18 = TestScenario(
+            __token_18__,
+            __token_18__2,
+            Enigma.encodePoolId(
+                uint24(__hyperTestingContract__.getPairNonce()),
+                false,
+                uint32(__hyperTestingContract__.getPoolNonce())
+            ),
+            "18-18 decimal pair"
+        );
+        scenarios.push(_scenario_18_18);
     }
 
     uint64 public constant FIRST_POOL = 0x0000010000000001;
+    uint64 public constant SECOND_POOL = 0x0000020000000002;
     uint64 public constant SECOND_POOL_FIRST_PAIR = 0x0000010000000002;
 
     /** @dev Requires tokens to be spent and spenders to be approved. */
@@ -207,7 +241,8 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         // assumes second pool has not been created...
         // can be fixed by getting pool nonce and encoding pool id.
         uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(__hyperTestingContract__.getPoolNonce()));
-        scenarios.push(TestScenario(__token_18__, __usdc__, poolId, "Controlled"));
+        _scenario_controlled = TestScenario(__token_18__, __usdc__, poolId, "Controlled");
+        scenarios.push(_scenario_controlled);
     }
 
     function basicSwap() internal {
@@ -265,12 +300,12 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         );
     }
 
-    function defaultPool() internal returns (HyperPool memory) {
+    function defaultPool() internal view returns (HyperPool memory) {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         return pool;
     }
 
-    function defaultRevertCatcherPosition() internal returns (HyperPosition memory) {
+    function defaultRevertCatcherPosition() internal view returns (HyperPosition memory) {
         HyperPosition memory pos = getPosition(
             address(__hyperTestingContract__),
             address(__revertCatcher__),
@@ -279,7 +314,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         return pos;
     }
 
-    function defaultPosition() internal returns (HyperPosition memory) {
+    function defaultPosition() internal view returns (HyperPosition memory) {
         HyperPosition memory pos = getPosition(
             address(__hyperTestingContract__),
             address(this),

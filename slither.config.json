@@ -1,0 +1,4 @@
+{
+	"no_fail": true,
+	"compile_force_framework": "foundry"
+}

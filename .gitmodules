@@ -8,4 +8,4 @@
 [submodule "lib/solstat"]
 	path = lib/solstat
 	url = https://github.com/primitivefinance/solstat
-	branch = beta-v0.0.1
+	branch = main

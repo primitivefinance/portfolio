@@ -1,28 +1,50 @@
 import ethers, { BigNumber, BigNumberish } from 'ethers'
 import * as instructions from './instructions'
 
+type GetFactory = (signer: ethers.Signer) => Promise<ethers.ContractFactory>
+
 export default class HyperSDK {
   /** Ethers signer. */
-  public signer: ethers.Signer
+  public _signer: ethers.Signer
   /** Ethers factory for the Hyper, Decompiler, contract. */
-  public getHyperFactory: (signer: ethers.Signer) => Promise<ethers.ContractFactory>
+  public _getHyperFactory: (signer: ethers.Signer) => Promise<ethers.ContractFactory>
   /** Ethers factory for the Forwarder contract. */
-  public getForwarderFactory: (signer: ethers.Signer) => Promise<ethers.ContractFactory>
+  public _getForwarderFactory: (signer: ethers.Signer) => Promise<ethers.ContractFactory>
   /** Hyper protocol contract instance. */
   public instance: ethers.Contract | undefined
   /** An intermediary smart contract that forwards the data to a designated Hyper protocol caller. */
   public forwarder: ethers.Contract | undefined
 
-  constructor(
-    signer: ethers.Signer,
-    getHyperFactory: (signer: ethers.Signer) => Promise<ethers.ContractFactory>,
-    getForwarderFactory: (signer: ethers.Signer) => Promise<ethers.ContractFactory>
-  ) {
-    this.signer = signer
-    this.getHyperFactory = getHyperFactory
-    this.getForwarderFactory = getForwarderFactory
+  constructor(signer: ethers.Signer, getHyperFactory: GetFactory, getForwarderFactory: GetFactory) {
+    this._signer = signer
+    this._getHyperFactory = getHyperFactory
+    this._getForwarderFactory = getForwarderFactory
     this.instance = undefined
     this.forwarder = undefined
+  }
+
+  get signer(): ethers.Signer {
+    return this._signer
+  }
+
+  set signer(x: ethers.Signer) {
+    this._signer = x
+  }
+
+  get getHyperFactory(): GetFactory {
+    return this._getHyperFactory
+  }
+
+  set getHyperFactory(x: GetFactory) {
+    this._getHyperFactory = x
+  }
+
+  get getForwarderFactory(): GetFactory {
+    return this._getForwarderFactory
+  }
+
+  set getForwarderFactory(x: GetFactory) {
+    this._getForwarderFactory = x
   }
 
   /** Deploys the Hyper protocol and forwarder contract. */
@@ -42,18 +64,29 @@ export default class HyperSDK {
   createPool(
     asset: string,
     quote: string,
-    strike: BigNumber,
-    sigma: number,
-    maturity: number,
-    fee: number,
+    controller: string,
     priorityFee: number,
+    fee: number,
+    volatility: number,
+    duration: number,
+    jit: number,
+    maxTick: number,
     price: BigNumber
   ): Promise<any> {
     const magicVariable = 0 // Used in this jump instructions set to reference the recently created pair and curve.
     let { bytes: pairData } = instructions.encodeCreatePair(asset, quote)
-    let { bytes: curveData } = instructions.encodeCreateCurve(BigNumber.from(strike), sigma, maturity, fee, priorityFee)
-    let { bytes: poolData } = instructions.encodeCreatePool(magicVariable, magicVariable, price)
-    let { hex: data } = instructions.encodeJumpInstruction([pairData, curveData, poolData])
+    let { bytes: poolData } = instructions.encodeCreatePool(
+      magicVariable,
+      controller,
+      priorityFee,
+      fee,
+      volatility,
+      duration,
+      jit,
+      maxTick,
+      price
+    )
+    let { hex: data } = instructions.encodeJumpInstruction([pairData, poolData])
     return this.forward(data)
   }
 
