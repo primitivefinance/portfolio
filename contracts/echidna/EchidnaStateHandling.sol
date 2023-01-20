@@ -39,27 +39,7 @@ contract EchidnaStateHandling is Helper{
         poolIds.push(id);
     }
 
-    function retrieve_random_pool_and_tokens(uint256 id)
-        private
-        view
-        returns (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 quote,
-            EchidnaERC20 asset
-        )
-    {
-        require(poolIds.length > 0);
-        uint256 random = between(id, 0, poolIds.length);
-
-        pool = getPool(address(_hyper), poolIds[random]);
-        poolId = poolIds[random];
-        HyperPair memory pair = pool.pair;
-        quote = EchidnaERC20(pair.tokenQuote);
-        asset = EchidnaERC20(pair.tokenAsset);
-    }
-
-    function is_created_pool(uint64 id) private view returns (bool) {
+    function is_created_pool(uint64 id) internal view returns (bool) {
         for (uint8 i = 0; i < poolIds.length; i++) {
             if (poolIds[i] == id) return true;
         }

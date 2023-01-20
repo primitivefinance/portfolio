@@ -155,6 +155,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId = poolIds[i];
 
             HyperPool memory pool = getPool(address(_hyper), poolId);
+            emit LogUint256("last timestamp",uint256(pool.lastTimestamp));
 
             if (pool.lastPrice != 0) {
                 emit LogUint256("pool's last price", pool.lastPrice);
@@ -313,6 +314,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
         require(asset.decimals() >= 6 && asset.decimals() <= 18);
         require(quote.decimals() >= 6 && quote.decimals() <= 18);
+        require(asset != quote);
         // require that this pair ID does not exist yet
         if (_hyper.getPairId(address(asset), address(quote)) != 0) {
             return;
@@ -373,7 +375,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
 
     function create_pair_with_more_than_max_decimals_should_fail(uint256 decimals) public {
-        decimals = uint8(between(decimals, 19, type(uint64).max));
+        decimals = uint8(between(decimals, 19, type(uint8).max));
         EchidnaERC20 testToken = create_token("Create more than max decimals fail", "CMTMF", uint8(decimals));
         EchidnaERC20 quote = create_token("Create more than max decimals fail quote", "CMTMF2", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(testToken), address(quote));
@@ -385,14 +387,14 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     // Create a non controlled pool (controller address is 0) with default pair
     // Note: This function can be extended to choose from any created pair and create a pool on top of it
     function create_non_controlled_pool(
-        uint256 pairId,
+        uint256 id,
         uint16 fee,
         int24 maxTick,
         uint16 volatility,
         uint16 duration,
         uint128 price
     ) public {
-        uint24 pairId = retrieve_created_pair(uint256(pairId));
+        uint24 pairId = retrieve_created_pair(uint256(id));
         {
             (, fee, maxTick, volatility, duration, , price) = clam_safe_create_bounds(
                 0,
@@ -584,10 +586,15 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         pool = getPool(address(_hyper), poolId);
         if (!pool.exists()) {
             emit AssertionFailed("BUG: Pool should return true on exists after being created.");
-        }
+        }     
 
         // save pools in Echidna
-        save_pool_id(poolId);
+        save_pool_id(poolId);        
+    }
+    function check_decoding_pool_id(uint64 _poolId, uint24 _pairId, uint8 _isMutable, uint32 _poolNonce) private {
+
+        (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) = ProcessingLib.decodePoolId([_poolId,_pairId,_isMutable,_poolNonce]);
+        
     }
 
     // ******************** Change Pool Parameters ********************
@@ -1046,7 +1053,6 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
     function allocate_with_non_existent_pool_should_fail(
         uint256 id,
-        uint64 poolId,
         uint256 deltaLiquidity
     ) public {
         (HyperPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(
@@ -1200,4 +1206,24 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         execute_allocate_call(poolId,_asset,_quote,deltaAsset,deltaQuote,amount);
         _hyper.unallocate(poolId, amount);
     }
+
+    function retrieve_random_pool_and_tokens(uint256 id)
+        private
+        view
+        returns (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 quote,
+            EchidnaERC20 asset
+        )
+    {
+        require(poolIds.length > 0);
+        uint256 random = between(id, 0, poolIds.length-1);
+
+        pool = getPool(address(_hyper), poolIds[random]);
+        poolId = poolIds[random];
+        HyperPair memory pair = pool.pair;
+        quote = EchidnaERC20(pair.tokenQuote);
+        asset = EchidnaERC20(pair.tokenAsset);
+    }    
 }
