@@ -9,10 +9,12 @@ use foundry_contracts::hyper::Hyper;
 const FACTORY: &str = "0x1F98431c8aD98523631AE4a59f267346ea31F984";
 #[tokio::main]
 async fn main() -> Result<()> {
-    let provider: Arc<Provider<Http>> = get_provider().await;
+    let provider: std::sync::Arc<Provider<Http>> = get_provider().await;
     let hyper_address = FACTORY.parse::<Address>().unwrap();
-    let hyper = Hyper::new(hyper_address, provider);
-    // let call = hyper.get_version().call().await?;
+    let hyper = Hyper::new(hyper_address, provider.clone());
+    let block = provider.get_block(0).await?;
+    println!("block: {:#?}", block.unwrap());
+    println!("hyper: {:#?}", hyper);
     Ok(())
 
 }
@@ -23,3 +25,9 @@ pub async fn get_provider() -> Arc<Provider<Http>> {
             .unwrap(),
     )
 }
+// pub async fn get_provider() -> Arc<Provider<Http>> {
+//     Arc::new(
+//         Provider::try_from("http://44.204.200.97:8545/")
+//             .unwrap(),
+//     )
+// }
