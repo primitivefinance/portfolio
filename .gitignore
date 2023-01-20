@@ -34,4 +34,6 @@ lcov.info
 # echidna
 crytic-export/
 
+# app
+app/target/
 
