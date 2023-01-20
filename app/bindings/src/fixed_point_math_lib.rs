@@ -5,33 +5,31 @@ pub mod fixed_point_math_lib {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///FixedPointMathLib was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///FixedPointMathLib was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[]";
     /// The parsed JSON-ABI of the contract.
-    pub static FIXEDPOINTMATHLIB_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
-    });
+    pub static FIXEDPOINTMATHLIB_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     /// Bytecode of the #name contract
-    pub static FIXEDPOINTMATHLIB_BYTECODE: ::ethers::contract::Lazy<
-        ::ethers::core::types::Bytes,
-    > = ::ethers::contract::Lazy::new(|| {
-        "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea26469706673582212203feab80a377677417fe7962370f62773a6ba2dfb523666580983e28ac1b4b9b064736f6c634300080d0033"
+    pub static FIXEDPOINTMATHLIB_BYTECODE: ::ethers::contract::Lazy<::ethers::core::types::Bytes> =
+        ::ethers::contract::Lazy::new(|| {
+            "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea26469706673582212203feab80a377677417fe7962370f62773a6ba2dfb523666580983e28ac1b4b9b064736f6c634300080d0033"
             .parse()
             .expect("invalid bytecode")
-    });
+        });
     pub struct FixedPointMathLib<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for FixedPointMathLib<M> {
         fn clone(&self) -> Self {
@@ -46,7 +44,9 @@ pub mod fixed_point_math_lib {
     }
     impl<M> std::fmt::Debug for FixedPointMathLib<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(FixedPointMathLib)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(FixedPointMathLib))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> FixedPointMathLib<M> {
@@ -57,13 +57,11 @@ pub mod fixed_point_math_lib {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    FIXEDPOINTMATHLIB_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                FIXEDPOINTMATHLIB_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -106,7 +104,8 @@ pub mod fixed_point_math_lib {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for FixedPointMathLib<M> {
+        for FixedPointMathLib<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }

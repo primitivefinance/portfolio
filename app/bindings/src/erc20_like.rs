@@ -5,22 +5,24 @@ pub mod erc20_like {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///ERC20Like was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///ERC20Like was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"balanceOf\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static ERC20LIKE_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static ERC20LIKE_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     pub struct ERC20Like<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for ERC20Like<M> {
         fn clone(&self) -> Self {
@@ -35,7 +37,9 @@ pub mod erc20_like {
     }
     impl<M> std::fmt::Debug for ERC20Like<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(ERC20Like)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(ERC20Like))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> ERC20Like<M> {
@@ -46,13 +50,11 @@ pub mod erc20_like {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    ERC20LIKE_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                ERC20LIKE_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `balanceOf` (0x70a08231) function
         pub fn balance_of(
@@ -64,8 +66,7 @@ pub mod erc20_like {
                 .expect("method not found (this should never happen)")
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for ERC20Like<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for ERC20Like<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -78,8 +79,8 @@ pub mod erc20_like {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "balanceOf", abi = "balanceOf(address)")]
     pub struct BalanceOfCall(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `balanceOf` function with signature `balanceOf(address)` and selector `0x70a08231`
@@ -90,7 +91,7 @@ pub mod erc20_like {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct BalanceOfReturn(pub ::ethers::core::types::U256);
 }

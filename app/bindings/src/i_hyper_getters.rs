@@ -5,23 +5,25 @@ pub mod i_hyper_getters {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///IHyperGetters was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    pub use super::super::shared_types::*;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
-    pub use super::super::shared_types::*;
+    ///IHyperGetters was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"bool\",\"name\":\"sellAsset\",\"type\":\"bool\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amountIn\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getAmountOut\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getAmounts\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"deltaAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"deltaQuote\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getLatestPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"int128\",\"name\":\"deltaLiquidity\",\"type\":\"int128\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getLiquidityDeltas\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"deltaAsset\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"deltaQuote\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"deltaAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"deltaQuote\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getMaxLiquidity\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"deltaLiquidity\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getNetBalance\",\"outputs\":[{\"internalType\":\"int256\",\"name\":\"\",\"type\":\"int256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getPairNonce\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getReserve\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getVirtualReserves\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"deltaAsset\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"deltaQuote\",\"type\":\"uint128\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint24\",\"name\":\"pairId\",\"type\":\"uint24\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"pairs\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"tokenAsset\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsAsset\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"tokenQuote\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsQuote\",\"type\":\"uint8\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"pools\",\"outputs\":[{\"internalType\":\"int24\",\"name\":\"lastTick\",\"type\":\"int24\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"lastTimestamp\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"controller\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalReward\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalQuote\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"lastPrice\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"liquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"stakedLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"int128\",\"name\":\"stakedLiquidityDelta\",\"type\":\"int128\",\"components\":[]},{\"internalType\":\"struct HyperCurve\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"int24\",\"name\":\"maxTick\",\"type\":\"int24\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"jit\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"fee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"duration\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"volatility\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"priorityFee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"createdAt\",\"type\":\"uint32\",\"components\":[]}]},{\"internalType\":\"struct HyperPair\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"address\",\"name\":\"tokenAsset\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsAsset\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"tokenQuote\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsQuote\",\"type\":\"uint8\",\"components\":[]}]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"positions\",\"outputs\":[{\"internalType\":\"uint128\",\"name\":\"freeLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"stakedLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"lastTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"stakeTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"unstakeTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthRewardLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthAssetLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthQuoteLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedAsset\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedQuote\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedReward\",\"type\":\"uint128\",\"components\":[]}]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static IHYPERGETTERS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static IHYPERGETTERS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     pub struct IHyperGetters<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for IHyperGetters<M> {
         fn clone(&self) -> Self {
@@ -36,7 +38,9 @@ pub mod i_hyper_getters {
     }
     impl<M> std::fmt::Debug for IHyperGetters<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(IHyperGetters)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(IHyperGetters))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> IHyperGetters<M> {
@@ -47,13 +51,11 @@ pub mod i_hyper_getters {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    IHYPERGETTERS_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                IHYPERGETTERS_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `getAmountOut` (0x7dae4890) function
         pub fn get_amount_out(
@@ -159,7 +161,12 @@ pub mod i_hyper_getters {
             pair_id: u32,
         ) -> ::ethers::contract::builders::ContractCall<
             M,
-            (::ethers::core::types::Address, u8, ::ethers::core::types::Address, u8),
+            (
+                ::ethers::core::types::Address,
+                u8,
+                ::ethers::core::types::Address,
+                u8,
+            ),
         > {
             self.0
                 .method_hash([94, 71, 102, 60], pair_id)
@@ -217,7 +224,8 @@ pub mod i_hyper_getters {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for IHyperGetters<M> {
+        for IHyperGetters<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -230,8 +238,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getAmountOut", abi = "getAmountOut(uint64,bool,uint256)")]
     pub struct GetAmountOutCall {
         pub pool_id: u64,
@@ -246,8 +254,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getAmounts", abi = "getAmounts(uint64)")]
     pub struct GetAmountsCall {
         pub pool_id: u64,
@@ -260,8 +268,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getBalance", abi = "getBalance(address,address)")]
     pub struct GetBalanceCall {
         pub owner: ::ethers::core::types::Address,
@@ -275,8 +283,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getLatestPrice", abi = "getLatestPrice(uint64)")]
     pub struct GetLatestPriceCall {
         pub pool_id: u64,
@@ -289,8 +297,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getLiquidityDeltas", abi = "getLiquidityDeltas(uint64,int128)")]
     pub struct GetLiquidityDeltasCall {
         pub pool_id: u64,
@@ -304,9 +312,12 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
-    #[ethcall(name = "getMaxLiquidity", abi = "getMaxLiquidity(uint64,uint256,uint256)")]
+    #[ethcall(
+        name = "getMaxLiquidity",
+        abi = "getMaxLiquidity(uint64,uint256,uint256)"
+    )]
     pub struct GetMaxLiquidityCall {
         pub pool_id: u64,
         pub delta_asset: ::ethers::core::types::U256,
@@ -320,8 +331,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getNetBalance", abi = "getNetBalance(address)")]
     pub struct GetNetBalanceCall {
         pub token: ::ethers::core::types::Address,
@@ -334,8 +345,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getPairNonce", abi = "getPairNonce()")]
     pub struct GetPairNonceCall;
     ///Container type for all input parameters for the `getReserve` function with signature `getReserve(address)` and selector `0xc9a396e9`
@@ -346,8 +357,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getReserve", abi = "getReserve(address)")]
     pub struct GetReserveCall {
         pub token: ::ethers::core::types::Address,
@@ -360,8 +371,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getVirtualReserves", abi = "getVirtualReserves(uint64)")]
     pub struct GetVirtualReservesCall {
         pub pool_id: u64,
@@ -374,8 +385,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "pairs", abi = "pairs(uint24)")]
     pub struct PairsCall {
         pub pair_id: u32,
@@ -388,8 +399,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "pools", abi = "pools(uint64)")]
     pub struct PoolsCall {
         pub pool_id: u64,
@@ -402,8 +413,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "positions", abi = "positions(address,uint64)")]
     pub struct PositionsCall {
         pub owner: ::ethers::core::types::Address,
@@ -429,78 +440,69 @@ pub mod i_hyper_getters {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <GetAmountOutCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetAmountOutCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetAmountOut(decoded));
             }
-            if let Ok(decoded)
-                = <GetAmountsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetAmountsCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetAmounts(decoded));
             }
-            if let Ok(decoded)
-                = <GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetBalance(decoded));
             }
-            if let Ok(decoded)
-                = <GetLatestPriceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetLatestPriceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetLatestPrice(decoded));
             }
-            if let Ok(decoded)
-                = <GetLiquidityDeltasCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetLiquidityDeltasCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetLiquidityDeltas(decoded));
             }
-            if let Ok(decoded)
-                = <GetMaxLiquidityCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetMaxLiquidityCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetMaxLiquidity(decoded));
             }
-            if let Ok(decoded)
-                = <GetNetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetNetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetNetBalance(decoded));
             }
-            if let Ok(decoded)
-                = <GetPairNonceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetPairNonceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetPairNonce(decoded));
             }
-            if let Ok(decoded)
-                = <GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetReserve(decoded));
             }
-            if let Ok(decoded)
-                = <GetVirtualReservesCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetVirtualReservesCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::GetVirtualReserves(decoded));
             }
-            if let Ok(decoded)
-                = <PairsCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <PairsCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::Pairs(decoded));
             }
-            if let Ok(decoded)
-                = <PoolsCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <PoolsCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::Pools(decoded));
             }
-            if let Ok(decoded)
-                = <PositionsCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <PositionsCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperGettersCalls::Positions(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -617,8 +619,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetAmountOutReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getAmounts` function with signature `getAmounts(uint64)` and selector `0x9e5e2e29`
     #[derive(
@@ -628,8 +630,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetAmountsReturn {
         pub delta_asset: ::ethers::core::types::U256,
         pub delta_quote: ::ethers::core::types::U256,
@@ -642,8 +644,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetBalanceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getLatestPrice` function with signature `getLatestPrice(uint64)` and selector `0x8c470b8f`
     #[derive(
@@ -653,8 +655,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetLatestPriceReturn {
         pub price: ::ethers::core::types::U256,
     }
@@ -666,8 +668,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetLiquidityDeltasReturn {
         pub delta_asset: u128,
         pub delta_quote: u128,
@@ -680,8 +682,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetMaxLiquidityReturn {
         pub delta_liquidity: u128,
     }
@@ -693,8 +695,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetNetBalanceReturn(pub ::ethers::core::types::I256);
     ///Container type for all return fields from the `getPairNonce` function with signature `getPairNonce()` and selector `0x078888d6`
     #[derive(
@@ -704,8 +706,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPairNonceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getReserve` function with signature `getReserve(address)` and selector `0xc9a396e9`
     #[derive(
@@ -715,8 +717,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetReserveReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getVirtualReserves` function with signature `getVirtualReserves(uint64)` and selector `0x5ef05b0c`
     #[derive(
@@ -726,8 +728,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetVirtualReservesReturn {
         pub delta_asset: u128,
         pub delta_quote: u128,
@@ -740,8 +742,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct PairsReturn {
         pub token_asset: ::ethers::core::types::Address,
         pub decimals_asset: u8,
@@ -756,8 +758,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct PoolsReturn {
         pub last_tick: i32,
         pub last_timestamp: u32,
@@ -780,8 +782,8 @@ pub mod i_hyper_getters {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct PositionsReturn {
         pub free_liquidity: u128,
         pub staked_liquidity: u128,

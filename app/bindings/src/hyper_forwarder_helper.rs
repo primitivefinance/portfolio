@@ -5,25 +5,24 @@ pub mod hyper_forwarder_helper {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///HyperForwarderHelper was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///HyperForwarderHelper was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"reason\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"Fail\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"type\":\"event\",\"name\":\"Success\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"approve\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"caller\",\"outputs\":[{\"internalType\":\"contract Caller\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint24\",\"name\":\"pairId\",\"type\":\"uint24\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"curveId\",\"type\":\"uint32\",\"components\":[]}],\"stateMutability\":\"pure\",\"type\":\"function\",\"name\":\"getPoolId\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"target\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"bytes\",\"name\":\"data\",\"type\":\"bytes\",\"components\":[]}],\"stateMutability\":\"payable\",\"type\":\"function\",\"name\":\"pass\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static HYPERFORWARDERHELPER_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
-    });
+    pub static HYPERFORWARDERHELPER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     /// Bytecode of the #name contract
     pub static HYPERFORWARDERHELPER_BYTECODE: ::ethers::contract::Lazy<
         ::ethers::core::types::Bytes,
@@ -59,13 +58,11 @@ pub mod hyper_forwarder_helper {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HYPERFORWARDERHELPER_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HYPERFORWARDERHELPER_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -119,10 +116,7 @@ pub mod hyper_forwarder_helper {
         ///Calls the contract's `caller` (0xfc9c8d39) function
         pub fn caller(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([252, 156, 141, 57], ())
                 .expect("method not found (this should never happen)")
@@ -152,20 +146,17 @@ pub mod hyper_forwarder_helper {
             self.0.event()
         }
         ///Gets the contract's `Success` event
-        pub fn success_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, SuccessFilter> {
+        pub fn success_filter(&self) -> ::ethers::contract::builders::Event<M, SuccessFilter> {
             self.0.event()
         }
         /// Returns an [`Event`](#ethers_contract::builders::Event) builder for all events of this contract
-        pub fn events(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, HyperForwarderHelperEvents> {
+        pub fn events(&self) -> ::ethers::contract::builders::Event<M, HyperForwarderHelperEvents> {
             self.0.event_with_filter(Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HyperForwarderHelper<M> {
+        for HyperForwarderHelper<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -177,8 +168,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "Fail", abi = "Fail(bytes)")]
     pub struct FailFilter {
         pub reason: ::ethers::core::types::Bytes,
@@ -190,8 +181,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "Success", abi = "Success()")]
     pub struct SuccessFilter();
     #[derive(Debug, Clone, PartialEq, Eq, ::ethers::contract::EthAbiType)]
@@ -231,8 +222,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "approve", abi = "approve(address,address)")]
     pub struct ApproveCall {
         pub token: ::ethers::core::types::Address,
@@ -246,8 +237,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "caller", abi = "caller()")]
     pub struct CallerCall;
     ///Container type for all input parameters for the `getPoolId` function with signature `getPoolId(uint24,uint32)` and selector `0x75d4a518`
@@ -258,8 +249,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getPoolId", abi = "getPoolId(uint24,uint32)")]
     pub struct GetPoolIdCall {
         pub pair_id: u32,
@@ -273,8 +264,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "pass", abi = "pass(address,bytes)")]
     pub struct PassCall {
         pub target: ::ethers::core::types::Address,
@@ -291,24 +282,23 @@ pub mod hyper_forwarder_helper {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <ApproveCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <ApproveCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(HyperForwarderHelperCalls::Approve(decoded));
             }
-            if let Ok(decoded)
-                = <CallerCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <CallerCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(HyperForwarderHelperCalls::Caller(decoded));
             }
-            if let Ok(decoded)
-                = <GetPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(HyperForwarderHelperCalls::GetPoolId(decoded));
             }
-            if let Ok(decoded)
-                = <PassCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) = <PassCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(HyperForwarderHelperCalls::Pass(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -362,8 +352,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct CallerReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `getPoolId` function with signature `getPoolId(uint24,uint32)` and selector `0x75d4a518`
     #[derive(
@@ -373,8 +363,8 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPoolIdReturn(pub u64);
     ///Container type for all return fields from the `pass` function with signature `pass(address,bytes)` and selector `0x53406cd6`
     #[derive(
@@ -384,7 +374,7 @@ pub mod hyper_forwarder_helper {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct PassReturn(pub bool);
 }

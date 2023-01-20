@@ -5,22 +5,24 @@ pub mod context {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///Context was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///Context was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"__asset__\",\"outputs\":[{\"internalType\":\"contract TestERC20\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"__quote__\",\"outputs\":[{\"internalType\":\"contract TestERC20\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"__weth__\",\"outputs\":[{\"internalType\":\"contract TestERC20\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"addPoolId\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"time\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"customWarp\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRandomPoolId\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getRandomUser\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"setPoolId\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"users\",\"outputs\":[{\"internalType\":\"address[]\",\"name\":\"\",\"type\":\"address[]\",\"components\":[]}]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static CONTEXT_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static CONTEXT_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     pub struct Context<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for Context<M> {
         fn clone(&self) -> Self {
@@ -35,7 +37,9 @@ pub mod context {
     }
     impl<M> std::fmt::Debug for Context<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(Context)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(Context))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> Context<M> {
@@ -46,21 +50,16 @@ pub mod context {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    CONTEXT_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                CONTEXT_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `__asset__` (0xd43c0f99) function
         pub fn asset(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([212, 60, 15, 153], ())
                 .expect("method not found (this should never happen)")
@@ -68,10 +67,7 @@ pub mod context {
         ///Calls the contract's `__quote__` (0x8dbc9651) function
         pub fn quote(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([141, 188, 150, 81], ())
                 .expect("method not found (this should never happen)")
@@ -79,10 +75,7 @@ pub mod context {
         ///Calls the contract's `__weth__` (0x28dd8e53) function
         pub fn weth(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([40, 221, 142, 83], ())
                 .expect("method not found (this should never happen)")
@@ -118,10 +111,7 @@ pub mod context {
         pub fn get_random_user(
             &self,
             id: ::ethers::core::types::U256,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([107, 103, 181, 92], id)
                 .expect("method not found (this should never happen)")
@@ -147,8 +137,7 @@ pub mod context {
                 .expect("method not found (this should never happen)")
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for Context<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for Context<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -161,8 +150,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "__asset__", abi = "__asset__()")]
     pub struct AssetCall;
     ///Container type for all input parameters for the `__quote__` function with signature `__quote__()` and selector `0x8dbc9651`
@@ -173,8 +162,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "__quote__", abi = "__quote__()")]
     pub struct QuoteCall;
     ///Container type for all input parameters for the `__weth__` function with signature `__weth__()` and selector `0x28dd8e53`
@@ -185,8 +174,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "__weth__", abi = "__weth__()")]
     pub struct WethCall;
     ///Container type for all input parameters for the `addPoolId` function with signature `addPoolId(uint64)` and selector `0xce5b07c3`
@@ -197,8 +186,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "addPoolId", abi = "addPoolId(uint64)")]
     pub struct AddPoolIdCall {
         pub pool_id: u64,
@@ -211,8 +200,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "customWarp", abi = "customWarp(uint256)")]
     pub struct CustomWarpCall {
         pub time: ::ethers::core::types::U256,
@@ -225,8 +214,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getRandomPoolId", abi = "getRandomPoolId(uint256)")]
     pub struct GetRandomPoolIdCall {
         pub id: ::ethers::core::types::U256,
@@ -239,8 +228,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getRandomUser", abi = "getRandomUser(uint256)")]
     pub struct GetRandomUserCall {
         pub id: ::ethers::core::types::U256,
@@ -253,8 +242,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "setPoolId", abi = "setPoolId(uint64)")]
     pub struct SetPoolIdCall {
         pub pool_id: u64,
@@ -267,8 +256,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "users", abi = "users()")]
     pub struct UsersCall;
     #[derive(Debug, Clone, PartialEq, Eq, ::ethers::contract::EthAbiType)]
@@ -287,50 +276,48 @@ pub mod context {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <AssetCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <AssetCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::Asset(decoded));
             }
-            if let Ok(decoded)
-                = <QuoteCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <QuoteCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::Quote(decoded));
             }
-            if let Ok(decoded)
-                = <WethCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) = <WethCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::Weth(decoded));
             }
-            if let Ok(decoded)
-                = <AddPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <AddPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::AddPoolId(decoded));
             }
-            if let Ok(decoded)
-                = <CustomWarpCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <CustomWarpCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::CustomWarp(decoded));
             }
-            if let Ok(decoded)
-                = <GetRandomPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetRandomPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::GetRandomPoolId(decoded));
             }
-            if let Ok(decoded)
-                = <GetRandomUserCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetRandomUserCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::GetRandomUser(decoded));
             }
-            if let Ok(decoded)
-                = <SetPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <SetPoolIdCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::SetPoolId(decoded));
             }
-            if let Ok(decoded)
-                = <UsersCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <UsersCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(ContextCalls::Users(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -419,8 +406,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct AssetReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `__quote__` function with signature `__quote__()` and selector `0x8dbc9651`
     #[derive(
@@ -430,8 +417,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct QuoteReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `__weth__` function with signature `__weth__()` and selector `0x28dd8e53`
     #[derive(
@@ -441,8 +428,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct WethReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `getRandomPoolId` function with signature `getRandomPoolId(uint256)` and selector `0x1741369f`
     #[derive(
@@ -452,8 +439,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetRandomPoolIdReturn(pub u64);
     ///Container type for all return fields from the `getRandomUser` function with signature `getRandomUser(uint256)` and selector `0x6b67b55c`
     #[derive(
@@ -463,8 +450,8 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetRandomUserReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `users` function with signature `users()` and selector `0xf2020275`
     #[derive(
@@ -474,7 +461,7 @@ pub mod context {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct UsersReturn(pub ::std::vec::Vec<::ethers::core::types::Address>);
 }

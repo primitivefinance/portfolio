@@ -5,33 +5,31 @@ pub mod invariant_breaker {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///InvariantBreaker was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///InvariantBreaker was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_address\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"val\",\"type\":\"uint256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"int256[]\",\"name\":\"val\",\"type\":\"int256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"val\",\"type\":\"address[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_bytes\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_bytes32\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"\",\"type\":\"int256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_int\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"address\",\"name\":\"val\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_address\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256[]\",\"name\":\"val\",\"type\":\"uint256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"int256[]\",\"name\":\"val\",\"type\":\"int256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"address[]\",\"name\":\"val\",\"type\":\"address[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"val\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_bytes\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes32\",\"name\":\"val\",\"type\":\"bytes32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_bytes32\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_decimal_int\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_decimal_uint\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_int\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"string\",\"name\":\"val\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_string\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_uint\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_string\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_uint\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"logs\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"IS_TEST\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"failed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"flag0\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"flag1\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"set0\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"set1\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static INVARIANTBREAKER_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
-    });
+    pub static INVARIANTBREAKER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     /// Bytecode of the #name contract
-    pub static INVARIANTBREAKER_BYTECODE: ::ethers::contract::Lazy<
-        ::ethers::core::types::Bytes,
-    > = ::ethers::contract::Lazy::new(|| {
-        "0x60806040526000805460ff191660011790556013805461010161ffff1990911617905534801561002e57600080fd5b5061036d8061003e6000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c806349ed73941461006757806363297fdb1461008d578063ba414fa61461009a578063d90babde146100a2578063e48f28d2146100b5578063fa7626d4146100c8575b600080fd5b60135461007990610100900460ff1681565b604051901515815260200160405180910390f35b6013546100799060ff1681565b6100796100d5565b6100796100b0366004610268565b610200565b6100796100c3366004610268565b61022a565b6000546100799060ff1681565b60008054610100900460ff16156100f55750600054610100900460ff1690565b6000737109709ecfa91a80626ff3989d68f67f5b1dd12d3b156101fb5760408051737109709ecfa91a80626ff3989d68f67f5b1dd12d602082018190526519985a5b195960d21b82840152825180830384018152606083019093526000929091610183917f667f9d70ca411d70ead50d8d5c22070dafc36ad75f3dcf5e7237b22ade9aecc4916080016102bc565b60408051601f198184030181529082905261019d916102e0565b6000604051808303816000865af19150503d80600081146101da576040519150601f19603f3d011682016040523d82523d6000602084013e6101df565b606091505b50915050808060200190518101906101f791906102f3565b9150505b919050565b600061020d606483610315565b60000361021f576013805460ff191690555b505060135460ff1690565b6000610237600a83610315565b158015610247575060135460ff16155b15610258576013805461ff00191690555b5050601354610100900460ff1690565b60006020828403121561027a57600080fd5b5035919050565b6000815160005b818110156102a25760208185018101518683015201610288565b818111156102b1576000828601525b509290920192915050565b6001600160e01b03198316815260006102d86004830184610281565b949350505050565b60006102ec8284610281565b9392505050565b60006020828403121561030557600080fd5b815180151581146102ec57600080fd5b60008261033257634e487b7160e01b600052601260045260246000fd5b50079056fea2646970667358221220351b75a922dfcc400642901240953319ddfc34c46bd1dbaeadb2fb6eacb33d7e64736f6c634300080d0033"
+    pub static INVARIANTBREAKER_BYTECODE: ::ethers::contract::Lazy<::ethers::core::types::Bytes> =
+        ::ethers::contract::Lazy::new(|| {
+            "0x60806040526000805460ff191660011790556013805461010161ffff1990911617905534801561002e57600080fd5b5061036d8061003e6000396000f3fe608060405234801561001057600080fd5b50600436106100625760003560e01c806349ed73941461006757806363297fdb1461008d578063ba414fa61461009a578063d90babde146100a2578063e48f28d2146100b5578063fa7626d4146100c8575b600080fd5b60135461007990610100900460ff1681565b604051901515815260200160405180910390f35b6013546100799060ff1681565b6100796100d5565b6100796100b0366004610268565b610200565b6100796100c3366004610268565b61022a565b6000546100799060ff1681565b60008054610100900460ff16156100f55750600054610100900460ff1690565b6000737109709ecfa91a80626ff3989d68f67f5b1dd12d3b156101fb5760408051737109709ecfa91a80626ff3989d68f67f5b1dd12d602082018190526519985a5b195960d21b82840152825180830384018152606083019093526000929091610183917f667f9d70ca411d70ead50d8d5c22070dafc36ad75f3dcf5e7237b22ade9aecc4916080016102bc565b60408051601f198184030181529082905261019d916102e0565b6000604051808303816000865af19150503d80600081146101da576040519150601f19603f3d011682016040523d82523d6000602084013e6101df565b606091505b50915050808060200190518101906101f791906102f3565b9150505b919050565b600061020d606483610315565b60000361021f576013805460ff191690555b505060135460ff1690565b6000610237600a83610315565b158015610247575060135460ff16155b15610258576013805461ff00191690555b5050601354610100900460ff1690565b60006020828403121561027a57600080fd5b5035919050565b6000815160005b818110156102a25760208185018101518683015201610288565b818111156102b1576000828601525b509290920192915050565b6001600160e01b03198316815260006102d86004830184610281565b949350505050565b60006102ec8284610281565b9392505050565b60006020828403121561030557600080fd5b815180151581146102ec57600080fd5b60008261033257634e487b7160e01b600052601260045260246000fd5b50079056fea2646970667358221220351b75a922dfcc400642901240953319ddfc34c46bd1dbaeadb2fb6eacb33d7e64736f6c634300080d0033"
             .parse()
             .expect("invalid bytecode")
-    });
+        });
     pub struct InvariantBreaker<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for InvariantBreaker<M> {
         fn clone(&self) -> Self {
@@ -46,7 +44,9 @@ pub mod invariant_breaker {
     }
     impl<M> std::fmt::Debug for InvariantBreaker<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(InvariantBreaker)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(InvariantBreaker))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> InvariantBreaker<M> {
@@ -57,13 +57,11 @@ pub mod invariant_breaker {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    INVARIANTBREAKER_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                INVARIANTBREAKER_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -175,9 +173,7 @@ pub mod invariant_breaker {
             self.0.event()
         }
         ///Gets the contract's `log_bytes` event
-        pub fn log_bytes_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogBytesFilter> {
+        pub fn log_bytes_filter(&self) -> ::ethers::contract::builders::Event<M, LogBytesFilter> {
             self.0.event()
         }
         ///Gets the contract's `log_bytes32` event
@@ -187,9 +183,7 @@ pub mod invariant_breaker {
             self.0.event()
         }
         ///Gets the contract's `log_int` event
-        pub fn log_int_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogIntFilter> {
+        pub fn log_int_filter(&self) -> ::ethers::contract::builders::Event<M, LogIntFilter> {
             self.0.event()
         }
         ///Gets the contract's `log_named_address` event
@@ -259,15 +253,11 @@ pub mod invariant_breaker {
             self.0.event()
         }
         ///Gets the contract's `log_string` event
-        pub fn log_string_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogStringFilter> {
+        pub fn log_string_filter(&self) -> ::ethers::contract::builders::Event<M, LogStringFilter> {
             self.0.event()
         }
         ///Gets the contract's `log_uint` event
-        pub fn log_uint_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogUintFilter> {
+        pub fn log_uint_filter(&self) -> ::ethers::contract::builders::Event<M, LogUintFilter> {
             self.0.event()
         }
         ///Gets the contract's `logs` event
@@ -275,14 +265,13 @@ pub mod invariant_breaker {
             self.0.event()
         }
         /// Returns an [`Event`](#ethers_contract::builders::Event) builder for all events of this contract
-        pub fn events(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, InvariantBreakerEvents> {
+        pub fn events(&self) -> ::ethers::contract::builders::Event<M, InvariantBreakerEvents> {
             self.0.event_with_filter(Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for InvariantBreaker<M> {
+        for InvariantBreaker<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -294,8 +283,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log", abi = "log(string)")]
     pub struct LogFilter(pub String);
     #[derive(
@@ -305,8 +294,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_address", abi = "log_address(address)")]
     pub struct LogAddressFilter(pub ::ethers::core::types::Address);
     #[derive(
@@ -316,8 +305,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_array", abi = "log_array(uint256[])")]
     pub struct LogArray1Filter {
         pub val: Vec<::ethers::core::types::U256>,
@@ -329,8 +318,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_array", abi = "log_array(int256[])")]
     pub struct LogArray2Filter {
         pub val: Vec<::ethers::core::types::I256>,
@@ -342,8 +331,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_array", abi = "log_array(address[])")]
     pub struct LogArray3Filter {
         pub val: Vec<::ethers::core::types::Address>,
@@ -355,8 +344,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_bytes", abi = "log_bytes(bytes)")]
     pub struct LogBytesFilter(pub ::ethers::core::types::Bytes);
     #[derive(
@@ -366,8 +355,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_bytes32", abi = "log_bytes32(bytes32)")]
     pub struct LogBytes32Filter(pub [u8; 32]);
     #[derive(
@@ -377,8 +366,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_int", abi = "log_int(int256)")]
     pub struct LogIntFilter(pub ::ethers::core::types::I256);
     #[derive(
@@ -388,8 +377,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_address", abi = "log_named_address(string,address)")]
     pub struct LogNamedAddressFilter {
         pub key: String,
@@ -402,8 +391,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_array", abi = "log_named_array(string,uint256[])")]
     pub struct LogNamedArray1Filter {
         pub key: String,
@@ -416,8 +405,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_array", abi = "log_named_array(string,int256[])")]
     pub struct LogNamedArray2Filter {
         pub key: String,
@@ -430,8 +419,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_array", abi = "log_named_array(string,address[])")]
     pub struct LogNamedArray3Filter {
         pub key: String,
@@ -444,8 +433,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_bytes", abi = "log_named_bytes(string,bytes)")]
     pub struct LogNamedBytesFilter {
         pub key: String,
@@ -458,8 +447,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_bytes32", abi = "log_named_bytes32(string,bytes32)")]
     pub struct LogNamedBytes32Filter {
         pub key: String,
@@ -472,8 +461,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(
         name = "log_named_decimal_int",
         abi = "log_named_decimal_int(string,int256,uint256)"
@@ -490,8 +479,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(
         name = "log_named_decimal_uint",
         abi = "log_named_decimal_uint(string,uint256,uint256)"
@@ -508,8 +497,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_int", abi = "log_named_int(string,int256)")]
     pub struct LogNamedIntFilter {
         pub key: String,
@@ -522,8 +511,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_string", abi = "log_named_string(string,string)")]
     pub struct LogNamedStringFilter {
         pub key: String,
@@ -536,8 +525,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_uint", abi = "log_named_uint(string,uint256)")]
     pub struct LogNamedUintFilter {
         pub key: String,
@@ -550,8 +539,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_string", abi = "log_string(string)")]
     pub struct LogStringFilter(pub String);
     #[derive(
@@ -561,8 +550,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_uint", abi = "log_uint(uint256)")]
     pub struct LogUintFilter(pub ::ethers::core::types::U256);
     #[derive(
@@ -572,8 +561,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "logs", abi = "logs(bytes)")]
     pub struct LogsFilter(pub ::ethers::core::types::Bytes);
     #[derive(Debug, Clone, PartialEq, Eq, ::ethers::contract::EthAbiType)]
@@ -694,12 +683,8 @@ pub mod invariant_breaker {
                 InvariantBreakerEvents::LogNamedArray3Filter(element) => element.fmt(f),
                 InvariantBreakerEvents::LogNamedBytesFilter(element) => element.fmt(f),
                 InvariantBreakerEvents::LogNamedBytes32Filter(element) => element.fmt(f),
-                InvariantBreakerEvents::LogNamedDecimalIntFilter(element) => {
-                    element.fmt(f)
-                }
-                InvariantBreakerEvents::LogNamedDecimalUintFilter(element) => {
-                    element.fmt(f)
-                }
+                InvariantBreakerEvents::LogNamedDecimalIntFilter(element) => element.fmt(f),
+                InvariantBreakerEvents::LogNamedDecimalUintFilter(element) => element.fmt(f),
                 InvariantBreakerEvents::LogNamedIntFilter(element) => element.fmt(f),
                 InvariantBreakerEvents::LogNamedStringFilter(element) => element.fmt(f),
                 InvariantBreakerEvents::LogNamedUintFilter(element) => element.fmt(f),
@@ -717,8 +702,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "IS_TEST", abi = "IS_TEST()")]
     pub struct IsTestCall;
     ///Container type for all input parameters for the `failed` function with signature `failed()` and selector `0xba414fa6`
@@ -729,8 +714,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "failed", abi = "failed()")]
     pub struct FailedCall;
     ///Container type for all input parameters for the `flag0` function with signature `flag0()` and selector `0x63297fdb`
@@ -741,8 +726,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "flag0", abi = "flag0()")]
     pub struct Flag0Call;
     ///Container type for all input parameters for the `flag1` function with signature `flag1()` and selector `0x49ed7394`
@@ -753,8 +738,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "flag1", abi = "flag1()")]
     pub struct Flag1Call;
     ///Container type for all input parameters for the `set0` function with signature `set0(int256)` and selector `0xd90babde`
@@ -765,8 +750,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "set0", abi = "set0(int256)")]
     pub struct Set0Call {
         pub val: ::ethers::core::types::I256,
@@ -779,8 +764,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "set1", abi = "set1(int256)")]
     pub struct Set1Call {
         pub val: ::ethers::core::types::I256,
@@ -798,28 +783,32 @@ pub mod invariant_breaker {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <IsTestCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <IsTestCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantBreakerCalls::IsTest(decoded));
             }
-            if let Ok(decoded)
-                = <FailedCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <FailedCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantBreakerCalls::Failed(decoded));
             }
-            if let Ok(decoded)
-                = <Flag0Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <Flag0Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantBreakerCalls::Flag0(decoded));
             }
-            if let Ok(decoded)
-                = <Flag1Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <Flag1Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantBreakerCalls::Flag1(decoded));
             }
-            if let Ok(decoded)
-                = <Set0Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) = <Set0Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantBreakerCalls::Set0(decoded));
             }
-            if let Ok(decoded)
-                = <Set1Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) = <Set1Call as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantBreakerCalls::Set1(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -887,8 +876,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct IsTestReturn(pub bool);
     ///Container type for all return fields from the `failed` function with signature `failed()` and selector `0xba414fa6`
     #[derive(
@@ -898,8 +887,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct FailedReturn(pub bool);
     ///Container type for all return fields from the `flag0` function with signature `flag0()` and selector `0x63297fdb`
     #[derive(
@@ -909,8 +898,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct Flag0Return(pub bool);
     ///Container type for all return fields from the `flag1` function with signature `flag1()` and selector `0x49ed7394`
     #[derive(
@@ -920,8 +909,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct Flag1Return(pub bool);
     ///Container type for all return fields from the `set0` function with signature `set0(int256)` and selector `0xd90babde`
     #[derive(
@@ -931,8 +920,8 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct Set0Return(pub bool);
     ///Container type for all return fields from the `set1` function with signature `set1(int256)` and selector `0xe48f28d2`
     #[derive(
@@ -942,7 +931,7 @@ pub mod invariant_breaker {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct Set1Return(pub bool);
 }

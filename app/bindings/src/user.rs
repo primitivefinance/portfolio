@@ -5,29 +5,31 @@ pub mod user {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///User was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///User was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[]";
     /// The parsed JSON-ABI of the contract.
-    pub static USER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static USER_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     /// Bytecode of the #name contract
-    pub static USER_BYTECODE: ::ethers::contract::Lazy<::ethers::core::types::Bytes> = ::ethers::contract::Lazy::new(||
-    {
-        "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358221220082cbb61dd4873d13fc35f4cc5b4b5602a722a005491d29e3091bc0e92cf146d64736f6c634300080d0033"
+    pub static USER_BYTECODE: ::ethers::contract::Lazy<::ethers::core::types::Bytes> =
+        ::ethers::contract::Lazy::new(|| {
+            "0x6080604052348015600f57600080fd5b50603f80601d6000396000f3fe6080604052600080fdfea2646970667358221220082cbb61dd4873d13fc35f4cc5b4b5602a722a005491d29e3091bc0e92cf146d64736f6c634300080d0033"
             .parse()
             .expect("invalid bytecode")
-    });
+        });
     pub struct User<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for User<M> {
         fn clone(&self) -> Self {
@@ -42,7 +44,9 @@ pub mod user {
     }
     impl<M> std::fmt::Debug for User<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(User)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(User))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> User<M> {
@@ -53,13 +57,11 @@ pub mod user {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    USER_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                USER_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -101,8 +103,7 @@ pub mod user {
             Ok(deployer)
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for User<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for User<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }

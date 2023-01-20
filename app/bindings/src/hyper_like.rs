@@ -5,22 +5,24 @@ pub mod hyper_like {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///HyperLike was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///HyperLike was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getPairNonce\",\"outputs\":[{\"internalType\":\"uint16\",\"name\":\"\",\"type\":\"uint16\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getReserve\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static HYPERLIKE_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static HYPERLIKE_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     pub struct HyperLike<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for HyperLike<M> {
         fn clone(&self) -> Self {
@@ -35,7 +37,9 @@ pub mod hyper_like {
     }
     impl<M> std::fmt::Debug for HyperLike<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(HyperLike)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(HyperLike))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> HyperLike<M> {
@@ -46,13 +50,11 @@ pub mod hyper_like {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    HYPERLIKE_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                HYPERLIKE_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `getBalance` (0xd4fac45d) function
         pub fn get_balance(
@@ -65,9 +67,7 @@ pub mod hyper_like {
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `getPairNonce` (0x078888d6) function
-        pub fn get_pair_nonce(
-            &self,
-        ) -> ::ethers::contract::builders::ContractCall<M, u16> {
+        pub fn get_pair_nonce(&self) -> ::ethers::contract::builders::ContractCall<M, u16> {
             self.0
                 .method_hash([7, 136, 136, 214], ())
                 .expect("method not found (this should never happen)")
@@ -82,8 +82,7 @@ pub mod hyper_like {
                 .expect("method not found (this should never happen)")
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for HyperLike<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for HyperLike<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -96,8 +95,8 @@ pub mod hyper_like {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getBalance", abi = "getBalance(address,address)")]
     pub struct GetBalanceCall(
         pub ::ethers::core::types::Address,
@@ -111,8 +110,8 @@ pub mod hyper_like {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getPairNonce", abi = "getPairNonce()")]
     pub struct GetPairNonceCall;
     ///Container type for all input parameters for the `getReserve` function with signature `getReserve(address)` and selector `0xc9a396e9`
@@ -123,8 +122,8 @@ pub mod hyper_like {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getReserve", abi = "getReserve(address)")]
     pub struct GetReserveCall(pub ::ethers::core::types::Address);
     #[derive(Debug, Clone, PartialEq, Eq, ::ethers::contract::EthAbiType)]
@@ -137,22 +136,19 @@ pub mod hyper_like {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(HyperLikeCalls::GetBalance(decoded));
             }
-            if let Ok(decoded)
-                = <GetPairNonceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetPairNonceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(HyperLikeCalls::GetPairNonce(decoded));
             }
-            if let Ok(decoded)
-                = <GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(HyperLikeCalls::GetReserve(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -199,8 +195,8 @@ pub mod hyper_like {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetBalanceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getPairNonce` function with signature `getPairNonce()` and selector `0x078888d6`
     #[derive(
@@ -210,8 +206,8 @@ pub mod hyper_like {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPairNonceReturn(pub u16);
     ///Container type for all return fields from the `getReserve` function with signature `getReserve(address)` and selector `0xc9a396e9`
     #[derive(
@@ -221,7 +217,7 @@ pub mod hyper_like {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetReserveReturn(pub ::ethers::core::types::U256);
 }

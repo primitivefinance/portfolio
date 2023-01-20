@@ -5,30 +5,31 @@ pub mod safe_cast_lib {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///SafeCastLib was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///SafeCastLib was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[]";
     /// The parsed JSON-ABI of the contract.
-    pub static SAFECASTLIB_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static SAFECASTLIB_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     /// Bytecode of the #name contract
-    pub static SAFECASTLIB_BYTECODE: ::ethers::contract::Lazy<
-        ::ethers::core::types::Bytes,
-    > = ::ethers::contract::Lazy::new(|| {
-        "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea264697066735822122092f8b399bde1b930a8e6247fa8203dae49f28e15e2c5762a15b113acb016253564736f6c634300080d0033"
+    pub static SAFECASTLIB_BYTECODE: ::ethers::contract::Lazy<::ethers::core::types::Bytes> =
+        ::ethers::contract::Lazy::new(|| {
+            "0x60566037600b82828239805160001a607314602a57634e487b7160e01b600052600060045260246000fd5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea264697066735822122092f8b399bde1b930a8e6247fa8203dae49f28e15e2c5762a15b113acb016253564736f6c634300080d0033"
             .parse()
             .expect("invalid bytecode")
-    });
+        });
     pub struct SafeCastLib<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for SafeCastLib<M> {
         fn clone(&self) -> Self {
@@ -43,7 +44,9 @@ pub mod safe_cast_lib {
     }
     impl<M> std::fmt::Debug for SafeCastLib<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(SafeCastLib)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(SafeCastLib))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> SafeCastLib<M> {
@@ -54,13 +57,11 @@ pub mod safe_cast_lib {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    SAFECASTLIB_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                SAFECASTLIB_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -102,8 +103,7 @@ pub mod safe_cast_lib {
             Ok(deployer)
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for SafeCastLib<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for SafeCastLib<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }

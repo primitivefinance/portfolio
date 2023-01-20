@@ -5,26 +5,25 @@ pub mod invariant_send_tokens {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///InvariantSendTokens was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    pub use super::super::shared_types::*;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
-    pub use super::super::shared_types::*;
+    ///InvariantSendTokens was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper_\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"asset_\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"quote_\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\",\"outputs\":[]},{\"inputs\":[],\"type\":\"error\",\"name\":\"InvalidBalance\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[],\"indexed\":true},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"SentTokens\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_address\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256[]\",\"name\":\"val\",\"type\":\"uint256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"int256[]\",\"name\":\"val\",\"type\":\"int256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"address[]\",\"name\":\"val\",\"type\":\"address[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_bytes\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_bytes32\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"int256\",\"name\":\"\",\"type\":\"int256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_int\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"address\",\"name\":\"val\",\"type\":\"address\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_address\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256[]\",\"name\":\"val\",\"type\":\"uint256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"int256[]\",\"name\":\"val\",\"type\":\"int256[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"address[]\",\"name\":\"val\",\"type\":\"address[]\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_array\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes\",\"name\":\"val\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_bytes\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"bytes32\",\"name\":\"val\",\"type\":\"bytes32\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_bytes32\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_decimal_int\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"decimals\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_decimal_uint\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"int256\",\"name\":\"val\",\"type\":\"int256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_int\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"string\",\"name\":\"val\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_string\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"key\",\"type\":\"string\",\"components\":[],\"indexed\":false},{\"internalType\":\"uint256\",\"name\":\"val\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_named_uint\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_string\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"log_uint\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[{\"internalType\":\"bytes\",\"name\":\"\",\"type\":\"bytes\",\"components\":[],\"indexed\":false}],\"type\":\"event\",\"name\":\"logs\",\"outputs\":[],\"anonymous\":false},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"IS_TEST\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"__asset__\",\"outputs\":[{\"internalType\":\"contract TestERC20\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"__hyper__\",\"outputs\":[{\"internalType\":\"contract HyperTimeOverride\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"__poolId__\",\"outputs\":[{\"internalType\":\"uint64\",\"name\":\"\",\"type\":\"uint64\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"__quote__\",\"outputs\":[{\"internalType\":\"contract TestERC20\",\"name\":\"\",\"type\":\"address\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"contract HyperLike\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"contract TestERC20\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"_getBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"contract IHyperStruct\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"_getPool\",\"outputs\":[{\"internalType\":\"struct HyperPool\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"int24\",\"name\":\"lastTick\",\"type\":\"int24\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"lastTimestamp\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"controller\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalReward\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalQuote\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"lastPrice\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"liquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"stakedLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"int128\",\"name\":\"stakedLiquidityDelta\",\"type\":\"int128\",\"components\":[]},{\"internalType\":\"struct HyperCurve\",\"name\":\"params\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"int24\",\"name\":\"maxTick\",\"type\":\"int24\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"jit\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"fee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"duration\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"volatility\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"priorityFee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"createdAt\",\"type\":\"uint32\",\"components\":[]}]},{\"internalType\":\"struct HyperPair\",\"name\":\"pair\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"address\",\"name\":\"tokenAsset\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsAsset\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"tokenQuote\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsQuote\",\"type\":\"uint8\",\"components\":[]}]}]}]},{\"inputs\":[{\"internalType\":\"contract IHyperStruct\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"positionId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"_getPosition\",\"outputs\":[{\"internalType\":\"struct HyperPosition\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint128\",\"name\":\"freeLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"stakedLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"lastTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"stakeTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"unstakeTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthRewardLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthAssetLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthQuoteLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedAsset\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedQuote\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedReward\",\"type\":\"uint128\",\"components\":[]}]}]},{\"inputs\":[{\"internalType\":\"contract HyperLike\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"contract TestERC20\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"_getReserve\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"failed\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"owners\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getBalanceSum\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getCurve\",\"outputs\":[{\"internalType\":\"struct HyperCurve\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"int24\",\"name\":\"maxTick\",\"type\":\"int24\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"jit\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"fee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"duration\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"volatility\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"priorityFee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"createdAt\",\"type\":\"uint32\",\"components\":[]}]}]},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"sellAsset\",\"type\":\"bool\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getMaxSwapLimit\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint24\",\"name\":\"pairId\",\"type\":\"uint24\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getPair\",\"outputs\":[{\"internalType\":\"struct HyperPair\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"address\",\"name\":\"tokenAsset\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsAsset\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"tokenQuote\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsQuote\",\"type\":\"uint8\",\"components\":[]}]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getPhysicalBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getPool\",\"outputs\":[{\"internalType\":\"struct HyperPool\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"int24\",\"name\":\"lastTick\",\"type\":\"int24\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"lastTimestamp\",\"type\":\"uint32\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"controller\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalReward\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthGlobalQuote\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"lastPrice\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"liquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"stakedLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"int128\",\"name\":\"stakedLiquidityDelta\",\"type\":\"int128\",\"components\":[]},{\"internalType\":\"struct HyperCurve\",\"name\":\"params\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"int24\",\"name\":\"maxTick\",\"type\":\"int24\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"jit\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"fee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"duration\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"volatility\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"priorityFee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint32\",\"name\":\"createdAt\",\"type\":\"uint32\",\"components\":[]}]},{\"internalType\":\"struct HyperPair\",\"name\":\"pair\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"address\",\"name\":\"tokenAsset\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsAsset\",\"type\":\"uint8\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"tokenQuote\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint8\",\"name\":\"decimalsQuote\",\"type\":\"uint8\",\"components\":[]}]}]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"owner\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"positionId\",\"type\":\"uint64\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getPosition\",\"outputs\":[{\"internalType\":\"struct HyperPosition\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint128\",\"name\":\"freeLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"stakedLiquidity\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"lastTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"stakeTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"unstakeTimestamp\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthRewardLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthAssetLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthQuoteLast\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedAsset\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedQuote\",\"type\":\"uint128\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"tokensOwedReward\",\"type\":\"uint128\",\"components\":[]}]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"owners\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getPositionLiquiditySum\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getReserve\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"caller\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"owners\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getState\",\"outputs\":[{\"internalType\":\"struct HyperState\",\"name\":\"\",\"type\":\"tuple\",\"components\":[{\"internalType\":\"uint256\",\"name\":\"reserveAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"reserveQuote\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"physicalBalanceAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"physicalBalanceQuote\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"totalBalanceAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"totalBalanceQuote\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"totalPositionLiquidity\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"callerPositionLiquidity\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"totalPoolLiquidity\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthAssetPool\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthQuotePool\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthAssetPosition\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"feeGrowthQuotePosition\",\"type\":\"uint256\",\"components\":[]}]}]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"hyper\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"address[]\",\"name\":\"owners\",\"type\":\"address[]\",\"components\":[]}],\"stateMutability\":\"view\",\"type\":\"function\",\"name\":\"getVirtualBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"sendAssetTokens\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"sendQuoteTokens\",\"outputs\":[]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static INVARIANTSENDTOKENS_ABI: ::ethers::contract::Lazy<
-        ::ethers::core::abi::Abi,
-    > = ::ethers::contract::Lazy::new(|| {
-        ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
-    });
+    pub static INVARIANTSENDTOKENS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     /// Bytecode of the #name contract
     pub static INVARIANTSENDTOKENS_BYTECODE: ::ethers::contract::Lazy<
         ::ethers::core::types::Bytes,
@@ -60,13 +59,11 @@ pub mod invariant_send_tokens {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    INVARIANTSENDTOKENS_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                INVARIANTSENDTOKENS_ABI.clone(),
+                client,
+            ))
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -116,10 +113,7 @@ pub mod invariant_send_tokens {
         ///Calls the contract's `__asset__` (0xd43c0f99) function
         pub fn asset(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([212, 60, 15, 153], ())
                 .expect("method not found (this should never happen)")
@@ -127,10 +121,7 @@ pub mod invariant_send_tokens {
         ///Calls the contract's `__hyper__` (0x3e81296e) function
         pub fn hyper(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([62, 129, 41, 110], ())
                 .expect("method not found (this should never happen)")
@@ -144,10 +135,7 @@ pub mod invariant_send_tokens {
         ///Calls the contract's `__quote__` (0x8dbc9651) function
         pub fn quote(
             &self,
-        ) -> ::ethers::contract::builders::ContractCall<
-            M,
-            ::ethers::core::types::Address,
-        > {
+        ) -> ::ethers::contract::builders::ContractCall<M, ::ethers::core::types::Address> {
             self.0
                 .method_hash([141, 188, 150, 81], ())
                 .expect("method not found (this should never happen)")
@@ -379,9 +367,7 @@ pub mod invariant_send_tokens {
             self.0.event()
         }
         ///Gets the contract's `log_bytes` event
-        pub fn log_bytes_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogBytesFilter> {
+        pub fn log_bytes_filter(&self) -> ::ethers::contract::builders::Event<M, LogBytesFilter> {
             self.0.event()
         }
         ///Gets the contract's `log_bytes32` event
@@ -391,9 +377,7 @@ pub mod invariant_send_tokens {
             self.0.event()
         }
         ///Gets the contract's `log_int` event
-        pub fn log_int_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogIntFilter> {
+        pub fn log_int_filter(&self) -> ::ethers::contract::builders::Event<M, LogIntFilter> {
             self.0.event()
         }
         ///Gets the contract's `log_named_address` event
@@ -463,15 +447,11 @@ pub mod invariant_send_tokens {
             self.0.event()
         }
         ///Gets the contract's `log_string` event
-        pub fn log_string_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogStringFilter> {
+        pub fn log_string_filter(&self) -> ::ethers::contract::builders::Event<M, LogStringFilter> {
             self.0.event()
         }
         ///Gets the contract's `log_uint` event
-        pub fn log_uint_filter(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, LogUintFilter> {
+        pub fn log_uint_filter(&self) -> ::ethers::contract::builders::Event<M, LogUintFilter> {
             self.0.event()
         }
         ///Gets the contract's `logs` event
@@ -479,14 +459,13 @@ pub mod invariant_send_tokens {
             self.0.event()
         }
         /// Returns an [`Event`](#ethers_contract::builders::Event) builder for all events of this contract
-        pub fn events(
-            &self,
-        ) -> ::ethers::contract::builders::Event<M, InvariantSendTokensEvents> {
+        pub fn events(&self) -> ::ethers::contract::builders::Event<M, InvariantSendTokensEvents> {
             self.0.event_with_filter(Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for InvariantSendTokens<M> {
+        for InvariantSendTokens<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -510,8 +489,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "SentTokens", abi = "SentTokens(address,uint256)")]
     pub struct SentTokensFilter {
         #[ethevent(indexed)]
@@ -525,8 +504,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log", abi = "log(string)")]
     pub struct LogFilter(pub String);
     #[derive(
@@ -536,8 +515,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_address", abi = "log_address(address)")]
     pub struct LogAddressFilter(pub ::ethers::core::types::Address);
     #[derive(
@@ -547,8 +526,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_array", abi = "log_array(uint256[])")]
     pub struct LogArray1Filter {
         pub val: Vec<::ethers::core::types::U256>,
@@ -560,8 +539,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_array", abi = "log_array(int256[])")]
     pub struct LogArray2Filter {
         pub val: Vec<::ethers::core::types::I256>,
@@ -573,8 +552,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_array", abi = "log_array(address[])")]
     pub struct LogArray3Filter {
         pub val: Vec<::ethers::core::types::Address>,
@@ -586,8 +565,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_bytes", abi = "log_bytes(bytes)")]
     pub struct LogBytesFilter(pub ::ethers::core::types::Bytes);
     #[derive(
@@ -597,8 +576,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_bytes32", abi = "log_bytes32(bytes32)")]
     pub struct LogBytes32Filter(pub [u8; 32]);
     #[derive(
@@ -608,8 +587,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_int", abi = "log_int(int256)")]
     pub struct LogIntFilter(pub ::ethers::core::types::I256);
     #[derive(
@@ -619,8 +598,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_address", abi = "log_named_address(string,address)")]
     pub struct LogNamedAddressFilter {
         pub key: String,
@@ -633,8 +612,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_array", abi = "log_named_array(string,uint256[])")]
     pub struct LogNamedArray1Filter {
         pub key: String,
@@ -647,8 +626,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_array", abi = "log_named_array(string,int256[])")]
     pub struct LogNamedArray2Filter {
         pub key: String,
@@ -661,8 +640,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_array", abi = "log_named_array(string,address[])")]
     pub struct LogNamedArray3Filter {
         pub key: String,
@@ -675,8 +654,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_bytes", abi = "log_named_bytes(string,bytes)")]
     pub struct LogNamedBytesFilter {
         pub key: String,
@@ -689,8 +668,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_bytes32", abi = "log_named_bytes32(string,bytes32)")]
     pub struct LogNamedBytes32Filter {
         pub key: String,
@@ -703,8 +682,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(
         name = "log_named_decimal_int",
         abi = "log_named_decimal_int(string,int256,uint256)"
@@ -721,8 +700,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(
         name = "log_named_decimal_uint",
         abi = "log_named_decimal_uint(string,uint256,uint256)"
@@ -739,8 +718,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_int", abi = "log_named_int(string,int256)")]
     pub struct LogNamedIntFilter {
         pub key: String,
@@ -753,8 +732,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_string", abi = "log_named_string(string,string)")]
     pub struct LogNamedStringFilter {
         pub key: String,
@@ -767,8 +746,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_named_uint", abi = "log_named_uint(string,uint256)")]
     pub struct LogNamedUintFilter {
         pub key: String,
@@ -781,8 +760,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_string", abi = "log_string(string)")]
     pub struct LogStringFilter(pub String);
     #[derive(
@@ -792,8 +771,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "log_uint", abi = "log_uint(uint256)")]
     pub struct LogUintFilter(pub ::ethers::core::types::U256);
     #[derive(
@@ -803,8 +782,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthEvent,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethevent(name = "logs", abi = "logs(bytes)")]
     pub struct LogsFilter(pub ::ethers::core::types::Bytes);
     #[derive(Debug, Clone, PartialEq, Eq, ::ethers::contract::EthAbiType)]
@@ -889,7 +868,9 @@ pub mod invariant_send_tokens {
                 return Ok(InvariantSendTokensEvents::LogNamedDecimalIntFilter(decoded));
             }
             if let Ok(decoded) = LogNamedDecimalUintFilter::decode_log(log) {
-                return Ok(InvariantSendTokensEvents::LogNamedDecimalUintFilter(decoded));
+                return Ok(InvariantSendTokensEvents::LogNamedDecimalUintFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = LogNamedIntFilter::decode_log(log) {
                 return Ok(InvariantSendTokensEvents::LogNamedIntFilter(decoded));
@@ -924,32 +905,16 @@ pub mod invariant_send_tokens {
                 InvariantSendTokensEvents::LogBytesFilter(element) => element.fmt(f),
                 InvariantSendTokensEvents::LogBytes32Filter(element) => element.fmt(f),
                 InvariantSendTokensEvents::LogIntFilter(element) => element.fmt(f),
-                InvariantSendTokensEvents::LogNamedAddressFilter(element) => {
-                    element.fmt(f)
-                }
-                InvariantSendTokensEvents::LogNamedArray1Filter(element) => {
-                    element.fmt(f)
-                }
-                InvariantSendTokensEvents::LogNamedArray2Filter(element) => {
-                    element.fmt(f)
-                }
-                InvariantSendTokensEvents::LogNamedArray3Filter(element) => {
-                    element.fmt(f)
-                }
+                InvariantSendTokensEvents::LogNamedAddressFilter(element) => element.fmt(f),
+                InvariantSendTokensEvents::LogNamedArray1Filter(element) => element.fmt(f),
+                InvariantSendTokensEvents::LogNamedArray2Filter(element) => element.fmt(f),
+                InvariantSendTokensEvents::LogNamedArray3Filter(element) => element.fmt(f),
                 InvariantSendTokensEvents::LogNamedBytesFilter(element) => element.fmt(f),
-                InvariantSendTokensEvents::LogNamedBytes32Filter(element) => {
-                    element.fmt(f)
-                }
-                InvariantSendTokensEvents::LogNamedDecimalIntFilter(element) => {
-                    element.fmt(f)
-                }
-                InvariantSendTokensEvents::LogNamedDecimalUintFilter(element) => {
-                    element.fmt(f)
-                }
+                InvariantSendTokensEvents::LogNamedBytes32Filter(element) => element.fmt(f),
+                InvariantSendTokensEvents::LogNamedDecimalIntFilter(element) => element.fmt(f),
+                InvariantSendTokensEvents::LogNamedDecimalUintFilter(element) => element.fmt(f),
                 InvariantSendTokensEvents::LogNamedIntFilter(element) => element.fmt(f),
-                InvariantSendTokensEvents::LogNamedStringFilter(element) => {
-                    element.fmt(f)
-                }
+                InvariantSendTokensEvents::LogNamedStringFilter(element) => element.fmt(f),
                 InvariantSendTokensEvents::LogNamedUintFilter(element) => element.fmt(f),
                 InvariantSendTokensEvents::LogStringFilter(element) => element.fmt(f),
                 InvariantSendTokensEvents::LogUintFilter(element) => element.fmt(f),
@@ -965,8 +930,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "IS_TEST", abi = "IS_TEST()")]
     pub struct IsTestCall;
     ///Container type for all input parameters for the `__asset__` function with signature `__asset__()` and selector `0xd43c0f99`
@@ -977,8 +942,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "__asset__", abi = "__asset__()")]
     pub struct AssetCall;
     ///Container type for all input parameters for the `__hyper__` function with signature `__hyper__()` and selector `0x3e81296e`
@@ -989,8 +954,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "__hyper__", abi = "__hyper__()")]
     pub struct HyperCall;
     ///Container type for all input parameters for the `__poolId__` function with signature `__poolId__()` and selector `0xc6a68a47`
@@ -1001,8 +966,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "__poolId__", abi = "__poolId__()")]
     pub struct PoolIdCall;
     ///Container type for all input parameters for the `__quote__` function with signature `__quote__()` and selector `0x8dbc9651`
@@ -1013,8 +978,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "__quote__", abi = "__quote__()")]
     pub struct QuoteCall;
     ///Container type for all input parameters for the `_getBalance` function with signature `_getBalance(address,address,address)` and selector `0xcf7dee1f`
@@ -1025,8 +990,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "_getBalance", abi = "_getBalance(address,address,address)")]
     pub struct _GetBalanceCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1041,8 +1006,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "_getPool", abi = "_getPool(address,uint64)")]
     pub struct _GetPoolCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1056,8 +1021,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "_getPosition", abi = "_getPosition(address,address,uint64)")]
     pub struct _GetPositionCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1072,8 +1037,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "_getReserve", abi = "_getReserve(address,address)")]
     pub struct _GetReserveCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1087,8 +1052,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "failed", abi = "failed()")]
     pub struct FailedCall;
     ///Container type for all input parameters for the `getBalance` function with signature `getBalance(address,address,address)` and selector `0xd6bd603c`
@@ -1099,8 +1064,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getBalance", abi = "getBalance(address,address,address)")]
     pub struct GetBalanceCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1115,9 +1080,12 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
-    #[ethcall(name = "getBalanceSum", abi = "getBalanceSum(address,address,address[])")]
+    #[ethcall(
+        name = "getBalanceSum",
+        abi = "getBalanceSum(address,address,address[])"
+    )]
     pub struct GetBalanceSumCall {
         pub hyper: ::ethers::core::types::Address,
         pub token: ::ethers::core::types::Address,
@@ -1131,8 +1099,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getCurve", abi = "getCurve(address,uint64)")]
     pub struct GetCurveCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1146,8 +1114,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getMaxSwapLimit", abi = "getMaxSwapLimit(bool)")]
     pub struct GetMaxSwapLimitCall {
         pub sell_asset: bool,
@@ -1160,8 +1128,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getPair", abi = "getPair(address,uint24)")]
     pub struct GetPairCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1175,9 +1143,12 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
-    #[ethcall(name = "getPhysicalBalance", abi = "getPhysicalBalance(address,address)")]
+    #[ethcall(
+        name = "getPhysicalBalance",
+        abi = "getPhysicalBalance(address,address)"
+    )]
     pub struct GetPhysicalBalanceCall {
         pub hyper: ::ethers::core::types::Address,
         pub token: ::ethers::core::types::Address,
@@ -1190,8 +1161,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getPool", abi = "getPool(address,uint64)")]
     pub struct GetPoolCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1205,8 +1176,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getPosition", abi = "getPosition(address,address,uint64)")]
     pub struct GetPositionCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1221,8 +1192,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(
         name = "getPositionLiquiditySum",
         abi = "getPositionLiquiditySum(address,uint64,address[])"
@@ -1240,8 +1211,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getReserve", abi = "getReserve(address,address)")]
     pub struct GetReserveCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1255,8 +1226,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "getState", abi = "getState(address,uint64,address,address[])")]
     pub struct GetStateCall {
         pub hyper: ::ethers::core::types::Address,
@@ -1272,8 +1243,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(
         name = "getVirtualBalance",
         abi = "getVirtualBalance(address,address,address[])"
@@ -1291,8 +1262,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "sendAssetTokens", abi = "sendAssetTokens(uint256)")]
     pub struct SendAssetTokensCall {
         pub amount: ::ethers::core::types::U256,
@@ -1305,8 +1276,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "sendQuoteTokens", abi = "sendQuoteTokens(uint256)")]
     pub struct SendQuoteTokensCall {
         pub amount: ::ethers::core::types::U256,
@@ -1342,136 +1313,126 @@ pub mod invariant_send_tokens {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <IsTestCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <IsTestCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::IsTest(decoded));
             }
-            if let Ok(decoded)
-                = <AssetCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <AssetCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::Asset(decoded));
             }
-            if let Ok(decoded)
-                = <HyperCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <HyperCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::Hyper(decoded));
             }
-            if let Ok(decoded)
-                = <PoolIdCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <PoolIdCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::PoolId(decoded));
             }
-            if let Ok(decoded)
-                = <QuoteCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <QuoteCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::Quote(decoded));
             }
-            if let Ok(decoded)
-                = <_GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <_GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::_GetBalance(decoded));
             }
-            if let Ok(decoded)
-                = <_GetPoolCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <_GetPoolCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::_GetPool(decoded));
             }
-            if let Ok(decoded)
-                = <_GetPositionCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <_GetPositionCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::_GetPosition(decoded));
             }
-            if let Ok(decoded)
-                = <_GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <_GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::_GetReserve(decoded));
             }
-            if let Ok(decoded)
-                = <FailedCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <FailedCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::Failed(decoded));
             }
-            if let Ok(decoded)
-                = <GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetBalance(decoded));
             }
-            if let Ok(decoded)
-                = <GetBalanceSumCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetBalanceSumCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetBalanceSum(decoded));
             }
-            if let Ok(decoded)
-                = <GetCurveCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetCurveCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetCurve(decoded));
             }
-            if let Ok(decoded)
-                = <GetMaxSwapLimitCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetMaxSwapLimitCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetMaxSwapLimit(decoded));
             }
-            if let Ok(decoded)
-                = <GetPairCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetPairCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetPair(decoded));
             }
-            if let Ok(decoded)
-                = <GetPhysicalBalanceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetPhysicalBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetPhysicalBalance(decoded));
             }
-            if let Ok(decoded)
-                = <GetPoolCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetPoolCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetPool(decoded));
             }
-            if let Ok(decoded)
-                = <GetPositionCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetPositionCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetPosition(decoded));
             }
-            if let Ok(decoded)
-                = <GetPositionLiquiditySumCall as ::ethers::core::abi::AbiDecode>::decode(
+            if let Ok(decoded) =
+                <GetPositionLiquiditySumCall as ::ethers::core::abi::AbiDecode>::decode(
                     data.as_ref(),
-                ) {
+                )
+            {
                 return Ok(InvariantSendTokensCalls::GetPositionLiquiditySum(decoded));
             }
-            if let Ok(decoded)
-                = <GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetReserveCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetReserve(decoded));
             }
-            if let Ok(decoded)
-                = <GetStateCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetStateCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetState(decoded));
             }
-            if let Ok(decoded)
-                = <GetVirtualBalanceCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <GetVirtualBalanceCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::GetVirtualBalance(decoded));
             }
-            if let Ok(decoded)
-                = <SendAssetTokensCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <SendAssetTokensCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::SendAssetTokens(decoded));
             }
-            if let Ok(decoded)
-                = <SendQuoteTokensCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <SendQuoteTokensCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(InvariantSendTokensCalls::SendQuoteTokens(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1498,9 +1459,7 @@ pub mod invariant_send_tokens {
                 InvariantSendTokensCalls::GetPhysicalBalance(element) => element.encode(),
                 InvariantSendTokensCalls::GetPool(element) => element.encode(),
                 InvariantSendTokensCalls::GetPosition(element) => element.encode(),
-                InvariantSendTokensCalls::GetPositionLiquiditySum(element) => {
-                    element.encode()
-                }
+                InvariantSendTokensCalls::GetPositionLiquiditySum(element) => element.encode(),
                 InvariantSendTokensCalls::GetReserve(element) => element.encode(),
                 InvariantSendTokensCalls::GetState(element) => element.encode(),
                 InvariantSendTokensCalls::GetVirtualBalance(element) => element.encode(),
@@ -1530,9 +1489,7 @@ pub mod invariant_send_tokens {
                 InvariantSendTokensCalls::GetPhysicalBalance(element) => element.fmt(f),
                 InvariantSendTokensCalls::GetPool(element) => element.fmt(f),
                 InvariantSendTokensCalls::GetPosition(element) => element.fmt(f),
-                InvariantSendTokensCalls::GetPositionLiquiditySum(element) => {
-                    element.fmt(f)
-                }
+                InvariantSendTokensCalls::GetPositionLiquiditySum(element) => element.fmt(f),
                 InvariantSendTokensCalls::GetReserve(element) => element.fmt(f),
                 InvariantSendTokensCalls::GetState(element) => element.fmt(f),
                 InvariantSendTokensCalls::GetVirtualBalance(element) => element.fmt(f),
@@ -1669,8 +1626,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct IsTestReturn(pub bool);
     ///Container type for all return fields from the `__asset__` function with signature `__asset__()` and selector `0xd43c0f99`
     #[derive(
@@ -1680,8 +1637,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct AssetReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `__hyper__` function with signature `__hyper__()` and selector `0x3e81296e`
     #[derive(
@@ -1691,8 +1648,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct HyperReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `__poolId__` function with signature `__poolId__()` and selector `0xc6a68a47`
     #[derive(
@@ -1702,8 +1659,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct PoolIdReturn(pub u64);
     ///Container type for all return fields from the `__quote__` function with signature `__quote__()` and selector `0x8dbc9651`
     #[derive(
@@ -1713,8 +1670,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct QuoteReturn(pub ::ethers::core::types::Address);
     ///Container type for all return fields from the `_getBalance` function with signature `_getBalance(address,address,address)` and selector `0xcf7dee1f`
     #[derive(
@@ -1724,8 +1681,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct _GetBalanceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `_getPool` function with signature `_getPool(address,uint64)` and selector `0x09deb4d3`
     #[derive(
@@ -1735,8 +1692,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct _GetPoolReturn(pub HyperPool);
     ///Container type for all return fields from the `_getPosition` function with signature `_getPosition(address,address,uint64)` and selector `0xdc723804`
     #[derive(
@@ -1746,8 +1703,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct _GetPositionReturn(pub HyperPosition);
     ///Container type for all return fields from the `_getReserve` function with signature `_getReserve(address,address)` and selector `0x5a8be8b0`
     #[derive(
@@ -1757,8 +1714,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct _GetReserveReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `failed` function with signature `failed()` and selector `0xba414fa6`
     #[derive(
@@ -1768,8 +1725,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct FailedReturn(pub bool);
     ///Container type for all return fields from the `getBalance` function with signature `getBalance(address,address,address)` and selector `0xd6bd603c`
     #[derive(
@@ -1779,8 +1736,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetBalanceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getBalanceSum` function with signature `getBalanceSum(address,address,address[])` and selector `0xff314c0a`
     #[derive(
@@ -1790,8 +1747,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetBalanceSumReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getCurve` function with signature `getCurve(address,uint64)` and selector `0xd83410b6`
     #[derive(
@@ -1801,8 +1758,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetCurveReturn(pub HyperCurve);
     ///Container type for all return fields from the `getMaxSwapLimit` function with signature `getMaxSwapLimit(bool)` and selector `0xcee2aaf5`
     #[derive(
@@ -1812,8 +1769,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetMaxSwapLimitReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getPair` function with signature `getPair(address,uint24)` and selector `0x7b135ad1`
     #[derive(
@@ -1823,8 +1780,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPairReturn(pub HyperPair);
     ///Container type for all return fields from the `getPhysicalBalance` function with signature `getPhysicalBalance(address,address)` and selector `0x634e05e0`
     #[derive(
@@ -1834,8 +1791,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPhysicalBalanceReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getPool` function with signature `getPool(address,uint64)` and selector `0x273c329f`
     #[derive(
@@ -1845,8 +1802,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPoolReturn(pub HyperPool);
     ///Container type for all return fields from the `getPosition` function with signature `getPosition(address,address,uint64)` and selector `0xdd05e299`
     #[derive(
@@ -1856,8 +1813,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPositionReturn(pub HyperPosition);
     ///Container type for all return fields from the `getPositionLiquiditySum` function with signature `getPositionLiquiditySum(address,uint64,address[])` and selector `0x8828200d`
     #[derive(
@@ -1867,8 +1824,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetPositionLiquiditySumReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getReserve` function with signature `getReserve(address,address)` and selector `0xcbc3ab53`
     #[derive(
@@ -1878,8 +1835,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetReserveReturn(pub ::ethers::core::types::U256);
     ///Container type for all return fields from the `getState` function with signature `getState(address,uint64,address,address[])` and selector `0xf3140b1e`
     #[derive(
@@ -1889,8 +1846,8 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetStateReturn(pub HyperState);
     ///Container type for all return fields from the `getVirtualBalance` function with signature `getVirtualBalance(address,address,address[])` and selector `0x6dce537d`
     #[derive(
@@ -1900,7 +1857,7 @@ pub mod invariant_send_tokens {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct GetVirtualBalanceReturn(pub ::ethers::core::types::U256);
 }

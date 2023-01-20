@@ -5,22 +5,24 @@ pub mod iweth {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///IWETH was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///IWETH was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\",\"name\":\"deposit\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"wad\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"withdraw\",\"outputs\":[]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static IWETH_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static IWETH_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     pub struct IWETH<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for IWETH<M> {
         fn clone(&self) -> Self {
@@ -35,7 +37,9 @@ pub mod iweth {
     }
     impl<M> std::fmt::Debug for IWETH<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(IWETH)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(IWETH))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> IWETH<M> {
@@ -46,13 +50,11 @@ pub mod iweth {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    IWETH_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                IWETH_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `deposit` (0xd0e30db0) function
         pub fn deposit(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
@@ -70,8 +72,7 @@ pub mod iweth {
                 .expect("method not found (this should never happen)")
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for IWETH<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for IWETH<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -84,8 +85,8 @@ pub mod iweth {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "deposit", abi = "deposit()")]
     pub struct DepositCall;
     ///Container type for all input parameters for the `withdraw` function with signature `withdraw(uint256)` and selector `0x2e1a7d4d`
@@ -96,8 +97,8 @@ pub mod iweth {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "withdraw", abi = "withdraw(uint256)")]
     pub struct WithdrawCall {
         pub wad: ::ethers::core::types::U256,
@@ -111,16 +112,14 @@ pub mod iweth {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <DepositCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <DepositCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IWETHCalls::Deposit(decoded));
             }
-            if let Ok(decoded)
-                = <WithdrawCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <WithdrawCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IWETHCalls::Withdraw(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())

@@ -5,22 +5,24 @@ pub mod i_hyper_actions {
     #![allow(dead_code)]
     #![allow(clippy::type_complexity)]
     #![allow(unused_imports)]
-    ///IHyperActions was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
-    use std::sync::Arc;
+    use ::ethers::contract::{
+        builders::{ContractCall, Event},
+        Contract, Lazy,
+    };
     use ::ethers::core::{
-        abi::{Abi, Token, Detokenize, InvalidOutputType, Tokenizable},
+        abi::{Abi, Detokenize, InvalidOutputType, Token, Tokenizable},
         types::*,
     };
-    use ::ethers::contract::{
-        Contract, builders::{ContractCall, Event},
-        Lazy,
-    };
     use ::ethers::providers::Middleware;
+    ///IHyperActions was auto-generated with ethers-rs Abigen. More information at: https://github.com/gakonst/ethers-rs
+    use std::sync::Arc;
     #[rustfmt::skip]
     const __ABI: &str = "[{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"deltaLiquidity\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"allocate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"deltaAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"deltaQuote\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"priorityFee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"fee\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"volatility\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"duration\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"uint16\",\"name\":\"jit\",\"type\":\"uint16\",\"components\":[]},{\"internalType\":\"int24\",\"name\":\"maxTick\",\"type\":\"int24\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"changeParameters\",\"outputs\":[]},{\"inputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\",\"name\":\"deposit\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"draw\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"fund\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"deltaLiquidity\",\"type\":\"uint128\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"stake\",\"outputs\":[]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"bool\",\"name\":\"sellAsset\",\"type\":\"bool\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"limit\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"swap\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"output\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"remainder\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unallocate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"deltaAsset\",\"type\":\"uint256\",\"components\":[]},{\"internalType\":\"uint256\",\"name\":\"deltaQuote\",\"type\":\"uint256\",\"components\":[]}]},{\"inputs\":[{\"internalType\":\"uint64\",\"name\":\"poolId\",\"type\":\"uint64\",\"components\":[]},{\"internalType\":\"uint128\",\"name\":\"deltaLiquidity\",\"type\":\"uint128\",\"components\":[]}],\"stateMutability\":\"nonpayable\",\"type\":\"function\",\"name\":\"unstake\",\"outputs\":[]}]";
     /// The parsed JSON-ABI of the contract.
-    pub static IHYPERACTIONS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(||
-    ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi"));
+    pub static IHYPERACTIONS_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
+        ::ethers::contract::Lazy::new(|| {
+            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("invalid abi")
+        });
     pub struct IHyperActions<M>(::ethers::contract::Contract<M>);
     impl<M> Clone for IHyperActions<M> {
         fn clone(&self) -> Self {
@@ -35,7 +37,9 @@ pub mod i_hyper_actions {
     }
     impl<M> std::fmt::Debug for IHyperActions<M> {
         fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-            f.debug_tuple(stringify!(IHyperActions)).field(&self.address()).finish()
+            f.debug_tuple(stringify!(IHyperActions))
+                .field(&self.address())
+                .finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> IHyperActions<M> {
@@ -46,13 +50,11 @@ pub mod i_hyper_actions {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(
-                ::ethers::contract::Contract::new(
-                    address.into(),
-                    IHYPERACTIONS_ABI.clone(),
-                    client,
-                ),
-            )
+            Self(::ethers::contract::Contract::new(
+                address.into(),
+                IHYPERACTIONS_ABI.clone(),
+                client,
+            ))
         }
         ///Calls the contract's `allocate` (0x2c0f8903) function
         pub fn allocate(
@@ -81,7 +83,15 @@ pub mod i_hyper_actions {
             self.0
                 .method_hash(
                     [106, 112, 126, 250],
-                    (pool_id, priority_fee, fee, volatility, duration, jit, max_tick),
+                    (
+                        pool_id,
+                        priority_fee,
+                        fee,
+                        volatility,
+                        duration,
+                        jit,
+                        max_tick,
+                    ),
                 )
                 .expect("method not found (this should never happen)")
         }
@@ -162,7 +172,8 @@ pub mod i_hyper_actions {
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-    for IHyperActions<M> {
+        for IHyperActions<M>
+    {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -175,8 +186,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "allocate", abi = "allocate(uint64,uint256)")]
     pub struct AllocateCall {
         pub pool_id: u64,
@@ -190,8 +201,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(
         name = "changeParameters",
         abi = "changeParameters(uint64,uint16,uint16,uint16,uint16,uint16,int24)"
@@ -213,8 +224,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "deposit", abi = "deposit()")]
     pub struct DepositCall;
     ///Container type for all input parameters for the `draw` function with signature `draw(address,uint256,address)` and selector `0xad24d6a0`
@@ -225,8 +236,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "draw", abi = "draw(address,uint256,address)")]
     pub struct DrawCall {
         pub token: ::ethers::core::types::Address,
@@ -241,8 +252,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "fund", abi = "fund(address,uint256)")]
     pub struct FundCall {
         pub token: ::ethers::core::types::Address,
@@ -256,8 +267,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "stake", abi = "stake(uint64,uint128)")]
     pub struct StakeCall {
         pub pool_id: u64,
@@ -271,8 +282,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "swap", abi = "swap(uint64,bool,uint256,uint256)")]
     pub struct SwapCall {
         pub pool_id: u64,
@@ -288,8 +299,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "unallocate", abi = "unallocate(uint64,uint256)")]
     pub struct UnallocateCall {
         pub pool_id: u64,
@@ -303,8 +314,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthCall,
         ::ethers::contract::EthDisplay,
+        Default,
     )]
-    #[derive(Default)]
     #[ethcall(name = "unstake", abi = "unstake(uint64,uint128)")]
     pub struct UnstakeCall {
         pub pool_id: u64,
@@ -326,50 +337,46 @@ pub mod i_hyper_actions {
         fn decode(
             data: impl AsRef<[u8]>,
         ) -> ::std::result::Result<Self, ::ethers::core::abi::AbiError> {
-            if let Ok(decoded)
-                = <AllocateCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <AllocateCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Allocate(decoded));
             }
-            if let Ok(decoded)
-                = <ChangeParametersCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <ChangeParametersCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::ChangeParameters(decoded));
             }
-            if let Ok(decoded)
-                = <DepositCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <DepositCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Deposit(decoded));
             }
-            if let Ok(decoded)
-                = <DrawCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) = <DrawCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Draw(decoded));
             }
-            if let Ok(decoded)
-                = <FundCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) = <FundCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Fund(decoded));
             }
-            if let Ok(decoded)
-                = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) =
+                <StakeCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Stake(decoded));
             }
-            if let Ok(decoded)
-                = <SwapCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref()) {
+            if let Ok(decoded) = <SwapCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Swap(decoded));
             }
-            if let Ok(decoded)
-                = <UnallocateCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <UnallocateCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Unallocate(decoded));
             }
-            if let Ok(decoded)
-                = <UnstakeCall as ::ethers::core::abi::AbiDecode>::decode(
-                    data.as_ref(),
-                ) {
+            if let Ok(decoded) =
+                <UnstakeCall as ::ethers::core::abi::AbiDecode>::decode(data.as_ref())
+            {
                 return Ok(IHyperActionsCalls::Unstake(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -458,8 +465,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct AllocateReturn {
         pub delta_asset: ::ethers::core::types::U256,
         pub delta_quote: ::ethers::core::types::U256,
@@ -472,8 +479,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct SwapReturn {
         pub output: ::ethers::core::types::U256,
         pub remainder: ::ethers::core::types::U256,
@@ -486,8 +493,8 @@ pub mod i_hyper_actions {
         PartialEq,
         ::ethers::contract::EthAbiType,
         ::ethers::contract::EthAbiCodec,
+        Default,
     )]
-    #[derive(Default)]
     pub struct UnallocateReturn {
         pub delta_asset: ::ethers::core::types::U256,
         pub delta_quote: ::ethers::core::types::U256,
