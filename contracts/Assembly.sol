@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 /**
 
   -------------
-  
+
   Using yul to handle low-level coversions
   can easily be a foot shotgun.
 
@@ -38,10 +38,10 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
     }
 }
 
-/** 
+/**
 
     @dev Reference:
-    
+
     if (delta < 0) {
         output = input - uint128(-delta);
         if (output >= input) revert InvalidLiquidity();
@@ -53,24 +53,10 @@ function __between(int256 value, int256 lower, int256 upper) pure returns (bool 
 function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
     bytes memory revertData = abi.encodeWithSelector(InvalidLiquidity.selector);
     assembly {
-        switch slt(delta, 0) // delta < 0 ? 1 : 0
-        // negative delta
-        case 1 {
-            output := sub(input, add(not(delta), 1))
-            switch slt(output, input) // output < input ? 1 : 0 todo: change op to lt
-            case 0 {
-                // not less than
-                revert(add(32, revertData), mload(revertData)) // 0x1fff9681
-            }
-        }
-        // position delta
-        case 0 {
-            output := add(input, delta)
-            switch slt(output, input) // (output < input ? 1 : 0) == 0 ? 1 : 0 todo: change op to lt
-            case 1 {
-                // less than
-                revert(add(32, revertData), mload(revertData)) // 0x1fff9681
-            }
+        output := add(input, delta)
+
+        if gt(output, 0xffffffffffffffffffffffffffffffff) {
+            revert(add(32, revertData), mload(revertData)) // 0x1fff9681
         }
     }
 }
