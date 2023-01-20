@@ -34,7 +34,7 @@ contract TestHyperCreate is TestHyperSetup {
             price
         );
         bool success = __revertCatcher__.process(data);
-        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(2));
+        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(__hyperTestingContract__.getPoolNonce()));
 
         HyperPool memory pool = _getPool(hs(), poolId);
         HyperCurve memory actual = pool.params;
@@ -54,7 +54,8 @@ contract TestHyperCreate is TestHyperSetup {
         bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "create failed");
-        assertEq(_getPool(hs(), defaultScenario.poolId + 1).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY);
+        uint64 poolId = Enigma.encodePoolId(uint24(1), false, uint32(__hyperTestingContract__.getPoolNonce()));
+        assertEq(_getPool(hs(), poolId).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY);
     }
 
     function testCreatePoolZeroPriceReverts() public {
@@ -255,6 +256,6 @@ contract TestHyperCreate is TestHyperSetup {
         bool success = __revertCatcher__.process(createData);
         assertTrue(success, "did not create pool");
 
-        poolId = Enigma.encodePoolId(pairId, true, uint32(2));
+        poolId = Enigma.encodePoolId(pairId, true, uint32(__hyperTestingContract__.getPoolNonce()));
     }
 }
