@@ -18,8 +18,7 @@ async fn main() -> Result<()> {
     let hyper = Hyper::new(hyper_address, provider.clone());
     let block = provider.get_block(0).await?;
     println!("block: {:#?}", block.unwrap());
-    println!("hyper: {:#?}", hyper);
-    Ok(())
+    println!("hyper: {hyper:#?}");
 }
 
 pub async fn get_provider() -> Arc<Provider<Http>> {
