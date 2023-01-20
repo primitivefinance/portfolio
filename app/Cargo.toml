@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-foundry-contracts = { path = "../out/bindings" }
+foundry-contracts = { path = "./bindings" }
 tokio = { version = "1.17.0", features = ["macros"] }
 env = "0.0.0"
 ethers = "1.0.0"

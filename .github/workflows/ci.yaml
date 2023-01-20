@@ -38,8 +38,8 @@ jobs:
         with:
           cache-on-failure: true
 
-      # - name: cargo test
-      #   run: cargo test --all --all-features
+      - name: cargo test
+        run: cargo test --all --all-features
 
   lint:
     runs-on: ubuntu-latest
@@ -59,8 +59,8 @@ jobs:
         with:
           cache-on-failure: true
 
-      # - name: cargo fmt
-      #   run: cargo +nightly fmt --all -- --check
+      - name: cargo fmt
+        run: cargo +nightly fmt --all -- --check
 
       - name: cargo clippy
         run: cargo +nightly clippy --all --all-features -- -D warnings
