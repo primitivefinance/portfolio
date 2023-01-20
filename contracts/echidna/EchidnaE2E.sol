@@ -971,6 +971,31 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
     using SafeCastLib for uint256;
 
+    // ******************** Claim ********************
+    function claim_should_succeed_with_correct_preconditions(
+        uint256 id,
+        uint256 deltaAsset,
+        uint256 deltaQuote
+    ) public {
+        (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
+        emit LogUint256("pool id:", uint256(poolId));
+
+        HyperPosition memory preClaimPosition = getPosition(address(_hyper), address(this), poolId);
+        require(preClaimPosition.lastTimestamp != 0);
+
+        try _hyper.claim(poolId, deltaAsset, deltaQuote) {
+            // if tokens were owned, decrement from position
+            // if tokens were owed, getBalance of tokens increased for the caller
+        } catch {
+            emit AssertionFailed("BUG: claim function should have succeeded");
+        }
+    }
+
     // Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool
     // ******************** Allocate ********************
     function allocate_should_succeed_with_correct_preconditions(uint256 id, uint256 deltaLiquidity) public {
