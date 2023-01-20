@@ -19,6 +19,7 @@ async fn main() -> Result<()> {
     let block = provider.get_block(0).await?;
     println!("block: {:#?}", block.unwrap());
     println!("hyper: {hyper:#?}");
+    Ok(())
 }
 
 pub async fn get_provider() -> Arc<Provider<Http>> {
