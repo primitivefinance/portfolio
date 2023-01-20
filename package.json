@@ -1,7 +1,7 @@
 {
   "name": "@primitivefi/hyper",
   "license": "AGPL-3.0-only",
-  "version": "beta-v0.0.1",
+  "version": "beta-v0.1.0",
   "description": "Gas optimized automated market maker.",
   "files": [
     "contracts/**/*.sol"
