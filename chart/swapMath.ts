@@ -17,6 +17,7 @@ export type Parameters = {
   fee?: number
   swapAssetIn?: number
   swapQuoteIn?: number
+  epsilon?: number
 }
 
 /**
@@ -74,6 +75,17 @@ export function computeMarginalPriceAssetIn(d_x, R_x, strike, vol, tau, fee, inv
   let d_y = part5 * part6
   console.log({ d_y })
   return d_y
+}
+
+// (P(t) / K ^ sqrt(1 - e / t ) ) Ke^(1/2o^2(sqrt(t)sqrt(t-e)-(t-e)))
+export function computePriceWithChangeInTau(strike, vol, price, tau, epsilon) {
+  tau = years(tau)
+  epsilon = years(epsilon)
+  let part0 = price / strike
+  let part1 = part0 ** Math.sqrt(1 - epsilon / tau)
+  let part2 = (1 / 2) * vol ** 2 * (Math.sqrt(tau) * Math.sqrt(tau - epsilon) - (tau - epsilon))
+  let part3 = Math.exp(part2)
+  return part1 * strike * part3
 }
 
 export function getAmounts(parameters: Parameters): [number, number] {

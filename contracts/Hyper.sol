@@ -190,18 +190,23 @@ contract Hyper is IHyper {
         // interactions modifier does the work.
     }
 
-    // todo: test
     function claim(uint64 poolId, uint deltaAsset, uint deltaQuote) external lock interactions {
         HyperPool memory pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
-        pos.syncPositionFees(pool.liquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
-        pos.tokensOwedAsset -= deltaAsset.safeCastTo128();
-        pos.tokensOwedQuote -= deltaQuote.safeCastTo128();
+        uint256 positionLiquidity = pos.freeLiquidity + pos.stakedLiquidity;
+        pos.syncPositionFees(positionLiquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
 
-        if (deltaAsset > 0) _applyCredit(pool.pair.tokenAsset, deltaAsset); // todo: problem, what balance do fees accrue to?
-        if (deltaQuote > 0) _applyCredit(pool.pair.tokenQuote, deltaQuote); // todo: add debit to this contract?
+        // 2^256 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
+        uint256 claimedAssets = deltaAsset == type(uint256).max ? pos.tokensOwedAsset : deltaAsset;
+        uint256 claimedQuotes = deltaQuote == type(uint256).max ? pos.tokensOwedQuote : deltaQuote;
+
+        pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
+        pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
+
+        if (claimedAssets > 0) _applyCredit(pool.pair.tokenAsset, claimedAssets);
+        if (claimedQuotes > 0) _applyCredit(pool.pair.tokenQuote, claimedQuotes);
 
         pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalReward);
         uint128 deltaReward = pos.tokensOwedReward;
@@ -222,9 +227,9 @@ contract Hyper is IHyper {
         emit Collect(
             poolId,
             msg.sender,
-            deltaAsset,
+            claimedAssets,
             pool.pair.tokenAsset,
-            deltaQuote,
+            claimedQuotes,
             pool.pair.tokenQuote,
             deltaReward,
             WETH
@@ -299,8 +304,14 @@ contract Hyper is IHyper {
     function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint feeAsset, uint feeQuote) {
         (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
+        // Positions are broken up into "free" and "staked" liquidity buckets.
+        // The pool accrues fees to the sum of these buckets, so the same fees are earned
+        // for a position with 2 free and 0 staked as a position with 1 free and 1 staked.
+        // The purpose for staking is to access a new fee bucket, the "reward", in addition
+        // to the standard bucket.
+        uint256 positionLiquidity = pos.freeLiquidity + pos.stakedLiquidity;
         (feeAsset, feeQuote) = pos.syncPositionFees(
-            pool.liquidity,
+            positionLiquidity,
             pool.feeGrowthGlobalAsset,
             pool.feeGrowthGlobalQuote
         );

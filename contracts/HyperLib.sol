@@ -208,15 +208,17 @@ function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, 
 /** @dev Liquidity must be altered after syncing positions and not before. */
 function syncPositionFees(
     HyperPosition storage self,
-    uint liquidity,
+    uint positionLiquidity,
     uint feeGrowthAsset,
     uint feeGrowthQuote
 ) returns (uint feeAssetEarned, uint feeQuoteEarned) {
-    uint checkpointAsset = Assembly.computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
-    uint checkpointQuote = Assembly.computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
-
-    feeAssetEarned = FixedPointMathLib.mulWadDown(checkpointAsset, liquidity);
-    feeQuoteEarned = FixedPointMathLib.mulWadDown(checkpointQuote, liquidity);
+    // fee growth current - position fee growth last
+    uint differenceAsset = Assembly.computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
+    uint differenceQuote = Assembly.computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
+    
+    // fee growth per liquidity * position liquidity
+    feeAssetEarned = FixedPointMathLib.mulWadDown(differenceAsset, positionLiquidity); 
+    feeQuoteEarned = FixedPointMathLib.mulWadDown(differenceQuote, positionLiquidity);
 
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;
