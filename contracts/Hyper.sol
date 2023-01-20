@@ -34,11 +34,11 @@ contract Hyper is IHyper {
             mstore(0x00, 0x20)
 
             // Then we load both the length of our string (11 bytes, 0x0b in hex) and its
-            // actual hex value (0x626574612d76302e302e31) using the offset 0x2b. Using this
+            // actual hex value (0x626574612d76302e312e30) using the offset 0x2b. Using this
             // particular offset value will right pad the length at the end of the slot
             // and left pad the string at the beginning of the next slot, assuring the
             // right ABI format to return a string.
-            mstore(0x2b, 0x0b626574612d76302e302e31) // "beta-v0.0.1"
+            mstore(0x2b, 0x0b626574612d76302e312e30) // "beta-v0.1.0"
 
             // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
@@ -69,10 +69,10 @@ contract Hyper is IHyper {
     }
 
     /**
-     * @dev     
+     * @dev
      * Used on external functions to handle settlement of outstanding token balances.
-     * 
-     * @notice 
+     *
+     * @notice
      * Tokens sent to this contract are lost.
      *
      * @custom:guide
@@ -104,7 +104,7 @@ contract Hyper is IHyper {
      * Failing to pass a valid WETH contract that implements the `deposit()` function,
      * will cause all transactions with Hyper to fail once address(this).balance > 0.
      *
-     * @notice 
+     * @notice
      * Tokens sent to this contract are lost.
      */
     constructor(address weth) {

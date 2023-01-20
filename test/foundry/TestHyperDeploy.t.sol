@@ -19,7 +19,7 @@ contract TestHyperDeploy is TestHyperSetup {
         assertEq(hyper.WETH(), weth, "weth address");
         (, bool settled) = hyper.__account__();
         assertTrue(settled, "settled");
-        // todo: fix version
-        //assertTrue(bytes32(abi.encodePacked(hyper.VERSION())) == bytes32(abi.encodePacked("beta-v0.0.1")));
+
+        assertTrue(bytes32(abi.encodePacked(hyper.VERSION())) == bytes32(abi.encodePacked("beta-v0.1.0")));
     }
 }
