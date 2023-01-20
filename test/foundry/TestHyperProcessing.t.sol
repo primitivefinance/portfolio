@@ -109,9 +109,15 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint8 useMax = 0;
         uint8 direction = 0;
-        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
+        uint128 input = 2e18;
+        uint128 output = helperGetAmountOut(
+            address(__hyperTestingContract__),
+            defaultScenario.poolId,
+            direction == 0,
+            input
+        ).safeCastTo128();
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
+        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, output, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -160,7 +166,13 @@ contract TestHyperProcessing is TestHyperSetup {
         customWarp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
         bool direction = true;
-        __hyperTestingContract__.swap(defaultScenario.poolId, direction, amount, getMaxSwapLimit(direction));
+        uint internalBalance = 0.5 ether;
+        __hyperTestingContract__.fund(address(defaultScenario.asset), internalBalance);
+        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint128 input = internalBalance.safeCastTo128();
+        uint128 output = helperGetAmountOut(address(__hyperTestingContract__), defaultScenario.poolId, direction, input)
+            .safeCastTo128();
+        __hyperTestingContract__.swap(defaultScenario.poolId, direction, amount, output);
 
         uint256 next = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
         assertTrue(next == prev);
@@ -269,9 +281,15 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint8 useMax = 0;
         uint8 direction = 0;
-        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
+        uint128 input = 2e18;
+        uint128 output = helperGetAmountOut(
+            address(__hyperTestingContract__),
+            defaultScenario.poolId,
+            direction == 0,
+            input
+        ).safeCastTo128();
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
+        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, output, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -295,10 +313,16 @@ contract TestHyperProcessing is TestHyperSetup {
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastTimestamp;
         uint8 useMax = 0;
         uint8 direction = 0;
-        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
+        uint128 input = 2e18;
+        uint128 output = helperGetAmountOut(
+            address(__hyperTestingContract__),
+            defaultScenario.poolId,
+            direction == 0,
+            input
+        ).safeCastTo128();
 
         // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
-        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
+        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, output, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -321,11 +345,17 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint256 prev = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
 
-        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         uint8 useMax = 0;
         uint8 direction = 0;
-        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
-        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
+        uint128 input = 2e18;
+        uint128 output = helperGetAmountOut(
+            address(__hyperTestingContract__),
+            defaultScenario.poolId,
+            direction == 0,
+            input
+        ).safeCastTo128();
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, output, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
@@ -348,11 +378,17 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint256 prev = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
 
-        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
         uint8 useMax = 0;
         uint8 direction = 0;
-        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
-        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, limit, direction);
+        uint128 input = 2e18;
+        uint128 output = helperGetAmountOut(
+            address(__hyperTestingContract__),
+            defaultScenario.poolId,
+            direction == 0,
+            input
+        ).safeCastTo128();
+        // need to swap a large amount so we cross slots. This is 2e18. 0x12 = 18 10s, 0x02 = 2
+        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x12, 0x02, 0x0, output, direction);
         success = __revertCatcher__.process(data);
         assertTrue(success, "swap failed");
 
@@ -760,8 +796,14 @@ contract TestHyperProcessing is TestHyperSetup {
         // touch pool to update it so we know how much staked liquidity the position has
         uint8 useMax = 0;
         uint8 direction = 0;
-        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
-        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x09, 0x01, 0x0, limit, direction);
+        uint128 input = 0x01 * (10 ** 0x0d);
+        uint128 output = helperGetAmountOut(
+            address(__hyperTestingContract__),
+            defaultScenario.poolId,
+            direction == 0,
+            input
+        ).safeCastTo128();
+        data = Enigma.encodeSwap(useMax, defaultScenario.poolId, 0x0d, 0x01, 0x0, output, direction);
         success = __revertCatcher__.process(data);
 
         HyperPosition memory revertCatcherPos = defaultRevertCatcherPosition();
@@ -809,8 +851,14 @@ contract TestHyperProcessing is TestHyperSetup {
         // touch pool to update it so we know how much staked liquidity the position has
         uint8 useMax = 0;
         uint8 direction = 0;
-        uint128 limit = getMaxSwapLimit(direction == 0).safeCastTo128();
-        data = Enigma.encodeSwap(useMax, positionId, 0x09, 0x01, 0x0, limit, direction);
+        uint128 input = 0x01 * (10 ** 0x0c);
+        uint128 output = helperGetAmountOut(
+            address(__hyperTestingContract__),
+            defaultScenario.poolId,
+            direction == 0,
+            input
+        ).safeCastTo128();
+        data = Enigma.encodeSwap(useMax, positionId, 0x0c, 0x01, 0x0, output, direction);
         success = __revertCatcher__.process(data);
 
         uint256 prevPoolStakedLiquidity = getPool(address(__hyperTestingContract__), positionId).stakedLiquidity;

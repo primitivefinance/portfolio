@@ -11,17 +11,13 @@ contract TestHyperSwap is TestHyperSetup {
         _;
     }
 
+    // todo: fake test
     function testSwap_should_succeed() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
         uint input = DEFAULT_SWAP_INPUT;
         uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
-        (uint out, ) = pool.getAmountOut(
-            getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40)),
-            true,
-            input,
-            0
-        );
+        (uint out, ) = pool.getAmountOut(true, input, 0);
 
         (uint output, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
@@ -83,4 +79,76 @@ contract TestHyperSwap is TestHyperSetup {
         );
     }
     */
+
+    // maxInput case
+    function testSwap_pays_fee_maxInput() public allocateFirst {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
+        uint maxInput = getMaxSwapAssetInWad(pool);
+        uint extra = 1;
+        console.log(maxInput);
+        (uint out, ) = pool.getAmountOut(true, maxInput + extra, 0);
+
+        uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        (uint output, uint remainder) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            true,
+            maxInput + extra,
+            0 // limit
+        );
+
+        pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+
+        assertEq(remainder, extra, "expected-output");
+        assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
+    }
+
+    // not maxInput case
+    function testSwap_pays_fee() public allocateFirst {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
+        uint maxInput = getMaxSwapAssetInWad(pool);
+        (uint out, ) = pool.getAmountOut(true, maxInput - 1, 0);
+
+        uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        (uint output, uint remainder) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            true,
+            maxInput - 1,
+            0 // limit
+        );
+
+        pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+
+        assertEq(remainder, 0, "expected-output");
+        assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
+    }
+
+    /// todo: Fix this test! view this plot: `yarn plot --strike 1 --vol 1 --tau 365 --price 1 --epsilon 180 --swapAssetIn 0.1`
+    /* function testSwap_small_tau() public allocateFirst {
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
+        customWarp(pool.params.maturity() - 100);
+
+        pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+
+        uint maxInput = getMaxSwapAssetInWad(pool);
+        (uint out, ) = pool.getAmountOut(true, maxInput - 1, 0);
+
+        uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        (uint output, uint remainder) = __hyperTestingContract__.swap(
+            defaultScenario.poolId,
+            true,
+            maxInput - 1,
+            0 // limit
+        );
+
+        pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+
+        assertEq(remainder, 0, "expected-output");
+        assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
+    } */
 }

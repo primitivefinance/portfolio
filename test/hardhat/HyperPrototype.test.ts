@@ -7,16 +7,20 @@ import { parseEther } from 'ethers/lib/utils'
 import HyperSDK from '../../compiler/sdk'
 import * as instructions from '../../compiler/instructions'
 
+import { loadFixture } from '@nomicfoundation/hardhat-network-helpers'
+
 // Default parameters for testing.
 const params = {
   strike: parseEther('10'),
-  sigma: 1e4,
+  volatility: 1e4,
+  duration: 365,
   maturity: 31556953,
   fee: 1e2,
   priorityFee: 1e1,
+  jit: 4,
   price: parseEther('10'),
   liquidity: parseEther('10'),
-  tick: 23027, // ~$10, rounded up
+  maxTick: 23027, // ~$10, rounded up
 }
 
 /**
@@ -29,22 +33,33 @@ describe('HyperPrototype', function () {
   let deployer: SignerWithAddress, signers: SignerWithAddress[]
   let tokens: [Contract, Contract]
   let weth: Contract
+  let hyper: Contract
+
+  async function deployFixture() {
+    let [signer] = await hre.ethers.getSigners()
+    let _sdk = new HyperSDK(
+      signer,
+      async (signer) => await hre.ethers.getContractFactory('TestHyperTime'),
+      async (signer) => await hre.ethers.getContractFactory('HyperForwarderHelper')
+    )
+
+    let fac = await hre.ethers.getContractFactory('WETH')
+    let _weth = await fac.deploy()
+    await _weth.deployed()
+    let _hyper = await _sdk.deploy(_weth.address) // Deploys Hyper protocol.
+
+    return { sdk: _sdk, weth: _weth, hyper: _hyper }
+  }
 
   // Setup
   before(async function () {
     signers = await ethers.getSigners()
     deployer = signers[0]
-    sdk = new HyperSDK(
-      deployer,
-      async (signer) => await hre.ethers.getContractFactory('TestHyperTime', signer),
-      async (signer) => await hre.ethers.getContractFactory('HyperForwarderHelper', signer)
-    )
-    weth = await (await hre.ethers.getContractFactory('WETH', signers[0])).deploy()
   })
 
   // Global context for every test.
   beforeEach(async function () {
-    this.hyper = await sdk.deploy(weth.address) // Deploys Hyper protocol.
+    ;({ sdk, weth, hyper: this.hyper } = await loadFixture(deployFixture))
     assert(typeof sdk.instance != 'undefined', 'Hyper contract not there, did it get deployed?')
     assert(typeof sdk.forwarder != 'undefined', 'Forwarder contract not there, did it get deployed?')
 
@@ -79,11 +94,13 @@ describe('HyperPrototype', function () {
       const call = sdk.createPool(
         tokens[0].address,
         tokens[1].address,
-        params.strike,
-        params.sigma,
-        params.maturity,
-        params.fee,
+        deployer.address,
         params.priorityFee,
+        params.fee,
+        params.volatility,
+        params.duration,
+        params.jit,
+        params.maxTick,
         params.price
       )
 
@@ -93,44 +110,25 @@ describe('HyperPrototype', function () {
         .withArgs(1, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
     })
 
-    it('Creates a curve in the createPool call', async function () {
-      const call = sdk.createPool(
-        tokens[0].address,
-        tokens[1].address,
-        params.strike,
-        params.sigma,
-        params.maturity,
-        params.fee,
-        params.priorityFee,
-        params.price
-      )
-
-      await expect(call)
-        .to.emit(sdk.forwarder, 'Success')
-        .to.emit(sdk.instance, 'CreateCurve')
-        .withArgs(1, params.strike, params.sigma, params.maturity, 1e4 - params.fee, 1e4 - params.priorityFee)
-    })
-
     it('Creates a pool in the createPool call', async function () {
       const call = sdk.createPool(
         tokens[0].address,
         tokens[1].address,
-        params.strike,
-        params.sigma,
-        params.maturity,
-        params.fee,
+        deployer.address,
         params.priorityFee,
+        params.fee,
+        params.volatility,
+        params.duration,
+        params.jit,
+        params.maxTick,
         params.price
       )
 
       await expect(call)
         .to.emit(sdk.forwarder, 'Success')
         .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(0x01, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
-        .to.emit(sdk.instance, 'CreateCurve')
-        .withArgs(0x0001, params.strike, params.sigma, params.maturity, 1e4 - params.fee, 1e4 - params.priorityFee)
         .to.emit(sdk.instance, 'CreatePool')
-        .withArgs(0x0100000001, 1, 1, params.price)
+        .withArgs(0x0000010100000001, true, tokens[0].address, tokens[1].address, params.price)
     })
 
     it('Creates a pair directly', async function () {
@@ -150,14 +148,6 @@ describe('HyperPrototype', function () {
         .to.emit(sdk.instance, 'CreatePair')
         .withArgs(1, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
     })
-
-    it('Creates a curve directly', async function () {
-      const { hex: data } = instructions.encodeCreatePair(tokens[0].address, tokens[1].address)
-
-      await expect(deployer.sendTransaction({ to: sdk.instance?.address, data, value: BigInt(0) }))
-        .to.emit(sdk.instance, 'CreatePair')
-        .withArgs(1, tokens[0].address, tokens[1].address, await tokens[0].decimals(), await tokens[1].decimals())
-    })
   })
 
   describe('Liquidity', function () {
@@ -167,17 +157,19 @@ describe('HyperPrototype', function () {
       const call = sdk.createPool(
         tokens[0].address,
         tokens[1].address,
-        params.strike,
-        params.sigma,
-        params.maturity,
-        params.fee,
+        deployer.address,
         params.priorityFee,
+        params.fee,
+        params.volatility,
+        params.duration,
+        params.jit,
+        params.maxTick,
         params.price
       )
 
       await call
 
-      poolId = await sdk.forwarder.getPoolId(1, 1)
+      poolId = await sdk?.forwarder?.getPoolId(1, true, 1)
 
       // mint tokens and approve hyper
     })
@@ -205,17 +197,19 @@ describe('HyperPrototype', function () {
       const call = sdk.createPool(
         tokens[0].address,
         tokens[1].address,
-        params.strike,
-        params.sigma,
-        params.maturity,
-        params.fee,
+        deployer.address,
         params.priorityFee,
+        params.fee,
+        params.volatility,
+        params.duration,
+        params.jit,
+        params.maxTick,
         params.price
       )
 
       await call
 
-      poolId = await sdk.forwarder.getPoolId(1, 1)
+      poolId = await sdk?.forwarder?.getPoolId(1, true, 1)
 
       // mint tokens and approve hyper
     })

@@ -39,6 +39,10 @@ Required:
 
 `yarn test`
 
+### 5. Using plot cli
+
+`yarn plot --strike $strike --vol $vol --tau $tau --price $price --fee $fee`
+
 ## Resources
 
 - [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)

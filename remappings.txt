@@ -1,8 +1,6 @@
-hardhat=/node_modules/hardhat
 @rari-capital/=node_modules/@rari-capital/
-contracts/=contracts/
 ds-test/=lib/solmate/lib/ds-test/src/
 forge-std/=lib/forge-std/src/
-lib/=lib/
+hardhat/=node_modules/hardhat/
 solmate/=lib/solmate/src/
 solstat/=lib/solstat/src/

@@ -11,7 +11,7 @@ import {InvariantSendTokens} from "./InvariantSendTokens.sol";
 import {InvariantWarper} from "./InvariantWarper.sol";
 import {InvariantCreatePool} from "./InvariantCreatePool.sol";
 
-bytes32 constant SLOT_LOCKED = bytes32(uint(5));
+bytes32 constant SLOT_LOCKED = bytes32(uint(10));
 
 /**
  * @dev Most important test suite, verifies the critical invariants of Hyper.
