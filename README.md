@@ -2,18 +2,6 @@
 
 Hyper is a replicating market maker.
 
-## System Invariants
-
-The system is designed around a single invariant:
-
-```
-Balance >= Reserve
-```
-
-Exposed via: `hyper.getNetBalance(token)`
-
-For more invariants, [read this](./test/README.md).
-
 ## Installation
 
 Required:
@@ -38,6 +26,22 @@ Required:
 ### 4. Test
 
 `yarn test`
+
+## Rust Playground
+
+To interact with the run bindings of the contract run `forge bind` in the root directory. Then cd into the `app/` directory and run `cargo run`.
+
+## System Invariants
+
+The system is designed around a single invariant:
+
+```
+Balance >= Reserve
+```
+
+Exposed via: `hyper.getNetBalance(token)`
+
+For more invariants, [read this](./test/README.md).
 
 ## Resources
 
