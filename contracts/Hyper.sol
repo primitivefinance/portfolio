@@ -68,7 +68,25 @@ contract Hyper is IHyper {
         locked = 1;
     }
 
-    /** @dev Used on every external operation that touches tokens. */
+    /**
+     * @dev     
+     * Used on external functions to handle settlement of outstanding token balances.
+     * 
+     * @notice 
+     * Tokens sent to this contract are lost.
+     *
+     * @custom:guide
+     * Step 1. Enter `locked` re-entrancy guard.
+     * Step 2. Validate Hyper's account system has not already been entered.
+     * Step 3. Wrap the entire ether balance of this contract and credit the wrapped ether to the msg.sender account.
+     * Step 4. Enter the re-entrancy guard of Hyper's account system.
+     * Step 5. Execute the function logic.
+     * Step 6. Exit the re-entrancy guard of Hyper's account system.
+     * Step 7. Enter the settlement function, requesting token payments or sending them out to msg.sender.
+     * Step 8. Validate Hyper's account system was settled.
+     * Step 9. Exit interactions modifier.
+     * Step 10. Exit `locked` re-entrancy guard.
+     */
     modifier interactions() {
         if (__account__.prepared) revert InvalidReentrancy();
         __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
@@ -81,6 +99,14 @@ contract Hyper is IHyper {
         if (!__account__.settled) revert InvalidSettlement();
     }
 
+    /**
+     * @dev
+     * Failing to pass a valid WETH contract that implements the `deposit()` function,
+     * will cause all transactions with Hyper to fail once address(this).balance > 0.
+     *
+     * @notice 
+     * Tokens sent to this contract are lost.
+     */
     constructor(address weth) {
         WETH = weth;
         __account__.settled = true;
