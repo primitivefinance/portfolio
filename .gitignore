@@ -37,3 +37,8 @@ crytic-export/
 # app
 app/target/
 
+
+
+# Added by cargo
+
+/target
