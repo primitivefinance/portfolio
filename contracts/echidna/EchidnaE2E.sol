@@ -21,6 +21,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         add_created_hyper_token(_asset);
         add_created_hyper_token(_quote);
         create_pair_with_safe_preconditions(1, 2);
+        create_non_controlled_pool(0,1,0,0,0,100);
     }
 
     OS.AccountSystem hyperAccount;
@@ -1254,28 +1255,68 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     // Swaps
     function swap_should_succeed(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
         address[] memory owners = new address[](1);
+        // Will always return a pool that exists 
         (
             HyperPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
+        HyperCurve memory curve = pool.params;
         amount = between(amount, 1, type(uint256).max);
+        limit = between(limit, 1, type(uint256).max);
+
 
         mint_and_approve(_asset, amount);
         mint_and_approve(_quote, amount);
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
 
-        try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
-            HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
-        } catch {}
+        emit LogUint256("amount: ", amount);
+        emit LogUint256("limit:", limit);
+
+        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        if (curve.maturity() <= block.timestamp){
+            emit LogUint256("Maturity timestamp",curve.maturity());
+            emit LogUint256("block.timestamp", block.timestamp);            
+            swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
+        } else {
+            try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
+                HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+            } catch {}
+        }
+
+    }
+    function swap_on_non_existent_pool_should_fail(uint64 id) public {
+        // Ensure that the pool id was not one that's already been created 
+        require(!is_created_pool(id)); 
+        HyperPool memory pool = getPool(address(_hyper),id);
+
+        swap_should_fail(pool.params, id, true, id, id, "BUG: Swap on a nonexistent pool should fail.");
+    }
+    function swap_on_zero_amount_should_fail(uint id) public {
+        // Will always return a pool that exists 
+        (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
+        uint256 amount = 0;
+        
+        swap_should_fail(pool.params, poolId, true, amount, id, "BUG: Swap with zero amount should fail.");
+    }
+    function swap_should_fail(HyperCurve memory curve, uint64 poolId, bool sellAsset, uint256 amount, uint256 limit, string memory msg) private {
+        try _hyper.swap(poolId, sellAsset, amount, amount) {
+            emit AssertionFailed(msg);
+        }
+        catch {}
     }
 
     function retrieve_random_pool_and_tokens(
         uint256 id
     ) private view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
-        require(poolIds.length > 0);
+        // assumes that at least one pool exists because it's been created in the constructor
         uint256 random = between(id, 0, poolIds.length - 1);
+        if (poolIds.length == 1) random = 0;
 
         pool = getPool(address(_hyper), poolIds[random]);
         poolId = poolIds[random];
