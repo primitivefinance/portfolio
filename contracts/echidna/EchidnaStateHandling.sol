@@ -12,8 +12,13 @@ contract EchidnaStateHandling is Helper{
     }
     function get_hyper_tokens(uint256 id1, uint256 id2) internal view returns (EchidnaERC20 asset, EchidnaERC20 quote) {
         // This assumes that hyperTokens.length is always >2
-        id1 = between(id1, 0, hyperTokens.length - 1);
-        id2 = between(id2, 0, hyperTokens.length - 1);
+        if (poolIds.length == 2) {
+            id1 = 0;
+            id2 = 1;
+        } else {
+            id1 = between(id1, 0, hyperTokens.length - 1);
+            id2 = between(id2, 0, hyperTokens.length - 1);
+        }
         require(id1 != id2);
         return (hyperTokens[id1], hyperTokens[id2]);
     }    

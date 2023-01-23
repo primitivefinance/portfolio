@@ -20,6 +20,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         EchidnaERC20 _quote = create_token("Quote Token", "QDEC18", 18);
         add_created_hyper_token(_asset);
         add_created_hyper_token(_quote);
+        create_pair_with_safe_preconditions(1, 2);
     }
 
     OS.AccountSystem hyperAccount;
@@ -1250,9 +1251,29 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         _hyper.unallocate(poolId, amount);
     }
 
+    // Swaps
+    function swap_should_succeed(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+        address[] memory owners = new address[](1);
+        (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
+        amount = between(amount, 1, type(uint256).max);
+
+        mint_and_approve(_asset, amount);
+        mint_and_approve(_quote, amount);
+        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+
+        try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
+            HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+        } catch {}
+    }
+
     function retrieve_random_pool_and_tokens(
         uint256 id
-    ) private view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 quote, EchidnaERC20 asset) {
+    ) private view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
         require(poolIds.length > 0);
         uint256 random = between(id, 0, poolIds.length - 1);
 
