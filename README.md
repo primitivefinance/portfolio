@@ -37,11 +37,7 @@ Required:
 
 ### 4. Test
 
-`yarn test`
-
-### 5. Using plot cli
-
-`yarn plot --strike $strike --vol $vol --tau $tau --price $price --fee $fee`
+`forge test`
 
 ## Resources
 

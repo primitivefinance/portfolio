@@ -1,6 +1,0 @@
-@rari-capital/=node_modules/@rari-capital/
-ds-test/=lib/solmate/lib/ds-test/src/
-forge-std/=lib/forge-std/src/
-hardhat/=node_modules/hardhat/
-solmate/=lib/solmate/src/
-solstat/=lib/solstat/src/
