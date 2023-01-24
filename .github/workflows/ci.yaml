@@ -17,4 +17,4 @@ jobs:
           version: nightly
 
       - name: Run tests
-        run: yarn test
+        run: forge test
