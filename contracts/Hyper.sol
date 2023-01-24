@@ -147,7 +147,7 @@ contract Hyper is IHyper {
     function allocate(
         uint64 poolId,
         uint amount
-    ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
+    ) external payable lock interactions returns (uint deltaAsset, uint deltaQuote) {
         bool useMax = amount == type(uint).max;
         (deltaAsset, deltaQuote) = _allocate(useMax, poolId, (useMax ? 1 : amount).safeCastTo128());
     }
@@ -177,7 +177,7 @@ contract Hyper is IHyper {
         bool sellAsset,
         uint amount,
         uint limit
-    ) external lock interactions returns (uint output, uint remainder) {
+    ) external payable lock interactions returns (uint output, uint remainder) {
         if (limit == type(uint256).max) limit = type(uint128).max;
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = useMax ? type(uint128).max : amount.safeCastTo128();
