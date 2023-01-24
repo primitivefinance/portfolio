@@ -47,7 +47,7 @@ contract Helper {
     }
     // ******************** Helper ********************
 
-    function between(uint256 random, uint256 low, uint256 high) internal pure returns (uint256) {
+    function between(uint256 random, uint256 low, uint256 high) public pure returns (uint256) {
         return low + (random % (high - low));
     }
 
@@ -57,17 +57,5 @@ contract Helper {
 
             b := a
         }
-    }
-
-    uint24[] pairIds;
-
-    function save_pair_id(uint24 pairId) internal {
-        pairIds.push(pairId);
-    }
-
-    function retrieve_created_pair(uint256 id) internal view returns (uint24 pairId) {
-        require(pairIds.length > 0);
-        id = between(id, 0, pairIds.length);
-        return pairIds[id];
     }
 }
