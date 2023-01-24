@@ -147,7 +147,7 @@ interface IHyperGetters {
 }
 
 interface IHyperActions {
-    function allocate(uint64 poolId, uint deltaLiquidity) external returns (uint deltaAsset, uint deltaQuote);
+    function allocate(uint64 poolId, uint deltaLiquidity) external payable returns (uint deltaAsset, uint deltaQuote);
 
     function unallocate(uint64 poolId, uint amount) external returns (uint deltaAsset, uint deltaQuote);
 
@@ -160,7 +160,7 @@ interface IHyperActions {
         bool sellAsset,
         uint amount,
         uint limit
-    ) external returns (uint output, uint remainder);
+    ) external payable returns (uint output, uint remainder);
 
     function fund(address token, uint256 amount) external;
 
