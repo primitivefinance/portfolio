@@ -1324,4 +1324,266 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         quote = EchidnaERC20(pair.tokenQuote);
         asset = EchidnaERC20(pair.tokenAsset);
     }
+
+    function swap_assets_in_always_decreases_price(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+        require(sellAsset);
+
+        address[] memory owners = new address[](1);
+        // Will always return a pool that exists 
+        (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
+        HyperCurve memory curve = pool.params;
+        require(curve.maturity() > block.timestamp);
+
+        amount = between(amount, 1, type(uint256).max);
+        limit = between(limit, 1, type(uint256).max);
+
+
+        mint_and_approve(_asset, amount);
+        mint_and_approve(_quote, amount);
+
+        emit LogUint256("amount: ", amount);
+        emit LogUint256("limit:", limit);
+
+        uint256 prevReserveSell = getReserve(address(_hyper), address(_asset));
+        uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
+
+        HyperPool memory prePool = getPool(address(_hyper), poolId);
+        _hyper.swap(poolId, sellAsset, amount, limit);
+        HyperPool memory postPool = getPool(address(_hyper), poolId);
+
+        uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
+        uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
+
+        if(postPool.lastPrice == 0) {
+            emit LogUint256("lastPrice", postPool.lastPrice);
+            emit AssertionFailed("BUG: pool.lastPrice is zero on a swap.");
+        }
+        if(postPool.lastPrice > prePool.lastPrice) {
+            emit LogUint256("price before swap", prePool.lastPrice);
+            emit LogUint256("price after swap", postPool.lastPrice);
+            emit AssertionFailed("BUG: pool.lastPrice increased after swapping assets in, it should have decreased.");
+        }
+
+        // feeGrowthSell = asset
+        check_external_swap_invariants(
+            prePool.lastPrice,
+            postPool.lastPrice,
+            prePool.liquidity,
+            postPool.liquidity,
+            prevReserveSell,
+            postReserveSell,
+            prevReserveBuy,
+            postReserveBuy,
+            prePool.feeGrowthGlobalAsset,
+            postPool.feeGrowthGlobalAsset,
+            prePool.feeGrowthGlobalQuote,
+            postPool.feeGrowthGlobalQuote
+        );
+    }
+
+
+    function swap_quote_in_always_increases_price(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+        require(!sellAsset);
+
+        address[] memory owners = new address[](1);
+        // Will always return a pool that exists 
+        (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
+        HyperCurve memory curve = pool.params;
+        require(curve.maturity() > block.timestamp);
+
+        amount = between(amount, 1, type(uint256).max);
+        limit = between(limit, 1, type(uint256).max);
+
+
+        mint_and_approve(_asset, amount);
+        mint_and_approve(_quote, amount);
+
+        emit LogUint256("amount: ", amount);
+        emit LogUint256("limit:", limit);
+        
+        uint256 prevReserveSell = getReserve(address(_hyper), address(_quote));
+        uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
+
+        HyperPool memory prePool = getPool(address(_hyper), poolId);
+        _hyper.swap(poolId, sellAsset, amount, limit);
+        HyperPool memory postPool = getPool(address(_hyper), poolId);
+
+        uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
+        uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
+
+        if(postPool.lastPrice < prePool.lastPrice) {
+            emit LogUint256("price before swap", prePool.lastPrice);
+            emit LogUint256("price after swap", postPool.lastPrice);
+            emit AssertionFailed("BUG: pool.lastPrice decreased after swapping quote in, it should have increased.");
+        }
+
+        // feeGrowthSell = quote
+        check_external_swap_invariants(
+            prePool.lastPrice,
+            postPool.lastPrice,
+            prePool.liquidity,
+            postPool.liquidity,
+            prevReserveSell,
+            postReserveSell,
+            prevReserveBuy,
+            postReserveBuy,
+            prePool.feeGrowthGlobalQuote,
+            postPool.feeGrowthGlobalQuote,
+            prePool.feeGrowthGlobalAsset,
+            postPool.feeGrowthGlobalAsset
+        );
+    }
+
+    function swap_asset_in_increases_reserve(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+        require(sellAsset);
+
+        address[] memory owners = new address[](1);
+        // Will always return a pool that exists 
+        (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
+        HyperCurve memory curve = pool.params;
+        require(curve.maturity() > block.timestamp);
+        
+        amount = between(amount, 1, type(uint256).max);
+        limit = between(limit, 1, type(uint256).max);
+
+
+        mint_and_approve(_asset, amount);
+        mint_and_approve(_quote, amount);
+
+        emit LogUint256("amount: ", amount);
+        emit LogUint256("limit:", limit);
+
+        uint256 prevReserveSell = getReserve(address(_hyper), address(_asset));
+        uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
+
+        HyperPool memory prePool = getPool(address(_hyper), poolId);
+        _hyper.swap(poolId, sellAsset, amount, limit);
+        HyperPool memory postPool = getPool(address(_hyper), poolId);
+
+        uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
+        uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
+
+        if(postReserveSell < prevReserveSell) {
+            emit LogUint256("asset reserve before swap", prevReserveSell);
+            emit LogUint256("asset reserve after swap", postReserveSell);
+            emit AssertionFailed("BUG: reserve decreased after swapping asset in, it should have increased.");
+        }
+
+        // feeGrowthSell = asset
+        check_external_swap_invariants(
+            prePool.lastPrice,
+            postPool.lastPrice,
+            prePool.liquidity,
+            postPool.liquidity,
+            prevReserveSell,
+            postReserveSell,
+            prevReserveBuy,
+            postReserveBuy,
+            prePool.feeGrowthGlobalAsset, 
+            postPool.feeGrowthGlobalAsset,
+            prePool.feeGrowthGlobalQuote,
+            postPool.feeGrowthGlobalQuote
+        );
+    }
+
+    function swap_quote_in_increases_reserve(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+        require(!sellAsset);
+
+        address[] memory owners = new address[](1);
+        // Will always return a pool that exists 
+        (
+            HyperPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
+        HyperCurve memory curve = pool.params;
+        require(curve.maturity() > block.timestamp);
+        
+        amount = between(amount, 1, type(uint256).max);
+        limit = between(limit, 1, type(uint256).max);
+
+
+        mint_and_approve(_asset, amount);
+        mint_and_approve(_quote, amount);
+
+        emit LogUint256("amount: ", amount);
+        emit LogUint256("limit:", limit);
+
+        uint256 prevReserveSell = getReserve(address(_hyper), address(_quote));
+        uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
+
+        HyperPool memory prePool = getPool(address(_hyper), poolId);
+        _hyper.swap(poolId, sellAsset, amount, limit);
+        HyperPool memory postPool = getPool(address(_hyper), poolId);
+
+        uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
+        uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
+
+        if(prevReserveSell < prevReserveSell) {
+            emit LogUint256("quote reserve before swap", prevReserveSell);
+            emit LogUint256("quote reserve after swap", prevReserveSell);
+            emit AssertionFailed("BUG: reserve decreased after swapping quote in, it should have increased.");
+        }
+
+        // feeGrowthSell = quote
+        check_external_swap_invariants(
+            prePool.lastPrice,
+            postPool.lastPrice,
+            prePool.liquidity,
+            postPool.liquidity,
+            prevReserveSell,
+            postReserveSell,
+            prevReserveBuy,
+            postReserveBuy,
+            prePool.feeGrowthGlobalQuote,
+            postPool.feeGrowthGlobalQuote,
+            prePool.feeGrowthGlobalAsset,
+            postPool.feeGrowthGlobalAsset
+        );
+    }
+
+    function check_external_swap_invariants(
+        uint prevPrice,
+        uint postPrice,
+        uint prevLiquidity,
+        uint postLiquidity,
+        uint prevReserveSell,
+        uint postReserveSell,
+        uint prevReserveBuy,
+        uint postReserveBuy,
+        uint prevFeeGrowthSell,
+        uint postFeeGrowthSell,
+        uint prevFeeGrowthBuy,
+        uint postFeeGrowthBuy
+    ) internal {
+        // price always changes in a swap
+        assert(postPrice != prevPrice);
+
+        // liquidity only changes in allocate and unallocate
+        assert(prevLiquidity == postLiquidity);
+
+        // fee growth checkpoints are always changing
+        assert(postFeeGrowthSell >= prevFeeGrowthSell);
+        assert(postFeeGrowthBuy >= postFeeGrowthBuy);
+
+        // actual token balances increase or decrease for non-internal balance swaps.
+        assert(postReserveSell > prevReserveSell);
+        assert(postReserveBuy < prevReserveBuy);
+    }
 }
