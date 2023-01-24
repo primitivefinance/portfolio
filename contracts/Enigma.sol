@@ -38,17 +38,17 @@ import "./Assembly.sol" as Assembly;
 uint8 constant JUMP_PROCESS_START_POINTER = 2;
 bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
-bytes1 constant UNSET00 = 0x02;
+bytes1 constant UNSET02 = 0x02;
 bytes1 constant UNALLOCATE = 0x03;
-bytes1 constant UNSET01 = 0x04;
+bytes1 constant UNSET04 = 0x04;
 bytes1 constant SWAP = 0x05;
-bytes1 constant STAKE_POSITION = 0x06;
-bytes1 constant UNSTAKE_POSITION = 0x07;
-bytes1 constant UNSET02 = 0x08;
-bytes1 constant UNSET03 = 0x09;
+bytes1 constant UNSET06 = 0x06;
+bytes1 constant UNSET07 = 0x07;
+bytes1 constant UNSET08 = 0x08;
+bytes1 constant UNSET09 = 0x09;
 bytes1 constant CREATE_POOL = 0x0B;
 bytes1 constant CREATE_PAIR = 0x0C;
-bytes1 constant UNSET04 = 0x0D;
+bytes1 constant UNSET0D = 0x0D;
 bytes1 constant INSTRUCTION_JUMP = 0xAA;
 
 error InvalidJump(uint256 pointer); // 0x80f63bd1
@@ -227,24 +227,4 @@ function decodeSwap(
     input = uint128(Assembly.toAmount(data[10:pointer]));
     output = uint128(Assembly.toAmount(data[pointer:data.length - 1]));
     direction = uint8(data[data.length - 1]);
-}
-
-function encodeStakePosition(uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
-    data = abi.encodePacked(STAKE_POSITION, poolId, deltaLiquidity);
-}
-
-function decodeStakePosition(bytes calldata data) pure returns (uint64 poolId, uint128 deltaLiquidity) {
-    if (data.length < 9) revert InvalidBytesLength(9, data.length);
-    poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
-}
-
-function encodeUnstakePosition(uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
-    data = abi.encodePacked(UNSTAKE_POSITION, poolId, deltaLiquidity);
-}
-
-function decodeUnstakePosition(bytes calldata data) pure returns (uint64 poolId, uint128 deltaLiquidity) {
-    if (data.length < 9) revert InvalidBytesLength(9, data.length);
-    poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }

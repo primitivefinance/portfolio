@@ -9,13 +9,8 @@ import "./setup/TestHyperSetup.sol";
  Fee Buckets and Claiming
     - Users allocate tokens to pools which issue liquidity represent their proportion of deposit.
     - Users swap against the pool and pay the swap fee. Absolute fees per liquidity unit is tracked in the `feeGrowth` variables.
-    - Users can stake liquidity. Staking liquidity will increment their position's staked liquidity and decrement their "free liquidity".
-    - Staking liquidity does not alter pool liquidity. The `liquidity` variable of each pool is the total supply of liquidity, including staked.
-    - Fee growth is always based on `liquidity`, which is `freeLiquidity + stakedLiquidity`. 
-    - Positions liquidity is just split into `free` and `staked`. 
-    - The sum of all position's sums of free and staked liquidity is equal to the pool liquidity. 
-    - Fees accrue both to free and staked liquidity, because the pool treats it all as global liquidity.
-    - Positions sync their fees by computing the sum of their free and staked liquidity multiplied by the fee per liquidity growth variable.
+    - The `liquidity` variable of each pool is the total supply of liquidity.
+    - Fee growth is always based on `liquidity`. 
  */
 contract TestHyperClaim is TestHyperSetup {
     using FixedPointMathLib for uint;
@@ -83,7 +78,8 @@ contract TestHyperClaim is TestHyperSetup {
         assertEq(post, tokensOwed, "claimed-bal");
     }
 
-    function testClaimGetBalanceReturnsFeeAmount_reward() public {
+    // todo: fix test once reward fees logic is updated.
+    /* function testClaimGetBalanceReturnsFeeAmount_reward() public {
         // Rewards only accrue to controlled pools
         createControlledPool();
 
@@ -97,7 +93,7 @@ contract TestHyperClaim is TestHyperSetup {
         __weth__.approve(address(__hyperTestingContract__), type(uint256).max);
 
         _alloc(scenario.poolId);
-        __hyperTestingContract__.stake(scenario.poolId, 1 ether);
+        // todo: removed stake functionality - update reward fee accrual. __hyperTestingContract__.stake(scenario.poolId, 1 ether);
 
         // pass some time for staking
         customWarp(__hyperTestingContract__.timestamp() + 1);
@@ -115,7 +111,7 @@ contract TestHyperClaim is TestHyperSetup {
         __hyperTestingContract__.claim(scenario.poolId, 0, 0);
         uint post = getBalance(address(__hyperTestingContract__), address(this), address(__weth__));
         assertEq(post, tokensOwed, "claimed-bal");
-    }
+    } */
 
     function testClaimCreditsAssetBalance() public postTestInvariantChecks {
         basicAllocate();
