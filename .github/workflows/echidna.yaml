@@ -27,3 +27,4 @@ jobs:
           files: .
           contract: EchidnaE2E
           config: E2E.yaml
+          crytic-args: --foundry-ignore-compile
