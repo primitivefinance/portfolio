@@ -45,15 +45,18 @@ contract Helper {
         price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         return (priorityFee, fee, maxTick, volatility, duration, jit, price);
     }
+
     // ******************** Helper ********************
 
-    function between(uint256 random, uint256 low, uint256 high) public pure returns (uint256) {
+    function between(uint256 random, uint256 low, uint256 high) internal pure returns (uint256) {
         return low + (random % (high - low));
     }
 
     function convertToInt128(uint128 a) internal pure returns (int128 b) {
         assembly {
-            if gt(a, 0x7fffffffffffffffffffffffffffffff) { revert(0, 0) }
+            if gt(a, 0x7fffffffffffffffffffffffffffffff) {
+                revert(0, 0)
+            }
 
             b := a
         }
