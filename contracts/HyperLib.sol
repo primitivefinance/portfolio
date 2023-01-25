@@ -86,6 +86,7 @@ error PoolExpired();
 error PositionZeroLiquidity(uint96 positionId);
 error SameTokenError();
 error SwapLimitReached();
+error ZeroAmounts();
 error ZeroInput();
 error ZeroLiquidity();
 error ZeroOutput();

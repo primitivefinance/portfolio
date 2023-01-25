@@ -270,6 +270,7 @@ contract Hyper is IHyper {
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
         (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(toInt128(deltaLiquidity)); // note: rounds up.
+        if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,

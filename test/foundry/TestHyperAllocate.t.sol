@@ -143,6 +143,38 @@ contract TestHyperAllocate is TestHyperSetup {
         _assertAllocate(deltaLiquidity);
     }
 
+    function testAllocate_zero_amounts_in_reverts() public postTestInvariantChecks {
+        // create a pool wtih two low decimal tokens, so that 1 wei of liquidity will round token amounts to zero.
+        address small_decimal_asset = address(new TestERC20("small decimals", "DEC6", 6));
+
+        bytes memory data = createPool(
+            small_decimal_asset,
+            address(__usdc__),
+            address(0),
+            uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
+            uint16(1e4 - DEFAULT_GAMMA),
+            uint16(DEFAULT_SIGMA),
+            uint16(DEFAULT_DURATION_DAYS),
+            DEFAULT_JIT,
+            DEFAULT_TICK,
+            DEFAULT_PRICE * 100
+        );
+
+        bool success = __revertCatcher__.jumpProcess(data);
+        assertTrue(success, "__revertCatcher__ call failed");
+
+        // assumes above pool is not using an existing pair
+        uint64 poolId = Enigma.encodePoolId(
+            __hyperTestingContract__.getPairNonce(),
+            false,
+            __hyperTestingContract__.getPoolNonce()
+        );
+
+        uint delLiquidity = 1;
+        vm.expectRevert(bytes4(keccak256("ZeroAmounts()")));
+        __hyperTestingContract__.allocate(poolId, delLiquidity);
+    }
+
     /** @dev ALlocates then asserts the invariants. */
     function _assertAllocate(uint128 deltaLiquidity) internal {
         // Preconditions
