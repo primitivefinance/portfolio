@@ -14,10 +14,8 @@ jobs:
           node-version: 16
           cache: 'npm'
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
+      - name: Install Foundry via slither-action
+        uses: crytic/slither-action@dev-install-foundry
 
       - name: Compile contracts
         run: forge build
