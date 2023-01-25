@@ -25,7 +25,7 @@ using SafeCastLib for uint;
 using FixedPointMathLib for uint;
 using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint;
 using {checkParameters, maturity, strike, validateParameters} for HyperCurve global;
-using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged, syncPositionStakedFees} for HyperPosition global;
+using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
 using {
     changePoolLiquidity,
     changePoolParameters,
@@ -82,11 +82,8 @@ error PairExists(uint24 pairId);
 error PerLiquidityError(uint256 deltaAsset);
 error PoolExists();
 error PoolExpired();
-error PositionStaked(uint96 positionId);
 error PositionZeroLiquidity(uint96 positionId);
-error PositionNotStaked(uint96 positionId);
 error SameTokenError();
-error StakeNotMature(uint64 poolId);
 error SwapLimitReached();
 error ZeroInput();
 error ZeroLiquidity();
@@ -121,8 +118,6 @@ struct HyperPool {
     uint256 feeGrowthGlobalQuote;
     uint128 lastPrice;
     uint128 liquidity; // available liquidity to remove
-    uint128 stakedLiquidity; // locked liquidity
-    int128 stakedLiquidityDelta; // liquidity to be added or removed
     HyperCurve params;
     HyperPair pair;
 }
@@ -130,10 +125,7 @@ struct HyperPool {
 // todo: optimize slot
 struct HyperPosition {
     uint128 freeLiquidity;
-    uint128 stakedLiquidity;
     uint256 lastTimestamp;
-    uint256 stakeTimestamp;
-    uint256 unstakeTimestamp;
     uint256 feeGrowthRewardLast;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
@@ -208,30 +200,22 @@ function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, 
 /** @dev Liquidity must be altered after syncing positions and not before. */
 function syncPositionFees(
     HyperPosition storage self,
-    uint positionLiquidity,
     uint feeGrowthAsset,
     uint feeGrowthQuote
 ) returns (uint feeAssetEarned, uint feeQuoteEarned) {
     // fee growth current - position fee growth last
     uint differenceAsset = Assembly.computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
     uint differenceQuote = Assembly.computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
-    
+
     // fee growth per liquidity * position liquidity
-    feeAssetEarned = FixedPointMathLib.mulWadDown(differenceAsset, positionLiquidity); 
-    feeQuoteEarned = FixedPointMathLib.mulWadDown(differenceQuote, positionLiquidity);
+    feeAssetEarned = FixedPointMathLib.mulWadDown(differenceAsset, self.freeLiquidity);
+    feeQuoteEarned = FixedPointMathLib.mulWadDown(differenceQuote, self.freeLiquidity);
 
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;
 
     self.tokensOwedAsset += SafeCastLib.safeCastTo128(feeAssetEarned);
     self.tokensOwedQuote += SafeCastLib.safeCastTo128(feeQuoteEarned);
-}
-
-function syncPositionStakedFees(HyperPosition storage self, uint liquidity, uint feeGrowth) returns (uint feeEarned) {
-    uint checkpoint = Assembly.computeCheckpointDistance(feeGrowth, self.feeGrowthRewardLast);
-    feeEarned = FixedPointMathLib.mulWadDown(checkpoint, liquidity);
-    self.feeGrowthRewardLast = feeEarned;
-    self.tokensOwedReward += SafeCastLib.safeCastTo128(feeEarned);
 }
 
 // ===== View ===== //

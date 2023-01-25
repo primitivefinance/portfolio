@@ -162,16 +162,6 @@ contract Hyper is IHyper {
     }
 
     /// @inheritdoc IHyperActions
-    function stake(uint64 poolId, uint128 deltaLiquidity) external lock interactions {
-        _stake(poolId, deltaLiquidity);
-    }
-
-    /// @inheritdoc IHyperActions
-    function unstake(uint64 poolId, uint128 deltaLiquidity) external lock interactions {
-        _unstake(poolId, deltaLiquidity);
-    }
-
-    /// @inheritdoc IHyperActions
     function swap(
         uint64 poolId,
         bool sellAsset,
@@ -221,8 +211,7 @@ contract Hyper is IHyper {
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
-        uint256 positionLiquidity = pos.freeLiquidity + pos.stakedLiquidity;
-        pos.syncPositionFees(positionLiquidity, pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
 
         // 2^256 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
         uint256 claimedAssets = deltaAsset == type(uint256).max ? pos.tokensOwedAsset : deltaAsset;
@@ -234,7 +223,6 @@ contract Hyper is IHyper {
         if (claimedAssets > 0) _applyCredit(pool.pair.tokenAsset, claimedAssets);
         if (claimedQuotes > 0) _applyCredit(pool.pair.tokenQuote, claimedQuotes);
 
-        pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalReward);
         uint128 deltaReward = pos.tokensOwedReward;
         pos.tokensOwedReward -= deltaReward;
 
@@ -330,17 +318,7 @@ contract Hyper is IHyper {
     function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint feeAsset, uint feeQuote) {
         (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
-        // Positions are broken up into "free" and "staked" liquidity buckets.
-        // The pool accrues fees to the sum of these buckets, so the same fees are earned
-        // for a position with 2 free and 0 staked as a position with 1 free and 1 staked.
-        // The purpose for staking is to access a new fee bucket, the "reward", in addition
-        // to the standard bucket.
-        uint256 positionLiquidity = pos.freeLiquidity + pos.stakedLiquidity;
-        (feeAsset, feeQuote) = pos.syncPositionFees(
-            positionLiquidity,
-            pool.feeGrowthGlobalAsset,
-            pool.feeGrowthGlobalQuote
-        );
+        (feeAsset, feeQuote) = pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
 
         _changePosition(args);
     }
@@ -373,45 +351,6 @@ contract Hyper is IHyper {
             _increaseReserves(asset, args.deltaAsset);
             _increaseReserves(quote, args.deltaQuote);
         }
-    }
-
-    function _stake(uint64 poolId, uint128 deltaLiquidity) internal {
-        HyperPool storage pool = pools[poolId];
-        if (!pool.exists()) revert NonExistentPool(poolId);
-
-        HyperPosition memory pos = positions[msg.sender][poolId];
-        if (deltaLiquidity == 0) revert ZeroLiquidity();
-        if (pos.freeLiquidity < deltaLiquidity) revert InsufficientPosition(poolId);
-
-        uint feeEarned = _changeStake(poolId, toInt128(deltaLiquidity));
-        pool.stakedLiquidityDelta += toInt128(deltaLiquidity);
-        emit Stake(poolId, msg.sender, deltaLiquidity);
-    }
-
-    function _unstake(uint64 poolId, uint128 deltaLiquidity) internal returns (uint feeEarned) {
-        HyperPool storage pool = pools[poolId];
-        if (!pool.exists()) revert NonExistentPool(poolId);
-
-        uint timestamp = _blockTimestamp();
-        HyperPosition memory pos = positions[msg.sender][poolId];
-        if (pos.stakeTimestamp == 0) revert PositionNotStaked(poolId);
-        if (pos.unstakeTimestamp > timestamp) revert StakeNotMature(poolId); // todo: Investigate if its okay to unstake whenever.
-
-        feeEarned = _changeStake(poolId, -toInt128(deltaLiquidity));
-        pool.stakedLiquidityDelta -= toInt128(deltaLiquidity);
-        emit Unstake(poolId, msg.sender, deltaLiquidity);
-    }
-
-    function _changeStake(uint64 poolId, int128 deltaLiquidity) internal returns (uint feeEarned) {
-        uint timestamp = _blockTimestamp();
-        HyperPool memory pool = pools[poolId];
-        HyperPosition storage pos = positions[msg.sender][poolId];
-        if (pos.stakeTimestamp == 0) pos.stakeTimestamp = timestamp.safeCastTo32();
-        if (pos.unstakeTimestamp == 0) pos.unstakeTimestamp = pool.params.maturity();
-
-        feeEarned = pos.syncPositionStakedFees(pool.stakedLiquidity, pool.feeGrowthGlobalReward); // must apply before liquidity changes.
-        pos.changePositionLiquidity(timestamp, -deltaLiquidity);
-        pos.stakedLiquidity = Assembly.addSignedDelta(pos.stakedLiquidity, deltaLiquidity);
     }
 
     // ===== Swaps ===== //
@@ -518,7 +457,7 @@ contract Hyper is IHyper {
                 ? 0
                 : ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * _state.fee) / 10_000;
             _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
-            if (priorityFeeAmount != 0) _state.priorityFeeGrowthGlobal = priorityFeeAmount.divWadDown(_swap.liquidity); // todo: change to staked liquidity
+            if (priorityFeeAmount != 0) _state.priorityFeeGrowthGlobal = priorityFeeAmount.divWadDown(_swap.liquidity); // todo: update for handling config reward token?
 
             deltaInput = _swap.remainder > maxInput ? maxInput : _swap.remainder; // swaps up to the maximum input
             deltaInputLessFee = deltaInput - _swap.feeAmount;
@@ -632,13 +571,6 @@ contract Hyper is IHyper {
 
         uint256 timestamp = _blockTimestamp();
         timeDelta = getTimePassed(poolId);
-
-        // todo: better configuration of this value?
-        uint requiredTimePassedForStake = 1;
-        if (timeDelta >= requiredTimePassedForStake) {
-            pool.stakedLiquidity = Assembly.addSignedDelta(pool.stakedLiquidity, pool.stakedLiquidityDelta);
-            pool.stakedLiquidityDelta = 0;
-        }
 
         if (pool.lastTick != tick) pool.lastTick = tick;
         if (pool.lastPrice != price) pool.lastPrice = price.safeCastTo128();
@@ -823,12 +755,6 @@ contract Hyper is IHyper {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.output, args.direction) = Enigma.decodeSwap(data);
             _swap(args);
-        } else if (instruction == Enigma.STAKE_POSITION) {
-            (uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeStakePosition(data);
-            _stake(poolId, deltaLiquidity);
-        } else if (instruction == Enigma.UNSTAKE_POSITION) {
-            (uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeUnstakePosition(data);
-            _unstake(poolId, deltaLiquidity);
         } else if (instruction == Enigma.CREATE_POOL) {
             (
                 uint24 pairId,

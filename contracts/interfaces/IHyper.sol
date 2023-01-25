@@ -17,8 +17,6 @@ interface IHyperEvents {
         address indexed tokenOut,
         uint256 output
     );
-    event Stake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
-    event Unstake(uint64 indexed poolId, address indexed owner, uint deltaLiquidity);
     event Allocate(
         uint64 indexed poolId,
         address indexed asset,
@@ -96,8 +94,6 @@ interface IHyperGetters {
             uint256 feeGrowthGlobalQuote,
             uint128 lastPrice,
             uint128 liquidity,
-            uint128 stakedLiquidity,
-            int128 stakedLiquidityDelta,
             HyperCurve memory,
             HyperPair memory
         );
@@ -110,10 +106,7 @@ interface IHyperGetters {
         view
         returns (
             uint128 freeLiquidity,
-            uint128 stakedLiquidity,
             uint256 lastTimestamp,
-            uint256 stakeTimestamp,
-            uint256 unstakeTimestamp,
             uint256 feeGrowthRewardLast,
             uint256 feeGrowthAssetLast,
             uint256 feeGrowthQuoteLast,
@@ -150,10 +143,6 @@ interface IHyperActions {
     function allocate(uint64 poolId, uint deltaLiquidity) external payable returns (uint deltaAsset, uint deltaQuote);
 
     function unallocate(uint64 poolId, uint amount) external returns (uint deltaAsset, uint deltaQuote);
-
-    function stake(uint64 poolId, uint128 deltaLiquidity) external;
-
-    function unstake(uint64 poolId, uint128 deltaLiquidity) external;
 
     function swap(
         uint64 poolId,
