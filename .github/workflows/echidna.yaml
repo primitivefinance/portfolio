@@ -3,16 +3,13 @@ on: [push]
 name: Echidna Test
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      - name: Use Node.js 16
-        uses: actions/setup-node@v2
         with:
-          node-version: 16
-          cache: 'npm'
+          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -20,7 +17,8 @@ jobs:
           version: nightly
 
       - name: Compile contracts
-        run: forge build
+        run: |
+          forge build --build-info
 
       - name: Run Echidna
         uses: crytic/echidna-action@v2
@@ -29,4 +27,4 @@ jobs:
           files: .
           contract: EchidnaE2E
           config: E2E.yaml
-          crytic-args: --foundry-ignore-compile
+          crytic-args: --ignore-compile
