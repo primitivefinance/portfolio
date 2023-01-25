@@ -46,7 +46,8 @@ using {
     tau
 } for HyperPool global;
 
-int24 constant MAX_TICK = 887272;
+int24 constant MAX_TICK = 887271;
+int24 constant MIN_TICK = -887271;
 uint256 constant BUFFER = 300 seconds;
 uint256 constant MIN_FEE = 1; // 0.01%
 uint256 constant MAX_FEE = 1000; // 10%
@@ -326,14 +327,15 @@ function validateParameters(HyperCurve memory self) view returns (bool, bytes me
     return (success, reason);
 }
 
-/** @dev Invalid parameters should revert. */
+/** @dev Invalid parameters should revert. Bound checks are inclusive. */
 function checkParameters(HyperCurve memory self) view returns (bool, bytes memory) {
+    if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
     if (!Assembly.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
         return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));
     if (!Assembly.isBetween(self.duration, MIN_DURATION, MAX_DURATION))
         return (false, abi.encodeWithSelector(InvalidDuration.selector, self.duration));
-    if (self.maxTick >= MAX_TICK) return (false, abi.encodeWithSelector(InvalidTick.selector, self.maxTick)); //  todo: fix, min tick check?
-    if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
+    if (!Assembly.__between(self.maxTick, MIN_TICK, MAX_TICK))
+        return (false, abi.encodeWithSelector(InvalidTick.selector, self.maxTick));
     if (!Assembly.isBetween(self.fee, MIN_FEE, MAX_FEE))
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
     // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
