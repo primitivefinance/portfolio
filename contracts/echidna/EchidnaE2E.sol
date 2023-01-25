@@ -1166,7 +1166,9 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     // A user should not be able to allocate more than they own
 
     // ******************** Unallocate ********************
-    function unallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
+    // A user attempting to unallocate an expired pool should be successful
+    // A user attempting to unallocate on any pool should succeed with correct preconditions
+    function unallocate_with_correct_preconditions_should_succeed(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
         (
             HyperPool memory pool,
@@ -1219,15 +1221,24 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
-        try _hyper.unallocate(poolId, amount) {
-            emit AssertionFailed("BUG: User was able to unallocate without prior allocation");
-        } catch {}
+        unallocate_should_fail(poolId, amount, "BUG: Unallocate without a position should fail.");
     }
 
     // A user attempting to unallocate a nonexistent pool should fail
-    // A user attempting to unallocate an expired pool should be successful
+    function unallocate_with_non_existent_pool_should_fail(uint64 id, uint256 amount) public {
+        require(!is_created_pool(id));
+        amount = between(amount, 1, type(uint256).max);
+        unallocate_should_fail(id, amount, "BUG: Unallocate to a non-existent pool should fail.");
+    }
+
     // Caller position last timestamp <= block.timestamp, with JIT policy
     // A user should not be able to unallocate more than they own
+    function unallocate_should_fail(uint64 poolId, uint256 amount, string memory msg) private {
+        try _hyper.unallocate(poolId, amount) {
+            emit AssertionFailed(msg);
+        } catch {}
+    }
+
     // A user calling allocate then unallocate should succeed
     function allocate_then_unallocate_should_succeed(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
