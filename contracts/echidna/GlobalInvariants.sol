@@ -1,19 +1,8 @@
 pragma solidity ^0.8.0;
-import "../test/EchidnaERC20.sol";
-import "./EchidnaStateHandling.sol";
-import "./Helper.sol";
-import "../../test/helpers/HelperHyperView.sol";
-import "solmate/tokens/WETH.sol";
+import "./PairCreation.sol";
+import "./PoolCreation.sol";
 
-contract GlobalInvariants is Helper, EchidnaStateHandling, HelperHyperView {
-    Hyper immutable _hyper;
-    WETH immutable _weth;
-
-    constructor() public {
-        _weth = new WETH();
-        _hyper = new Hyper(address(_weth));
-    }
-
+contract GlobalInvariants is PairCreation, PoolCreation {
     // ******************** System wide Invariants ********************
     // The token balance of Hyper should be greater or equal to the reserve for all tokens
     // Note: assumption that pairs are created through create_pair invariant test

@@ -1,10 +1,20 @@
 pragma solidity ^0.8.0;
-
+import "solmate/tokens/WETH.sol";
 import "../test/EchidnaERC20.sol";
 import "./Helper.sol";
 import "../Hyper.sol";
+import "../../test/helpers/HelperHyperView.sol";
+import "../Enigma.sol" as ProcessingLib;
 
-contract EchidnaStateHandling is Helper {
+contract EchidnaStateHandling is Helper, HelperHyperView {
+    Hyper public immutable _hyper;
+    WETH public immutable _weth;
+
+    constructor() public {
+        _weth = new WETH();
+        _hyper = new Hyper(address(_weth));
+    }
+
     // Hyper Tokens
     EchidnaERC20[] public hyperTokens;
 
