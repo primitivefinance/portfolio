@@ -19,7 +19,7 @@ contract GlobalInvariants is
     // Note: assumption that pairs are created through create_pair invariant test
     // which will add the token to the hyperTokens list
     // this function is built so that extending the creation of new pairs should not require code changes here
-    function global_token_balance_greater_or_equal_reserves() public {
+    function global_token_balance_greater_or_equal_reserves() public view {
         uint256 reserveBalance = 0;
         uint256 tokenBalance = 0;
         for (uint8 i = 0; i < EchidnaStateHandling.hyperTokens.length; i++) {
@@ -36,14 +36,14 @@ contract GlobalInvariants is
     }
 
     // ---------- HyperPair Properties -------
-    function pair_asset_never_equal_to_quote(uint256 id) public {
+    function pair_asset_never_equal_to_quote(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
         HyperPair memory pair = getPair(address(_hyper), pairId);
         assert(pair.tokenAsset != pair.tokenQuote);
     }
 
-    function pair_decimals_never_exceed_bounds(uint256 id) public {
+    function pair_decimals_never_exceed_bounds(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
         HyperPair memory pair = getPair(address(_hyper), pairId);
@@ -57,11 +57,12 @@ contract GlobalInvariants is
     }
 
     // ---------- Pool Properties -------
-    function pool_fee_growth_greater_than_position_fee_growth() public {
+    function pool_fee_growth_greater_than_position_fee_growth() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
         }
+        // TODO: Add pool fee growth tests 
     }
 
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
@@ -165,7 +166,7 @@ contract GlobalInvariants is
 
     // TODO: Find a better name here with `pool_` at the beginning
 
-    function check_hyper_curve_assumptions() public {
+    function check_hyper_curve_assumptions() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);

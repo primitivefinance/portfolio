@@ -96,13 +96,12 @@ contract AllocateUnallocate is EchidnaStateHandling {
 
     function allocate_with_non_existent_pool_should_fail(uint256 id, uint256 deltaLiquidity) public {
         (
-            HyperPool memory pool,
+            ,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
 
-        address[] memory owners = new address[](1);
         require(!is_created_pool(poolId)); // require pool does not exist
         emit LogUint256("pool id:", uint256(poolId));
 
@@ -124,16 +123,12 @@ contract AllocateUnallocate is EchidnaStateHandling {
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        // Save pre allocation state
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
-
-        try _hyper.allocate(poolId, deltaLiquidity) returns (uint256 allocateAset, uint256 allocateQuote) {
+        try _hyper.allocate(poolId, deltaLiquidity) returns (uint256,uint256) {
             emit AssertionFailed("BUG: allocate with non existent pool should fail");
         } catch {}
     }
 
     function allocate_with_zero_delta_liquidity_should_fail(uint256 id) public {
-        address[] memory owners = new address[](1);
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -158,7 +153,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        try _hyper.allocate(poolId, deltaLiquidity) returns (uint256 allocateAset, uint256 allocateQuote) {
+        try _hyper.allocate(poolId, deltaLiquidity) returns (uint256,uint256) {
             emit AssertionFailed("BUG: allocate with deltaLiquidity=0 should fail");
         } catch {}
     }
@@ -217,8 +212,6 @@ contract AllocateUnallocate is EchidnaStateHandling {
 
         // Save pre unallocation state
         HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
-        uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
-        uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
         unallocate_should_fail(poolId, amount, "BUG: Unallocate without a position should fail.");
@@ -233,9 +226,9 @@ contract AllocateUnallocate is EchidnaStateHandling {
 
     // Caller position last timestamp <= block.timestamp, with JIT policy
     // A user should not be able to unallocate more than they own
-    function unallocate_should_fail(uint64 poolId, uint256 amount, string memory msg) private {
+    function unallocate_should_fail(uint64 poolId, uint256 amount, string memory failureMsg) private {
         try _hyper.unallocate(poolId, amount) {
-            emit AssertionFailed(msg);
+            emit AssertionFailed(failureMsg);
         } catch {}
     }
 

@@ -16,7 +16,7 @@ contract EchidnaE2E is GlobalInvariants {
     OS.AccountSystem hyperAccount;
 
     // ******************** Check Proper System Deployment ********************
-    function check_proper_deployment() public {
+    function check_proper_deployment() public view {
         assert(address(_weth) != address(0));
         assert(address(_hyper) != address(0));
 
@@ -43,8 +43,7 @@ contract EchidnaE2E is GlobalInvariants {
         (
             HyperPool memory pool,
             uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
+            ,
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 

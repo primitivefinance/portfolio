@@ -11,7 +11,7 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
     Hyper public immutable _hyper;
     WETH public immutable _weth;
 
-    constructor() public {
+    constructor() {
         _weth = new WETH();
         _hyper = new Hyper(address(_weth));
     }
@@ -82,7 +82,6 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
     }
 
     function retrieve_non_expired_pool_and_tokens(
-        uint256 id
     ) internal view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
         for (uint8 i = 0; i < poolIds.length; i++) {
             // will auto skew to the first pool that is not expired, however this should be okay.

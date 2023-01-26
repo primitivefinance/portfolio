@@ -31,10 +31,11 @@ contract Swaps is EchidnaStateHandling {
         if (curve.maturity() <= block.timestamp) {
             emit LogUint256("Maturity timestamp", curve.maturity());
             emit LogUint256("block.timestamp", block.timestamp);
-            swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
+            swap_should_fail(poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
             try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
                 HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+                // TODO: Add swap tests
             } catch {}
         }
     }
@@ -44,49 +45,46 @@ contract Swaps is EchidnaStateHandling {
         require(!is_created_pool(id));
         HyperPool memory pool = getPool(address(_hyper), id);
 
-        swap_should_fail(pool.params, id, true, id, id, "BUG: Swap on a nonexistent pool should fail.");
+        swap_should_fail(id, true, id, id, "BUG: Swap on a nonexistent pool should fail.");
     }
 
-    function swap_on_zero_amount_should_fail(uint id) public {
+    function swap_on_zero_amount_should_fail() public {
         // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens(id);
+            , 
+        ) = retrieve_non_expired_pool_and_tokens();
         uint256 amount = 0;
 
-        swap_should_fail(pool.params, poolId, true, amount, id + 1, "BUG: Swap with zero swap amount should fail.");
+        swap_should_fail(poolId, true, amount, poolId + 1, "BUG: Swap with zero swap amount should fail.");
     }
 
-    function swap_on_limit_amount_of_zero_should_fail(uint id) public {
+    function swap_on_limit_amount_of_zero_should_fail() public {
         // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens(id);
-        uint256 amount = between(id, 1, type(uint256).max);
+            ,
+        ) = retrieve_non_expired_pool_and_tokens();
+        uint256 amount = between(poolId, 1, type(uint256).max);
 
-        swap_should_fail(pool.params, poolId, true, amount, 0, "BUG: Swap with zero limit amount should fail.");
+        swap_should_fail(poolId, true, amount, 0, "BUG: Swap with zero limit amount should fail.");
     }
 
     function swap_should_fail(
-        HyperCurve memory curve,
         uint64 poolId,
         bool sellAsset,
         uint256 amount,
         uint256 limit,
-        string memory msg
+        string memory failureMsg
     ) private {
-        try _hyper.swap(poolId, sellAsset, amount, amount) {
-            emit AssertionFailed(msg);
+        try _hyper.swap(poolId, sellAsset, amount, limit) {
+            emit AssertionFailed(failureMsg);
         } catch {}
     }
 
-    function swap_assets_in_always_decreases_price(uint id, uint256 amount, uint256 limit) public {
+    function swap_assets_in_always_decreases_price(uint256 amount, uint256 limit) public {
         bool sellAsset = true;
 
         address[] memory owners = new address[](1);
@@ -96,7 +94,7 @@ contract Swaps is EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens();
         HyperCurve memory curve = pool.params;
         emit LogUint256("curve maturity", uint256(curve.maturity()));
         emit LogUint256("block timestamp", block.timestamp);
@@ -149,7 +147,7 @@ contract Swaps is EchidnaStateHandling {
         );
     }
 
-    function swap_quote_in_always_increases_price(uint id, uint256 amount, uint256 limit) public {
+    function swap_quote_in_always_increases_price(uint256 amount, uint256 limit) public {
         bool sellAsset = false;
 
         address[] memory owners = new address[](1);
@@ -159,7 +157,7 @@ contract Swaps is EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens();
         HyperCurve memory curve = pool.params;
         // require(curve.maturity() > block.timestamp);
 
@@ -205,7 +203,7 @@ contract Swaps is EchidnaStateHandling {
         );
     }
 
-    function swap_asset_in_increases_reserve(uint id, uint256 amount, uint256 limit) public {
+    function swap_asset_in_increases_reserve(uint256 amount, uint256 limit) public {
         bool sellAsset = true;
 
         address[] memory owners = new address[](1);
@@ -215,7 +213,7 @@ contract Swaps is EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens();
         HyperCurve memory curve = pool.params;
         // require(curve.maturity() > block.timestamp);
 
@@ -261,7 +259,7 @@ contract Swaps is EchidnaStateHandling {
         );
     }
 
-    function swap_quote_in_increases_reserve(uint id, uint256 amount, uint256 limit) public {
+    function swap_quote_in_increases_reserve(uint256 amount, uint256 limit) public {
         bool sellAsset = false;
 
         address[] memory owners = new address[](1);
@@ -271,7 +269,7 @@ contract Swaps is EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens();
         HyperCurve memory curve = pool.params;
         // require(curve.maturity() > block.timestamp);
 
@@ -330,7 +328,7 @@ contract Swaps is EchidnaStateHandling {
         uint postFeeGrowthSell,
         uint prevFeeGrowthBuy,
         uint postFeeGrowthBuy
-    ) internal {
+    ) internal pure {
         // price always changes in a swap
         assert(postPrice != prevPrice);
 
