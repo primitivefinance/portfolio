@@ -1281,7 +1281,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -1324,7 +1324,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens(id);
         uint256 amount = 0;
 
         swap_should_fail(pool.params, poolId, true, amount, id + 1, "BUG: Swap with zero swap amount should fail.");
@@ -1337,8 +1337,8 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
-        uint256 amount = 0;
+        ) = retrieve_non_expired_pool_and_tokens(id);
+        uint256 amount = between(id, 1, type(uint256).max);
 
         swap_should_fail(pool.params, poolId, true, amount, 0, "BUG: Swap with zero limit amount should fail.");
     }
@@ -1356,20 +1356,6 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         } catch {}
     }
 
-    function retrieve_random_pool_and_tokens(
-        uint256 id
-    ) private view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
-        // assumes that at least one pool exists because it's been created in the constructor
-        uint256 random = between(id, 0, poolIds.length - 1);
-        if (poolIds.length == 1) random = 0;
-
-        pool = getPool(address(_hyper), poolIds[random]);
-        poolId = poolIds[random];
-        HyperPair memory pair = pool.pair;
-        quote = EchidnaERC20(pair.tokenQuote);
-        asset = EchidnaERC20(pair.tokenAsset);
-    }
-
     function swap_assets_in_always_decreases_price(uint id, uint256 amount, uint256 limit) public {
         bool sellAsset = true;
 
@@ -1380,9 +1366,12 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
-        require(curve.maturity() > block.timestamp);
+        emit LogUint256("curve maturity", uint256(curve.maturity()));
+        emit LogUint256("block timestamp", block.timestamp);
+        emit LogBool("is curve maturity greater than timestamp?", curve.maturity() > block.timestamp);
+        // require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -1440,9 +1429,9 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
-        require(curve.maturity() > block.timestamp);
+        // require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -1496,9 +1485,9 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
-        require(curve.maturity() > block.timestamp);
+        // require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -1552,9 +1541,9 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        ) = retrieve_non_expired_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
-        require(curve.maturity() > block.timestamp);
+        // require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -1625,5 +1614,34 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         // actual token balances increase or decrease for non-internal balance swaps.
         assert(postReserveSell > prevReserveSell);
         assert(postReserveBuy < prevReserveBuy);
+    }
+
+    function retrieve_random_pool_and_tokens(
+        uint256 id
+    ) private view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
+        // assumes that at least one pool exists because it's been created in the constructor
+        uint256 random = between(id, 0, poolIds.length - 1);
+        if (poolIds.length == 1) random = 0;
+
+        pool = getPool(address(_hyper), poolIds[random]);
+        poolId = poolIds[random];
+        HyperPair memory pair = pool.pair;
+        quote = EchidnaERC20(pair.tokenQuote);
+        asset = EchidnaERC20(pair.tokenAsset);
+    }
+
+    function retrieve_non_expired_pool_and_tokens(
+        uint256 id
+    ) private view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
+        for (uint8 i = 0; i < poolIds.length; i++) {
+            // will auto skew to the first pool that is not expired, however this should be okay.
+            // this gives us a higher chance to return a pool that is not expired through iterating
+            pool = getPool(address(_hyper), poolIds[i]);
+            HyperCurve memory curve = pool.params;
+            if (curve.maturity() > block.timestamp) {
+                HyperPair memory pair = pool.pair;
+                return (pool, poolIds[i], EchidnaERC20(pair.tokenQuote), EchidnaERC20(pair.tokenAsset));
+            }
+        }
     }
 }
