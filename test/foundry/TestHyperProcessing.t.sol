@@ -420,7 +420,7 @@ contract TestHyperProcessing is TestHyperSetup {
         uint tau = getPool(address(__hyperTestingContract__), defaultScenario.poolId).tau(
             __hyperTestingContract__.timestamp()
         );
-        uint strike = Price.computePriceWithTick(curve.maxTick);
+        uint strike = curve.maxPrice;
         console.log(tau, strike, curve.volatility);
         uint256 theoreticalR2 = Price.getXWithPrice(price, strike, curve.volatility, tau);
 
@@ -548,7 +548,7 @@ contract TestHyperProcessing is TestHyperSetup {
             uint16(DEFAULT_SIGMA),
             DEFAULT_DURATION_DAYS,
             jit,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
@@ -576,8 +576,6 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testUnallocatePositionTimestampUpdated() public postTestInvariantChecks {
-        int24 hiTick = DEFAULT_TICK;
-        int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = Enigma.encodeAllocate(0, defaultScenario.poolId, power, amount);
@@ -607,8 +605,6 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testUnallocatePositionfreeLiquidityDecreases() public postTestInvariantChecks {
-        int24 hiTick = DEFAULT_TICK;
-        int24 loTick = DEFAULT_TICK - 256;
         uint8 amount = 0x01;
         uint8 power = 0x01;
         bytes memory data = Enigma.encodeAllocate(0, defaultScenario.poolId, power, amount);

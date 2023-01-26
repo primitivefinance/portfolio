@@ -97,7 +97,7 @@ contract InvariantCreatePool is InvariantTargetContract {
                     1, // vol
                     1, // dur
                     5,
-                    int24(20_000),
+                    args.strike,
                     args.price
                 )
             ); // temp

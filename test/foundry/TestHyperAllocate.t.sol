@@ -68,12 +68,7 @@ contract TestHyperAllocate is TestHyperSetup {
 
         uint tau = pool.lastTau(); // seconds
 
-        uint256 theoreticalR2 = Price.getXWithPrice(
-            price,
-            Price.computePriceWithTick(pool.params.maxTick),
-            pool.params.volatility,
-            tau
-        );
+        uint256 theoreticalR2 = Price.getXWithPrice(price, pool.params.maxPrice, pool.params.volatility, tau);
 
         uint delLiquidity = 4_000_000;
         __hyperTestingContract__.allocate(defaultScenario.poolId, delLiquidity);
@@ -156,7 +151,7 @@ contract TestHyperAllocate is TestHyperSetup {
             uint16(DEFAULT_SIGMA),
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE * 100
         );
 

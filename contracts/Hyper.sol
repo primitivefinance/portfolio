@@ -400,7 +400,7 @@ contract Hyper is IHyper {
         _state.tokenInput = _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote;
         _state.tokenOutput = _state.sell ? pool.pair.tokenQuote : pool.pair.tokenAsset;
 
-        Price.RMM memory rmm = Price.RMM({strike: pool.params.strike(), sigma: pool.params.volatility, tau: 0});
+        Price.RMM memory rmm = Price.RMM({strike: pool.params.maxPrice, sigma: pool.params.volatility, tau: 0});
         Iteration memory _swap;
         {
             (uint256 price, int24 tick, uint updatedTau) = _computeSyncedPrice(args.poolId);
@@ -616,10 +616,10 @@ contract Hyper is IHyper {
         address controller,
         uint16 priorityFee,
         uint16 fee,
-        uint16 vol,
-        uint16 dur,
+        uint16 volatility,
+        uint16 duration,
         uint16 jit,
-        int24 max,
+        uint128 maxPrice,
         uint128 price
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
@@ -637,11 +637,11 @@ contract Hyper is IHyper {
         pool.pair = pairs[pairNonce];
 
         HyperCurve memory params = HyperCurve({
-            maxTick: max,
+            maxPrice: maxPrice,
             jit: hasController ? jit : uint8(_liquidityPolicy()),
             fee: fee,
-            duration: dur,
-            volatility: vol,
+            duration: duration,
+            volatility: volatility,
             priorityFee: hasController ? priorityFee : 0, // min fee
             createdAt: timestamp
         });
@@ -665,14 +665,14 @@ contract Hyper is IHyper {
         uint16 volatility,
         uint16 duration,
         uint16 jit,
-        int24 maxTick
+        uint128 maxPrice
     ) external lock interactions {
         HyperPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
         HyperCurve memory modified = pool.params;
         if (jit != 0) modified.jit = jit;
-        if (maxTick != 0) modified.maxTick = maxTick;
+        if (maxPrice != 0) modified.maxPrice = maxPrice;
         if (fee != 0) modified.fee = fee;
         if (volatility != 0) modified.volatility = volatility;
         if (duration != 0) modified.duration = duration;
@@ -680,7 +680,7 @@ contract Hyper is IHyper {
 
         pool.changePoolParameters(modified);
 
-        emit ChangeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
+        emit ChangeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxPrice);
     }
 
     /** @dev Overridable in tests.  */
@@ -765,10 +765,10 @@ contract Hyper is IHyper {
                 uint16 vol,
                 uint16 dur,
                 uint16 jit,
-                int24 max,
+                uint128 maxPrice,
                 uint128 price
             ) = Enigma.decodeCreatePool(data);
-            _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
+            _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
         } else if (instruction == Enigma.CREATE_PAIR) {
             (address asset, address quote) = Enigma.decodeCreatePair(data);
             _createPair(asset, quote);

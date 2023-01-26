@@ -133,7 +133,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             uint16(DEFAULT_SIGMA),
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
@@ -153,7 +153,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             uint16(DEFAULT_SIGMA),
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
@@ -231,7 +231,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             DEFAULT_VOLATILITY,
             DEFAULT_DURATION,
             DEFAULT_JIT,
-            DEFAULT_MAX_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
