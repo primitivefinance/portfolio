@@ -1,8 +1,9 @@
 pragma solidity ^0.8.0;
 import "./PairCreation.sol";
 import "./PoolCreation.sol";
+import "./ChangeParameters.sol";
 
-contract GlobalInvariants is PairCreation, PoolCreation {
+contract GlobalInvariants is PairCreation, PoolCreation, ChangeParameters {
     // ******************** System wide Invariants ********************
     // The token balance of Hyper should be greater or equal to the reserve for all tokens
     // Note: assumption that pairs are created through create_pair invariant test
@@ -242,35 +243,6 @@ contract GlobalInvariants is PairCreation, PoolCreation {
                 emit LogUint256("amountQuoteDec", amountQuoteDec);
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
                 emit AssertionFailed("BUG (quote): getAmounts returned more than getAmountsWad");
-            }
-        }
-    }
-
-    function retrieve_random_pool_and_tokens(
-        uint256 id
-    ) internal view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
-        // assumes that at least one pool exists because it's been created in the constructor
-        uint256 random = between(id, 0, poolIds.length - 1);
-        if (poolIds.length == 1) random = 0;
-
-        pool = getPool(address(_hyper), poolIds[random]);
-        poolId = poolIds[random];
-        HyperPair memory pair = pool.pair;
-        quote = EchidnaERC20(pair.tokenQuote);
-        asset = EchidnaERC20(pair.tokenAsset);
-    }
-
-    function retrieve_non_expired_pool_and_tokens(
-        uint256 id
-    ) internal view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
-        for (uint8 i = 0; i < poolIds.length; i++) {
-            // will auto skew to the first pool that is not expired, however this should be okay.
-            // this gives us a higher chance to return a pool that is not expired through iterating
-            pool = getPool(address(_hyper), poolIds[i]);
-            HyperCurve memory curve = pool.params;
-            if (curve.maturity() > block.timestamp) {
-                HyperPair memory pair = pool.pair;
-                return (pool, poolIds[i], EchidnaERC20(pair.tokenQuote), EchidnaERC20(pair.tokenAsset));
             }
         }
     }
