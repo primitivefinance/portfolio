@@ -2,8 +2,16 @@ pragma solidity ^0.8.0;
 import "./PairCreation.sol";
 import "./PoolCreation.sol";
 import "./ChangeParameters.sol";
+import "./FundingDrawingDepositing.sol";
+import "./AllocateUnallocate.sol";
 
-contract GlobalInvariants is PairCreation, PoolCreation, ChangeParameters {
+contract GlobalInvariants is
+    PairCreation,
+    PoolCreation,
+    ChangeParameters,
+    FundingDrawingDepositing,
+    AllocateUnallocate
+{
     // ******************** System wide Invariants ********************
     // The token balance of Hyper should be greater or equal to the reserve for all tokens
     // Note: assumption that pairs are created through create_pair invariant test
