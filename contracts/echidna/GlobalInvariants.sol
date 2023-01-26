@@ -4,13 +4,15 @@ import "./PoolCreation.sol";
 import "./ChangeParameters.sol";
 import "./FundingDrawingDepositing.sol";
 import "./AllocateUnallocate.sol";
+import "./Swaps.sol";
 
 contract GlobalInvariants is
     PairCreation,
     PoolCreation,
     ChangeParameters,
     FundingDrawingDepositing,
-    AllocateUnallocate
+    AllocateUnallocate,
+    Swaps
 {
     // ******************** System wide Invariants ********************
     // The token balance of Hyper should be greater or equal to the reserve for all tokens
