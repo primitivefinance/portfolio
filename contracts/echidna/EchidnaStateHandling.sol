@@ -94,4 +94,8 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
             }
         }
     }
+    function mint_and_approve(EchidnaERC20 token, uint256 amount) internal {
+        token.mint(address(this), amount);
+        token.approve(address(_hyper), type(uint256).max);
+    }    
 }
