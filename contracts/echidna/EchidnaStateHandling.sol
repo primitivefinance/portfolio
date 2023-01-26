@@ -2,14 +2,16 @@ pragma solidity ^0.8.0;
 
 import "../test/EchidnaERC20.sol";
 import "./Helper.sol";
+import "../Hyper.sol";
 
-contract EchidnaStateHandling is Helper{
+contract EchidnaStateHandling is Helper {
     // Hyper Tokens
     EchidnaERC20[] public hyperTokens;
 
     function add_created_hyper_token(EchidnaERC20 token) internal {
         hyperTokens.push(token);
     }
+
     function get_hyper_tokens(uint256 id1, uint256 id2) internal view returns (EchidnaERC20 asset, EchidnaERC20 quote) {
         // This assumes that hyperTokens.length is always >2
         if (poolIds.length == 2) {
@@ -21,11 +23,13 @@ contract EchidnaStateHandling is Helper{
         }
         require(id1 != id2);
         return (hyperTokens[id1], hyperTokens[id2]);
-    }    
-    function get_token_at_index(uint256 index) internal view returns (EchidnaERC20 token){
+    }
+
+    function get_token_at_index(uint256 index) internal view returns (EchidnaERC20 token) {
         return hyperTokens[index];
     }
-    // Pairs 
+
+    // Pairs
     uint24[] pairIds;
 
     function save_pair_id(uint24 pairId) internal {
@@ -36,10 +40,11 @@ contract EchidnaStateHandling is Helper{
         require(pairIds.length > 0);
         id = between(id, 0, pairIds.length);
         return pairIds[id];
-    }    
+    }
 
-    // Pools 
+    // Pools
     uint64[] poolIds;
+
     function save_pool_id(uint64 id) internal {
         poolIds.push(id);
     }
@@ -49,5 +54,5 @@ contract EchidnaStateHandling is Helper{
             if (poolIds[i] == id) return true;
         }
         return false;
-    }    
+    }
 }
