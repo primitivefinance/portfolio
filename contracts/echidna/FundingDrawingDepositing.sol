@@ -74,7 +74,6 @@ contract FundingDrawingDepositing is EchidnaStateHandling {
     }
 
     function fund_token(address token, uint256 amount) private returns (bool) {
-        // TODO Refactor: reuse the HelperHyperView.getState() keeps this cleaner
         uint256 senderBalancePreFund = EchidnaERC20(token).balanceOf(address(this));
         uint256 virtualBalancePreFund = getBalance(address(_hyper), address(this), address(token));
         uint256 reservePreFund = getReserve(address(_hyper), address(token));
@@ -219,8 +218,6 @@ contract FundingDrawingDepositing is EchidnaStateHandling {
 
         //-- Postconditions
         // caller balance should be equal
-
-        //TODO Refactor: use HelperHyperView.getState() here
         uint256 virtualBalancePostFund = getBalance(address(_hyper), address(this), address(token));
         if (virtualBalancePostFund != virtualBalancePreFund) {
             emit LogUint256("virtual balance post fund-draw", virtualBalancePostFund);

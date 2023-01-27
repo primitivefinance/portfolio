@@ -8,6 +8,7 @@ contract Helper {
     event LogBool(string msg, bool value);
     event LogInt24(string msg, int24 value);
     event LogInt128(string msg, int128 value);
+    event LogInt256(string msg, int256 value);
 
     int24 constant MAX_TICK = 887272;
     int24 constant MIN_TICK = -414486;

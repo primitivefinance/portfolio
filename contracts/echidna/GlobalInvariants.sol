@@ -62,7 +62,7 @@ contract GlobalInvariants is
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
         }
-        // TODO: Add pool fee growth tests 
+        // TODO: Add pool fee growth tests
     }
 
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
@@ -134,13 +134,13 @@ contract GlobalInvariants is
                 if (pool.liquidity == 0) {
                     emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
                 }
+            } else {
+                if (pool.liquidity != 0) {
+                    emit AssertionFailed("BUG: zero last price should have a zero liquidity.");
+                }
             }
-            //TODO: if pool.lastPrice == 0; pool.liquidity == 0?
         }
     }
-
-    // TODO: remove if it's a false invariant
-    // TODO: Add to iterate over all created-pools
 
     function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
         require(deltaLiquidity != 0);
@@ -164,9 +164,7 @@ contract GlobalInvariants is
         }
     }
 
-    // TODO: Find a better name here with `pool_` at the beginning
-
-    function check_hyper_curve_assumptions() public view {
+    function pool_hyper_curve_assumptions() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
@@ -180,8 +178,7 @@ contract GlobalInvariants is
         }
     }
 
-    // TODO: Find a better name here with `pool_` at the beginning
-    function check_hyper_pool_assumptions() public {
+    function hyper_pool_assumptions() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
