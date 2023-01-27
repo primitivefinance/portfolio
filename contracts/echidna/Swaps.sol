@@ -129,37 +129,40 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.swap(poolId, sellAsset, amount, limit);
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
+        try _hyper.swap(poolId, sellAsset, amount, limit) {
+            HyperPool memory postPool = getPool(address(_hyper), poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
+            uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
+            uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
 
-        if (postPool.lastPrice == 0) {
-            emit LogUint256("lastPrice", postPool.lastPrice);
-            emit AssertionFailed("BUG: pool.lastPrice is zero on a swap.");
-        }
-        if (postPool.lastPrice > prePool.lastPrice) {
-            emit LogUint256("price before swap", prePool.lastPrice);
-            emit LogUint256("price after swap", postPool.lastPrice);
-            emit AssertionFailed("BUG: pool.lastPrice increased after swapping assets in, it should have decreased.");
-        }
+            if (postPool.lastPrice == 0) {
+                emit LogUint256("lastPrice", postPool.lastPrice);
+                emit AssertionFailed("BUG: pool.lastPrice is zero on a swap.");
+            }
+            if (postPool.lastPrice > prePool.lastPrice) {
+                emit LogUint256("price before swap", prePool.lastPrice);
+                emit LogUint256("price after swap", postPool.lastPrice);
+                emit AssertionFailed(
+                    "BUG: pool.lastPrice increased after swapping assets in, it should have decreased."
+                );
+            }
 
-        // feeGrowthSell = asset
-        check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
-            prePool.liquidity,
-            postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
-            prePool.feeGrowthGlobalAsset,
-            postPool.feeGrowthGlobalAsset,
-            prePool.feeGrowthGlobalQuote,
-            postPool.feeGrowthGlobalQuote
-        );
+            // feeGrowthSell = asset
+            check_external_swap_invariants(
+                prePool.lastPrice,
+                postPool.lastPrice,
+                prePool.liquidity,
+                postPool.liquidity,
+                prevReserveSell,
+                postReserveSell,
+                prevReserveBuy,
+                postReserveBuy,
+                prePool.feeGrowthGlobalAsset,
+                postPool.feeGrowthGlobalAsset,
+                prePool.feeGrowthGlobalQuote,
+                postPool.feeGrowthGlobalQuote
+            );
+        } catch {}
     }
 
     function swap_quote_in_always_increases_price(uint256 amount, uint256 limit) public {
@@ -189,33 +192,36 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.swap(poolId, sellAsset, amount, limit);
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
+        try _hyper.swap(poolId, sellAsset, amount, limit) {
+            HyperPool memory postPool = getPool(address(_hyper), poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
+            uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
+            uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
 
-        if (postPool.lastPrice < prePool.lastPrice) {
-            emit LogUint256("price before swap", prePool.lastPrice);
-            emit LogUint256("price after swap", postPool.lastPrice);
-            emit AssertionFailed("BUG: pool.lastPrice decreased after swapping quote in, it should have increased.");
-        }
+            if (postPool.lastPrice < prePool.lastPrice) {
+                emit LogUint256("price before swap", prePool.lastPrice);
+                emit LogUint256("price after swap", postPool.lastPrice);
+                emit AssertionFailed(
+                    "BUG: pool.lastPrice decreased after swapping quote in, it should have increased."
+                );
+            }
 
-        // feeGrowthSell = quote
-        check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
-            prePool.liquidity,
-            postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
-            prePool.feeGrowthGlobalQuote,
-            postPool.feeGrowthGlobalQuote,
-            prePool.feeGrowthGlobalAsset,
-            postPool.feeGrowthGlobalAsset
-        );
+            // feeGrowthSell = quote
+            check_external_swap_invariants(
+                prePool.lastPrice,
+                postPool.lastPrice,
+                prePool.liquidity,
+                postPool.liquidity,
+                prevReserveSell,
+                postReserveSell,
+                prevReserveBuy,
+                postReserveBuy,
+                prePool.feeGrowthGlobalQuote,
+                postPool.feeGrowthGlobalQuote,
+                prePool.feeGrowthGlobalAsset,
+                postPool.feeGrowthGlobalAsset
+            );
+        } catch {}
     }
 
     function swap_asset_in_increases_reserve(uint256 amount, uint256 limit) public {
@@ -245,33 +251,34 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.swap(poolId, sellAsset, amount, limit);
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
+        try _hyper.swap(poolId, sellAsset, amount, limit) {
+            HyperPool memory postPool = getPool(address(_hyper), poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
+            uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
+            uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
 
-        if (postReserveSell < prevReserveSell) {
-            emit LogUint256("asset reserve before swap", prevReserveSell);
-            emit LogUint256("asset reserve after swap", postReserveSell);
-            emit AssertionFailed("BUG: reserve decreased after swapping asset in, it should have increased.");
-        }
+            if (postReserveSell < prevReserveSell) {
+                emit LogUint256("asset reserve before swap", prevReserveSell);
+                emit LogUint256("asset reserve after swap", postReserveSell);
+                emit AssertionFailed("BUG: reserve decreased after swapping asset in, it should have increased.");
+            }
 
-        // feeGrowthSell = asset
-        check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
-            prePool.liquidity,
-            postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
-            prePool.feeGrowthGlobalAsset,
-            postPool.feeGrowthGlobalAsset,
-            prePool.feeGrowthGlobalQuote,
-            postPool.feeGrowthGlobalQuote
-        );
+            // feeGrowthSell = asset
+            check_external_swap_invariants(
+                prePool.lastPrice,
+                postPool.lastPrice,
+                prePool.liquidity,
+                postPool.liquidity,
+                prevReserveSell,
+                postReserveSell,
+                prevReserveBuy,
+                postReserveBuy,
+                prePool.feeGrowthGlobalAsset,
+                postPool.feeGrowthGlobalAsset,
+                prePool.feeGrowthGlobalQuote,
+                postPool.feeGrowthGlobalQuote
+            );
+        } catch {}
     }
 
     function swap_quote_in_increases_reserve(uint256 amount, uint256 limit) public {
@@ -301,33 +308,34 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.swap(poolId, sellAsset, amount, limit);
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
+        try _hyper.swap(poolId, sellAsset, amount, limit) {
+            HyperPool memory postPool = getPool(address(_hyper), poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
+            uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
+            uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
 
-        if (prevReserveSell < prevReserveSell) {
-            emit LogUint256("quote reserve before swap", prevReserveSell);
-            emit LogUint256("quote reserve after swap", prevReserveSell);
-            emit AssertionFailed("BUG: reserve decreased after swapping quote in, it should have increased.");
-        }
+            if (prevReserveSell < prevReserveSell) {
+                emit LogUint256("quote reserve before swap", prevReserveSell);
+                emit LogUint256("quote reserve after swap", prevReserveSell);
+                emit AssertionFailed("BUG: reserve decreased after swapping quote in, it should have increased.");
+            }
 
-        // feeGrowthSell = quote
-        check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
-            prePool.liquidity,
-            postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
-            prePool.feeGrowthGlobalQuote,
-            postPool.feeGrowthGlobalQuote,
-            prePool.feeGrowthGlobalAsset,
-            postPool.feeGrowthGlobalAsset
-        );
+            // feeGrowthSell = quote
+            check_external_swap_invariants(
+                prePool.lastPrice,
+                postPool.lastPrice,
+                prePool.liquidity,
+                postPool.liquidity,
+                prevReserveSell,
+                postReserveSell,
+                prevReserveBuy,
+                postReserveBuy,
+                prePool.feeGrowthGlobalQuote,
+                postPool.feeGrowthGlobalQuote,
+                prePool.feeGrowthGlobalAsset,
+                postPool.feeGrowthGlobalAsset
+            );
+        } catch {}
     }
 
     function check_external_swap_invariants(
