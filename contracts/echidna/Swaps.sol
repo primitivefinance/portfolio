@@ -35,7 +35,30 @@ contract Swaps is EchidnaStateHandling {
         } else {
             try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
                 HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
-                // TODO: Add swap tests
+                {
+                    // change in asset's balance after swaps is equivalent to the change in reserves
+                    int256 assetBalanceOf = int256(postState.physicalBalanceAsset - preState.physicalBalanceAsset);
+                    int256 reserveAssetDiff = int256(postState.reserveAsset - preState.reserveAsset);
+                    if (assetBalanceOf != reserveAssetDiff) {
+                        emit LogInt256("assetBalanceOf", assetBalanceOf);
+                        emit LogInt256("reserveAssetDiff", reserveAssetDiff);
+                        emit AssertionFailed(
+                            "BUG: Hyper's balance of asset token did not equal change in asset reserves"
+                        );
+                    }
+                }
+                {
+                    // change in quote's balance after swaps is equivalent to the change in reserves
+                    int256 quoteBalanceOf = int(postState.physicalBalanceQuote - preState.physicalBalanceQuote);
+                    int256 reserveQuoteDiff = int(postState.reserveQuote - preState.reserveQuote);
+                    if (quoteBalanceOf != reserveQuoteDiff) {
+                        emit LogInt256("quoteBalanceOf", quoteBalanceOf);
+                        emit LogInt256("reserveQuoteDiff", reserveQuoteDiff);
+                        emit AssertionFailed(
+                            "BUG: Hyper's balance of quote token did not equal change in asset reserves"
+                        );
+                    }
+                }
             } catch {}
         }
     }
@@ -50,11 +73,7 @@ contract Swaps is EchidnaStateHandling {
 
     function swap_on_zero_amount_should_fail() public {
         // Will always return a pool that exists
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            , 
-        ) = retrieve_non_expired_pool_and_tokens();
+        (HyperPool memory pool, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
         uint256 amount = 0;
 
         swap_should_fail(poolId, true, amount, poolId + 1, "BUG: Swap with zero swap amount should fail.");
@@ -62,11 +81,7 @@ contract Swaps is EchidnaStateHandling {
 
     function swap_on_limit_amount_of_zero_should_fail() public {
         // Will always return a pool that exists
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            ,
-        ) = retrieve_non_expired_pool_and_tokens();
+        (HyperPool memory pool, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
         uint256 amount = between(poolId, 1, type(uint256).max);
 
         swap_should_fail(poolId, true, amount, 0, "BUG: Swap with zero limit amount should fail.");
