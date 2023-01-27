@@ -1,0 +1,6 @@
+testMaxGas: 800000030
+codeSize: 0xfffffffffff
+coverage: true 
+corpusDir: swaps
+testMode: assertion
+testLimit: 100000

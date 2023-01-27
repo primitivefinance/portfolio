@@ -24,8 +24,7 @@ contract StatelessSwaps is Helper, Test {
 
     uint256 constant INITIAL_BALANCE = 1e50;
 
-    function setUp() internal {
-        // constructor() {
+    constructor() {
         weth = new WETH();
         usdc = new TestERC20("USD Coin", "USDC", 6);
         quote = new TestERC20("Quote", "QUOTE", 18);
@@ -67,9 +66,9 @@ contract StatelessSwaps is Helper, Test {
     uint16 fee = 1;
     uint64 poolId;
 
-    // function bound(uint256 random, uint256 low, uint256 high) internal pure returns (uint256) {
-    //     return between(random, low, high + 1);
-    // }
+    function bound(uint256 random, uint256 low, uint256 high) internal view override  returns (uint256) {
+        return between(random, low, high + 1);
+    }
 
     /// @dev "Stateless" swap fuzz
     function test_swap_fuzz(
@@ -82,7 +81,6 @@ contract StatelessSwaps is Helper, Test {
         uint256 vol,
         uint256 tau
     ) public {
-        setUp();
 
         stk = bound(stk, 1, type(uint128).max);
         price = bound(
@@ -106,13 +104,13 @@ contract StatelessSwaps is Helper, Test {
             // so that the required tokens (= amount * liquidity) don't overflow.
             liquidity = bound(liquidity, 1, uint128(type(int128).max));
             if (amountAsset != 0) {
-                liquidity = bound(liquidity, 1, (uint128(type(int128).max) + amountAsset - 1) / amountAsset);
+                liquidity = bound(liquidity, amountAsset, (uint128(type(int128).max) + amountAsset - 1) / amountAsset);
             }
             if (amountQuote != 0) {
-                liquidity = bound(liquidity, 1, (uint128(type(int128).max) + amountQuote - 1) / amountQuote);
+                liquidity = bound(liquidity, amountQuote, (uint128(type(int128).max) + amountQuote - 1) / amountQuote);
             }
 
-            // console.log("Allocating liquidity:", liquidity);
+            emit LogUint256("Allocating liquidity:", liquidity);
 
             vm.prank(alice);
             hyper.allocate(poolId, liquidity);
@@ -120,7 +118,7 @@ contract StatelessSwaps is Helper, Test {
 
         // Update stk to what Hyper stores, otherwise calculations will be inexcat.
         stk = Price.computePriceWithTick(Price.computeTickWithPrice(stk));
-
+        emit LogUint256("stk",stk);
         {
             // Scoping due to stack-depth.
             Price.RMM memory rmm = Price.RMM({strike: stk, sigma: vol, tau: tau});
@@ -134,22 +132,28 @@ contract StatelessSwaps is Helper, Test {
                 // console.log("selling");
                 // console.log("liveIndependent R_x", R_x);
                 // console.log("liveDependent R_y", R_y);
-                if (R_x > 1e18) return; // Shouldn't happen
+                if (R_x >= 1e18) return; // Shouldn't happen
                 maxInput = (1e18 - R_x) * liquidity / 1e18;
                 maxOutput = R_y * liquidity / 1e18;
             } else {
                 // console.log("buying");
-                // console.log("liveIndependent R_y", R_y);
-                // console.log("liveDependent R_x", R_x);
-                if (stk > R_y) return; // Can happen although this will lead to an overflow on computing max in the swap fn.
-                maxInput = (stk - R_y) * liquidity / 1e18;
+                emit LogUint256("liveIndependent R_y", R_y);
+                emit LogUint256("liveDependent R_x", R_x);
+                if (R_y > stk) return; // Can happen although this will lead to an overflow on computing max in the swap fn.
+                maxInput = (stk - R_y) * liquidity / 1e18; // (2-2)*2/1e18
                 maxOutput = R_x * liquidity / 1e18;
             }
+            emit LogUint256("max input",maxInput);
+            emit LogUint256("max ouput ",maxOutput);            
+            // assert(false);
 
             if (maxInput < 1 || maxOutput < 1) return; // Will revert in swap due to input/output == 0.
 
             input = bound(input, 1, maxInput);
             output = bound(output, 1, maxOutput);
+
+            emit LogUint256("input",input);
+            emit LogUint256("output",output);
         }
 
         // Max error margin the invariant check in the swap allows for.
