@@ -66,7 +66,7 @@ contract StatelessSwaps is Helper, Test {
     uint16 fee = 1;
     uint64 poolId;
 
-    function bound(uint256 random, uint256 low, uint256 high) internal view override  returns (uint256) {
+    function bound(uint256 random, uint256 low, uint256 high) internal pure override returns (uint256) {
         return between(random, low, high + 1);
     }
 
@@ -81,7 +81,6 @@ contract StatelessSwaps is Helper, Test {
         uint256 vol,
         uint256 tau
     ) public {
-
         stk = bound(stk, 1, type(uint128).max);
         price = bound(
             price,
@@ -118,7 +117,7 @@ contract StatelessSwaps is Helper, Test {
 
         // Update stk to what Hyper stores, otherwise calculations will be inexcat.
         stk = Price.computePriceWithTick(Price.computeTickWithPrice(stk));
-        emit LogUint256("stk",stk);
+        emit LogUint256("stk", stk);
         {
             // Scoping due to stack-depth.
             Price.RMM memory rmm = Price.RMM({strike: stk, sigma: vol, tau: tau});
@@ -143,8 +142,8 @@ contract StatelessSwaps is Helper, Test {
                 maxInput = (stk - R_y) * liquidity / 1e18; // (2-2)*2/1e18
                 maxOutput = R_x * liquidity / 1e18;
             }
-            emit LogUint256("max input",maxInput);
-            emit LogUint256("max ouput ",maxOutput);            
+            emit LogUint256("max input", maxInput);
+            emit LogUint256("max ouput ", maxOutput);
             // assert(false);
 
             if (maxInput < 1 || maxOutput < 1) return; // Will revert in swap due to input/output == 0.
@@ -152,8 +151,8 @@ contract StatelessSwaps is Helper, Test {
             input = bound(input, 1, maxInput);
             output = bound(output, 1, maxOutput);
 
-            emit LogUint256("input",input);
-            emit LogUint256("output",output);
+            emit LogUint256("input", input);
+            emit LogUint256("output", output);
         }
 
         // Max error margin the invariant check in the swap allows for.
@@ -164,8 +163,8 @@ contract StatelessSwaps is Helper, Test {
 
         //
         if (success) {
-            Price.RMM memory rmm = Price.RMM({strike: stk, sigma: vol, tau: tau});
-            (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, price);
+            // Price.RMM memory rmm = Price.RMM({strike: stk, sigma: vol, tau: tau});
+            // (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, price);
             // console.log("R_x", R_x);
             // console.log("R_y", R_y);
             // console.log("bal asset", hyper.getBalance(self, address(asset)));
@@ -200,12 +199,14 @@ contract StatelessSwaps is Helper, Test {
     ) internal returns (uint64) {
         bytes memory data;
         bytes[] memory instructions = new bytes[](1);
+        bool success;
+        bytes memory returndata;
 
         if (poolId == 0) {
             instructions[0] = ProcessingLib.encodeCreatePair(token0, token1);
             data = ProcessingLib.encodeJumpInstruction(instructions);
 
-            (bool success, bytes memory returndata) = address(hyper).call(data);
+            (success, returndata) = address(hyper).call(data);
             if (!success) {
                 assembly {
                     revert(add(32, returndata), mload(returndata))
@@ -237,7 +238,7 @@ contract StatelessSwaps is Helper, Test {
 
         data = ProcessingLib.encodeJumpInstruction(instructions);
 
-        (bool success, bytes memory returndata) = address(hyper).call(data);
+        (success, returndata) = address(hyper).call(data);
         if (!success) {
             assembly {
                 revert(add(32, returndata), mload(returndata))
