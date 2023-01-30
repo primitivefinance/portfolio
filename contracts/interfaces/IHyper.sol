@@ -15,7 +15,8 @@ interface IHyperEvents {
         address indexed tokenIn,
         uint256 input,
         address indexed tokenOut,
-        uint256 output
+        uint256 output,
+        uint256 fee
     );
     event Allocate(
         uint64 indexed poolId,
@@ -86,7 +87,7 @@ interface IHyperGetters {
         external
         view
         returns (
-            int24 lastTick,
+            int128 lastInvariant,
             uint32 lastTimestamp,
             address controller,
             uint256 feeGrowthGlobalReward,

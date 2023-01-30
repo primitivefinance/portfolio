@@ -24,6 +24,7 @@ library Price {
         uint256 tau; // seconds
     }
 
+    error UndefinedPrice();
     error OverflowWad(int256 wad);
 
     int256 internal constant TICK_BASE = 1_0001e14;
@@ -47,24 +48,46 @@ library Price {
         prc = getPriceWithX(R_x, args.strike, args.sigma, args.tau);
     }
 
-    function getYWithX(RMM memory args, uint256 R_x) internal pure returns (uint256 R_y) {
-        R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, 0);
+    function getYWithX(RMM memory args, uint256 R_x, int256 inv) internal pure returns (uint256 R_y) {
+        R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, inv);
     }
 
-    function getXWithY(RMM memory args, uint256 R_y) internal pure returns (uint256 R_x) {
-        R_x = getXWithY(R_y, args.strike, args.sigma, args.tau, 0);
+    function getXWithY(RMM memory args, uint256 R_y, int256 inv) internal pure returns (uint256 R_x) {
+        R_x = getXWithY(R_y, args.strike, args.sigma, args.tau, inv);
     }
 
     function computePriceWithChangeInTau(RMM memory args, uint256 prc, uint256 eps) internal pure returns (uint256) {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, eps);
     }
 
-    function computeReserves(RMM memory args, uint prc) internal pure returns (uint R_y, uint R_x) {
+    function computeReserves(RMM memory args, uint prc, int128 inv) internal pure returns (uint R_y, uint R_x) {
         R_x = getXWithPrice(prc, args.strike, args.sigma, args.tau);
-        R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, 0);
+        R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, inv);
     }
 
     // ===== Raw Functions ===== //
+
+    /**
+     * @dev Computes the next price, invariant, and y reserves of a curve after a change in time.
+     */
+    function computeCurveChanges(
+        uint256 stk,
+        uint256 vol,
+        uint256 tau,
+        uint256 prc,
+        int256 invariant,
+        uint256 epsilon
+    ) internal pure returns (uint p_t, int128 i_t, uint t_e) {
+        RMM memory curve = RMM(stk, vol, tau);
+        p_t = curve.computePriceWithChangeInTau(prc, epsilon);
+
+        uint x_1 = curve.getXWithPrice(prc);
+        curve.tau -= epsilon;
+        uint256 y_2 = curve.getYWithX(x_1, invariant);
+
+        i_t = int128(curve.invariantOf(y_2, x_1)); // todo: fix cast
+        t_e = tau - epsilon;
+    }
 
     /**
      * @dev Computes change in price given a change in time in seconds.
@@ -118,6 +141,41 @@ library Price {
 
         uint256 price = term_3.mulWadDown(term_7); // WAD * WAD / WAD = WAD
         return price;
+    }
+
+    /**
+     * @custom:math
+     * y(τ - ε) = K phi( 1 / (o * sqrt(t)) * ln(P(t) / K) + 1/2*o^2t - o*sqrt(t-e))
+     */
+    function computeYWithChangeInTau(
+        uint256 stk,
+        uint256 vol,
+        uint256 prc,
+        uint256 tau,
+        uint256 epsilon
+    ) internal pure returns (uint256 R_y) {
+        RMM memory params = RMM(stk, vol, tau);
+
+        uint256 tauYears;
+        assembly {
+            tauYears := sdiv(mul(tau, WAD), YEAR) // tau * WAD / year = time in years scaled to WAD
+        }
+
+        uint256 epsilonYears;
+        assembly {
+            epsilonYears := sdiv(mul(epsilon, WAD), YEAR) // epsilon * WAD / year = epsilon in years scaled to WAD
+        }
+
+        uint256 sigmaWad = convertPercentageToWad(uint256(params.sigma));
+        uint part0 = WAD.divWadDown(sigmaWad.mulWadDown(tauYears.sqrt() * 1e9));
+        part0 = part0.mulWadDown(uint(int256(prc.divWadDown(params.strike)).lnWad()));
+
+        uint part1 = (sigmaWad * sigmaWad) / DOUBLE_WAD;
+        part1 = part1.mulWadDown(tauYears);
+
+        uint part2 = sigmaWad.mulWadDown((tauYears - epsilonYears).sqrt() * 1e9);
+
+        R_y = params.strike.mulWadDown(uint(Gaussian.cdf(int(part0 + part1 - part2))));
     }
 
     /**
@@ -186,6 +244,9 @@ library Price {
 
     /**
      * @dev price(R_x) = Ke^(Φ^-1(1 - R_x)σ√τ - 1/2σ^2τ)
+     *      As lim_x->0, S(x) = +infinity for all tau > 0 and vol > 0.
+     *      As lim_x->1, S(x) = 0 for all tau > 0 and vol > 0.
+     *      If tau or vol is zero, price is equal to strike.
      * @param R_x WAD
      * @param stk WAD
      * @param vol percentage
@@ -197,6 +258,10 @@ library Price {
         uint256 volWad = convertPercentageToWad(vol);
 
         if (uint256(Gaussian.ONE) < R_x) revert OverflowWad(int256(R_x));
+        if (R_x == 0) revert UndefinedPrice(); // As lim_x->0, S(x) = +infinity.
+        if (tauYears == 0 || volWad == 0) return stk; // Ke^(0 - 0) = K.
+        if (R_x == uint256(Gaussian.ONE)) return stk; // As lim_x->1, S(x) = 0 for all tau > 0 and vol > 0.
+
         int256 input = Gaussian.ONE - int256(R_x);
         int256 ppf = Gaussian.ppf(input);
         uint256 sqrtTauSigma = (tauYears.sqrt() * SQRT_WAD).mulWadDown(volWad);

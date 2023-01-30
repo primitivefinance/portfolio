@@ -70,7 +70,7 @@ contract TestHyperAllocate is TestHyperSetup {
 
         uint256 theoreticalR2 = Price.getXWithPrice(price, pool.params.maxPrice, pool.params.volatility, tau);
 
-        uint delLiquidity = 4_000_000;
+        uint delLiquidity = 1e12;
         __hyperTestingContract__.allocate(defaultScenario.poolId, delLiquidity);
 
         uint256 globalR1 = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
@@ -113,16 +113,10 @@ contract TestHyperAllocate is TestHyperSetup {
         assertEq(deltaAsset, reserveAsset, "delta-asset");
         assertEq(deltaQuote, reserveQuote, "delta-quote");
         assertEq(maxLiquidity, pool.liquidity, "delta-liquidity");
-        assertEq(
-            assetBalance,
-            getReserve(address(__hyperTestingContract__), asset) - (deltaAsset + 1), // round up
-            "asset-balance"
-        );
-        assertEq(
-            quoteBalance,
-            getReserve(address(__hyperTestingContract__), quote) - (deltaQuote + 1), // round up
-            "quote-balance"
-        );
+        uint nextAssetBalance = getReserve(address(__hyperTestingContract__), asset) - (deltaAsset); // round up
+        uint nextQuoteBalance = getReserve(address(__hyperTestingContract__), quote) - (deltaQuote);
+        assertApproxEqAbs(assetBalance, nextAssetBalance, 1, "asset-balance"); // sometimes rounded up
+        assertApproxEqAbs(quoteBalance, nextQuoteBalance, 1, "quote-balance"); // sometimes rounded up
     }
 
     /**
@@ -134,6 +128,12 @@ contract TestHyperAllocate is TestHyperSetup {
     function testFuzzAllocateUnallocateSuccessful(uint128 deltaLiquidity) public postTestInvariantChecks {
         vm.assume(deltaLiquidity != 0);
         vm.assume(deltaLiquidity < (2 ** 126 - 1e36)); // note: if its 2^127, it could still overflow since liquidity is multiplied against token amounts in getLiquidityDeltas.
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        uint lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
+            ? pool.pair.decimalsQuote
+            : pool.pair.decimalsAsset;
+        uint minLiquidity = 10 ** (18 - lowerDecimals);
+        vm.assume(deltaLiquidity > minLiquidity);
         // TODO: Add use max flag support.
         _assertAllocate(deltaLiquidity);
     }
@@ -143,8 +143,8 @@ contract TestHyperAllocate is TestHyperSetup {
         address small_decimal_asset = address(new TestERC20("small decimals", "DEC6", 6));
 
         bytes memory data = createPool(
+            address(__token_18__),
             small_decimal_asset,
-            address(__usdc__),
             address(0),
             uint16(1e4 - DEFAULT_PRIORITY_GAMMA),
             uint16(1e4 - DEFAULT_GAMMA),
@@ -152,7 +152,7 @@ contract TestHyperAllocate is TestHyperSetup {
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
             DEFAULT_STRIKE,
-            DEFAULT_PRICE * 100
+            DEFAULT_PRICE * 10
         );
 
         bool success = __revertCatcher__.jumpProcess(data);

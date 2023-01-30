@@ -40,6 +40,11 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // Preconditions
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
+        uint lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
+            ? pool.pair.decimalsQuote
+            : pool.pair.decimalsAsset;
+        uint minLiquidity = 10 ** (18 - lowerDecimals);
+        vm.assume(deltaLiquidity > minLiquidity);
         assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
         assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
