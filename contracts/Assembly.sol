@@ -5,7 +5,7 @@ pragma solidity 0.8.13;
 
   -------------
 
-  Using yul to handle low-level coversions
+  Using yul to handle low-level conversions
   can easily be a foot shotgun.
 
   We like the gas reductions.
