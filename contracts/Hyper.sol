@@ -274,7 +274,7 @@ contract Hyper is IHyper {
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
             poolId: poolId,
-            timestamp: _blockTimestamp(),
+            timestamp: block.timestamp,
             deltaAsset: deltaAsset,
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
@@ -303,7 +303,7 @@ contract Hyper is IHyper {
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
             poolId: poolId,
-            timestamp: _blockTimestamp(),
+            timestamp: block.timestamp,
             deltaAsset: deltaAsset,
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
@@ -328,7 +328,7 @@ contract Hyper is IHyper {
         HyperPosition storage position = positions[args.owner][args.poolId];
 
         if (args.deltaLiquidity < 0) {
-            uint distance = position.getTimeSinceChanged(_blockTimestamp());
+            uint distance = position.getTimeSinceChanged(block.timestamp);
             if (pools[args.poolId].params.jit > distance) revert JitLiquidity(distance);
         }
 
@@ -546,7 +546,7 @@ contract Hyper is IHyper {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
 
-        (price, tick, updatedTau) = (pool.lastPrice, pool.lastTick, pool.tau(_blockTimestamp()));
+        (price, tick, updatedTau) = (pool.lastPrice, pool.lastTick, pool.tau(block.timestamp));
 
         uint passed = getTimePassed(poolId);
         if (passed > 0) {
@@ -569,13 +569,12 @@ contract Hyper is IHyper {
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
-        uint256 timestamp = _blockTimestamp();
         timeDelta = getTimePassed(poolId);
 
         if (pool.lastTick != tick) pool.lastTick = tick;
         if (pool.lastPrice != price) pool.lastPrice = price.safeCastTo128();
         if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
-        if (pool.lastTimestamp != timestamp) pool.syncPoolTimestamp(timestamp);
+        if (pool.lastTimestamp != block.timestamp) pool.syncPoolTimestamp(block.timestamp);
 
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
@@ -623,7 +622,7 @@ contract Hyper is IHyper {
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
 
-        uint32 timestamp = uint(_blockTimestamp()).safeCastTo32();
+        uint32 timestamp = uint(block.timestamp).safeCastTo32();
         HyperPool memory pool;
         pool.controller = controller;
         pool.lastTimestamp = timestamp;
@@ -680,11 +679,6 @@ contract Hyper is IHyper {
         pool.changePoolParameters(modified);
 
         emit ChangeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
-    }
-
-    /** @dev Overridable in tests.  */
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
     }
 
     /** @dev Overridable in tests.  */
@@ -845,7 +839,7 @@ contract Hyper is IHyper {
     }
 
     function getTimePassed(uint64 poolId) public view returns (uint) {
-        return _blockTimestamp() - pools[poolId].lastTimestamp;
+        return block.timestamp - pools[poolId].lastTimestamp;
     }
 
     function getVirtualReserves(uint64 poolId) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
@@ -876,7 +870,7 @@ contract Hyper is IHyper {
         (output, ) = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
-            timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp // invariant: should not underflow.
+            timeSinceUpdate: block.timestamp - pool.lastTimestamp // invariant: should not underflow.
         });
     }
 }
