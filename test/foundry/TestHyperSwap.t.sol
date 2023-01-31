@@ -58,7 +58,7 @@ contract TestHyperSwap is TestHyperSetup {
     function testSwap_revert_PoolExpired() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         uint end = pool.params.createdAt + Assembly.convertDaysToSeconds(pool.params.duration);
-        customWarp(end + 1);
+        vm.warp(end + 1);
         vm.expectRevert(PoolExpired.selector);
         __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, type(uint128).max);
     }
@@ -130,7 +130,7 @@ contract TestHyperSwap is TestHyperSetup {
     /* function testSwap_small_tau() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        customWarp(pool.params.maturity() - 100);
+        vm.warp(pool.params.maturity() - 100);
 
         pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 

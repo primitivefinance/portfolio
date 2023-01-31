@@ -103,7 +103,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastPrice;
 
@@ -136,7 +136,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         int256 prev = getPool(address(__hyperTestingContract__),defaultScenario.poolId).lastTick;
 
@@ -163,7 +163,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
 
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
         bool direction = true;
         uint internalBalance = 0.5 ether;
@@ -192,7 +192,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
 
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
         bool direction = false;
         __hyperTestingContract__.swap(defaultScenario.poolId, direction, amount, getMaxSwapLimit(direction));
@@ -253,10 +253,10 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
 
         // move some time beyond maturity
-        customWarp(
+        vm.warp(
             block.timestamp +
                 getPool(address(__hyperTestingContract__), defaultScenario.poolId).tau(
-                    __hyperTestingContract__.timestamp()
+                    block.timestamp
                 ) +
                 1
         );
@@ -276,7 +276,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
 
         uint8 useMax = 0;
@@ -308,7 +308,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastTimestamp;
         uint8 useMax = 0;
@@ -341,7 +341,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 prev = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
 
@@ -374,7 +374,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
         // move some time
-        customWarp(block.timestamp + 1);
+        vm.warp(block.timestamp + 1);
 
         uint256 prev = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
 
@@ -418,7 +418,7 @@ contract TestHyperProcessing is TestHyperSetup {
         uint256 price = getPool(address(__hyperTestingContract__), defaultScenario.poolId).lastPrice;
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), (defaultScenario.poolId));
         uint tau = getPool(address(__hyperTestingContract__), defaultScenario.poolId).tau(
-            __hyperTestingContract__.timestamp()
+            block.timestamp
         );
         uint strike = Price.computePriceWithTick(curve.maxTick);
         console.log(tau, strike, curve.volatility);
@@ -566,7 +566,7 @@ contract TestHyperProcessing is TestHyperSetup {
         // Set the distance for the position by warping in time.
         uint256 distance = 22;
         uint256 warpTimestamp = block.timestamp + distance;
-        customWarp(warpTimestamp);
+        vm.warp(warpTimestamp);
 
         data = Enigma.encodeUnallocate(0, poolId, power, amount);
 
@@ -592,7 +592,7 @@ contract TestHyperProcessing is TestHyperSetup {
         ).lastTimestamp;
 
         uint256 warpTimestamp = block.timestamp + 1;
-        customWarp(warpTimestamp);
+        vm.warp(warpTimestamp);
 
         data = Enigma.encodeUnallocate(0, defaultScenario.poolId, power, amount);
         success = __revertCatcher__.process(data);
@@ -915,7 +915,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool success = __revertCatcher__.process(data);
         assertTrue(success);
     } */
-    /* 
+    /*
     function testCreatePoolMagicCurveId() public {
         // Create a new pair to increment the nonce to 2
         bytes memory data = Enigma.encodeCreatePair(address(defaultScenario.quote), address(__weth__));

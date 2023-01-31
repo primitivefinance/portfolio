@@ -4,13 +4,13 @@ pragma solidity ^0.8.0;
 import "./setup/TestHyperSetup.sol";
 
 /**
- @custom:docs 
- 
+ @custom:docs
+
  Fee Buckets and Claiming
     - Users allocate tokens to pools which issue liquidity represent their proportion of deposit.
     - Users swap against the pool and pay the swap fee. Absolute fees per liquidity unit is tracked in the `feeGrowth` variables.
     - The `liquidity` variable of each pool is the total supply of liquidity.
-    - Fee growth is always based on `liquidity`. 
+    - Fee growth is always based on `liquidity`.
  */
 contract TestHyperClaim is TestHyperSetup {
     using FixedPointMathLib for uint;
@@ -96,7 +96,7 @@ contract TestHyperClaim is TestHyperSetup {
         // todo: removed stake functionality - update reward fee accrual. __hyperTestingContract__.stake(scenario.poolId, 1 ether);
 
         // pass some time for staking
-        customWarp(__hyperTestingContract__.timestamp() + 1);
+        vm.warp(block.timestamp + 1);
 
         _swap(scenario.poolId); // swapping in controlled pool should increment reward token (weth)
 
