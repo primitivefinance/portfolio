@@ -609,6 +609,30 @@ contract Hyper is IHyper {
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
     }
 
+    function createPool(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 vol,
+        uint16 dur,
+        uint16 jit,
+        int24 max,
+        uint128 price
+    ) external returns (uint64 poolId) {
+        return _createPool(
+            pairId,
+            controller,
+            priorityFee,
+            fee,
+            vol,
+            dur,
+            jit,
+            max,
+            price
+        );
+    }
+
     /** @dev If pairId == 0, its a magic variable that uses current pair nonce. */
     function _createPool(
         uint24 pairId,
