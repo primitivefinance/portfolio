@@ -113,6 +113,14 @@ contract TestHyperClaim is TestHyperSetup {
         assertEq(post, tokensOwed, "claimed-bal");
     } */
 
+    // todo: price moves to 4118355366381035960, but it should be 4118355366381035960 + 3540.
+    // https://keisan.casio.com/calculator
+    // inputs: K: 10, x: 0.650840964589078473, t: .999336025883107282, v: 1
+    // output price: 4.118355305540121976745
+    // actual price: 4_118355366381035960
+    // actual, non error price: 4_118355366381039500, diff: 3540
+    // actaul computed x:          0.6507457154641188644249
+    // actual computed x w/ error: 0.6507457154641185463956, diff:
     function testClaimCreditsAssetBalance() public postTestInvariantChecks {
         basicAllocate();
 
@@ -151,7 +159,7 @@ contract TestHyperClaim is TestHyperSetup {
         uint nextBalance = _getBalance(hx(), address(this), defaultScenario.asset);
 
         console.log("post reserve bal", nextReserve);
-        console.log("next user bal", nextBalance);
+        console.log("next user bal---", nextBalance);
         console.logInt(int(nextBalance) - int(nextReserve));
         assertTrue(nextReserve >= nextBalance, "invalid-virtual-reserve-state");
 
