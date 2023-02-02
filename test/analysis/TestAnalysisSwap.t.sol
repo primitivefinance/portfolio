@@ -56,7 +56,7 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
     Uni pool;
     uint24 fee = 3000;
     uint64 poolId = 0x0000010100000001;
-    int24 tick;
+    uint128 maxPrice;
     uint stk;
     uint price;
 
@@ -68,13 +68,12 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
         price = 1e36 / (((price * price * 10 ** ERC20(USDC).decimals())) >> (96 * 2));
         stk = (price * 5) / 4;
         console.log("stk", stk);
-        tick = Price.computeTickWithPrice(stk);
         console.log("Got price of WETH-USDC 30bps", price);
-        console.log("Got tick at price", uint24(tick));
+        console.log("Got strike", stk);
 
         vm.deal(address(this), 1_000 ether);
         (bool success, bytes memory revertData) = address(hyper).call{value: 1_000 ether}(
-            createPool(WETH, USDC, address(this), 1, 30, 5_500, 365, 1, tick, uint128(price))
+            createPool(WETH, USDC, address(this), 1, 30, 5_500, 365, 1, uint128(stk), uint128(price))
         );
         assertTrue(success, "create pool failed");
 
@@ -112,13 +111,13 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
 
         uint optimized;
         uint i;
-        int24 startTick = tick;
-        int24 endTick = startTick;
+        uint128 startMaxPrice = maxPrice;
+        uint128 endMaxPrice = startMaxPrice;
         uint16 vol = 2_000;
         uint16 dur = 365;
 
         while (optimized < uQuote && i != 25) {
-            uint strike = Price.computePriceWithTick(endTick);
+            uint strike = endMaxPrice;
             if (dur > 20) {
                 // optimize duration first
                 hyper.changeParameters(poolId, 0, 0, 0, dur, 0, 0);
@@ -131,9 +130,9 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
                 vol -= 100;
             } else {
                 // optimize strike
-                hyper.changeParameters(poolId, 0, 0, 0, 0, 0, endTick);
+                hyper.changeParameters(poolId, 0, 0, 0, 0, 0, endMaxPrice);
                 console.log("strike price: ", strike);
-                endTick -= 250;
+                endMaxPrice -= 250;
             }
             optimized = hyper.getAmountOut(poolId, true, 1 ether);
             console.log("target - optimized", uQuote - optimized);
@@ -149,7 +148,7 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
         dur = uint16(bound(dur, 10, 100));
         strike = uint128(bound(strike, stk, price * 2)); // between strike and twice the price
 
-        hyper.changeParameters(poolId, 0, 0, vol, dur, 0, Price.computeTickWithPrice(strike));
+        hyper.changeParameters(poolId, 0, 0, vol, dur, 0, strike);
 
         uint target = 1261714834;
         uint actual = hyper.getAmountOut(poolId, true, 1 ether);

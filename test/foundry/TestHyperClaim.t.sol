@@ -113,11 +113,24 @@ contract TestHyperClaim is TestHyperSetup {
         assertEq(post, tokensOwed, "claimed-bal");
     } */
 
+    // todo: price moves to 4118355366381035960, but it should be 4118355366381035960 + 3540.
+    // https://keisan.casio.com/calculator
+    // inputs: K: 10, x: 0.650840964589078473, t: .999336025883107282, v: 1
+    // output price: 4.118355305540121976745
+    // actual price: 4_118355366381035960
+    // actual, non error price: 4_118355366381039500, diff: 3540
+    // actaul computed x:          0.6507457154641188644249
+    // actual computed x w/ error: 0.6507457154641185463956, diff:
     function testClaimCreditsAssetBalance() public postTestInvariantChecks {
         basicAllocate();
-        basicSwap(); // swaps __asset__ in, so pays fees in asset.
 
         HyperPool memory pool = defaultPool();
+        (uint virtualAsset0, ) = pool.getVirtualReserves();
+        basicSwap(); // swaps __asset__ in, so pays fees in asset.
+        pool = defaultPool();
+        (uint virtualAsset1, ) = pool.getVirtualReserves();
+        console.log("diff", virtualAsset0, virtualAsset1);
+
         uint real0 = _getReserve(hx(), defaultScenario.asset);
         uint real1 = _getReserve(hx(), defaultScenario.quote);
         (uint res0, uint res1) = pool.getVirtualReserves();
@@ -142,7 +155,13 @@ contract TestHyperClaim is TestHyperSetup {
         uint prevReserve = _getReserve(hx(), defaultScenario.asset);
         uint prevBalance = _getBalance(hx(), address(this), defaultScenario.asset);
         __hyperTestingContract__.claim(defaultScenario.poolId, fee0, fee1);
+        uint nextReserve = _getReserve(hx(), defaultScenario.asset);
         uint nextBalance = _getBalance(hx(), address(this), defaultScenario.asset);
+
+        console.log("post reserve bal", nextReserve);
+        console.log("next user bal---", nextBalance);
+        console.logInt(int(nextBalance) - int(nextReserve));
+        assertTrue(nextReserve >= nextBalance, "invalid-virtual-reserve-state");
 
         maxDraw(); // clear reserve
 
@@ -150,7 +169,7 @@ contract TestHyperClaim is TestHyperSetup {
         (fee0, ) = (pos.tokensOwedAsset, pos.tokensOwedQuote);
         assertEq(fee0, 0, "unclaimed-fees");
 
-        uint nextReserve = _getReserve(hx(), defaultScenario.asset);
+        nextReserve = _getReserve(hx(), defaultScenario.asset);
         // todo: fix. Price deviation trick leaves dust, there should be no dust! assertEq(nextReserve, 0, "reserve-not-zero");
         assertTrue(nextBalance > prevBalance, "no fee claimed");
         assertTrue(nextReserve < prevReserve, "no fee removed");
@@ -192,5 +211,69 @@ contract TestHyperClaim is TestHyperSetup {
         assertTrue(evesClaimedFees != 0, "eve-zero-fees");
         assertEq(evesClaimedFees, 2, "unexpected-fees"); // 2_000 * 0.00125 = 2.5, rounded down to integer of 2
         assertEq((evesShare * totalFeeAssetPerLiquidity) / 1 ether, evesClaimedFees, "incorrect-fee");
+    }
+
+    function testClaim_succeeds_withdraw() public {
+        // create a new 18 decimal pair pool with standard variables.
+        address token0 = address(new TestERC20("18A", "18A", 18));
+        address token1 = address(new TestERC20("18Q", "18Q", 18));
+        vm.label(token0, "asset 18 decimals");
+        vm.label(token1, "quote 18 decimals");
+
+        // mint some tokens and do approvals
+        deal(token0, address(this), 100 ether);
+        deal(token1, address(this), 100 ether);
+        TestERC20(token0).approve(address(__hyperTestingContract__), type(uint).max);
+        TestERC20(token1).approve(address(__hyperTestingContract__), type(uint).max);
+
+        uint16 duration = uint16(365 days / Assembly.SECONDS_PER_DAY);
+
+        // create the pool
+        bytes memory data = createPool({
+            token0: token0,
+            token1: token1,
+            controller: address(0),
+            priorityFee: 0,
+            fee: 100, // 1% fee
+            volatility: 1e4, // 100% volatility
+            duration: duration,
+            jit: 0, // jit
+            maxPrice: 10 ether,
+            price: 10 ether
+        });
+        bool success = __revertCatcher__.jumpProcess(data);
+        assertTrue(success, "create-failed");
+
+        // grab the latest poolId
+        uint64 poolId = Enigma.encodePoolId(
+            __hyperTestingContract__.getPairNonce(),
+            false,
+            __hyperTestingContract__.getPoolNonce()
+        );
+
+        // add a tiny amount of liquidity so we can test easier
+        uint delLiquidity = 100_000 wei; // with the pool params, asset reserves will be about 300 wei.
+        __hyperTestingContract__.allocate(poolId, delLiquidity);
+
+        // swap a small amount so we generate fees
+        uint amountIn = 10_000 wei; // 1% fees will generate 100 wei of asset fee growth
+        __hyperTestingContract__.swap(poolId, true, amountIn, 0);
+
+        // withdraw all the liquidity after the swap, to sync fees.
+        __hyperTestingContract__.unallocate(poolId, delLiquidity);
+
+        // withdraw all internal balances
+        uint bal0 = __hyperTestingContract__.getBalance(address(this), token0);
+        uint bal1 = __hyperTestingContract__.getBalance(address(this), token1);
+        __hyperTestingContract__.draw(token0, bal0, address(this));
+        __hyperTestingContract__.draw(token1, bal1, address(this));
+
+        // finally, do the claim and check the differences in reserves
+        uint prev = __hyperTestingContract__.getBalance(address(this), token0);
+        __hyperTestingContract__.claim(poolId, type(uint).max, type(uint).max);
+        uint post = __hyperTestingContract__.getBalance(address(this), token0);
+
+        assertEq(post, (amountIn * 100) / 10_000, "expected-fees-claimed");
+        assertTrue(post > prev, "no-asset-fees-claimed");
     }
 }

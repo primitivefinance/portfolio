@@ -15,7 +15,7 @@ contract HelperHyperActions {
         uint16 volatility,
         uint16 duration,
         uint16 jit,
-        int24 maxTick,
+        uint128 maxPrice,
         uint128 price
     ) internal pure returns (bytes memory data) {
         bytes[] memory instructions = new bytes[](2);
@@ -30,7 +30,7 @@ contract HelperHyperActions {
                 volatility,
                 duration,
                 jit,
-                maxTick,
+                maxPrice,
                 price
             )
         );

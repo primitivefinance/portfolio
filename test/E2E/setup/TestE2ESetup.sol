@@ -114,7 +114,7 @@ contract TestE2ESetup is Helpers, Test {
             uint16(DEFAULT_SIGMA),
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 

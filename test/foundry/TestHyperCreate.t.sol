@@ -53,30 +53,30 @@ contract TestHyperCreatePool is TestHyperSetup {
         uint16 jit,
         uint16 duration,
         uint16 volatility,
-        int24 maxTick,
+        uint128 maxPrice,
         uint128 price
     ) public {
+        uint24 pairId = uint24(1);
         fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
         priorityFee = uint16(bound(priorityFee, 1, fee));
         jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
         duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
         volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-        maxTick = int24(bound(maxTick, -MAX_TICK, MAX_TICK));
         vm.assume(price > 0);
-        vm.assume(maxTick != 0); // todo: fix once maxTick fixes check for 0 tick.
+        vm.assume(maxPrice > 0);
         bytes memory data = Enigma.encodeCreatePool(
-            uint24(1),
+            pairId,
             address(this),
             priorityFee,
             fee,
             volatility,
             duration,
             jit,
-            maxTick,
+            maxPrice,
             price
         );
         bool success = __revertCatcher__.process(data);
-        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(__hyperTestingContract__.getPoolNonce()));
+        uint64 poolId = Enigma.encodePoolId(pairId, true, __hyperTestingContract__.getPoolNonce());
 
         HyperPool memory pool = _getPool(hs(), poolId);
         HyperCurve memory actual = pool.params;
@@ -88,7 +88,7 @@ contract TestHyperCreatePool is TestHyperSetup {
         assertEq(actual.volatility, volatility, "volatility");
         assertEq(actual.duration, duration, "duration");
         assertEq(actual.jit, jit, "jit");
-        assertEq(actual.maxTick, maxTick, "maxTick");
+        assertEq(actual.maxPrice, maxPrice, "maxPrice");
     }
 
     function testCreatePoolNonControlledHasDefaultJit() public {
@@ -120,7 +120,7 @@ contract TestHyperCreatePool is TestHyperSetup {
         uint16 jit,
         uint16 duration,
         uint16 volatility,
-        int24 maxTick
+        uint128 maxPrice
     ) public {
         uint64 poolId = _createDefaultPool();
         fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
@@ -128,17 +128,16 @@ contract TestHyperCreatePool is TestHyperSetup {
         jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
         duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
         volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-        maxTick = int24(bound(maxTick, -MAX_TICK, MAX_TICK));
-        vm.assume(maxTick != 0); // todo: fix once maxTick fixes check for 0 tick.
+        vm.assume(maxPrice > 0);
 
-        __hyperTestingContract__.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
+        __hyperTestingContract__.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxPrice);
         HyperCurve memory actual = _getPool(hs(), poolId).params;
         assertEq(actual.priorityFee, priorityFee, "priorityFee");
         assertEq(actual.fee, fee, "fee");
         assertEq(actual.volatility, volatility, "volatility");
         assertEq(actual.duration, duration, "duration");
         assertEq(actual.jit, jit, "jit");
-        assertEq(actual.maxTick, maxTick, "maxTick");
+        assertEq(actual.maxPrice, maxPrice, "maxPrice");
     }
 
     function testChangeParametersPriorityFeeSuccess() public {
@@ -159,7 +158,7 @@ contract TestHyperCreatePool is TestHyperSetup {
             DEFAULT_VOLATILITY * 2,
             DEFAULT_DURATION + 30,
             0,
-            DEFAULT_TICK + 500
+            DEFAULT_STRIKE + 500
         );
         (uint post0, uint post1) = __hyperTestingContract__.getVirtualReserves(poolId);
         assertEq(post0, prev0, "virtual-asset-balance-altered");
@@ -178,7 +177,7 @@ contract TestHyperCreatePool is TestHyperSetup {
             DEFAULT_VOLATILITY,
             DEFAULT_DURATION,
             DEFAULT_JIT,
-            DEFAULT_TICK
+            DEFAULT_STRIKE
         );
     }
 
@@ -193,7 +192,7 @@ contract TestHyperCreatePool is TestHyperSetup {
             1,
             DEFAULT_DURATION,
             DEFAULT_JIT,
-            DEFAULT_TICK
+            DEFAULT_STRIKE
         );
     }
 
@@ -208,22 +207,7 @@ contract TestHyperCreatePool is TestHyperSetup {
             DEFAULT_VOLATILITY,
             5000,
             DEFAULT_JIT,
-            DEFAULT_TICK
-        );
-    }
-
-    function testChangeParametersInvalidTickReverts() public {
-        uint64 poolId = _createDefaultPool();
-        int24 failureArg = 1000000;
-        vm.expectRevert(abi.encodeWithSelector(InvalidTick.selector, uint24(failureArg)));
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            DEFAULT_FEE,
-            DEFAULT_FEE,
-            DEFAULT_VOLATILITY,
-            DEFAULT_DURATION,
-            DEFAULT_JIT,
-            failureArg
+            DEFAULT_STRIKE
         );
     }
 
@@ -238,14 +222,14 @@ contract TestHyperCreatePool is TestHyperSetup {
             DEFAULT_VOLATILITY,
             DEFAULT_DURATION,
             failureArg,
-            DEFAULT_TICK
+            DEFAULT_STRIKE
         );
     }
 
     function testChangeParametersPriorityFeeAboveFeeReverts() public {
         uint64 poolId = _createDefaultPool();
         HyperCurve memory curve = HyperCurve({
-            maxTick: DEFAULT_TICK,
+            maxPrice: DEFAULT_STRIKE,
             jit: DEFAULT_JIT,
             fee: 55,
             duration: DEFAULT_DURATION,
@@ -263,7 +247,7 @@ contract TestHyperCreatePool is TestHyperSetup {
             curve.volatility,
             curve.duration,
             curve.jit,
-            curve.maxTick
+            curve.maxPrice
         );
     }
 
@@ -278,7 +262,7 @@ contract TestHyperCreatePool is TestHyperSetup {
             DEFAULT_VOLATILITY,
             DEFAULT_DURATION,
             DEFAULT_JIT,
-            DEFAULT_TICK
+            DEFAULT_STRIKE
         );
     }
 
@@ -292,7 +276,7 @@ contract TestHyperCreatePool is TestHyperSetup {
             DEFAULT_VOLATILITY,
             DEFAULT_DURATION,
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
         bool success = __revertCatcher__.process(createData);
