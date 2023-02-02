@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Vm.sol";
 import "./setup/TestHyperSetup.sol";
 
-contract TestHyperCreate is TestHyperSetup {
+contract TestHyperCreatePool is TestHyperSetup {
     function testFuzzCreatePoolExternal(
         uint16 priorityFee,
         uint16 fee,
