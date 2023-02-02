@@ -44,4 +44,13 @@ contract TestHyperFund is TestHyperSetup {
         assertEq(end.reserveAsset, prev.reserveAsset, "reverse-exact-reserve");
         assertEq(end.physicalBalanceAsset, prev.physicalBalanceAsset, "reverse-exact-physical");
     }
+
+    function test_fund_max_balance() public postTestInvariantChecks {
+        uint tokenBalance = defaultScenario.asset.balanceOf(address(this));
+        __hyperTestingContract__.fund(address(defaultScenario.asset), type(uint).max);
+        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+
+        assertTrue(tokenBalance > 0, "zero-balance");
+        assertEq(nextBalance, tokenBalance, "did-not-max-fund");
+    }
 }

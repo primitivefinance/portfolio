@@ -36,4 +36,15 @@ contract TestHyperDraw is TestHyperSetup {
 
         assertTrue(nextBalance > prevBalance);
     }
+
+    function test_draw_max_balance() public {
+        __hyperTestingContract__.fund(address(defaultScenario.asset), 4000);
+
+        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        __hyperTestingContract__.draw(address(defaultScenario.asset), type(uint).max, address(this));
+        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+
+        assertTrue(prevBalance > 0, "fund-unsuccessful");
+        assertEq(nextBalance, 0, "did-not-withdraw-max");
+    }
 }

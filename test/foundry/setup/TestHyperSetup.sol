@@ -269,7 +269,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             defaultScenario.poolId,
             false,
             (pool.getMaxSwapQuoteInWad() * 1 ether) / 2 ether,
-            type(uint256).max
+            1
         );
 
         assertTrue(output > 0, "no swap happened!");
@@ -281,6 +281,10 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     function _alloc(uint64 id) internal {
         __hyperTestingContract__.allocate(id, 1 ether);
+    }
+
+    function _unalloc(uint64 id) internal {
+        __hyperTestingContract__.unallocate(id, type(uint).max);
     }
 
     function basicUnallocate() internal {
@@ -300,9 +304,26 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         );
     }
 
+    function _draw(TestScenario memory scenario) internal {
+        __hyperTestingContract__.draw(
+            address(scenario.asset),
+            __hyperTestingContract__.getBalance(address(this), address(scenario.asset)),
+            address(this)
+        );
+        __hyperTestingContract__.draw(
+            address(scenario.quote),
+            __hyperTestingContract__.getBalance(address(this), address(scenario.quote)),
+            address(this)
+        );
+    }
+
     function defaultPool() internal view returns (HyperPool memory) {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         return pool;
+    }
+
+    function _poolOf(uint64 id) internal view returns (HyperPool memory) {
+        return getPool(address(__hyperTestingContract__), id);
     }
 
     function defaultRevertCatcherPosition() internal view returns (HyperPosition memory) {

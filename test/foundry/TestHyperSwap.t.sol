@@ -19,6 +19,8 @@ contract TestHyperSwap is TestHyperSetup {
         uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
         (uint out, ) = pool.getAmountOut(true, input, 0);
 
+        (uint a, uint b) = pool.getVirtualReserves();
+
         (uint output, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
@@ -29,28 +31,17 @@ contract TestHyperSwap is TestHyperSetup {
         assertEq(output, expected, "expected-output");
 
         (uint amount0, uint amount1) = pool.getAmounts();
-        console.log("amounts", amount0, amount1);
-        console.log("outputs, actual, expected", output, out);
     }
 
     function testSwap_back_and_forth_outputs_less() public allocateFirst {
         uint256 start = 10000;
+        uint limit = 1;
 
         bool direction = false;
-        (uint output, ) = __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            direction,
-            start,
-            direction ? 0 : type(uint128).max
-        );
+        (uint output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, start, limit);
 
         direction = true;
-        (uint finalOutput, ) = __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            direction,
-            output,
-            direction ? 0 : type(uint128).max
-        );
+        (uint finalOutput, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, output, limit);
 
         assertGt(start, finalOutput);
     }
@@ -86,7 +77,6 @@ contract TestHyperSwap is TestHyperSetup {
 
         uint maxInput = getMaxSwapAssetInWad(pool);
         uint extra = 1;
-        console.log(maxInput);
         (uint out, ) = pool.getAmountOut(true, maxInput + extra, 0);
 
         uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
