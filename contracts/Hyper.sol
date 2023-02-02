@@ -619,7 +619,7 @@ contract Hyper is IHyper {
         uint16 jit,
         int24 max,
         uint128 price
-    ) external returns (uint64 poolId) {
+    ) external lock interactions returns (uint64 poolId) {
         return _createPool(
             pairId,
             controller,
