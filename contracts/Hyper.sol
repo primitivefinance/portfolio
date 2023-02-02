@@ -584,7 +584,7 @@ contract Hyper is IHyper {
 
     // ===== Initializing Pools ===== //
 
-    function createPair(address asset, address quote) external lock returns (uint24 pairId) {
+    function createPair(address asset, address quote) external lock interactions returns (uint24 pairId) {
         return _createPair(asset, quote);
     }
 
