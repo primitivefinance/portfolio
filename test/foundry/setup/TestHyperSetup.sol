@@ -122,7 +122,6 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     }
 
     function initScenarios() internal {
-        __hyperTestingContract__.setTimestamp(uint128(block.timestamp)); // Important
         // Create default pool
         bytes memory data = createPool(
             address(__token_18__),
@@ -215,11 +214,6 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         vm.label(address(__token_8__), "Token8Decimals");
         vm.label(address(__token_18__), "Token18Decimals");
         vm.label(address(__badToken__), "BadToken");
-    }
-
-    function customWarp(uint time) internal {
-        vm.warp(time);
-        __hyperTestingContract__.setTimestamp(uint128(time));
     }
 
     function createControlledPool() internal {

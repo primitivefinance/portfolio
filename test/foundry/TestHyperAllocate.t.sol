@@ -189,7 +189,7 @@ contract TestHyperAllocate is TestHyperSetup {
         }
 
         // Unallocate
-        customWarp(block.timestamp + JUST_IN_TIME_LIQUIDITY_POLICY); // TODO: make this public function.
+        vm.warp(block.timestamp + JUST_IN_TIME_LIQUIDITY_POLICY); // TODO: make this public function.
         (uint unallocatedAsset, uint unallocatedQuote) = __hyperTestingContract__.unallocate(
             defaultScenario.poolId,
             deltaLiquidity

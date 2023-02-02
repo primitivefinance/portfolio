@@ -146,7 +146,6 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             // Unallocate
             uint timestamp = block.timestamp + 4; // todo: fix default jit policy
             vm.warp(timestamp);
-            __hyper__.setTimestamp(uint128(timestamp));
 
             (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getLiquidityDeltas(
                 __poolId__,
