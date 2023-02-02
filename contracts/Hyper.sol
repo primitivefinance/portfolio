@@ -369,7 +369,7 @@ contract Hyper is IHyper {
         bool sellAsset = args.direction == 0;
 
         HyperPool memory pool = pools[args.poolId];
-        if (_blockTimestamp() > pool.params.maturity()) revert PoolExpired();
+        if (block.timestamp > pool.params.maturity()) revert PoolExpired();
         if (args.useMax == 0) {
             input = args.input;
         } else {
@@ -559,7 +559,7 @@ contract Hyper is IHyper {
         if (!pool.exists()) revert NonExistentPool(poolId);
         Price.RMM memory curve = pool.getRMM();
 
-        updatedTau = pool.tau(_blockTimestamp());
+        updatedTau = pool.tau(block.timestamp);
         curve.tau = updatedTau;
 
         (uint x, uint y) = pool.getAmountsWad();
@@ -632,10 +632,10 @@ contract Hyper is IHyper {
         uint16 vol,
         uint16 dur,
         uint16 jit,
-        int24 max,
+        uint128 maxPrice,
         uint128 price
     ) external lock interactions returns (uint64 poolId) {
-        return _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
+        return _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
     }
 
     /** @dev If pairId == 0, its a magic variable that uses current pair nonce. */

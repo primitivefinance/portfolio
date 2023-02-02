@@ -163,7 +163,7 @@ contract TestHyperProcessing is TestHyperSetup {
 
         // move some time
         vm.warp(block.timestamp + 1);
-        uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
+        uint256 prev = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).liquidity;
         bool direction = true;
         uint internalBalance = 0.5 ether;
         __hyperTestingContract__.fund(address(_scenario_18_18.asset), internalBalance);
@@ -174,7 +174,8 @@ contract TestHyperProcessing is TestHyperSetup {
         __hyperTestingContract__.swap(_scenario_18_18.poolId, direction, amount, output);
 
         uint256 next = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).liquidity;
-        assertTrue(next == prev);
+        console.log(next, prev);
+        assertTrue(next == prev, "liquidity-changed");
     }
 
     // todo: fuzz input size. Swaps can revert if input to swap is too small...
@@ -193,7 +194,7 @@ contract TestHyperProcessing is TestHyperSetup {
 
         // move some time
         vm.warp(block.timestamp + 1);
-        uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
+        uint256 prev = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).liquidity;
         bool direction = false;
         __hyperTestingContract__.swap(_scenario_18_18.poolId, direction, amount, limit);
 
@@ -241,7 +242,7 @@ contract TestHyperProcessing is TestHyperSetup {
         // move some time beyond maturity
         vm.warp(
             block.timestamp +
-                getPool(address(__hyperTestingContract__), defaultScenario.poolId).tau(block.timestamp) +
+                getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).tau(block.timestamp) +
                 1
         );
 
@@ -261,7 +262,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(success);
         // move some time
         vm.warp(block.timestamp + 1);
-        uint256 prev = getPool(address(__hyperTestingContract__), defaultScenario.poolId).liquidity;
+        uint256 prev = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).liquidity;
 
         uint8 useMax = 0;
         uint8 direction = 0;
@@ -399,9 +400,9 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testProcessAllocateFull() public postTestInvariantChecks {
-        uint256 price = __hyperTestingContract__.getLatestPrice(defaultScenario.poolId); // todo: fix getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
-        HyperCurve memory curve = getCurve(address(__hyperTestingContract__), (defaultScenario.poolId));
-        uint tau = getPool(address(__hyperTestingContract__), defaultScenario.poolId).tau(block.timestamp);
+        uint256 price = __hyperTestingContract__.getLatestPrice(_scenario_18_18.poolId); // todo: fix getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
+        HyperCurve memory curve = getCurve(address(__hyperTestingContract__), (_scenario_18_18.poolId));
+        uint tau = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).tau(block.timestamp);
 
         uint strike = curve.maxPrice;
         console.log(tau, strike, curve.volatility);
