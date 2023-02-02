@@ -185,7 +185,10 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function draw(address token, uint256 amount, address to) external lock interactions {
         if (to == address(this)) revert InvalidTransfer(); // todo: Investigate attack vectors if this was not here.
-        if (amount > getBalance(msg.sender, token)) revert DrawBalance();
+
+        uint balance = getBalance(msg.sender, token);
+        if (amount == type(uint).max) amount = balance;
+        if (amount > balance) revert DrawBalance();
 
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
@@ -196,7 +199,8 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function fund(address token, uint256 amount) external override lock interactions {
-        __account__.dangerousFund(token, address(this), amount); // transferFrom(msg.sender)
+        if (amount == type(uint).max) amount = OS.__balanceOf__(token, msg.sender);
+        __account__.dangerousFund(token, address(this), amount); // warning: external call to msg.sender.
     }
 
     /// @inheritdoc IHyperActions
