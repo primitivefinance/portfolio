@@ -226,8 +226,9 @@ library Price {
      * @custom:math R_x = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
     function getXWithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 R_x) {
-        if (prc != 0) {
-            int256 ln = FixedPointMathLib.lnWad(int256(FixedPointMathLib.divWadDown(prc, stk)));
+        uint256 input = FixedPointMathLib.divWadDown(prc, stk); // todo: clarify + document whats going on here
+        if (input != 0) {
+            int256 ln = FixedPointMathLib.lnWad(int256(input));
             uint256 tauYears = convertSecondsToWadYears(tau);
 
             uint256 sigmaWad = convertPercentageToWad(vol);

@@ -269,7 +269,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             defaultScenario.poolId,
             false,
             (pool.getMaxSwapQuoteInWad() * 1 ether) / 2 ether,
-            type(uint256).max
+            1
         );
 
         assertTrue(output > 0, "no swap happened!");

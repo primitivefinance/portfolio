@@ -23,14 +23,13 @@ import "./OS.sol" as OS;
 using Price for Price.RMM;
 using SafeCastLib for uint;
 using FixedPointMathLib for uint;
+using FixedPointMathLib for int;
 using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint;
 using {checkParameters, maturity, validateParameters} for HyperCurve global;
 using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
 using {
     changePoolLiquidity,
     changePoolParameters,
-    computePriceChangeWithTime,
-    computeChangesAfterTime,
     exists,
     getAmounts,
     getAmountOut,
@@ -87,6 +86,7 @@ error PoolExists();
 error PoolExpired();
 error PositionZeroLiquidity(uint96 positionId);
 error SameTokenError();
+error SwapInputTooSmall();
 error SwapLimitReached();
 error ZeroAmounts();
 error ZeroInput();
@@ -114,14 +114,14 @@ struct HyperCurve {
 }
 
 struct HyperPool {
-    int128 lastInvariant;
+    uint128 virtualX;
+    uint128 virtualY;
+    uint128 liquidity; // available liquidity to remove
     uint32 lastTimestamp; // updated on swaps.
     address controller;
     uint256 feeGrowthGlobalReward;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
-    uint128 lastPrice;
-    uint128 liquidity; // available liquidity to remove
     HyperCurve params;
     HyperPair pair;
 }
@@ -159,8 +159,9 @@ struct Order {
 }
 
 struct Iteration {
-    int128 invariant;
-    uint256 price;
+    int256 invariant;
+    uint256 virtualX;
+    uint256 virtualY;
     uint256 remainder;
     uint256 feeAmount;
     uint256 liquidity;
@@ -245,17 +246,20 @@ function getLiquidityDeltas(
     int128 deltaLiquidity
 ) view returns (uint128 deltaAsset, uint128 deltaQuote) {
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
+
     (uint amountAssetWad, uint amountQuoteWad) = self.getAmountsWad();
+    uint scaleDownFactorAsset = Assembly.computeScalar(self.pair.decimalsAsset) * Price.WAD;
+    uint scaleDownFactorQuote = Assembly.computeScalar(self.pair.decimalsQuote) * Price.WAD;
 
     uint delta;
     if (deltaLiquidity > 0) {
         delta = uint128(deltaLiquidity);
-        deltaAsset = amountAssetWad.mulWadUp(delta).scaleFromWadDown(self.pair.decimalsAsset).safeCastTo128();
-        deltaQuote = amountQuoteWad.mulWadUp(delta).scaleFromWadDown(self.pair.decimalsQuote).safeCastTo128();
+        deltaAsset = amountAssetWad.mulDivUp(delta, scaleDownFactorAsset).safeCastTo128();
+        deltaQuote = amountQuoteWad.mulDivUp(delta, scaleDownFactorQuote).safeCastTo128();
     } else {
         delta = uint128(-deltaLiquidity);
-        deltaAsset = amountAssetWad.mulWadDown(delta).scaleFromWadDown(self.pair.decimalsAsset).safeCastTo128();
-        deltaQuote = amountQuoteWad.mulWadDown(delta).scaleFromWadDown(self.pair.decimalsQuote).safeCastTo128();
+        deltaAsset = amountAssetWad.mulDivDown(delta, scaleDownFactorAsset).safeCastTo128();
+        deltaQuote = amountQuoteWad.mulDivDown(delta, scaleDownFactorQuote).safeCastTo128();
     }
 }
 
@@ -268,36 +272,11 @@ function getAmounts(HyperPool memory self) view returns (uint amountAssetDec, ui
 
 /** @dev WAD Amounts per WAD of liquidity. */
 function getAmountsWad(HyperPool memory self) view returns (uint amountAssetWad, uint amountQuoteWad) {
-    Price.RMM memory rmm = self.getRMM();
-    amountAssetWad = rmm.getXWithPrice(self.lastPrice);
-    amountQuoteWad = rmm.getYWithX(amountAssetWad, self.lastInvariant);
+    amountAssetWad = self.virtualX;
+    amountQuoteWad = self.virtualY;
 }
 
 // ===== Derived ===== //
-
-function computePriceChangeWithTime(HyperPool memory self, uint timeRemaining, uint epsilon) pure returns (uint price) {
-    price = Price.computePriceWithChangeInTau(
-        self.params.maxPrice,
-        self.params.volatility,
-        self.lastPrice,
-        timeRemaining,
-        epsilon
-    );
-}
-
-function computeChangesAfterTime(
-    HyperPool memory self,
-    uint epsilon
-) view returns (uint price, int128 invariant, uint tau) {
-    (price, invariant, tau) = Price.computeCurveChanges(
-        self.params.maxPrice,
-        self.params.volatility,
-        self.lastTau(),
-        self.lastPrice,
-        self.lastInvariant,
-        epsilon
-    );
-}
 
 function getTimeSinceChanged(HyperPosition memory self, uint timestamp) view returns (uint distance) {
     return timestamp - self.lastTimestamp;
@@ -362,16 +341,16 @@ function checkParameters(HyperCurve memory self) view returns (bool, bytes memor
 
 function getMaxSwapAssetInWad(HyperPool memory self) view returns (uint) {
     Price.RMM memory rmm = self.getRMM();
-    (, uint res1) = rmm.computeReserves(self.lastPrice, self.lastInvariant);
-    uint maxInput = FixedPointMathLib.WAD - res1;
+    (uint x, ) = self.getAmountsWad();
+    uint maxInput = FixedPointMathLib.WAD - x;
     maxInput = maxInput.mulWadDown(self.liquidity);
     return maxInput.scaleFromWadDown(self.pair.decimalsAsset);
 }
 
 function getMaxSwapQuoteInWad(HyperPool memory self) view returns (uint) {
     Price.RMM memory rmm = self.getRMM();
-    (uint res0, ) = rmm.computeReserves(self.lastPrice, self.lastInvariant);
-    uint maxInput = rmm.strike - res0;
+    (, uint y) = self.getAmountsWad();
+    uint maxInput = rmm.strike - y;
     maxInput = maxInput.mulWadDown(self.liquidity);
     return maxInput.scaleFromWadDown(self.pair.decimalsQuote);
 }
@@ -379,14 +358,17 @@ function getMaxSwapQuoteInWad(HyperPool memory self) view returns (uint) {
 function getNextInvariant(HyperPool memory self, uint256 timeSinceUpdate) view returns (int128 invariant, uint tau) {
     Price.RMM memory curve = self.getRMM();
 
-    uint256 x = curve.getXWithPrice(self.lastPrice);
     curve.tau -= timeSinceUpdate; // update to next curve at new time.
-    uint256 y = curve.getYWithX(x, self.lastInvariant);
+    (uint x, uint y) = self.getAmountsWad();
 
     invariant = int128(curve.invariantOf(y, x)); // todo: fix casting
     tau = curve.tau;
 }
 
+/**
+ * @dev This is an approximation of the amount out and it is not exactly precise to the optimal amount.
+ * @custom:error Maximum absolute error of 1e-6.
+ */
 function getAmountOut(
     HyperPool memory self,
     bool sellAsset,
@@ -399,9 +381,11 @@ function getAmountOut(
 
     {
         // fill in data
-        (data.price, data.invariant, nextCurve.tau) = self.computeChangesAfterTime(timeSinceUpdate);
         data.remainder = amountIn.scaleToWad(sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote);
         data.liquidity = self.liquidity;
+        (data.virtualX, data.virtualY) = self.getAmountsWad();
+        nextCurve.tau -= timeSinceUpdate;
+        data.invariant = nextCurve.invariantOf(data.virtualY, data.virtualX);
     }
 
     uint fee = self.controller != address(0) ? self.params.priorityFee : self.params.fee;
@@ -413,11 +397,12 @@ function getAmountOut(
         uint maxInput;
         uint delInput;
 
+        // if sellAsset, ind = x && dep = y, else ind = y && dep = x
         if (sellAsset) {
-            (prevDep, prevInd) = liveCurve.computeReserves(data.price, data.invariant);
+            (prevInd, prevDep) = (data.virtualX, data.virtualY);
             maxInput = (FixedPointMathLib.WAD - prevInd).mulWadDown(data.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
         } else {
-            (prevInd, prevDep) = liveCurve.computeReserves(data.price, data.invariant);
+            (prevDep, prevInd) = (data.virtualX, data.virtualY);
             maxInput = (liveCurve.strike - prevInd).mulWadDown(data.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
         }
 
@@ -431,6 +416,8 @@ function getAmountOut(
 
         data.remainder -= delInput;
         data.input += delInput;
+
+        if (nextDep > prevDep) revert SwapInputTooSmall();
         data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
     }
 

@@ -35,22 +35,13 @@ contract TestHyperSwap is TestHyperSetup {
 
     function testSwap_back_and_forth_outputs_less() public allocateFirst {
         uint256 start = 10000;
+        uint limit = 1;
 
         bool direction = false;
-        (uint output, ) = __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            direction,
-            start,
-            direction ? 0 : type(uint128).max
-        );
+        (uint output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, start, limit);
 
         direction = true;
-        (uint finalOutput, ) = __hyperTestingContract__.swap(
-            defaultScenario.poolId,
-            direction,
-            output,
-            direction ? 0 : type(uint128).max
-        );
+        (uint finalOutput, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, output, limit);
 
         assertGt(start, finalOutput);
     }

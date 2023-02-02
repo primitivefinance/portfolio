@@ -14,6 +14,7 @@ contract TestHyperCreate is TestHyperSetup {
         uint128 maxPrice,
         uint128 price
     ) public {
+        uint24 pairId = uint24(1);
         fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
         priorityFee = uint16(bound(priorityFee, 1, fee));
         jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
@@ -22,7 +23,7 @@ contract TestHyperCreate is TestHyperSetup {
         vm.assume(price > 0);
         vm.assume(maxPrice > 0);
         bytes memory data = Enigma.encodeCreatePool(
-            uint24(1),
+            pairId,
             address(this),
             priorityFee,
             fee,
@@ -33,7 +34,7 @@ contract TestHyperCreate is TestHyperSetup {
             price
         );
         bool success = __revertCatcher__.process(data);
-        uint64 poolId = Enigma.encodePoolId(uint24(1), true, uint32(__hyperTestingContract__.getPoolNonce()));
+        uint64 poolId = Enigma.encodePoolId(pairId, true, __hyperTestingContract__.getPoolNonce());
 
         HyperPool memory pool = _getPool(hs(), poolId);
         HyperCurve memory actual = pool.params;

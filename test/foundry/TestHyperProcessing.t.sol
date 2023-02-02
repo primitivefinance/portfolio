@@ -13,10 +13,6 @@ contract TestHyperProcessing is TestHyperSetup {
             "Pool not created"
         );
         assertTrue(
-            getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastInvariant == 0,
-            "Pool does not have zero invariant"
-        );
-        assertTrue(
             getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).liquidity == 0,
             "Pool initialized with liquidity"
         );
@@ -92,7 +88,7 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(!success);
     }
 
-    function testSwapExactInPoolPriceUpdated() public postTestInvariantChecks {
+    function testSwapExactInVirtualReservesUpdated() public postTestInvariantChecks {
         // Add liquidity first
         bytes memory data = Enigma.encodeAllocate(
             0,
@@ -105,7 +101,8 @@ contract TestHyperProcessing is TestHyperSetup {
         // move some time
         customWarp(block.timestamp + 1);
 
-        uint256 prev = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId);
+        (uint256 prevX, uint prevY) = (pool.virtualX, pool.virtualY); // todo: fix getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
 
         uint8 useMax = 0;
         uint8 direction = 0;
@@ -121,8 +118,10 @@ contract TestHyperProcessing is TestHyperSetup {
         success = __revertCatcher__.process(data);
         assertTrue(success);
 
-        uint256 next = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
-        assertTrue(next != prev);
+        pool = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId);
+        (uint256 nextX, uint nextY) = (pool.virtualX, pool.virtualY);
+        assertTrue(nextX != prevX, "virtual-x-unchanged");
+        assertTrue(nextY != prevY, "virtual-y-unchanged");
     }
 
     /* function testSwapExactInPoolSlotIndexUpdated() public {
@@ -178,9 +177,10 @@ contract TestHyperProcessing is TestHyperSetup {
         assertTrue(next == prev);
     }
 
+    // todo: fuzz input size. Swaps can revert if input to swap is too small...
     function testSwapInQuote() public postTestInvariantChecks {
-        uint limit = type(uint256).max;
-        uint amount = 2222;
+        uint limit = 1;
+        uint amount = 1 ether;
         // Add liquidity first
         bytes memory data = Enigma.encodeAllocate(
             0,
@@ -195,15 +195,16 @@ contract TestHyperProcessing is TestHyperSetup {
         customWarp(block.timestamp + 1);
         uint256 prev = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).liquidity;
         bool direction = false;
-        __hyperTestingContract__.swap(_scenario_18_18.poolId, direction, amount, getMaxSwapLimit(direction));
+        __hyperTestingContract__.swap(_scenario_18_18.poolId, direction, amount, limit);
 
         uint256 next = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).liquidity;
         assertTrue(next == prev);
     }
 
+    // todo: better fuzz swap reverse tests
     function testSwapReverse() public {
         bool direction = true;
-        uint limit = type(uint256).max;
+        uint limit = 1;
         uint amount = 17e16; // specific value will cause InvalidInvariant error.
         allocatePool(address(__hyperTestingContract__), _scenario_18_18.poolId, 10e19);
 
@@ -215,20 +216,9 @@ contract TestHyperProcessing is TestHyperSetup {
         __hyperTestingContract__.fund(address(_scenario_18_18.asset), amount);
         uint256 prev = getBalance(address(__hyperTestingContract__), address(this), address(_scenario_18_18.asset));
 
-        (uint output, ) = __hyperTestingContract__.swap(
-            _scenario_18_18.poolId,
-            direction,
-            amount,
-            getMaxSwapLimit(direction)
-        );
+        (uint output, ) = __hyperTestingContract__.swap(_scenario_18_18.poolId, direction, amount, limit);
         direction = false;
-        vm.expectRevert(abi.encodeWithSelector(InvalidInvariant.selector, int(0), -int(5)));
-        (uint input, ) = __hyperTestingContract__.swap(
-            _scenario_18_18.poolId,
-            direction,
-            output,
-            getMaxSwapLimit(direction)
-        );
+        (uint input, ) = __hyperTestingContract__.swap(_scenario_18_18.poolId, direction, output, limit);
 
         uint256 next = getBalance(address(__hyperTestingContract__), address(this), address(_scenario_18_18.asset));
         assertTrue(next <= prev, "invalid-user-gained-balance");
@@ -411,7 +401,7 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testProcessAllocateFull() public postTestInvariantChecks {
-        uint256 price = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
+        uint256 price = __hyperTestingContract__.getLatestPrice(defaultScenario.poolId); // todo: fix getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), (_scenario_18_18.poolId));
         uint tau = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).tau(
             __hyperTestingContract__.timestamp()

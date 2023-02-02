@@ -26,4 +26,10 @@ contract TestPriceComputeReserves is TestPriceSetup {
         assertEq(actualQuoteReserve, DEFAULT_QUOTE_RESERVE);
         assertEq(actualAssetReserve, DEFAULT_ASSET_RESERVE);
     }
+
+    function testFuzz_computeReserves_no_reverts(uint price) public {
+        vm.assume(price > 0);
+        vm.assume(price < type(uint128).max);
+        (uint y, uint x) = cases[0].computeReserves(price, 0);
+    }
 }
