@@ -2,8 +2,64 @@ pragma solidity ^0.8.0;
 import "./EchidnaStateHandling.sol";
 
 contract Swaps is EchidnaStateHandling {
+    function mint_and_allocate(HyperPair memory pair, uint256 amount, uint64 poolId) internal {
+        mint_and_approve(EchidnaERC20(pair.tokenAsset), amount);
+        mint_and_approve(EchidnaERC20(pair.tokenQuote), amount);
+        _hyper.allocate(poolId, amount);
+    }
+
+    function clamp_liquidity(uint256 id, uint64 poolId) internal returns (uint256 liquidity) {
+        (uint256 amountAsset, uint256 amountQuote) = _hyper.getAmounts(poolId);
+        uint256 liquidity = between(id, 1, uint128(type(int128).max));
+        if (amountAsset != 0) {
+            liquidity = between(liquidity, amountAsset, (uint128(type(int128).max) + amountAsset - 1) / amountAsset);
+        }
+        if (amountQuote != 0) {
+            liquidity = between(liquidity, amountQuote, (uint128(type(int128).max) + amountQuote - 1) / amountQuote);
+        }
+    }
+
+    function clam_safe_input_output_value(
+        bool sellAsset,
+        uint256 liquidity,
+        HyperPool memory pool
+    ) internal returns (uint256 input, uint256 output) {
+        uint maxInput;
+        uint maxOutput;
+        HyperCurve memory curve = pool.params;
+        uint stk = curve.strike();
+        // Scoping due to stack-depth.
+        Price.RMM memory rmm = pool.getRMM();
+
+        // Compute reserves to determine max input and output.
+        (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, pool.lastPrice);
+
+        if (sellAsset) {
+            // console.log("selling");
+            // console.log("liveIndependent R_x", R_x);
+            // console.log("liveDependent R_y", R_y);
+            if (R_x >= 1e18) return (0, 0); // Shouldn't happen
+            maxInput = ((1e18 - R_x) * liquidity) / 1e18;
+            maxOutput = (R_y * liquidity) / 1e18;
+        } else {
+            // console.log("buying");
+            emit LogUint256("liveIndependent R_y", R_y);
+            emit LogUint256("liveDependent R_x", R_x);
+            if (R_y > stk) return (0, 0); // Can happen although this will lead to an overflow on computing max in the swap fn.
+            maxInput = ((stk - R_y) * liquidity) / 1e18; // (2-2)*2/1e18
+            maxOutput = (R_x * liquidity) / 1e18;
+        }
+        emit LogUint256("max input", maxInput);
+        emit LogUint256("max ouput ", maxOutput);
+        // assert(false);
+
+        if (maxInput < 1 || maxOutput < 1) return (0, 0); // Will revert in swap due to input/output == 0.
+        input = between(liquidity, 1, maxInput);
+        output = between(liquidity, 1, maxOutput);
+    }
+
     // Swaps
-    function swap_should_succeed(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_should_succeed(uint id, bool sellAsset) public {
         address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
@@ -13,54 +69,74 @@ contract Swaps is EchidnaStateHandling {
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
-        amount = between(amount, 1, type(uint256).max);
-        limit = between(limit, 1, type(uint256).max);
 
-        mint_and_approve(_asset, amount);
-        mint_and_approve(_quote, amount);
+        uint256 liquidity = clamp_liquidity(id, poolId);
+        mint_and_allocate(pool.pair, liquidity, poolId);
 
-        emit LogUint256("amount: ", amount);
-        emit LogUint256("limit:", limit);
-
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
-
-        // emit LogUint256("maturity",uint256(curve.maturity()));
-        // emit LogUint256("block.timestamp", block.timestamp);
         emit LogUint256("difference in maturity and timestamp:", uint256(curve.maturity()) - uint256(block.timestamp));
 
         if (curve.maturity() <= block.timestamp) {
             emit LogUint256("Maturity timestamp", curve.maturity());
             emit LogUint256("block.timestamp", block.timestamp);
-            swap_should_fail(poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
+            swap_should_fail(poolId, true, id, id, "BUG: Swap on an expired pool should have failed.");
         } else {
-            try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256, uint256) {
-                HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
-                {
-                    // change in asset's balance after swaps is equivalent to the change in reserves
-                    int256 assetBalanceOf = int256(postState.physicalBalanceAsset - preState.physicalBalanceAsset);
-                    int256 reserveAssetDiff = int256(postState.reserveAsset - preState.reserveAsset);
-                    if (assetBalanceOf != reserveAssetDiff) {
-                        emit LogInt256("assetBalanceOf", assetBalanceOf);
-                        emit LogInt256("reserveAssetDiff", reserveAssetDiff);
-                        emit AssertionFailed(
-                            "BUG: Hyper's balance of asset token did not equal change in asset reserves"
-                        );
-                    }
-                }
-                {
-                    // change in quote's balance after swaps is equivalent to the change in reserves
-                    int256 quoteBalanceOf = int(postState.physicalBalanceQuote - preState.physicalBalanceQuote);
-                    int256 reserveQuoteDiff = int(postState.reserveQuote - preState.reserveQuote);
-                    if (quoteBalanceOf != reserveQuoteDiff) {
-                        emit LogInt256("quoteBalanceOf", quoteBalanceOf);
-                        emit LogInt256("reserveQuoteDiff", reserveQuoteDiff);
-                        emit AssertionFailed(
-                            "BUG: Hyper's balance of quote token did not equal change in asset reserves"
-                        );
-                    }
-                }
-            } catch {}
+            uint256 stk = Price.computePriceWithTick(Price.computeTickWithPrice(curve.strike()));
+            emit LogUint256("stk", stk);
+
+            (uint input, uint output) = clam_safe_input_output_value(sellAsset, liquidity, pool);
+            if (input == 0 && output == 0) return;
+            check_swap_error(pool, poolId, sellAsset, input, output);
         }
+    }
+
+    function check_swap_error(
+        HyperPool memory pool,
+        uint64 poolId,
+        bool sellAsset,
+        uint256 input,
+        uint256 output
+    ) internal {
+        HyperPair memory pair = pool.pair;
+        uint256 initAsset = EchidnaERC20(pair.tokenAsset).balanceOf(address(this));
+        uint256 initQuote = EchidnaERC20(pair.tokenQuote).balanceOf(address(this));
+        // Max error margin the invariant check in the swap allows for.
+        uint256 maxErr = 100 * 1e18;
+        {
+            // Swapping back and forth should not succeed if `output > input` under normal circumstances.
+            (bool success, ) = swapBackAndForthCall(
+                poolId,
+                sellAsset,
+                uint128(input),
+                uint128(output),
+                uint128(input + maxErr)
+            );
+
+            if (success) {
+                _hyper.draw(pair.tokenAsset, _hyper.getBalance(address(this), pair.tokenAsset), address(this));
+                _hyper.draw(pair.tokenQuote, _hyper.getBalance(address(this), pair.tokenQuote), address(this));
+
+                emit LogUint256("asset gain", EchidnaERC20(pair.tokenAsset).balanceOf(address(this)) - initAsset);
+                emit LogUint256("quote gain", EchidnaERC20(pair.tokenQuote).balanceOf(address(this)) - initQuote);
+                emit AssertionFailed("Swap allowed to extract tokens");
+            }
+        }
+    }
+
+    function swapBackAndForthCall(
+        uint64 poolId,
+        bool sell,
+        uint128 input,
+        uint128 output1,
+        uint128 output2
+    ) internal returns (bool success, bytes memory returndata) {
+        bytes[] memory instructions = new bytes[](2);
+
+        instructions[0] = ProcessingLib.encodeSwap(0, poolId, 0, input, 0, output1, sell ? 0 : 1);
+        instructions[1] = ProcessingLib.encodeSwap(0, poolId, 0, output1, 0, output2, sell ? 1 : 0);
+
+        bytes memory data = ProcessingLib.encodeJumpInstruction(instructions);
+
+        (success, returndata) = address(_hyper).call(data);
     }
 
     function swap_on_non_existent_pool_should_fail(uint64 id) public {
