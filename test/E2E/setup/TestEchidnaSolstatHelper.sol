@@ -50,9 +50,7 @@ contract TestEchidnaSolstatHelper is Test {
         assertEqCall(addr, calldata1, addr, calldata2, eqRevertData);
     }
 
-    function assertEqCall(address address1, bytes memory calldata1, address address2, bytes memory calldata2)
-        internal
-    {
+    function assertEqCall(address address1, bytes memory calldata1, address address2, bytes memory calldata2) internal {
         assertEqCall(address1, calldata1, address2, calldata2, true);
     }
 
@@ -73,13 +71,13 @@ contract TestEchidnaSolstatHelper is Test {
             emit log("Error: Call reverted unexpectedly");
             emit log_named_bytes("  Expected return-value", returndata2);
             emit log_named_bytes("       Call revert-data", returndata1);
-            fail();
+            assert(false);
         }
         if (success1 && !success2) {
             emit log("Error: Call did not revert");
             emit log_named_bytes("  Expected revert-data", returndata2);
             emit log_named_bytes("     Call return-value", returndata1);
-            fail();
+            assert(false);
         }
         if (!success1 && !success2 && eqRevertData) {
             assertEq(returndata1, returndata2, "Call revert data does not match");
@@ -91,7 +89,7 @@ contract TestEchidnaSolstatHelper is Test {
             emit log("Error: a >= b not satisfied [uint]");
             emit log_named_uint("  Value a", a);
             emit log_named_uint("  Value b", b);
-            fail();
+            assert(false);
         }
     }
 
@@ -100,7 +98,7 @@ contract TestEchidnaSolstatHelper is Test {
             emit log("Error: a >= b not satisfied [int]");
             emit log_named_int("  Value a", a);
             emit log_named_int("  Value b", b);
-            fail();
+            assert(false);
         }
     }
 
@@ -109,7 +107,7 @@ contract TestEchidnaSolstatHelper is Test {
             emit log("Error: a <= b not satisfied [int]");
             emit log_named_int("  Value a", a);
             emit log_named_int("  Value b", b);
-            fail();
+            assert(false);
         }
     }
 
@@ -118,7 +116,7 @@ contract TestEchidnaSolstatHelper is Test {
             emit log("Error: a <= b not satisfied [uint]");
             emit log_named_uint("  Value a", a);
             emit log_named_uint("  Value b", b);
-            fail();
+            assert(false);
         }
     }
 
