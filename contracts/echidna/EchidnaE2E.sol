@@ -40,11 +40,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 deltaAsset,
         uint256 deltaQuote
     ) public {
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            ,
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         HyperPosition memory preClaimPosition = getPosition(address(_hyper), address(this), poolId);
@@ -56,6 +52,12 @@ contract EchidnaE2E is GlobalInvariants {
         } catch {
             emit AssertionFailed("BUG: claim function should have succeeded");
         }
+    }
+
+    function create_special_pool() public {
+        require(!specialPoolCreated, "Special Pool already created");
+        uint24 pairId = create_special_pair();
+        create_special_pool(pairId, PoolParams(0, 0, 1, 0, 0, 0, 100));
     }
 
     // Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool

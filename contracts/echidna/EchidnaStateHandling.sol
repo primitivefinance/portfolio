@@ -18,6 +18,18 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
 
     // Hyper Tokens
     EchidnaERC20[] public hyperTokens;
+    uint64 internal specialPoolId;
+    bool internal specialPoolCreated;
+
+    struct PoolParams {
+        uint16 priorityFee;
+        uint16 fee;
+        int24 maxTick;
+        uint16 volatility;
+        uint16 duration;
+        uint16 jit;
+        uint128 price;
+    }
 
     function add_created_hyper_token(EchidnaERC20 token) internal {
         hyperTokens.push(token);
@@ -81,8 +93,11 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
         asset = EchidnaERC20(pair.tokenAsset);
     }
 
-    function retrieve_non_expired_pool_and_tokens(
-    ) internal view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
+    function retrieve_non_expired_pool_and_tokens()
+        internal
+        view
+        returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote)
+    {
         for (uint8 i = 0; i < poolIds.length; i++) {
             // will auto skew to the first pool that is not expired, however this should be okay.
             // this gives us a higher chance to return a pool that is not expired through iterating
