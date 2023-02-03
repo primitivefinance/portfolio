@@ -213,6 +213,34 @@ contract PoolCreation is EchidnaStateHandling {
         save_pool_id(poolId);
     }
 
+    /// @dev Create Special Pool is used to test swaps where quote token has 15 decimals.
+    function create_special_pool(uint24 pairId, PoolParams memory pp) internal returns (uint64 poolId) {
+        PoolParams memory _pp;
+        (
+            _pp.priorityFee,
+            _pp.fee,
+            _pp.maxTick,
+            _pp.volatility,
+            _pp.duration,
+            _pp.jit,
+            _pp.price
+        ) = clam_safe_create_bounds(pp.priorityFee, pp.fee, pp.maxTick, pp.volatility, pp.duration, pp.jit, pp.price);
+        bytes memory createPoolData = ProcessingLib.encodeCreatePool(
+            pairId,
+            address(this),
+            _pp.priorityFee,
+            _pp.fee,
+            _pp.volatility,
+            _pp.duration,
+            _pp.jit,
+            _pp.maxTick,
+            _pp.price
+        );
+        (, poolId) = execute_create_pool(pairId, createPoolData, false);
+        specialPoolId = poolId;
+        specialPoolCreated = true;
+    }
+
     // function check_decoding_pool_id(uint64 _poolId, uint24 _pairId, uint8 _isMutable, uint32 _poolNonce) private {
 
     //     (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) = ProcessingLib.decodePoolId([_poolId,_pairId,_isMutable,_poolNonce]);

@@ -360,10 +360,46 @@ contract Swaps is EchidnaStateHandling {
 
         // fee growth checkpoints are always changing
         assert(postFeeGrowthSell >= prevFeeGrowthSell);
-        assert(postFeeGrowthBuy >= postFeeGrowthBuy);
+        assert(postFeeGrowthBuy >= prevFeeGrowthBuy);
 
         // actual token balances increase or decrease for non-internal balance swaps.
         assert(postReserveSell > prevReserveSell);
         assert(postReserveBuy < prevReserveBuy);
+    }
+
+    function swap_quote_with_fifteen_decimals(uint256 amount, uint256 limit) public {
+        require(specialPoolCreated, "Special Pool not created");
+        uint _amount = between(amount, 1, type(uint256).max);
+        uint _limit = between(limit, 1, type(uint256).max);
+
+        HyperPool memory prePool = getPool(address(_hyper), specialPoolId);
+
+        mint_and_approve(EchidnaERC20(prePool.pair.tokenAsset), _amount);
+        mint_and_approve(EchidnaERC20(prePool.pair.tokenQuote), _amount);
+
+        emit LogUint256("amount: ", _amount);
+        emit LogUint256("limit:", _limit);
+
+        uint256 prevReserveSell = getReserve(address(_hyper), prePool.pair.tokenQuote);
+        uint256 prevReserveBuy = getReserve(address(_hyper), prePool.pair.tokenAsset);
+
+        try _hyper.swap(specialPoolId, false, _amount, _limit) {
+            HyperPool memory postPool = getPool(address(_hyper), specialPoolId);
+            uint256 postReserveSell = getReserve(address(_hyper), postPool.pair.tokenQuote);
+            uint256 postReserveBuy = getReserve(address(_hyper), postPool.pair.tokenAsset);
+
+            assert(postPool.lastPrice != prePool.lastPrice);
+
+            // liquidity only changes in allocate and unallocate
+            assert(prePool.liquidity == postPool.liquidity);
+
+            // fee growth checkpoints are always changing
+            assert(postPool.feeGrowthGlobalQuote >= prePool.feeGrowthGlobalQuote);
+            assert(postPool.feeGrowthGlobalAsset >= prePool.feeGrowthGlobalAsset); //maybe reverse
+
+            // actual token balances increase or decrease for non-internal balance swaps.
+            assert(postReserveSell > prevReserveSell);
+            assert(postReserveBuy < prevReserveBuy);
+        } catch {}
     }
 }

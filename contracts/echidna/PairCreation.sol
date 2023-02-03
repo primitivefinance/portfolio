@@ -103,4 +103,13 @@ contract PairCreation is EchidnaStateHandling {
         (bool success, ) = address(_hyper).call(createPairData);
         assert(!success);
     }
+
+    function create_special_pair() internal returns (uint24 pairId) {
+        EchidnaERC20 _quote = create_token("Quote Token 15 Decimals", "QDEC15", 15);
+        EchidnaERC20 _asset = create_token("Asset Token 18 Decimals", "ADEC18", 18);
+        bytes memory createPairData = ProcessingLib.encodeCreatePair(address(_asset), address(_quote));
+        (bool success, ) = address(_hyper).call(createPairData);
+        assert(!success);
+        pairId = _hyper.getPairId(address(_asset), address(_quote));
+    }
 }
