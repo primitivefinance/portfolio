@@ -141,4 +141,33 @@ contract TestHyperSwap is TestHyperSetup {
         assertEq(remainder, 0, "expected-output");
         assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
     } */
+
+    function test_swap_invariant_growth() public {
+        __hyperTestingContract__.allocate(_scenario_controlled.poolId, 10 ether);
+        HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_controlled.poolId);
+
+        uint maxInput = getMaxSwapAssetInWad(pool);
+        uint input = (maxInput * 1 ether) / 2 ether; // half of max input.
+        (uint out, ) = pool.getAmountOut(true, input, 0);
+        out = (out * 9000) / 10000; // 90% of output, so invariant is positive.
+
+        uint prevInvariantGrowth = pool.invariantGrowthGlobal;
+
+        bytes memory data = Enigma.encodeSwap(
+            0,
+            _scenario_controlled.poolId,
+            0x0,
+            uint128(input),
+            0x0,
+            uint128(out),
+            0
+        );
+        (bool success, ) = address(__hyperTestingContract__).call(data);
+        assertTrue(success, "swap failed");
+
+        pool = getPool(address(__hyperTestingContract__), _scenario_controlled.poolId);
+        uint postInvariantGrowth = pool.invariantGrowthGlobal;
+
+        assertTrue(postInvariantGrowth > prevInvariantGrowth, "invariant-did-not-increase");
+    }
 }

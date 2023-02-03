@@ -92,7 +92,7 @@ interface IHyperGetters {
             uint128 liquidity,
             uint32 lastTimestamp,
             address controller,
-            uint256 feeGrowthGlobalReward,
+            uint256 invariantGrowthGlobal,
             uint256 feeGrowthGlobalAsset,
             uint256 feeGrowthGlobalQuote,
             HyperCurve memory,
@@ -108,12 +108,12 @@ interface IHyperGetters {
         returns (
             uint128 freeLiquidity,
             uint256 lastTimestamp,
-            uint256 feeGrowthRewardLast,
+            uint256 invariantGrowthLast,
             uint256 feeGrowthAssetLast,
             uint256 feeGrowthQuoteLast,
             uint128 tokensOwedAsset,
             uint128 tokensOwedQuote,
-            uint128 tokensOwedReward
+            uint128 invariantOwed
         );
 
     function getPairNonce() external view returns (uint24);

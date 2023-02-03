@@ -170,6 +170,8 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             "18-18 decimal pair"
         );
         scenarios.push(_scenario_18_18);
+
+        createControlledPool();
     }
 
     uint64 public constant FIRST_POOL = 0x0000010000000001;
