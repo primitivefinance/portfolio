@@ -35,6 +35,27 @@ contract GlobalInvariants is
         }
     }
 
+    function reserve_greater_than_get_amounts() public {
+        uint256 tokenBalance = 0;
+        for (uint8 i = 0; i < poolIds.length; i++) {
+            uint64 poolId = poolIds[i];
+            HyperPool memory pool = getPool(address(_hyper), poolId);
+            HyperPair memory pair = pool.pair;
+
+            // retrieve reserves of the token and add to tracked reserve balance
+            uint256 assetReserveBalance = getReserve(address(_hyper), pair.tokenAsset);
+            uint256 quoteReserveBalance = getReserve(address(_hyper), pair.tokenQuote);
+
+            // reserve/poolLiquidity
+            // compare after
+
+            (uint assetAmount, uint quoteAmount) = _hyper.getAmounts(poolId);
+
+            assert(assetReserveBalance >= assetAmount);
+            assert(quoteReserveBalance >= quoteAmount);
+        }
+    }
+
     // ---------- HyperPair Properties -------
     function pair_asset_never_equal_to_quote(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
