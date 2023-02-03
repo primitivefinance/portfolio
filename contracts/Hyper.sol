@@ -687,29 +687,18 @@ contract Hyper is IHyper {
         emit CreatePool(poolId, hasController, pool.pair.tokenAsset, pool.pair.tokenQuote, price);
     }
 
-    function changeParameters(
-        uint64 poolId,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        uint128 maxPrice
-    ) external lock interactions {
+    function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external lock interactions {
         HyperPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
         HyperCurve memory modified = pool.params;
         if (jit != 0) modified.jit = jit;
-        if (maxPrice != 0) modified.maxPrice = maxPrice;
         if (fee != 0) modified.fee = fee;
-        if (volatility != 0) modified.volatility = volatility;
-        if (duration != 0) modified.duration = duration;
         if (priorityFee != 0) modified.priorityFee = priorityFee;
 
         pool.changePoolParameters(modified);
 
-        emit ChangeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxPrice);
+        emit ChangeParameters(poolId, priorityFee, fee, jit);
     }
 
     /** @dev Overridable in tests.  */

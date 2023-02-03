@@ -114,55 +114,25 @@ contract TestHyperCreatePool is TestHyperSetup {
         assertTrue(!success);
     }
 
-    function testFuzzChangeParameters(
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 jit,
-        uint16 duration,
-        uint16 volatility,
-        uint128 maxPrice
-    ) public {
+    function testFuzzChangeParameters(uint16 priorityFee, uint16 fee, uint16 jit) public {
         uint64 poolId = _createDefaultPool();
         fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
         priorityFee = uint16(bound(priorityFee, 1, fee));
         jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
-        duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
-        volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-        vm.assume(maxPrice > 0);
 
-        __hyperTestingContract__.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxPrice);
+        __hyperTestingContract__.changeParameters(poolId, priorityFee, fee, jit);
         HyperCurve memory actual = _getPool(hs(), poolId).params;
         assertEq(actual.priorityFee, priorityFee, "priorityFee");
         assertEq(actual.fee, fee, "fee");
-        assertEq(actual.volatility, volatility, "volatility");
-        assertEq(actual.duration, duration, "duration");
         assertEq(actual.jit, jit, "jit");
-        assertEq(actual.maxPrice, maxPrice, "maxPrice");
     }
 
     function testChangeParametersPriorityFeeSuccess() public {
         uint64 poolId = _createDefaultPool();
         uint16 prev = _getPool(hs(), poolId).params.priorityFee;
-        __hyperTestingContract__.changeParameters(poolId, DEFAULT_FEE + 10, DEFAULT_FEE + 20, 0, 0, 0, 0);
+        __hyperTestingContract__.changeParameters(poolId, DEFAULT_FEE + 10, DEFAULT_FEE + 20, 0);
         uint16 post = _getPool(hs(), poolId).params.priorityFee;
         assertEq(post, prev + 10, "priority-fee-change");
-    }
-
-    function testChangeParametersSuccessKeepsPoolSolvency() public {
-        uint64 poolId = _createDefaultPool();
-        (uint prev0, uint prev1) = __hyperTestingContract__.getVirtualReserves(poolId);
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            0,
-            0,
-            DEFAULT_VOLATILITY * 2,
-            DEFAULT_DURATION + 30,
-            0,
-            DEFAULT_STRIKE + 500
-        );
-        (uint post0, uint post1) = __hyperTestingContract__.getVirtualReserves(poolId);
-        assertEq(post0, prev0, "virtual-asset-balance-altered");
-        assertEq(post1, prev1, "virtual-quote-balance-altered");
     }
 
     function testChangeParametersNotControllerReverts() public {
@@ -170,60 +140,14 @@ contract TestHyperCreatePool is TestHyperSetup {
         uint16 failureArg = 1;
         vm.expectRevert(NotController.selector);
         vm.prank(address(0x0006));
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            DEFAULT_FEE,
-            DEFAULT_FEE,
-            DEFAULT_VOLATILITY,
-            DEFAULT_DURATION,
-            DEFAULT_JIT,
-            DEFAULT_STRIKE
-        );
-    }
-
-    function testChangeParametersInvalidVolatilityReverts() public {
-        uint64 poolId = _createDefaultPool();
-        uint16 failureArg = 1;
-        vm.expectRevert(abi.encodeWithSelector(InvalidVolatility.selector, failureArg));
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            DEFAULT_FEE,
-            DEFAULT_FEE,
-            1,
-            DEFAULT_DURATION,
-            DEFAULT_JIT,
-            DEFAULT_STRIKE
-        );
-    }
-
-    function testChangeParametersInvalidDurationReverts() public {
-        uint64 poolId = _createDefaultPool();
-        uint16 failureArg = 5000;
-        vm.expectRevert(abi.encodeWithSelector(InvalidDuration.selector, failureArg));
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            DEFAULT_FEE,
-            DEFAULT_FEE,
-            DEFAULT_VOLATILITY,
-            5000,
-            DEFAULT_JIT,
-            DEFAULT_STRIKE
-        );
+        __hyperTestingContract__.changeParameters(poolId, DEFAULT_FEE, DEFAULT_FEE, DEFAULT_JIT);
     }
 
     function testChangeParametersInvalidJitReverts() public {
         uint64 poolId = _createDefaultPool();
         uint16 failureArg = 10000;
         vm.expectRevert(abi.encodeWithSelector(InvalidJit.selector, failureArg));
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            DEFAULT_FEE,
-            DEFAULT_FEE,
-            DEFAULT_VOLATILITY,
-            DEFAULT_DURATION,
-            failureArg,
-            DEFAULT_STRIKE
-        );
+        __hyperTestingContract__.changeParameters(poolId, DEFAULT_FEE, DEFAULT_FEE, failureArg);
     }
 
     function testChangeParametersPriorityFeeAboveFeeReverts() public {
@@ -240,30 +164,14 @@ contract TestHyperCreatePool is TestHyperSetup {
         (, bytes memory revertData) = curve.checkParameters();
         assertEq(revertData, abi.encodeWithSelector(InvalidFee.selector, curve.priorityFee));
         vm.expectRevert(revertData);
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            curve.priorityFee,
-            curve.fee,
-            curve.volatility,
-            curve.duration,
-            curve.jit,
-            curve.maxPrice
-        );
+        __hyperTestingContract__.changeParameters(poolId, curve.priorityFee, curve.fee, curve.jit);
     }
 
     function testChangeParametersInvalidFeeReverts() public {
         uint16 failureArg = 2 ** 16 - 10;
         uint64 poolId = _createDefaultPool();
         vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, failureArg));
-        __hyperTestingContract__.changeParameters(
-            poolId,
-            DEFAULT_FEE,
-            failureArg,
-            DEFAULT_VOLATILITY,
-            DEFAULT_DURATION,
-            DEFAULT_JIT,
-            DEFAULT_STRIKE
-        );
+        __hyperTestingContract__.changeParameters(poolId, DEFAULT_FEE, failureArg, DEFAULT_JIT);
     }
 
     function _createDefaultPool() internal returns (uint64 poolId) {

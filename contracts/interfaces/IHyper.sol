@@ -35,15 +35,8 @@ interface IHyperEvents {
         uint256 deltaLiquidity
     );
 
-    event ChangeParameters(
-        uint64 indexed poolId,
-        uint16 indexed priorityFee,
-        uint16 indexed fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        uint128 maxPrice
-    );
+    /** @dev Emits a `0` for unchanged parameters. */
+    event ChangeParameters(uint64 indexed poolId, uint16 indexed priorityFee, uint16 indexed fee, uint16 jit);
     event Collect(
         uint64 poolId,
         address account,
@@ -158,15 +151,7 @@ interface IHyperActions {
 
     function deposit() external payable;
 
-    function changeParameters(
-        uint64 poolId,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        uint128 maxPrice
-    ) external;
+    function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
 }
 
 interface IHyper is IHyperActions, IHyperEvents, IHyperGetters {}
