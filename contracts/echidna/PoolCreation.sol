@@ -37,7 +37,7 @@ contract PoolCreation is EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, false);
+            (HyperPool memory pool, ) = execute_create_pool(pairId, createPoolData, false);
             assert(!pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
@@ -88,7 +88,7 @@ contract PoolCreation is EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, true);
+            (HyperPool memory pool, ) = execute_create_pool(pairId, createPoolData, true);
             assert(pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
@@ -175,7 +175,7 @@ contract PoolCreation is EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, true);
+            (HyperPool memory pool, ) = execute_create_pool(pairId, createPoolData, true);
             assert(pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
@@ -197,6 +197,7 @@ contract PoolCreation is EchidnaStateHandling {
     ) private returns (HyperPool memory pool, uint64 poolId) {
         uint256 preCreationPoolNonce = _hyper.getPoolNonce();
         (bool success, ) = address(_hyper).call(createPoolData);
+        assert(success);
 
         // pool nonce should increase by 1 each time a pool is created
         uint256 poolNonce = _hyper.getPoolNonce();

@@ -181,7 +181,7 @@ contract FundingDrawingDepositing is EchidnaStateHandling {
     }
 
     function draw_to_zero_should_fail(uint256 assetAmount, uint256 quoteAmount) public {
-        (EchidnaERC20 _asset, EchidnaERC20 _quote) = get_hyper_tokens(assetAmount, quoteAmount);
+        (EchidnaERC20 _asset, ) = get_hyper_tokens(assetAmount, quoteAmount);
 
         // make sure a user has funded already
         uint256 virtualBalancePreFund = getBalance(address(_hyper), address(this), address(_asset));
