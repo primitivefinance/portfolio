@@ -4,7 +4,7 @@ import "../../test/helpers/HelperHyperProfiles.sol" as DefaultValues;
 import "./GlobalInvariants.sol";
 
 contract EchidnaE2E is GlobalInvariants {
-    constructor() public GlobalInvariants() {
+    constructor() GlobalInvariants() {
         EchidnaERC20 _asset = create_token("Asset Token", "ADEC6", 6);
         EchidnaERC20 _quote = create_token("Quote Token", "QDEC18", 18);
         add_created_hyper_token(_asset);
@@ -40,7 +40,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 deltaAsset,
         uint256 deltaQuote
     ) public {
-        (HyperPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         HyperPosition memory preClaimPosition = getPosition(address(_hyper), address(this), poolId);

@@ -33,7 +33,7 @@ contract Swaps is EchidnaStateHandling {
             emit LogUint256("block.timestamp", block.timestamp);
             swap_should_fail(poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
-            try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
+            try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256, uint256) {
                 HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
                 {
                     // change in asset's balance after swaps is equivalent to the change in reserves
@@ -66,14 +66,13 @@ contract Swaps is EchidnaStateHandling {
     function swap_on_non_existent_pool_should_fail(uint64 id) public {
         // Ensure that the pool id was not one that's already been created
         require(!is_created_pool(id));
-        HyperPool memory pool = getPool(address(_hyper), id);
 
         swap_should_fail(id, true, id, id, "BUG: Swap on a nonexistent pool should fail.");
     }
 
     function swap_on_zero_amount_should_fail() public {
         // Will always return a pool that exists
-        (HyperPool memory pool, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
+        (, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
         uint256 amount = 0;
 
         swap_should_fail(poolId, true, amount, poolId + 1, "BUG: Swap with zero swap amount should fail.");
@@ -81,7 +80,7 @@ contract Swaps is EchidnaStateHandling {
 
     function swap_on_limit_amount_of_zero_should_fail() public {
         // Will always return a pool that exists
-        (HyperPool memory pool, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
+        (, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
         uint256 amount = between(poolId, 1, type(uint256).max);
 
         swap_should_fail(poolId, true, amount, 0, "BUG: Swap with zero limit amount should fail.");
@@ -102,7 +101,6 @@ contract Swaps is EchidnaStateHandling {
     function swap_assets_in_always_decreases_price(uint256 amount, uint256 limit) public {
         bool sellAsset = true;
 
-        address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
             HyperPool memory pool,
@@ -168,16 +166,8 @@ contract Swaps is EchidnaStateHandling {
     function swap_quote_in_always_increases_price(uint256 amount, uint256 limit) public {
         bool sellAsset = false;
 
-        address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens();
-        HyperCurve memory curve = pool.params;
-        // require(curve.maturity() > block.timestamp);
+        (, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_non_expired_pool_and_tokens();
 
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -227,16 +217,8 @@ contract Swaps is EchidnaStateHandling {
     function swap_asset_in_increases_reserve(uint256 amount, uint256 limit) public {
         bool sellAsset = true;
 
-        address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens();
-        HyperCurve memory curve = pool.params;
-        // require(curve.maturity() > block.timestamp);
+        (, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_non_expired_pool_and_tokens();
 
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -284,16 +266,8 @@ contract Swaps is EchidnaStateHandling {
     function swap_quote_in_increases_reserve(uint256 amount, uint256 limit) public {
         bool sellAsset = false;
 
-        address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens();
-        HyperCurve memory curve = pool.params;
-        // require(curve.maturity() > block.timestamp);
+        (, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_non_expired_pool_and_tokens();
 
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);

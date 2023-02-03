@@ -57,13 +57,6 @@ contract GlobalInvariants is
     }
 
     // ---------- Pool Properties -------
-    function pool_fee_growth_greater_than_position_fee_growth() public view {
-        for (uint8 i = 0; i < poolIds.length; i++) {
-            uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-        }
-        // TODO: Add pool fee growth tests
-    }
 
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
         (HyperPool memory pool, , , ) = retrieve_random_pool_and_tokens(id);
@@ -144,12 +137,7 @@ contract GlobalInvariants is
 
     function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
         require(deltaLiquidity != 0);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 quote,
-            EchidnaERC20 asset
-        ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
@@ -234,7 +222,6 @@ contract GlobalInvariants is
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
 
             (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getAmounts();
 
