@@ -82,73 +82,12 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
         hyper.allocate(poolId, 1_000 ether);
     }
 
-    function __testAnalysisSwapQuote() public {
-        (uint uWeth, uint uUsdc) = (ERC20(WETH).balanceOf(address(pool)), ERC20(USDC).balanceOf(address(pool)));
-        console.log("WETH in Uniswap: ", uWeth);
-        console.log("USDC in Uniswap: ", uUsdc);
-
-        (uint bWeth, uint bUsdc) = hyper.getVirtualReserves(poolId);
-        console.log("WETH in Hyper: ", bWeth);
-        console.log("USDC in Hyper: ", bUsdc);
-
-        console.log("Diff in WETH, uni - hyper: ");
-        console.logInt(int(uWeth) - int(bWeth));
-        console.log("Diff in USDC, uni - hyper: ");
-        console.logInt(int(uUsdc) - int(bUsdc));
-
-        bytes memory quote = abi.encodeWithSelector(Quoter.quoteExactInputSingle.selector, WETH, USDC, fee, 1 ether, 0);
-        //(bool success, bytes memory quoteData) = address(quoter).staticcall(quote);
-        //uint uQuote = abi.decode(quoteData, (uint));
-        uint uQuote = quoter.quoteExactInputSingle(WETH, USDC, fee, 1 ether, 0);
-        console.log("Got uniswap quote: ", uQuote);
-
-        uint hQuote = hyper.getAmountOut(poolId, true, 1 ether);
-        //(uint hQuote, ) = hyper.swap(poolId, true, 1 ether, 0);
-        console.log("Got hyper quote: ", hQuote);
-
-        console.log("Diff in quote, uni - hyper: ");
-        console.logInt(int(uQuote) - int(hQuote));
-
-        uint optimized;
-        uint i;
-        uint128 startMaxPrice = maxPrice;
-        uint128 endMaxPrice = startMaxPrice;
-        uint16 vol = 2_000;
-        uint16 dur = 365;
-
-        while (optimized < uQuote && i != 25) {
-            uint strike = endMaxPrice;
-            if (dur > 20) {
-                // optimize duration first
-                hyper.changeParameters(poolId, 0, 0, 0, dur, 0, 0);
-                console.log("dur: ", dur);
-                dur -= 35;
-            } else if (strike < price) {
-                // optimize vol
-                hyper.changeParameters(poolId, 0, 0, vol, 0, 0, 0);
-                console.log("vol: ", vol);
-                vol -= 100;
-            } else {
-                // optimize strike
-                hyper.changeParameters(poolId, 0, 0, 0, 0, 0, endMaxPrice);
-                console.log("strike price: ", strike);
-                endMaxPrice -= 250;
-            }
-            optimized = hyper.getAmountOut(poolId, true, 1 ether);
-            console.log("target - optimized", uQuote - optimized);
-
-            ++i;
-        }
-
-        console.log("DONE");
-    }
-
     function __testFuzzSwapOutput(uint16 vol, uint16 dur, uint128 strike) public {
         vol = uint16(bound(vol, 500, 2_000));
         dur = uint16(bound(dur, 10, 100));
         strike = uint128(bound(strike, stk, price * 2)); // between strike and twice the price
 
-        hyper.changeParameters(poolId, 0, 0, vol, dur, 0, strike);
+        hyper.changeParameters(poolId, 0, 0, 0);
 
         uint target = 1261714834;
         uint actual = hyper.getAmountOut(poolId, true, 1 ether);
