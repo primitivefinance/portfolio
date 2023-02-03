@@ -105,7 +105,7 @@ contract TestHyperClaim is TestHyperSetup {
         HyperPosition memory pos = _getPosition(hs(), address(this), scenario.poolId);
         HyperPool memory pool = _getPool(hs(), scenario.poolId);
         uint tokensOwed = Assembly
-            .computeCheckpointDistance(pool.feeGrowthGlobalReward, pos.feeGrowthRewardLast)
+            .computeCheckpointDistance(pool.invariantGrowthGlobal, pos.invariantGrowthLast)
             .mulWadDown(pool.liquidity);
 
         __hyperTestingContract__.claim(scenario.poolId, 0, 0);

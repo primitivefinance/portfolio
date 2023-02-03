@@ -215,7 +215,7 @@ contract Hyper is IHyper {
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
-        pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote, pool.invariantGrowthGlobal);
 
         // 2^256 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
         uint256 claimedAssets = deltaAsset == type(uint256).max ? pos.tokensOwedAsset : deltaAsset;
@@ -227,21 +227,6 @@ contract Hyper is IHyper {
         if (claimedAssets > 0) _applyCredit(pool.pair.tokenAsset, claimedAssets);
         if (claimedQuotes > 0) _applyCredit(pool.pair.tokenQuote, claimedQuotes);
 
-        uint128 deltaReward = pos.tokensOwedReward;
-        pos.tokensOwedReward -= deltaReward;
-
-        // todo: a hack that utilizes Hyper contract as a fee bucket for priority swaps.
-        // Currently uses WETH as the reward token. However, these priority fees
-        // are paid based on liquidity.
-        // If 1 WAD of liquidity is worth a small amount, the priority fee cost
-        // a lot relative to the liquidity's value.
-        // A better change is making this reward token configurable.
-        if (deltaReward > 0) {
-            _applyCredit(WETH, deltaReward); // gift to `msg.sender`.
-            if (getBalance(address(this), WETH) < deltaReward) revert InvalidReward();
-            __account__.debit(address(this), WETH, deltaReward); // only place hyper's balance is used
-        }
-
         emit Collect(
             poolId,
             msg.sender,
@@ -249,8 +234,8 @@ contract Hyper is IHyper {
             pool.pair.tokenAsset,
             claimedQuotes,
             pool.pair.tokenQuote,
-            deltaReward,
-            WETH
+            0,
+            address(0)
         );
     }
 
@@ -320,10 +305,16 @@ contract Hyper is IHyper {
         emit Unallocate(poolId, pool.pair.tokenAsset, pool.pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
-    function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint feeAsset, uint feeQuote) {
+    function _changeLiquidity(
+        ChangeLiquidityParams memory args
+    ) internal returns (uint feeAsset, uint feeQuote, uint invariantGrowth) {
         (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
-        (feeAsset, feeQuote) = pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        (feeAsset, feeQuote, invariantGrowth) = pos.syncPositionFees(
+            pool.feeGrowthGlobalAsset,
+            pool.feeGrowthGlobalQuote,
+            pool.invariantGrowthGlobal
+        );
 
         _changePosition(args);
     }
@@ -442,7 +433,6 @@ contract Hyper is IHyper {
         uint256 nextIndependent;
         uint256 liveDependent;
         uint256 nextDependent;
-        uint256 priorityFeeAmount;
 
         {
             uint256 maxInput;
@@ -491,6 +481,13 @@ contract Hyper is IHyper {
             liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote); // invariant is denominated in quote token.
             nextInvariantWad = nextInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
             if (nextInvariantWad < liveInvariantWad) revert InvalidInvariant(liveInvariantWad, nextInvariantWad);
+
+            // Apply priority invariant growth.
+            if (msg.sender == pool.controller) {
+                int256 delta = nextInvariantWad - liveInvariantWad;
+                uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
+                if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(_swap.liquidity);
+            }
         }
 
         {
@@ -520,21 +517,11 @@ contract Hyper is IHyper {
             _swap.liquidity,
             _state.sell ? _state.feeGrowthGlobal : 0,
             _state.sell ? 0 : _state.feeGrowthGlobal,
-            _state.priorityFeeGrowthGlobal
+            _state.invariantGrowthGlobal
         );
 
         _increaseReserves(_state.tokenInput, _swap.input);
         _decreaseReserves(_state.tokenOutput, _swap.output);
-
-        // Apply reserve effects.
-        if (priorityFeeAmount != 0) {
-            // Uses hyper's internal balance as a fee bucket for priority swaps.
-            // todo: investigate two different pools accruing priority rewards in the same bucket,
-            // and if it's possible to "steal" another pool's accrued priority rewards.
-            _increaseReserves(WETH, priorityFeeAmount);
-            emit IncreaseUserBalance(address(this), WETH, priorityFeeAmount);
-            __account__.credit(address(this), WETH, priorityFeeAmount);
-        }
 
         {
             uint64 id = args.poolId;
@@ -577,7 +564,7 @@ contract Hyper is IHyper {
         uint256 liquidity,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote,
-        uint256 feeGrowthGlobalReward
+        uint256 invariantGrowthGlobal
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
@@ -590,7 +577,7 @@ contract Hyper is IHyper {
 
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
-        pool.feeGrowthGlobalReward = Assembly.computeCheckpoint(pool.feeGrowthGlobalReward, feeGrowthGlobalReward);
+        pool.invariantGrowthGlobal = Assembly.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
     }
 
     // ===== Initializing Pools ===== //

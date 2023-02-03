@@ -119,7 +119,7 @@ struct HyperPool {
     uint128 liquidity; // available liquidity to remove
     uint32 lastTimestamp; // updated on swaps.
     address controller;
-    uint256 feeGrowthGlobalReward;
+    uint256 invariantGrowthGlobal;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
     HyperCurve params;
@@ -130,12 +130,12 @@ struct HyperPool {
 struct HyperPosition {
     uint128 freeLiquidity;
     uint256 lastTimestamp;
-    uint256 feeGrowthRewardLast;
+    uint256 invariantGrowthLast;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
     uint128 tokensOwedAsset;
     uint128 tokensOwedQuote;
-    uint128 tokensOwedReward;
+    uint128 invariantOwed;
 }
 
 struct ChangeLiquidityParams {
@@ -175,7 +175,7 @@ struct SwapState {
     address tokenOutput;
     uint256 fee;
     uint256 feeGrowthGlobal;
-    uint256 priorityFeeGrowthGlobal;
+    uint256 invariantGrowthGlobal;
 }
 
 struct Payment {
@@ -206,21 +206,26 @@ function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, 
 function syncPositionFees(
     HyperPosition storage self,
     uint feeGrowthAsset,
-    uint feeGrowthQuote
-) returns (uint feeAssetEarned, uint feeQuoteEarned) {
+    uint feeGrowthQuote,
+    uint invariantGrowth
+) returns (uint feeAssetEarned, uint feeQuoteEarned, uint feeInvariantEarned) {
     // fee growth current - position fee growth last
     uint differenceAsset = Assembly.computeCheckpointDistance(feeGrowthAsset, self.feeGrowthAssetLast);
     uint differenceQuote = Assembly.computeCheckpointDistance(feeGrowthQuote, self.feeGrowthQuoteLast);
+    uint differenceInvariant = Assembly.computeCheckpointDistance(invariantGrowth, self.invariantGrowthLast);
 
     // fee growth per liquidity * position liquidity
     feeAssetEarned = FixedPointMathLib.mulWadDown(differenceAsset, self.freeLiquidity);
     feeQuoteEarned = FixedPointMathLib.mulWadDown(differenceQuote, self.freeLiquidity);
+    feeInvariantEarned = FixedPointMathLib.mulWadDown(differenceInvariant, self.freeLiquidity);
 
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;
+    self.invariantGrowthLast = invariantGrowth;
 
     self.tokensOwedAsset += SafeCastLib.safeCastTo128(feeAssetEarned);
     self.tokensOwedQuote += SafeCastLib.safeCastTo128(feeQuoteEarned);
+    self.invariantOwed += SafeCastLib.safeCastTo128(feeInvariantEarned);
 }
 
 // ===== View ===== //
