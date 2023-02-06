@@ -24,26 +24,28 @@ contract Helper {
     function clam_safe_create_bounds(
         uint16 priorityFee,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
         uint128 price
-    ) internal returns (uint16, uint16, int24, uint16, uint16, uint16, uint128) {
+    ) internal returns (uint16, uint16, uint128, uint16, uint16, uint16, uint128) {
         // scaling remaining pool creation values
         fee = uint16(between(fee, MIN_FEE, MAX_FEE));
         priorityFee = uint16(between(priorityFee, 1, fee));
         emit LogUint256("priority fee", uint256(priorityFee));
         volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
         duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
+        /*
         maxTick = (-MIN_TICK) + (maxTick % (MAX_TICK - (-MIN_TICK))); // [-MIN_TICK,MAX_TICK]
         if (maxTick == 0) {
             maxTick += 1;
         }
         emit LogInt24("maxTick", maxTick);
+        */
         jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
         price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
-        return (priorityFee, fee, maxTick, volatility, duration, jit, price);
+        return (priorityFee, fee, maxPrice, volatility, duration, jit, price);
     }
     // ******************** Helper ********************
 
