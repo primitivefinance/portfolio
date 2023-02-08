@@ -437,7 +437,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
             assert(curve.jit == JUST_IN_TIME_LIQUIDITY_POLICY);
-            // assert(curve.maxPrice == maxPrice);
+            assert(curve.maxPrice == maxPrice);
         }
     }
 
