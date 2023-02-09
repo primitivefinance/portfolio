@@ -1607,6 +1607,8 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint prevFeeGrowthBuy,
         uint postFeeGrowthBuy
     ) internal pure {
+        prevFeeGrowthBuy;
+
         // price always changes in a swap
         assert(postPrice != prevPrice);
 
