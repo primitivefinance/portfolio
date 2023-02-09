@@ -27,7 +27,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     OS.AccountSystem hyperAccount;
 
     // ******************** Check Proper System Deployment ********************
-    function check_proper_deployment() public {
+    function check_proper_deployment() public view {
         assert(address(_weth) != address(0));
         assert(address(_hyper) != address(0));
 
