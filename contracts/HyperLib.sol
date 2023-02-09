@@ -344,8 +344,7 @@ function checkParameters(HyperCurve memory self) pure returns (bool, bytes memor
 
 // ===== Swaps ===== //
 
-function getMaxSwapAssetInWad(HyperPool memory self) view returns (uint) {
-    Price.RMM memory rmm = self.getRMM();
+function getMaxSwapAssetInWad(HyperPool memory self) pure returns (uint) {
     (uint x, ) = self.getAmountsWad();
     uint maxInput = FixedPointMathLib.WAD - x;
     maxInput = maxInput.mulWadDown(self.liquidity);
