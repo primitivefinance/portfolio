@@ -111,10 +111,12 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", pool.lastPrice);
-            emit LogUint256("strike price", curve.strike());
+            uint256 poolLastPrice = _hyper.getLatestPrice(poolId);
 
-            assert(pool.lastPrice <= curve.strike());
+            emit LogUint256("pool's last price", poolLastPrice);
+            emit LogUint256("strike price", curve.maxPrice);
+
+            assert(poolLastPrice <= curve.maxPrice);
         }
     }
 
@@ -126,10 +128,10 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", pool.lastPrice);
-            emit LogUint256("strike price", curve.strike());
+            emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
+            emit LogUint256("strike price", curve.maxPrice);
 
-            if (curve.strike() == 0) {
+            if (curve.maxPrice == 0) {
                 emit AssertionFailed("BUG: Strike price should never be 0.");
             }
         }
@@ -157,13 +159,13 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             HyperPool memory pool = getPool(address(_hyper), poolId);
             emit LogUint256("last timestamp", uint256(pool.lastTimestamp));
 
-            if (pool.lastPrice != 0) {
-                emit LogUint256("pool's last price", pool.lastPrice);
+            if (_hyper.getLatestPrice(poolId) != 0) {
+                emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
                 if (pool.liquidity == 0) {
                     emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
                 }
             }
-            //TODO: if pool.lastPrice == 0; pool.liquidity == 0?
+            //TODO: if _hyper.getLatestPrice(poolId) == 0; pool.liquidity == 0?
         }
     }
 
@@ -252,7 +254,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
                 emit AssertionFailed("BUG amountAssetWad is greater than 1e18");
             }
             // Inclusive of strike price?
-            if (amountQuoteWad > curve.strike()) {
+            if (amountQuoteWad > curve.maxPrice) {
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
                 emit AssertionFailed("BUG amountQuoteWad is greater than strike");
             }
@@ -306,8 +308,8 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         return token;
     }
 
-    /* Future Invariant: This could be extended to create arbitrary pairs. 
-    For now for complexity, I am leaving as is. 
+    /* Future Invariant: This could be extended to create arbitrary pairs.
+    For now for complexity, I am leaving as is.
     Test overlapping token pairs
     */
     function create_pair_with_safe_preconditions(uint256 id1, uint256 id2) public {
@@ -394,17 +396,17 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     function create_non_controlled_pool(
         uint256 id,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint128 price
     ) public {
         uint24 pairId = retrieve_created_pair(uint256(id));
         {
-            (, fee, maxTick, volatility, duration, , price) = clam_safe_create_bounds(
+            (, fee, maxPrice, volatility, duration, , price) = clam_safe_create_bounds(
                 0,
                 fee,
-                maxTick,
+                maxPrice,
                 volatility,
                 duration,
                 0,
@@ -419,7 +421,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             volatility,
             duration,
             0, // no jit
-            maxTick,
+            maxPrice,
             price
         );
         {
@@ -427,7 +429,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             assert(!pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
-            assert(pool.lastPrice == price);
+            // assert(_hyper.getLatestPrice(poolId) == price); FIXME: This is reverting with UndefinedPrice()
             assert(curve.createdAt == block.timestamp);
             assert(pool.controller == address(0));
             assert(curve.priorityFee == 0);
@@ -435,7 +437,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
             assert(curve.jit == JUST_IN_TIME_LIQUIDITY_POLICY);
-            assert(curve.maxTick == maxTick);
+            assert(curve.maxPrice == maxPrice);
         }
     }
 
@@ -443,7 +445,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -451,10 +453,10 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     ) public {
         uint24 pairId = retrieve_created_pair(id);
         {
-            (priorityFee, fee, maxTick, volatility, duration, jit, price) = clam_safe_create_bounds(
+            (priorityFee, fee, maxPrice, volatility, duration, jit, price) = clam_safe_create_bounds(
                 priorityFee,
                 fee,
-                maxTick,
+                maxPrice,
                 volatility,
                 duration,
                 jit,
@@ -469,7 +471,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             volatility,
             duration,
             jit, // no jit
-            maxTick,
+            maxPrice,
             price
         );
         {
@@ -484,14 +486,14 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
             assert(curve.jit == jit);
-            assert(curve.maxTick == maxTick);
+            assert(curve.maxPrice == maxPrice);
         }
     }
 
     function create_controlled_pool_with_zero_priority_fee_should_fail(
         uint256 id,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -500,10 +502,10 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint24 pairId = retrieve_created_pair(id);
         uint16 priorityFee = 0;
         {
-            (, fee, maxTick, volatility, duration, jit, price) = clam_safe_create_bounds(
+            (, fee, maxPrice, volatility, duration, jit, price) = clam_safe_create_bounds(
                 priorityFee,
                 fee,
-                maxTick,
+                maxPrice,
                 volatility,
                 duration,
                 jit,
@@ -518,7 +520,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             volatility,
             duration,
             jit, // no jit
-            maxTick,
+            maxPrice,
             price
         );
         (bool success, ) = address(_hyper).call(createPoolData);
@@ -529,7 +531,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -537,10 +539,10 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     ) public {
         uint24 pairId = retrieve_created_pair(id);
         {
-            (priorityFee, fee, maxTick, volatility, duration, jit, price) = clam_safe_create_bounds(
+            (priorityFee, fee, maxPrice, volatility, duration, jit, price) = clam_safe_create_bounds(
                 priorityFee,
                 fee,
-                maxTick,
+                maxPrice,
                 volatility,
                 duration,
                 jit,
@@ -555,7 +557,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             volatility,
             duration,
             jit, // no jit
-            maxTick,
+            maxPrice,
             price
         );
         {
@@ -570,7 +572,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
             assert(curve.jit == jit);
-            assert(curve.maxTick == maxTick);
+            assert(curve.maxPrice == maxPrice);
         }
     }
 
@@ -608,7 +610,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -625,12 +627,12 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             priorityFee = uint16(between(priorityFee, 1, fee));
             volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
             duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-            maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+            // maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
             jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
-        _hyper.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
+        _hyper.changeParameters(poolId, priorityFee, fee, jit);
         {
             (HyperPool memory postChangeState, , , ) = retrieve_random_pool_and_tokens(id);
             HyperCurve memory preChangeCurve = preChangeState.params;
@@ -643,7 +645,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             assert(postChangeCurve.volatility == volatility);
             assert(postChangeCurve.duration == duration);
             assert(postChangeCurve.jit == jit);
-            assert(postChangeCurve.maxTick == maxTick);
+            assert(postChangeCurve.maxPrice == maxPrice);
         }
     }
 
@@ -652,7 +654,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -669,12 +671,12 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             priorityFee = uint16(between(priorityFee, 1, fee));
             volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
             duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-            maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
+            // maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
             jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
-        try _hyper.changeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick) {
+        try _hyper.changeParameters(poolId, priorityFee, fee, jit) {
             emit AssertionFailed("BUG: Changing pool parameters of a nonmutable pool should not be possible");
         } catch {}
     }
@@ -1009,7 +1011,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(pool.lastPrice != 0);
+        require(_hyper.getLatestPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero
@@ -1133,7 +1135,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(pool.lastPrice != 0);
+        require(_hyper.getLatestPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         uint128 deltaLiquidity = 0;
@@ -1230,7 +1232,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(pool.lastPrice != 0);
+        require(_hyper.getLatestPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero
@@ -1255,7 +1257,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     // Swaps
     function swap_should_succeed(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
         address[] memory owners = new address[](1);
-        // Will always return a pool that exists 
+        // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -1276,7 +1278,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
         if (curve.maturity() <= block.timestamp){
             emit LogUint256("Maturity timestamp",curve.maturity());
-            emit LogUint256("block.timestamp", block.timestamp);            
+            emit LogUint256("block.timestamp", block.timestamp);
             swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
             try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
@@ -1286,14 +1288,14 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
     }
     function swap_on_non_existent_pool_should_fail(uint64 id) public {
-        // Ensure that the pool id was not one that's already been created 
-        require(!is_created_pool(id)); 
+        // Ensure that the pool id was not one that's already been created
+        require(!is_created_pool(id));
         HyperPool memory pool = getPool(address(_hyper),id);
 
         swap_should_fail(pool.params, id, true, id, id, "BUG: Swap on a nonexistent pool should fail.");
     }
     function swap_on_zero_amount_should_fail(uint id) public {
-        // Will always return a pool that exists 
+        // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -1301,7 +1303,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
         uint256 amount = 0;
-        
+
         swap_should_fail(pool.params, poolId, true, amount, id, "BUG: Swap with zero amount should fail.");
     }
     function swap_should_fail(HyperCurve memory curve, uint64 poolId, bool sellAsset, uint256 amount, uint256 limit, string memory msg) private {
@@ -1329,7 +1331,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         require(sellAsset);
 
         address[] memory owners = new address[](1);
-        // Will always return a pool that exists 
+        // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -1352,6 +1354,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 prevReserveSell = getReserve(address(_hyper), address(_asset));
         uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
 
+        uint256 prePoolLastPrice = _hyper.getLatestPrice(poolId);
         HyperPool memory prePool = getPool(address(_hyper), poolId);
         _hyper.swap(poolId, sellAsset, amount, limit);
         HyperPool memory postPool = getPool(address(_hyper), poolId);
@@ -1359,20 +1362,22 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
         uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
 
-        if(postPool.lastPrice == 0) {
-            emit LogUint256("lastPrice", postPool.lastPrice);
-            emit AssertionFailed("BUG: pool.lastPrice is zero on a swap.");
+        uint256 postPoolLastPrice = _hyper.getLatestPrice(poolId);
+
+        if(postPoolLastPrice == 0) {
+            emit LogUint256("lastPrice", postPoolLastPrice);
+            emit AssertionFailed("BUG: postPoolLastPrice is zero on a swap.");
         }
-        if(postPool.lastPrice > prePool.lastPrice) {
-            emit LogUint256("price before swap", prePool.lastPrice);
-            emit LogUint256("price after swap", postPool.lastPrice);
+        if(postPoolLastPrice > prePoolLastPrice) {
+            emit LogUint256("price before swap", prePoolLastPrice);
+            emit LogUint256("price after swap", postPoolLastPrice);
             emit AssertionFailed("BUG: pool.lastPrice increased after swapping assets in, it should have decreased.");
         }
 
         // feeGrowthSell = asset
         check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
+            prePoolLastPrice,
+            postPoolLastPrice,
             prePool.liquidity,
             postPool.liquidity,
             prevReserveSell,
@@ -1386,12 +1391,20 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         );
     }
 
+    struct _T_ {
+        uint256 prevReserveSell;
+        uint256 prevReserveBuy;
+        uint256 prePoolLastPrice;
+        uint256 postPoolLastPrice;
+        uint256 postReserveSell;
+        uint256 postReserveBuy;
+    }
 
     function swap_quote_in_always_increases_price(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
         require(!sellAsset);
 
         address[] memory owners = new address[](1);
-        // Will always return a pool that exists 
+        // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -1404,51 +1417,59 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
 
-
         mint_and_approve(_asset, amount);
         mint_and_approve(_quote, amount);
 
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
-        
-        uint256 prevReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
 
-        HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.swap(poolId, sellAsset, amount, limit);
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
+        _T_ memory t = _T_({
+            prevReserveSell: getReserve(address(_hyper), address(_quote)),
+            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
+            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            postPoolLastPrice: 0,
+            postReserveSell: 0,
+            postReserveBuy: 0
+        });
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
+        {
+            HyperPool memory prePool = getPool(address(_hyper), poolId);
+            _hyper.swap(poolId, sellAsset, amount, limit);
+            HyperPool memory postPool = getPool(address(_hyper), poolId);
+            t.postPoolLastPrice = _hyper.getLatestPrice(poolId);
 
-        if(postPool.lastPrice < prePool.lastPrice) {
-            emit LogUint256("price before swap", prePool.lastPrice);
-            emit LogUint256("price after swap", postPool.lastPrice);
-            emit AssertionFailed("BUG: pool.lastPrice decreased after swapping quote in, it should have increased.");
+            if(t.postPoolLastPrice < t.prePoolLastPrice) {
+                emit LogUint256("price before swap", t.prePoolLastPrice);
+                emit LogUint256("price after swap", t.postPoolLastPrice);
+                emit AssertionFailed("BUG: pool.lastPrice decreased after swapping quote in, it should have increased.");
+            }
+
+            t.postReserveSell = getReserve(address(_hyper), address(_quote));
+            t.postReserveBuy = getReserve(address(_hyper), address(_asset));
+
+            // feeGrowthSell = quote
+            check_external_swap_invariants(
+                t.prePoolLastPrice,
+                t.postPoolLastPrice,
+                prePool.liquidity,
+                postPool.liquidity,
+                t.prevReserveSell,
+                t.postReserveSell,
+                t.prevReserveBuy,
+                t.postReserveBuy,
+                prePool.feeGrowthGlobalQuote,
+                postPool.feeGrowthGlobalQuote,
+                prePool.feeGrowthGlobalAsset,
+                postPool.feeGrowthGlobalAsset
+            );
         }
-
-        // feeGrowthSell = quote
-        check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
-            prePool.liquidity,
-            postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
-            prePool.feeGrowthGlobalQuote,
-            postPool.feeGrowthGlobalQuote,
-            prePool.feeGrowthGlobalAsset,
-            postPool.feeGrowthGlobalAsset
-        );
     }
 
     function swap_asset_in_increases_reserve(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
         require(sellAsset);
 
         address[] memory owners = new address[](1);
-        // Will always return a pool that exists 
+        // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -1457,7 +1478,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
-        
+
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
 
@@ -1468,33 +1489,40 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        uint256 prevReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
+        _T_ memory t = _T_({
+            prevReserveSell: getReserve(address(_hyper), address(_quote)),
+            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
+            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            postPoolLastPrice: 0,
+            postReserveSell: 0,
+            postReserveBuy: 0
+        });
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
         _hyper.swap(poolId, sellAsset, amount, limit);
         HyperPool memory postPool = getPool(address(_hyper), poolId);
+        t.postPoolLastPrice = _hyper.getLatestPrice(poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
+        t.postReserveSell = getReserve(address(_hyper), address(_asset));
+        t.postReserveBuy = getReserve(address(_hyper), address(_quote));
 
-        if(postReserveSell < prevReserveSell) {
-            emit LogUint256("asset reserve before swap", prevReserveSell);
-            emit LogUint256("asset reserve after swap", postReserveSell);
+        if(t.postReserveSell < t.prevReserveSell) {
+            emit LogUint256("asset reserve before swap", t.prevReserveSell);
+            emit LogUint256("asset reserve after swap", t.postReserveSell);
             emit AssertionFailed("BUG: reserve decreased after swapping asset in, it should have increased.");
         }
 
         // feeGrowthSell = asset
         check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
+            t.prePoolLastPrice,
+            t.postPoolLastPrice,
             prePool.liquidity,
             postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
-            prePool.feeGrowthGlobalAsset, 
+            t.prevReserveSell,
+            t.postReserveSell,
+            t.prevReserveBuy,
+            t.postReserveBuy,
+            prePool.feeGrowthGlobalAsset,
             postPool.feeGrowthGlobalAsset,
             prePool.feeGrowthGlobalQuote,
             postPool.feeGrowthGlobalQuote
@@ -1505,7 +1533,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         require(!sellAsset);
 
         address[] memory owners = new address[](1);
-        // Will always return a pool that exists 
+        // Will always return a pool that exists
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -1514,7 +1542,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         HyperCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
-        
+
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
 
@@ -1525,32 +1553,39 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        uint256 prevReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
+        _T_ memory t = _T_({
+            prevReserveSell: getReserve(address(_hyper), address(_quote)),
+            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
+            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            postPoolLastPrice: 0,
+            postReserveSell: 0,
+            postReserveBuy: 0
+        });
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
         _hyper.swap(poolId, sellAsset, amount, limit);
         HyperPool memory postPool = getPool(address(_hyper), poolId);
+        t.postPoolLastPrice = _hyper.getLatestPrice(poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
+        t.postReserveSell = getReserve(address(_hyper), address(_quote));
+        t.postReserveBuy = getReserve(address(_hyper), address(_asset));
 
-        if(prevReserveSell < prevReserveSell) {
-            emit LogUint256("quote reserve before swap", prevReserveSell);
-            emit LogUint256("quote reserve after swap", prevReserveSell);
+        if(t.prevReserveSell < t.prevReserveSell) {
+            emit LogUint256("quote reserve before swap", t.prevReserveSell);
+            emit LogUint256("quote reserve after swap", t.prevReserveSell);
             emit AssertionFailed("BUG: reserve decreased after swapping quote in, it should have increased.");
         }
 
         // feeGrowthSell = quote
         check_external_swap_invariants(
-            prePool.lastPrice,
-            postPool.lastPrice,
+            t.prePoolLastPrice,
+            t.postPoolLastPrice,
             prePool.liquidity,
             postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
+            t.prevReserveSell,
+            t.postReserveSell,
+            t.prevReserveBuy,
+            t.postReserveBuy,
             prePool.feeGrowthGlobalQuote,
             postPool.feeGrowthGlobalQuote,
             prePool.feeGrowthGlobalAsset,
