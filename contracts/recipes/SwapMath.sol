@@ -26,7 +26,7 @@ uint256 constant WAD = 1 ether;
 /**
  @custom:math 1 / φ( Φ^(−1) (x) )
  */
-function d_ppf(int256 input) view returns (int256) {
+function d_ppf(int256 input) pure returns (int256) {
     int256 numerator;
     int256 denominator;
     assembly {
