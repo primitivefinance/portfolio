@@ -48,7 +48,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     // Note: assumption that pairs are created through create_pair invariant test
     // which will add the token to the hyperTokens list
     // this function is built so that extending the creation of new pairs should not require code changes here
-    function global_token_balance_greater_or_equal_reserves() public {
+    function global_token_balance_greater_or_equal_reserves() public view {
         uint256 reserveBalance = 0;
         uint256 tokenBalance = 0;
         for (uint8 i = 0; i < EchidnaStateHandling.hyperTokens.length; i++) {
