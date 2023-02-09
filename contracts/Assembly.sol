@@ -27,7 +27,7 @@ uint8 constant MAX_DECIMALS = 18;
  * @param value Value to compare
  * @param lower Lower bound of the range
  * @param upper Upper bound of the range
- * @return valid True if the value is between the ranged
+ * @return valid True if the value is between the range
  * @custom:example
  * ```
  * bool valid = isBetween(50, 0, 100);
