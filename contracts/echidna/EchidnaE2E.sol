@@ -72,7 +72,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         assert(pair.tokenAsset != pair.tokenQuote);
     }
 
-    function pair_decimals_never_exceed_bounds(uint256 id) public {
+    function pair_decimals_never_exceed_bounds(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
         HyperPair memory pair = getPair(address(_hyper), pairId);
