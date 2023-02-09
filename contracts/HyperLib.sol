@@ -295,7 +295,7 @@ function isMutable(HyperPool memory self) pure returns (bool) {
     return self.controller != address(0);
 }
 
-function getRMM(HyperPool memory self) view returns (Price.RMM memory) {
+function getRMM(HyperPool memory self) pure returns (Price.RMM memory) {
     return Price.RMM({strike: self.params.maxPrice, sigma: self.params.volatility, tau: self.lastTau()});
 }
 
