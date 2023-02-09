@@ -1296,12 +1296,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
     function swap_on_zero_amount_should_fail(uint id) public {
         // Will always return a pool that exists
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         uint256 amount = 0;
 
         swap_should_fail(pool.params, poolId, true, amount, id, "BUG: Swap with zero amount should fail.");
