@@ -1307,6 +1307,9 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         swap_should_fail(pool.params, poolId, true, amount, id, "BUG: Swap with zero amount should fail.");
     }
     function swap_should_fail(HyperCurve memory curve, uint64 poolId, bool sellAsset, uint256 amount, uint256 limit, string memory message) private {
+        curve;
+        limit;
+
         try _hyper.swap(poolId, sellAsset, amount, amount) {
             emit AssertionFailed(message);
         }
