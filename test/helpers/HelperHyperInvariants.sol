@@ -15,6 +15,8 @@ contract HelperHyperInvariants {
         address token,
         address[] memory accounts
     ) internal view returns (bool) {
+        accounts;
+
         uint reserve = HyperLike(hyper).getReserve(token);
         uint physical = ERC20Like(token).balanceOf(hyper);
         if (reserve > physical) revert SettlementInvariantInvalid(physical, reserve);
