@@ -1223,7 +1223,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     // A user should not be able to unallocate more than they own
     // A user calling allocate then unallocate should succeed
     function allocate_then_unallocate_should_succeed(uint256 id, uint256 amount) public {
-        address[] memory owners = new address[](1);
+        // address[] memory owners = new address[](1);
         (
             HyperPool memory pool,
             uint64 poolId,
