@@ -230,7 +230,7 @@ function syncPositionFees(
 
 // ===== View ===== //
 
-function getVirtualReserves(HyperPool memory self) view returns (uint128 reserveAsset, uint128 reserveQuote) {
+function getVirtualReserves(HyperPool memory self) pure returns (uint128 reserveAsset, uint128 reserveQuote) {
     return self.getLiquidityDeltas(-int128(self.liquidity)); // rounds down
 }
 
