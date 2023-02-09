@@ -1198,18 +1198,13 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
     // A user without a position should not be able to unallocate funds
     function unallocate_without_position_should_fail(uint256 id, uint256 amount) public {
-        address[] memory owners = new address[](1);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        // address[] memory owners = new address[](1);
+        (HyperPool memory pool, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
-        uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
-        uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
+        // HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        // uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
+        // uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
         try _hyper.unallocate(poolId, amount) {
