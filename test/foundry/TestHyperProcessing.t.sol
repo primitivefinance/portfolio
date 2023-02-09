@@ -661,7 +661,7 @@ contract TestHyperProcessing is TestHyperSetup {
     function testCreatePairPairExistsReverts() public {
         bytes memory data = Enigma.encodeCreatePair(address(_scenario_18_18.asset), address(_scenario_18_18.quote));
         vm.expectRevert(abi.encodeWithSelector(PairExists.selector, uint24(_scenario_18_18.poolId >> 40)));
-        bool success = __revertCatcher__.process(data);
+        __revertCatcher__.process(data);
     }
 
     function testCreatePairLowerDecimalBoundsAssetReverts() public {
@@ -669,7 +669,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Enigma.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 5));
-        bool success = __revertCatcher__.process(data);
+        __revertCatcher__.process(data);
     }
 
     function testCreatePairLowerDecimalBoundsQuoteReverts() public {
@@ -677,7 +677,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token1 = address(new TestERC20("t", "t", 5));
         bytes memory data = Enigma.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 5));
-        bool success = __revertCatcher__.process(data);
+        __revertCatcher__.process(data);
     }
 
     function testCreatePairUpperDecimalBoundsAssetReverts() public {
@@ -685,7 +685,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Enigma.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 24));
-        bool success = __revertCatcher__.process(data);
+        __revertCatcher__.process(data);
     }
 
     function testCreatePairUpperDecimalBoundsQuoteReverts() public {
@@ -693,7 +693,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token1 = address(new TestERC20("t", "t", 24));
         bytes memory data = Enigma.encodeCreatePair(address(token0), address(token1));
         vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 24));
-        bool success = __revertCatcher__.process(data);
+        __revertCatcher__.process(data);
     }
 
     function testCreatePairPairNonceIncrementedReturnsOneAdded() public {
