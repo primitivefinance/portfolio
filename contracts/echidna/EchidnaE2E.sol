@@ -1553,45 +1553,44 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        uint256 prevReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
+        _T_ memory t = _T_({
+            prevReserveSell: getReserve(address(_hyper), address(_quote)),
+            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
+            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            postPoolLastPrice: 0,
+            postReserveSell: 0,
+            postReserveBuy: 0
+        });
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
-        uint256 prePoolLastPrice = _hyper.getLatestPrice(poolId);
         _hyper.swap(poolId, sellAsset, amount, limit);
         HyperPool memory postPool = getPool(address(_hyper), poolId);
-        uint256 postPoolLastPrice = _hyper.getLatestPrice(poolId);
+        t.postPoolLastPrice = _hyper.getLatestPrice(poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_quote));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_asset));
+        t.postReserveSell = getReserve(address(_hyper), address(_quote));
+        t.postReserveBuy = getReserve(address(_hyper), address(_asset));
 
-        if(prevReserveSell < prevReserveSell) {
-            emit LogUint256("quote reserve before swap", prevReserveSell);
-            emit LogUint256("quote reserve after swap", prevReserveSell);
+        if(t.prevReserveSell < t.prevReserveSell) {
+            emit LogUint256("quote reserve before swap", t.prevReserveSell);
+            emit LogUint256("quote reserve after swap", t.prevReserveSell);
             emit AssertionFailed("BUG: reserve decreased after swapping quote in, it should have increased.");
         }
 
-        /*
-
-        TODO: Fix stack too deep
-
         // feeGrowthSell = quote
         check_external_swap_invariants(
-            prePoolLastPrice,
-            postPoolLastPrice,
+            t.prePoolLastPrice,
+            t.postPoolLastPrice,
             prePool.liquidity,
             postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
+            t.prevReserveSell,
+            t.postReserveSell,
+            t.prevReserveBuy,
+            t.postReserveBuy,
             prePool.feeGrowthGlobalQuote,
             postPool.feeGrowthGlobalQuote,
             prePool.feeGrowthGlobalAsset,
             postPool.feeGrowthGlobalAsset
         );
-
-        */
     }
 
     function check_external_swap_invariants(
