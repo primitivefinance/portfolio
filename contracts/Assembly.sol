@@ -86,14 +86,6 @@ function convertDaysToSeconds(uint256 amountDays) pure returns (uint256 amountSe
     }
 }
 
-function toBytes32(bytes memory raw) pure returns (bytes32 data) {
-    assembly {
-        data := mload(add(raw, 32))
-        let shift := mul(sub(32, mload(raw)), 8)
-        data := shr(shift, data)
-    }
-}
-
 function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     assembly {
         data := mload(add(raw, 32))
