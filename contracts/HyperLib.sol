@@ -313,7 +313,7 @@ function maturity(HyperCurve memory self) view returns (uint32 endTimestamp) {
     return (Assembly.convertDaysToSeconds(self.duration) + self.createdAt).safeCastTo32();
 }
 
-function validateParameters(HyperCurve memory self) view returns (bool, bytes memory) {
+function validateParameters(HyperCurve memory self) pure returns (bool, bytes memory) {
     (bool success, bytes memory reason) = self.checkParameters();
     if (!success) {
         assembly {
