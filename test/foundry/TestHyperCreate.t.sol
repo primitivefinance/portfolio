@@ -211,7 +211,6 @@ contract TestHyperCreatePool is TestHyperSetup {
         vm.store(address(__hyperTestingContract__), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
         assertEq(__hyperTestingContract__.getPoolNonce(), type(uint32).max, "not set to max value");
 
-        address token = address(new TestERC20("t", "t", 18));
         bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
 
         vm.expectRevert(arithmeticError);
