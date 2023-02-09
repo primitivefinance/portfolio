@@ -183,8 +183,21 @@ interface IHyperActions {
      */
     function draw(address token, uint256 amount, address to) external;
 
+    /**
+     * @notice Deposits ETH into the user internal balance
+     * @dev Amount of ETH must be sent as `msg.value`, the ETH will be wrapped
+     */
     function deposit() external payable;
 
+    /**
+     * @notice Updates the parameters of the pool `poolId`
+     * @dev The sender must be the pool controller, leaving a function parameter
+     * as '0' will not change the pool parameter.
+     * @param poolId Id of the pool to update
+     * @param priorityFee New priority fee of the pool
+     * @param fee New fee of the pool
+     * @param jit New JIT policy of the pool
+     */
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
 }
 
