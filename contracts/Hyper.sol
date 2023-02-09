@@ -395,7 +395,7 @@ contract Hyper is IHyper {
         _state.tokenOutput = _state.sell ? pool.pair.tokenQuote : pool.pair.tokenAsset;
 
         Price.RMM memory rmm = pool.getRMM();
-        Iteration memory _swap;
+        Iteration memory iteration;
         {
             (, int256 invariant, uint updatedTau) = _computeSyncedPrice(args.poolId);
             rmm.tau = updatedTau;
@@ -407,7 +407,7 @@ contract Hyper is IHyper {
             output = output.scaleToWad(_state.sell ? pool.pair.decimalsQuote : pool.pair.decimalsAsset);
 
             // Keeps WAD values
-            _swap = Iteration({
+            iteration = Iteration({
                 virtualX: 0,
                 virtualY: 0,
                 invariant: invariant,
@@ -418,13 +418,13 @@ contract Hyper is IHyper {
                 output: output
             });
 
-            (_swap.virtualX, _swap.virtualY) = pool.getAmountsWad();
+            (iteration.virtualX, iteration.virtualY) = pool.getAmountsWad();
         }
 
         if (rmm.tau == 0) revert PoolExpired();
-        if (_swap.output == 0) revert ZeroOutput();
-        if (_swap.remainder == 0) revert ZeroInput();
-        if (_swap.liquidity == 0) revert ZeroLiquidity();
+        if (iteration.output == 0) revert ZeroOutput();
+        if (iteration.remainder == 0) revert ZeroInput();
+        if (iteration.liquidity == 0) revert ZeroLiquidity();
 
         // =---= Effects =---= //
 
@@ -438,27 +438,27 @@ contract Hyper is IHyper {
             uint256 maxInput;
             uint256 deltaInput;
             uint256 deltaInputLessFee;
-            uint256 deltaOutput = _swap.output;
+            uint256 deltaOutput = iteration.output;
 
             // Virtual reserves
             if (_state.sell) {
-                (liveIndependent, liveDependent) = (_swap.virtualX, _swap.virtualY);
-                maxInput = (FixedPointMathLib.WAD - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
+                (liveIndependent, liveDependent) = (iteration.virtualX, iteration.virtualY);
+                maxInput = (FixedPointMathLib.WAD - liveIndependent).mulWadDown(iteration.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
             } else {
-                (liveDependent, liveIndependent) = (_swap.virtualX, _swap.virtualY);
-                maxInput = (rmm.strike - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+                (liveDependent, liveIndependent) = (iteration.virtualX, iteration.virtualY);
+                maxInput = (rmm.strike - liveIndependent).mulWadDown(iteration.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            _swap.feeAmount = ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * _state.fee) / 10_000;
+            iteration.feeAmount = ((iteration.remainder > maxInput ? maxInput : iteration.remainder) * _state.fee) / 10_000;
 
-            deltaInput = _swap.remainder > maxInput ? maxInput : _swap.remainder; // swaps up to the maximum input
-            deltaInputLessFee = deltaInput - _swap.feeAmount;
+            deltaInput = iteration.remainder > maxInput ? maxInput : iteration.remainder; // swaps up to the maximum input
+            deltaInputLessFee = deltaInput - iteration.feeAmount;
 
-            nextIndependent = liveIndependent + deltaInputLessFee.divWadDown(_swap.liquidity);
-            nextDependent = liveDependent - deltaOutput.divWadDown(_swap.liquidity);
+            nextIndependent = liveIndependent + deltaInputLessFee.divWadDown(iteration.liquidity);
+            nextDependent = liveDependent - deltaOutput.divWadDown(iteration.liquidity);
 
-            _swap.remainder -= deltaInput;
-            _swap.input += deltaInput;
+            iteration.remainder -= deltaInput;
+            iteration.input += deltaInput;
         }
 
         {
@@ -466,16 +466,16 @@ contract Hyper is IHyper {
             int256 nextInvariantWad;
 
             if (_state.sell) {
-                (_swap.virtualX, _swap.virtualY) = (nextIndependent, nextDependent);
-                liveInvariantWad = _swap.invariant;
+                (iteration.virtualX, iteration.virtualY) = (nextIndependent, nextDependent);
+                liveInvariantWad = iteration.invariant;
                 nextInvariantWad = rmm.invariantOf(nextDependent, nextIndependent);
             } else {
-                (_swap.virtualX, _swap.virtualY) = (nextDependent, nextIndependent);
-                liveInvariantWad = _swap.invariant;
+                (iteration.virtualX, iteration.virtualY) = (nextDependent, nextIndependent);
+                liveInvariantWad = iteration.invariant;
                 nextInvariantWad = rmm.invariantOf(nextIndependent, nextDependent);
             }
 
-            _swap.invariant = int128(nextInvariantWad);
+            iteration.invariant = int128(nextInvariantWad);
 
             // todo: improve documentation for scaling invariant down, e.g. you can't have a negative invariant of a fraction of a token
             liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote); // invariant is denominated in quote token.
@@ -486,7 +486,7 @@ contract Hyper is IHyper {
             if (msg.sender == pool.controller) {
                 int256 delta = nextInvariantWad - liveInvariantWad;
                 uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-                if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(_swap.liquidity);
+                if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity);
             }
         }
 
@@ -501,36 +501,36 @@ contract Hyper is IHyper {
                 outputDec = pool.pair.decimalsAsset;
             }
 
-            if (_swap.invariant > 0) {
-                _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
+            if (iteration.invariant > 0) {
+                _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(iteration.feeAmount, iteration.liquidity);
             }
 
-            _swap.input = _swap.input.scaleFromWadDown(inputDec);
-            _swap.output = _swap.output.scaleFromWadDown(outputDec);
+            iteration.input = iteration.input.scaleFromWadDown(inputDec);
+            iteration.output = iteration.output.scaleFromWadDown(outputDec);
         }
 
         // Apply pool effects.
         _syncPool(
             args.poolId,
-            _swap.virtualX,
-            _swap.virtualY,
-            _swap.liquidity,
+            iteration.virtualX,
+            iteration.virtualY,
+            iteration.liquidity,
             _state.sell ? _state.feeGrowthGlobal : 0,
             _state.sell ? 0 : _state.feeGrowthGlobal,
             _state.invariantGrowthGlobal
         );
 
-        _increaseReserves(_state.tokenInput, _swap.input);
-        _decreaseReserves(_state.tokenOutput, _swap.output);
+        _increaseReserves(_state.tokenInput, iteration.input);
+        _decreaseReserves(_state.tokenOutput, iteration.output);
 
         {
             uint64 id = args.poolId;
             uint price = getLatestPrice(id);
-            emit Swap(id, price, _state.tokenInput, _swap.input, _state.tokenOutput, _swap.output, _swap.feeAmount);
+            emit Swap(id, price, _state.tokenInput, iteration.input, _state.tokenOutput, iteration.output, iteration.feeAmount);
         }
 
         delete _state;
-        return (args.poolId, _swap.remainder, _swap.input, _swap.output);
+        return (args.poolId, iteration.remainder, iteration.input, iteration.output);
     }
 
     /**
