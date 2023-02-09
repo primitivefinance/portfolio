@@ -137,7 +137,6 @@ contract TestHyperCreatePool is TestHyperSetup {
 
     function testChangeParametersNotControllerReverts() public {
         uint64 poolId = _createDefaultPool();
-        uint16 failureArg = 1;
         vm.expectRevert(NotController.selector);
         vm.prank(address(0x0006));
         __hyperTestingContract__.changeParameters(poolId, DEFAULT_FEE, DEFAULT_FEE, DEFAULT_JIT);
