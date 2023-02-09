@@ -168,8 +168,19 @@ interface IHyperActions {
         uint256 limit
     ) external payable returns (uint256 output, uint256 remainder);
 
+    /**
+     * @notice Deposits `amount` `token` into the user internal balance
+     * @param token Token to deposit
+     * @param amount Amount to deposit
+     */
     function fund(address token, uint256 amount) external;
 
+    /**
+     * @notice Draws `amount` `token` from the user internal balance
+     * @param token Token to draw
+     * @param amount Amount to draw
+     * @param to Address receiving the tokens
+     */
     function draw(address token, uint256 amount, address to) external;
 
     function deposit() external payable;
