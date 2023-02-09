@@ -77,10 +77,10 @@ contract TestAssembly is Test {
     }
 
     function testAssembly_scaleFromWadUpSigned_rounds_up_conditionally() public {
-        int input = int(0.01 ether); // 16 decimals
+        int256 input = int256(0.01 ether); // 16 decimals
         uint256 decimals = 2;
-        int actual = Assembly.scaleFromWadUpSigned(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
-        int expected = 1;
+        int256 actual = Assembly.scaleFromWadUpSigned(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
+        int256 expected = 1;
         assertEq(actual, expected, "unexpected-scale-from-wad-up-result");
     }
 

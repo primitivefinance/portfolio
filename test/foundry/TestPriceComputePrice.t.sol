@@ -6,7 +6,7 @@ import "./setup/TestPriceSetup.sol";
 contract TestPriceComputePrice is TestPriceSetup {
     using Price for Price.RMM;
     using FixedPointMathLib for uint256;
-    using FixedPointMathLib for int;
+    using FixedPointMathLib for int256;
 
     function test_getPriceWithX_defaults_return_expected_price() public {
         uint256 actual = cases[0].getPriceWithX(DEFAULT_ASSET_RESERVE);
@@ -69,15 +69,15 @@ contract TestPriceComputePrice is TestPriceSetup {
 
     /* function testFuzz_exponent(uint256 x) public {
         x = bound(x, 691462483081398177 - 244, 691462483081398177);
-        int actual = Gaussian.ppf(int(x));
+        int256 actual = Gaussian.ppf(int256(x));
         console.log("input: 691462483081397933");
         console.logInt(actual);
         console.log("-244");
-        console.logInt(Gaussian.ppf(int(691462483081398177 - 244)));
+        console.logInt(Gaussian.ppf(int256(691462483081398177 - 244)));
         console.log("-245");
-        console.logInt(Gaussian.ppf(int(691462483081398177 - 245)));
+        console.logInt(Gaussian.ppf(int256(691462483081398177 - 245)));
         console.log("expected input: ", 691462483081398177 - 244);
-        assertTrue(actual != int(0.5 ether), "found value!");
+        assertTrue(actual != int256(0.5 ether), "found value!");
         assertTrue(false);
     } */
 
@@ -109,7 +109,7 @@ contract TestPriceComputePrice is TestPriceSetup {
             uint256 halfSigmaTau = doubleSigma * tauYears; // units^2, 1e72
             uint256 sqrtTauSigma = ((tauYears.sqrt() * WAD) * volRay) / RAY; // 1e18 * 1e18 * 1e36 / 1e36 = 1e36
 
-            int256 lnOverVol = (ln * Gaussian.ONE * int(RAY) + int256(halfSigmaTau)) /
+            int256 lnOverVol = (ln * Gaussian.ONE * int256(RAY) + int256(halfSigmaTau)) /
                 int256(sqrtTauSigma) /
                 Gaussian.ONE; // 1e18
             console.log("==lnOverVol==");

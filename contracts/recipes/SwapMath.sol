@@ -48,7 +48,7 @@ struct Parameters {
     uint256 vol;
     uint256 tau;
     uint256 fee;
-    int inv;
+    int256 inv;
 }
 
 /**
@@ -64,7 +64,7 @@ function computeMarginalPriceQuoteIn(
     uint256 vol,
     uint256 tau,
     uint256 fee,
-    int inv
+    int256 inv
 ) pure returns (uint256) {
     Parameters memory params = Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
     uint256 volSqrtTau;
@@ -117,7 +117,7 @@ function computeMarginalPriceAssetIn(
     uint256 vol,
     uint256 tau,
     uint256 fee,
-    int inv
+    int256 inv
 ) pure returns (uint256) {
     Parameters memory params = Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
     uint256 sqrtTau;

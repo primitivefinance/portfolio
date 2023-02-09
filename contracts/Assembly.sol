@@ -156,15 +156,15 @@ function scaleFromWadDown(uint256 amountWad, uint256 decimals) pure returns (uin
     }
 }
 
-function scaleFromWadUpSigned(int amountWad, uint256 decimals) pure returns (int outputDec) {
-    int factor = int(computeScalar(decimals));
+function scaleFromWadUpSigned(int256 amountWad, uint256 decimals) pure returns (int256 outputDec) {
+    int256 factor = int256(computeScalar(decimals));
     assembly {
         outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
     }
 }
 
-function scaleFromWadDownSigned(int amountWad, uint256 decimals) pure returns (int outputDec) {
-    int factor = int(computeScalar(decimals));
+function scaleFromWadDownSigned(int256 amountWad, uint256 decimals) pure returns (int256 outputDec) {
+    int256 factor = int256(computeScalar(decimals));
     assembly {
         outputDec := sdiv(amountWad, factor)
     }

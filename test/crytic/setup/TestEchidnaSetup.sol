@@ -20,7 +20,7 @@ contract TestEchidnaEvents {
     event AssertionFailed(uint256, uint256, uint256);
     event AssertionFailed(string, uint256);
     event AssertionFailed(bytes);
-    event AssertionFailed(int);
+    event AssertionFailed(int256);
 }
 
 contract Addresses {

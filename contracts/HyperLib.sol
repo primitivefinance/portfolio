@@ -23,7 +23,7 @@ import "./OS.sol" as OS;
 using Price for Price.RMM;
 using SafeCastLib for uint256;
 using FixedPointMathLib for uint256;
-using FixedPointMathLib for int;
+using FixedPointMathLib for int256;
 using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
 using {checkParameters, maturity, validateParameters} for HyperCurve global;
 using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;

@@ -64,7 +64,7 @@ interface IHyperEvents {
 }
 
 interface IHyperGetters {
-    function getNetBalance(address token) external view returns (int);
+    function getNetBalance(address token) external view returns (int256);
 
     function getReserve(address token) external view returns (uint256);
 

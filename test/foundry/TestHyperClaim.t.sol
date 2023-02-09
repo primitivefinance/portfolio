@@ -160,7 +160,7 @@ contract TestHyperClaim is TestHyperSetup {
 
         console.log("post reserve bal", nextReserve);
         console.log("next user bal---", nextBalance);
-        console.logInt(int(nextBalance) - int(nextReserve));
+        console.logInt(int256(nextBalance) - int256(nextReserve));
         assertTrue(nextReserve >= nextBalance, "invalid-virtual-reserve-state");
 
         maxDraw(); // clear reserve

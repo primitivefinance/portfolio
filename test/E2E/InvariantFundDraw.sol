@@ -13,8 +13,8 @@ contract InvariantFundDraw is InvariantTargetContract {
 
         // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
         // They will be credited to the msg.sender of the next call.
-        int netAssetBalance = __hyper__.getNetBalance(address(__asset__));
-        int netQuoteBalance = __hyper__.getNetBalance(address(__quote__));
+        int256 netAssetBalance = __hyper__.getNetBalance(address(__asset__));
+        int256 netQuoteBalance = __hyper__.getNetBalance(address(__quote__));
         assertTrue(netAssetBalance >= 0, "negative-net-asset-tokens");
         assertTrue(netQuoteBalance >= 0, "negative-net-quote-tokens");
 

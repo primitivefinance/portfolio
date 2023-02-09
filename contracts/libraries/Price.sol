@@ -175,7 +175,7 @@ library Price {
 
         uint256 part2 = sigmaWad.mulWadDown((tauYears - epsilonYears).sqrt() * 1e9);
 
-        R_y = params.strike.mulWadDown(uint256(Gaussian.cdf(int(part0 + part1 - part2))));
+        R_y = params.strike.mulWadDown(uint256(Gaussian.cdf(int256(part0 + part1 - part2))));
     }
 
     /**

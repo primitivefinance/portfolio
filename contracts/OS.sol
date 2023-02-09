@@ -153,7 +153,7 @@ function settle(
     address token,
     address account
 ) returns (uint256 credited, uint256 debited, uint256 remainder) {
-    int net = self.getNetBalance(token, account);
+    int256 net = self.getNetBalance(token, account);
     if (net > 0) {
         credited = uint256(net);
         // unaccounted for tokens, e.g. transferred directly into Hyper.

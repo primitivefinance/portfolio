@@ -21,8 +21,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     uint256 expectedDeltaQuote;
     bool transferAssetIn;
     bool transferQuoteIn;
-    int assetCredit;
-    int quoteCredit;
+    int256 assetCredit;
+    int256 quoteCredit;
     uint256 deltaAsset;
     uint256 deltaQuote;
     uint256 userAssetBalance;
@@ -196,8 +196,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         emit log("bAsset", bAsset);
         emit log("bQuote", bQuote);
 
-        int diffAsset = int(bAsset) - int(dAsset);
-        int diffQuote = int(bQuote) - int(dQuote);
+        int256 diffAsset = int256(bAsset) - int256(dAsset);
+        int256 diffQuote = int256(bQuote) - int256(dQuote);
         emit log("diffAsset", diffAsset);
         emit log("diffQuote", diffQuote);
 
@@ -208,5 +208,5 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     }
 
     event log(string, uint256);
-    event log(string, int);
+    event log(string, int256);
 }

@@ -24,7 +24,7 @@ contract Hyper is IHyper {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using {Assembly.isBetween} for uint8;
-    using {Assembly.scaleFromWadDownSigned} for int;
+    using {Assembly.scaleFromWadDownSigned} for int256;
     using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
 
     function VERSION() public pure returns (string memory) {
