@@ -152,6 +152,15 @@ interface IHyperActions {
      */
     function unallocate(uint64 poolId, uint256 amount) external returns (uint256 deltaAsset, uint256 deltaQuote);
 
+    /**
+     * @notice Swaps asset and quote tokens within the pool `poolId`
+     * @param poolId Id of the pool to swap into
+     * @param sellAsset True if asset tokens should be swapped for quote tokens
+     * @param amount Amount of tokens to swap
+     * @param limit Maximum amount of tokens to pay for the swap
+     * @return output Amount of tokens received by the user
+     * @return remainder Amount of tokens unused by the swap and refunded to the user
+     */
     function swap(
         uint64 poolId,
         bool sellAsset,
