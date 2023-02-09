@@ -309,7 +309,7 @@ function tau(HyperPool memory self, uint timestamp) view returns (uint) {
     return end - timestamp;
 }
 
-function maturity(HyperCurve memory self) view returns (uint32 endTimestamp) {
+function maturity(HyperCurve memory self) pure returns (uint32 endTimestamp) {
     return (Assembly.convertDaysToSeconds(self.duration) + self.createdAt).safeCastTo32();
 }
 
