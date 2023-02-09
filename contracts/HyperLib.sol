@@ -299,7 +299,7 @@ function getRMM(HyperPool memory self) view returns (Price.RMM memory) {
     return Price.RMM({strike: self.params.maxPrice, sigma: self.params.volatility, tau: self.lastTau()});
 }
 
-function lastTau(HyperPool memory self) view returns (uint) {
+function lastTau(HyperPool memory self) pure returns (uint) {
     return self.tau(self.lastTimestamp);
 }
 
