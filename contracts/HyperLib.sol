@@ -351,7 +351,7 @@ function getMaxSwapAssetInWad(HyperPool memory self) pure returns (uint) {
     return maxInput.scaleFromWadDown(self.pair.decimalsAsset);
 }
 
-function getMaxSwapQuoteInWad(HyperPool memory self) view returns (uint) {
+function getMaxSwapQuoteInWad(HyperPool memory self) pure returns (uint) {
     Price.RMM memory rmm = self.getRMM();
     (, uint y) = self.getAmountsWad();
     uint maxInput = rmm.strike - y;
