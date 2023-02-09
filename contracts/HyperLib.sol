@@ -359,7 +359,7 @@ function getMaxSwapQuoteInWad(HyperPool memory self) view returns (uint) {
     return maxInput.scaleFromWadDown(self.pair.decimalsQuote);
 }
 
-function getNextInvariant(HyperPool memory self, uint256 timeSinceUpdate) view returns (int128 invariant, uint tau) {
+function getNextInvariant(HyperPool memory self, uint256 timeSinceUpdate) pure returns (int128 invariant, uint tau) {
     Price.RMM memory curve = self.getRMM();
 
     curve.tau -= timeSinceUpdate; // update to next curve at new time.
