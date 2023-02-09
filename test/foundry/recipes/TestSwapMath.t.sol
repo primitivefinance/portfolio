@@ -5,7 +5,7 @@ import "../../../contracts/recipes/SwapMath.sol" as SwapMath;
 import "forge-std/Test.sol";
 
 contract TestSwapMath is Test {
-    function testSwapMath_D_ppf() public {
+    function testSwapMath_D_ppf() public view {
         int256 input = int256(0.5 ether);
         int256 actual = SwapMath.d_ppf(input);
         console.logInt(actual);
