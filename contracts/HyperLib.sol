@@ -269,7 +269,7 @@ function getLiquidityDeltas(
 }
 
 /** @dev Decimal amounts per WAD of liquidity, rounded down... */
-function getAmounts(HyperPool memory self) view returns (uint amountAssetDec, uint amountQuoteDec) {
+function getAmounts(HyperPool memory self) pure returns (uint amountAssetDec, uint amountQuoteDec) {
     (uint amountAssetWad, uint amountQuoteWad) = self.getAmountsWad();
     amountAssetDec = amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset);
     amountQuoteDec = amountQuoteWad.scaleFromWadDown(self.pair.decimalsQuote);
