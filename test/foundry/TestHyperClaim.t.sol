@@ -149,7 +149,7 @@ contract TestHyperClaim is TestHyperSetup {
 
         Price.RMM memory rmm = pool.getRMM();
         uint adjustedAmt = entitledAssetAmount.divWadDown(liquidity);
-        uint expectedPrice = rmm.getPriceWithX(adjustedAmt);
+        // uint expectedPrice = rmm.getPriceWithX(adjustedAmt);
 
         // Claim
         uint prevReserve = _getReserve(hx(), defaultScenario.asset);
