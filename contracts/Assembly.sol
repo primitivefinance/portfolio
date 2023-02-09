@@ -94,14 +94,16 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     }
 }
 
-/// @dev Separates the upper and lower bits of a byte
-/// @param data Byte to separate
-/// @return upper Upper bit of the byte
-/// @return lower Lower bit of the byte
-/// @custom:example
-/// ```
-/// (bytes1 upper, bytes1 lower) = separate(0x12);
-/// ```
+/**
+ * @dev Separates the upper and lower bits of a byte
+ * @param data Byte to separate
+ * @return upper Upper bit of the byte
+ * @return lower Lower bit of the byte
+ * @custom:example
+ * ```
+ * (bytes1 upper, bytes1 lower) = separate(0x12);
+ * ```
+ */
 function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
     upper = data >> 4;
     lower = data & 0x0f;
