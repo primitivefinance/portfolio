@@ -196,7 +196,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
     // TODO: Find a better name here with `pool_` at the beginning
 
-    function check_hyper_curve_assumptions() public {
+    function check_hyper_curve_assumptions() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
