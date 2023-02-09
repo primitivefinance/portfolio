@@ -100,4 +100,12 @@ contract TestAssembly is Test {
         uint expected = 1;
         assertEq(actual, expected, "non-equal");
     }
+
+    function testAssembly_isBetween(uint256 value, uint256 lower, uint256 upper) public {
+        if (value >= lower && value <= upper) {
+            assertTrue(Assembly.isBetween(value, lower, upper));
+        } else {
+            assertFalse(Assembly.isBetween(value, lower, upper));
+        }
+    }
 }
