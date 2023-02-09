@@ -276,7 +276,7 @@ function getAmounts(HyperPool memory self) view returns (uint amountAssetDec, ui
 }
 
 /** @dev WAD Amounts per WAD of liquidity. */
-function getAmountsWad(HyperPool memory self) view returns (uint amountAssetWad, uint amountQuoteWad) {
+function getAmountsWad(HyperPool memory self) pure returns (uint amountAssetWad, uint amountQuoteWad) {
     amountAssetWad = self.virtualX;
     amountQuoteWad = self.virtualY;
 }
