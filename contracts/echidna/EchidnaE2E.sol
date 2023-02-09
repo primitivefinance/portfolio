@@ -1256,7 +1256,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
     // Swaps
     function swap_should_succeed(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
-        address[] memory owners = new address[](1);
+        // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
             HyperPool memory pool,
@@ -1275,14 +1275,15 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        // HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+
         if (curve.maturity() <= block.timestamp){
             emit LogUint256("Maturity timestamp",curve.maturity());
             emit LogUint256("block.timestamp", block.timestamp);
             swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
-            try _hyper.swap(poolId, sellAsset, amount, limit) returns (uint256 output, uint256 remainder) {
-                HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+            try _hyper.swap(poolId, sellAsset, amount, limit) {
+                // HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
             } catch {}
         }
 
