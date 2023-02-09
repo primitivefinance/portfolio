@@ -303,7 +303,7 @@ function lastTau(HyperPool memory self) view returns (uint) {
     return self.tau(self.lastTimestamp);
 }
 
-function tau(HyperPool memory self, uint timestamp) view returns (uint) {
+function tau(HyperPool memory self, uint timestamp) pure returns (uint) {
     uint end = self.params.maturity();
     if (timestamp > end) return 0;
     return end - timestamp;
