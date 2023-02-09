@@ -63,8 +63,8 @@ contract TestHyperAllocate is TestHyperSetup {
         assertTrue(pool.lastTimestamp != 0, "pool-created");
 
         uint256 price = __hyperTestingContract__.getLatestPrice(defaultScenario.poolId); // todo: fix pool.lastPrice;
-        HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
-        HyperPair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
+        // HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
+        // HyperPair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
 
         uint tau = pool.lastTau(); // seconds
 
