@@ -118,7 +118,7 @@ function computeMarginalPriceAssetIn(
     uint256 tau,
     uint256 fee,
     int inv
-) view returns (uint256) {
+) pure returns (uint256) {
     Parameters memory params = Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
     uint256 sqrtTau;
     uint256 volSqrtTau;
