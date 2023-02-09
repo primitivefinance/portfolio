@@ -291,7 +291,7 @@ function exists(HyperPool memory self) view returns (bool) {
     return self.lastTimestamp != 0;
 }
 
-function isMutable(HyperPool memory self) view returns (bool) {
+function isMutable(HyperPool memory self) pure returns (bool) {
     return self.controller != address(0);
 }
 
