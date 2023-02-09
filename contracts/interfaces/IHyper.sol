@@ -134,8 +134,22 @@ interface IHyperGetters {
 }
 
 interface IHyperActions {
+    /**
+     * @notice Allocates `deltaLiquidity` units of liquidity into the pool `poolId`
+     * @param poolId Id of the pool receiving the liquidity
+     * @param deltaLiquidity Amount of units of liquidity to allocate into the pool
+     * @return deltaAsset Amount of asset tokens paid by the sender
+     * @return deltaQuote Amount of quote tokens paid by the sender
+     */
     function allocate(uint64 poolId, uint256 deltaLiquidity) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
 
+    /**
+     * @notice Removes `amount` units of liquidity from the pool `poolId`
+     * @param poolId Id of the pool to unallocate from
+     * @param amount Amount of units of liquidity to unallocate from the pool
+     * @return deltaAsset Amount of asset tokens received by the sender
+     * @return deltaQuote Amount of quote tokens received by the sender
+     */
     function unallocate(uint64 poolId, uint256 amount) external returns (uint256 deltaAsset, uint256 deltaQuote);
 
     function swap(
