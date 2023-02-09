@@ -1489,40 +1489,44 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        uint256 prevReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
+        _T_ memory t = _T_({
+            prevReserveSell: getReserve(address(_hyper), address(_quote)),
+            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
+            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            postPoolLastPrice: 0,
+            postReserveSell: 0,
+            postReserveBuy: 0
+        });
 
         HyperPool memory prePool = getPool(address(_hyper), poolId);
-        uint256 prePoolLastPrice = _hyper.getLatestPrice(poolId);
         _hyper.swap(poolId, sellAsset, amount, limit);
         HyperPool memory postPool = getPool(address(_hyper), poolId);
-        uint256 postPoolLastPrice = _hyper.getLatestPrice(poolId);
+        t.postPoolLastPrice = _hyper.getLatestPrice(poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
+        t.postReserveSell = getReserve(address(_hyper), address(_asset));
+        t.postReserveBuy = getReserve(address(_hyper), address(_quote));
 
-        if(postReserveSell < prevReserveSell) {
-            emit LogUint256("asset reserve before swap", prevReserveSell);
-            emit LogUint256("asset reserve after swap", postReserveSell);
+        if(t.postReserveSell < t.prevReserveSell) {
+            emit LogUint256("asset reserve before swap", t.prevReserveSell);
+            emit LogUint256("asset reserve after swap", t.postReserveSell);
             emit AssertionFailed("BUG: reserve decreased after swapping asset in, it should have increased.");
         }
 
-    /*
         // feeGrowthSell = asset
         check_external_swap_invariants(
-            prePoolLastPrice,
-            postPoolLastPrice,
+            t.prePoolLastPrice,
+            t.postPoolLastPrice,
             prePool.liquidity,
             postPool.liquidity,
-            prevReserveSell,
-            postReserveSell,
-            prevReserveBuy,
-            postReserveBuy,
+            t.prevReserveSell,
+            t.postReserveSell,
+            t.prevReserveBuy,
+            t.postReserveBuy,
             prePool.feeGrowthGlobalAsset,
             postPool.feeGrowthGlobalAsset,
             prePool.feeGrowthGlobalQuote,
             postPool.feeGrowthGlobalQuote
-        ); */
+        );
     }
 
     function swap_quote_in_increases_reserve(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
