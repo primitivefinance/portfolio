@@ -378,7 +378,7 @@ function getAmountOut(
     bool sellAsset,
     uint amountIn,
     uint timeSinceUpdate
-) view returns (uint, uint) {
+) pure returns (uint, uint) {
     Iteration memory data;
     Price.RMM memory liveCurve = self.getRMM();
     Price.RMM memory nextCurve = liveCurve;
