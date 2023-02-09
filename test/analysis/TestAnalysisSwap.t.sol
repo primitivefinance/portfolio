@@ -72,7 +72,7 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
         console.log("Got strike", stk);
 
         vm.deal(address(this), 1_000 ether);
-        (bool success, bytes memory revertData) = address(hyper).call{value: 1_000 ether}(
+        (bool success, ) = address(hyper).call{value: 1_000 ether}(
             createPool(WETH, USDC, address(this), 1, 30, 5_500, 365, 1, uint128(stk), uint128(price))
         );
         assertTrue(success, "create pool failed");
