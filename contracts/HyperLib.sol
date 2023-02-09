@@ -325,7 +325,7 @@ function validateParameters(HyperCurve memory self) view returns (bool, bytes me
 }
 
 /** @dev Invalid parameters should revert. Bound checks are inclusive. */
-function checkParameters(HyperCurve memory self) view returns (bool, bytes memory) {
+function checkParameters(HyperCurve memory self) pure returns (bool, bytes memory) {
     if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
     if (!Assembly.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
         return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));
