@@ -44,7 +44,7 @@ using {
     isMutable,
     syncPoolTimestamp,
     lastTau,
-    tau
+    computeTau
 } for HyperPool global;
 
 uint256 constant MIN_MAX_PRICE = 1;
@@ -300,10 +300,10 @@ function getRMM(HyperPool memory self) pure returns (Price.RMM memory) {
 }
 
 function lastTau(HyperPool memory self) pure returns (uint) {
-    return self.tau(self.lastTimestamp);
+    return self.computeTau(self.lastTimestamp);
 }
 
-function tau(HyperPool memory self, uint timestamp) pure returns (uint) {
+function computeTau(HyperPool memory self, uint timestamp) pure returns (uint) {
     uint end = self.params.maturity();
     if (timestamp > end) return 0;
     return end - timestamp;

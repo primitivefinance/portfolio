@@ -242,7 +242,7 @@ contract TestHyperProcessing is TestHyperSetup {
         // move some time beyond maturity
         vm.warp(
             block.timestamp +
-                getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).tau(block.timestamp) +
+                getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).computeTau(block.timestamp) +
                 1
         );
 
@@ -402,7 +402,7 @@ contract TestHyperProcessing is TestHyperSetup {
     function testProcessAllocateFull() public postTestInvariantChecks {
         uint256 price = __hyperTestingContract__.getLatestPrice(_scenario_18_18.poolId); // todo: fix getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).lastPrice;
         HyperCurve memory curve = getCurve(address(__hyperTestingContract__), (_scenario_18_18.poolId));
-        uint tau = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).tau(block.timestamp);
+        uint tau = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId).computeTau(block.timestamp);
 
         uint strike = curve.maxPrice;
         console.log(tau, strike, curve.volatility);

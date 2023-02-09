@@ -546,7 +546,7 @@ contract Hyper is IHyper {
         if (!pool.exists()) revert NonExistentPool(poolId);
         Price.RMM memory curve = pool.getRMM();
 
-        updatedTau = pool.tau(block.timestamp);
+        updatedTau = pool.computeTau(block.timestamp);
         curve.tau = updatedTau;
 
         (uint x, uint y) = pool.getAmountsWad();
