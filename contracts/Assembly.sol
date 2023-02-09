@@ -16,7 +16,6 @@ pragma solidity 0.8.13;
 
  */
 
-error CastOverflow(uint);
 error InvalidLiquidity();
 
 uint constant SECONDS_PER_DAY = 86_400 seconds;
