@@ -34,7 +34,9 @@ uint8 constant MAX_DECIMALS = 18;
  * ```
  */
 function isBetween(uint256 value, uint256 lower, uint256 upper) pure returns (bool valid) {
-    return __between(int256(value), int256(lower), int256(upper));
+    assembly {
+        valid := and(or(eq(value, lower), gt(value, lower)), or(eq(value, upper), lt(value, upper)))
+    }
 }
 
 function __between(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
