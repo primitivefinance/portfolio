@@ -150,7 +150,7 @@ contract TestHyperProcessing is TestHyperSetup {
 
     function testSwapUseMax() public postTestInvariantChecks {
         uint amount = type(uint256).max;
-        uint limit = amount;
+        // uint limit = amount;
         // Add liquidity first
         bytes memory data = Enigma.encodeAllocate(
             0,
@@ -167,7 +167,7 @@ contract TestHyperProcessing is TestHyperSetup {
         bool direction = true;
         uint internalBalance = 0.5 ether;
         __hyperTestingContract__.fund(address(_scenario_18_18.asset), internalBalance);
-        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(_scenario_18_18.asset));
+        // uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(_scenario_18_18.asset));
         uint128 input = internalBalance.safeCastTo128();
         uint128 output = helperGetAmountOut(address(__hyperTestingContract__), _scenario_18_18.poolId, direction, input)
             .safeCastTo128();
