@@ -131,10 +131,10 @@ contract TestHyperClaim is TestHyperSetup {
         (uint virtualAsset1, ) = pool.getVirtualReserves();
         console.log("diff", virtualAsset0, virtualAsset1);
 
-        uint real0 = _getReserve(hx(), defaultScenario.asset);
-        uint real1 = _getReserve(hx(), defaultScenario.quote);
-        (uint res0, uint res1) = pool.getVirtualReserves();
-        uint liquidity = pool.liquidity;
+        // uint real0 = _getReserve(hx(), defaultScenario.asset);
+        // uint real1 = _getReserve(hx(), defaultScenario.quote);
+        // (uint res0, uint res1) = pool.getVirtualReserves();
+        // uint liquidity = pool.liquidity;
 
         basicUnallocate();
         maxDraw(); // zero balance to ensure we aren't paying ourself.
@@ -145,10 +145,10 @@ contract TestHyperClaim is TestHyperSetup {
         assertTrue(fee0 > 0, "fee0-zero");
         assertTrue(pool.liquidity == 0, "non-zero-liquidity");
 
-        uint entitledAssetAmount = real0 - fee0;
+        // uint entitledAssetAmount = real0 - fee0;
 
-        Price.RMM memory rmm = pool.getRMM();
-        uint adjustedAmt = entitledAssetAmount.divWadDown(liquidity);
+        // Price.RMM memory rmm = pool.getRMM();
+        // uint adjustedAmt = entitledAssetAmount.divWadDown(liquidity);
         // uint expectedPrice = rmm.getPriceWithX(adjustedAmt);
 
         // Claim
