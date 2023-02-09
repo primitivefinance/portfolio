@@ -249,7 +249,7 @@ function getMaxLiquidity(
 function getLiquidityDeltas(
     HyperPool memory self,
     int128 deltaLiquidity
-) view returns (uint128 deltaAsset, uint128 deltaQuote) {
+) pure returns (uint128 deltaAsset, uint128 deltaQuote) {
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
 
     (uint amountAssetWad, uint amountQuoteWad) = self.getAmountsWad();
