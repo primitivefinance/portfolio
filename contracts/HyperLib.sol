@@ -283,7 +283,7 @@ function getAmountsWad(HyperPool memory self) view returns (uint amountAssetWad,
 
 // ===== Derived ===== //
 
-function getTimeSinceChanged(HyperPosition memory self, uint timestamp) view returns (uint distance) {
+function getTimeSinceChanged(HyperPosition memory self, uint timestamp) pure returns (uint distance) {
     return timestamp - self.lastTimestamp;
 }
 
