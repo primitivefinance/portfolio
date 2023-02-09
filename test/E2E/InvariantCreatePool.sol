@@ -55,7 +55,7 @@ contract InvariantCreatePool is InvariantTargetContract {
         _assertCreatePool(args);
     }
 
-    function shuffle(uint random, address[] memory array) internal view returns (address[] memory output) {
+    function shuffle(uint random, address[] memory array) internal pure returns (address[] memory output) {
         for (uint256 i = 0; i < array.length; i++) {
             uint256 n = i + (random % (array.length - i));
             address temp = array[n];
