@@ -701,7 +701,7 @@ contract TestHyperProcessing is TestHyperSetup {
         address token0 = address(new TestERC20("t", "t", 18));
         address token1 = address(new TestERC20("t", "t", 18));
         bytes memory data = Enigma.encodeCreatePair(address(token0), address(token1));
-        bool success = __revertCatcher__.process(data);
+        __revertCatcher__.process(data);
         uint256 nonce = __hyperTestingContract__.getPairNonce();
         assertEq(nonce, prevNonce + 1);
     }
