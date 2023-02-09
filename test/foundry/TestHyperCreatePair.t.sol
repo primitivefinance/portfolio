@@ -6,7 +6,7 @@ import "./setup/TestHyperSetup.sol";
 
 contract TestHyperCreatePair is TestHyperSetup {
     function testCreatePairExternal() public {
-        (uint256 pairId) = __hyperTestingContract__.createPair(
+        __hyperTestingContract__.createPair(
             address(__usdc__),
             address(__token_18__)
         );
