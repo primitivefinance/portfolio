@@ -88,8 +88,8 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     // ---------- Pool Properties -------
     function pool_fee_growth_greater_than_position_fee_growth() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
-            uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
+            // uint64 poolId = poolIds[i];
+            // HyperPool memory pool = getPool(address(_hyper), poolId);
         }
     }
 
@@ -174,12 +174,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
     function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
         require(deltaLiquidity != 0);
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 quote,
-            EchidnaERC20 asset
-        ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
@@ -267,7 +262,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+            // HyperCurve memory curve = pool.params;
 
             (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getAmounts();
 
@@ -425,7 +420,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, false);
+            (HyperPool memory pool,) = execute_create_pool(pairId, createPoolData, false);
             assert(!pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
@@ -475,7 +470,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, true);
+            (HyperPool memory pool,) = execute_create_pool(pairId, createPoolData, true);
             assert(pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
@@ -561,7 +556,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, true);
+            (HyperPool memory pool,) = execute_create_pool(pairId, createPoolData, true);
             assert(pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
@@ -583,6 +578,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     ) private returns (HyperPool memory pool, uint64 poolId) {
         uint256 preCreationPoolNonce = _hyper.getPoolNonce();
         (bool success, ) = address(_hyper).call(createPoolData);
+        success;
 
         // pool nonce should increase by 1 each time a pool is created
         uint256 poolNonce = _hyper.getPoolNonce();
@@ -660,6 +656,8 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint16 jit,
         uint128 price
     ) public {
+        maxPrice;
+
         (HyperPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
@@ -867,7 +865,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
 
     function draw_to_zero_should_fail(uint256 assetAmount, uint256 quoteAmount) public {
-        (EchidnaERC20 _asset, EchidnaERC20 _quote) = get_hyper_tokens(assetAmount, quoteAmount);
+        (EchidnaERC20 _asset,) = get_hyper_tokens(assetAmount, quoteAmount);
 
         // make sure a user has funded already
         uint256 virtualBalancePreFund = getBalance(address(_hyper), address(this), address(_asset));
@@ -981,12 +979,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 deltaAsset,
         uint256 deltaQuote
     ) public {
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         HyperPosition memory preClaimPosition = getPosition(address(_hyper), address(this), poolId);
@@ -1088,14 +1081,9 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
 
     function allocate_with_non_existent_pool_should_fail(uint256 id, uint256 deltaLiquidity) public {
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) = retrieve_random_pool_and_tokens(id);
 
-        address[] memory owners = new address[](1);
+        // address[] memory owners = new address[](1);
         require(!is_created_pool(poolId)); // require pool does not exist
         emit LogUint256("pool id:", uint256(poolId));
 
@@ -1118,15 +1106,15 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         mint_and_approve(_quote, deltaQuote);
 
         // Save pre allocation state
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        // HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
 
-        try _hyper.allocate(poolId, deltaLiquidity) returns (uint256 allocateAset, uint256 allocateQuote) {
+        try _hyper.allocate(poolId, deltaLiquidity) {
             emit AssertionFailed("BUG: allocate with non existent pool should fail");
         } catch {}
     }
 
     function allocate_with_zero_delta_liquidity_should_fail(uint256 id) public {
-        address[] memory owners = new address[](1);
+        // address[] memory owners = new address[](1);
         (
             HyperPool memory pool,
             uint64 poolId,
@@ -1151,7 +1139,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        try _hyper.allocate(poolId, deltaLiquidity) returns (uint256 allocateAset, uint256 allocateQuote) {
+        try _hyper.allocate(poolId, deltaLiquidity) {
             emit AssertionFailed("BUG: allocate with deltaLiquidity=0 should fail");
         } catch {}
     }
