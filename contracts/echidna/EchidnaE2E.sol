@@ -1532,7 +1532,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     function swap_quote_in_increases_reserve(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
         require(!sellAsset);
 
-        address[] memory owners = new address[](1);
+        // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
             HyperPool memory pool,
