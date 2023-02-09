@@ -65,7 +65,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
 
     // ---------- HyperPair Properties -------
-    function pair_asset_never_equal_to_quote(uint256 id) public {
+    function pair_asset_never_equal_to_quote(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
         HyperPair memory pair = getPair(address(_hyper), pairId);
