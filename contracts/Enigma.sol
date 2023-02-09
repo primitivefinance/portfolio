@@ -106,16 +106,17 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24) {
     return uint24(poolId >> 40);
 }
 
-/// @dev Returns the pool id given some pool parameters
-/// @param pairId Id of the pair of asset / quote tokens
-/// @param isMutable True if the pool is mutable
-/// @param poolNonce Current pool nonce of the Hyper contract
-/// @return Corresponding encoded pool id
-/// @custom:example
-/// ```
-/// // Gets the pool id given some parameters
-/// uint64 poolId = encodePoolId(0, true, 1);
-/// ```
+/**
+ * @dev Returns the pool id given some pool parameters
+ * @param pairId Id of the pair of asset / quote tokens
+ * @param isMutable True if the pool is mutable
+ * @param poolNonce Current pool nonce of the Hyper contract
+ * @return Corresponding encoded pool id
+ * @custom:example
+ * ```
+ * uint64 poolId = encodePoolId(0, true, 1);
+ * ```
+ */
 function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64) {
     return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
 }
