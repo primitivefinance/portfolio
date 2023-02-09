@@ -287,7 +287,7 @@ function getTimeSinceChanged(HyperPosition memory self, uint timestamp) view ret
     return timestamp - self.lastTimestamp;
 }
 
-function exists(HyperPool memory self) view returns (bool) {
+function exists(HyperPool memory self) pure returns (bool) {
     return self.lastTimestamp != 0;
 }
 
