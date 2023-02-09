@@ -39,7 +39,7 @@ contract TestHyperProcessing is TestHyperSetup {
         );
     }
 
-    function testGetLiquidityMinted() public {
+    function testGetLiquidityMinted() public view {
         uint deltaLiquidity = __hyperTestingContract__.getMaxLiquidity(_scenario_18_18.poolId, 1, 1e19);
     }
 
