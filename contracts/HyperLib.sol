@@ -31,16 +31,16 @@ using {
     changePoolLiquidity,
     changePoolParameters,
     exists,
-    getAmounts,
-    getAmountOut,
+    getPoolAmounts,
+    getPoolAmountOut,
     getAmountsWad,
-    getLiquidityDeltas,
-    getMaxLiquidity,
+    getPoolLiquidityDeltas,
+    getPoolMaxLiquidity,
     getMaxSwapAssetInWad,
     getMaxSwapQuoteInWad,
     getNextInvariant,
     getRMM,
-    getVirtualReserves,
+    getPoolVirtualReserves,
     isMutable,
     syncPoolTimestamp,
     lastTau,
@@ -230,11 +230,11 @@ function syncPositionFees(
 
 // ===== View ===== //
 
-function getVirtualReserves(HyperPool memory self) pure returns (uint128 reserveAsset, uint128 reserveQuote) {
-    return self.getLiquidityDeltas(-int128(self.liquidity)); // rounds down
+function getPoolVirtualReserves(HyperPool memory self) pure returns (uint128 reserveAsset, uint128 reserveQuote) {
+    return self.getPoolLiquidityDeltas(-int128(self.liquidity)); // rounds down
 }
 
-function getMaxLiquidity(
+function getPoolMaxLiquidity(
     HyperPool memory self,
     uint deltaAsset,
     uint deltaQuote
@@ -246,7 +246,7 @@ function getMaxLiquidity(
 }
 
 /** @dev Rounds positive deltas up. Rounds negative deltas down. */
-function getLiquidityDeltas(
+function getPoolLiquidityDeltas(
     HyperPool memory self,
     int128 deltaLiquidity
 ) pure returns (uint128 deltaAsset, uint128 deltaQuote) {
@@ -269,7 +269,7 @@ function getLiquidityDeltas(
 }
 
 /** @dev Decimal amounts per WAD of liquidity, rounded down... */
-function getAmounts(HyperPool memory self) pure returns (uint amountAssetDec, uint amountQuoteDec) {
+function getPoolAmounts(HyperPool memory self) pure returns (uint amountAssetDec, uint amountQuoteDec) {
     (uint amountAssetWad, uint amountQuoteWad) = self.getAmountsWad();
     amountAssetDec = amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset);
     amountQuoteDec = amountQuoteWad.scaleFromWadDown(self.pair.decimalsQuote);
@@ -373,7 +373,7 @@ function getNextInvariant(HyperPool memory self, uint256 timeSinceUpdate) pure r
  * @dev This is an approximation of the amount out and it is not exactly precise to the optimal amount.
  * @custom:error Maximum absolute error of 1e-6.
  */
-function getAmountOut(
+function getPoolAmountOut(
     HyperPool memory self,
     bool sellAsset,
     uint amountIn,

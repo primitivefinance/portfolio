@@ -163,7 +163,7 @@ contract HelperHyperView {
     function helperGetAmountOut(address hyper, uint64 poolId, bool sellAsset, uint input) public view returns (uint) {
         HyperPool memory pool = getPool(hyper, poolId);
         uint256 passed = IHyperStruct(hyper).getTimePassed(poolId);
-        (uint output, ) = pool.getAmountOut(sellAsset, input, passed);
+        (uint output, ) = pool.getPoolAmountOut(sellAsset, input, passed);
         return output;
     }
 }

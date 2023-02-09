@@ -108,7 +108,7 @@ contract TestHyperAllocate is TestHyperSetup {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         assetBalance = getBalance(address(__hyperTestingContract__), address(this), asset);
         quoteBalance = getBalance(address(__hyperTestingContract__), address(this), quote);
-        (uint128 reserveAsset, uint128 reserveQuote) = pool.getVirtualReserves();
+        (uint128 reserveAsset, uint128 reserveQuote) = pool.getPoolVirtualReserves();
 
         assertEq(deltaAsset, reserveAsset, "delta-asset");
         assertEq(deltaQuote, reserveQuote, "delta-quote");

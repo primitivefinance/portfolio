@@ -251,14 +251,14 @@ contract Hyper is IHyper {
         if (!pool.exists()) revert NonExistentPool(poolId);
 
         if (useMax) {
-            deltaLiquidity = pool.getMaxLiquidity({
+            deltaLiquidity = pool.getPoolMaxLiquidity({
                 deltaAsset: getBalance(msg.sender, pool.pair.tokenAsset),
                 deltaQuote: getBalance(msg.sender, pool.pair.tokenQuote)
             });
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(toInt128(deltaLiquidity)); // note: rounds up.
+        (deltaAsset, deltaQuote) = pool.getPoolLiquidityDeltas(toInt128(deltaLiquidity)); // note: rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
@@ -288,7 +288,7 @@ contract Hyper is IHyper {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
 
-        (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(-toInt128(deltaLiquidity)); // rounds down
+        (deltaAsset, deltaQuote) = pool.getPoolLiquidityDeltas(-toInt128(deltaLiquidity)); // rounds down
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -369,7 +369,7 @@ contract Hyper is IHyper {
         }
 
         uint256 passed = getTimePassed(args.poolId);
-        (output, ) = pool.getAmountOut(sellAsset, input, passed);
+        (output, ) = pool.getPoolAmountOut(sellAsset, input, passed);
 
         args.input = input.safeCastTo128();
         args.output = output.safeCastTo128();
@@ -850,7 +850,7 @@ contract Hyper is IHyper {
     }
 
     function getVirtualReserves(uint64 poolId) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
-        return pools[poolId].getVirtualReserves();
+        return pools[poolId].getPoolVirtualReserves();
     }
 
     function getMaxLiquidity(
@@ -858,23 +858,23 @@ contract Hyper is IHyper {
         uint deltaAsset,
         uint deltaQuote
     ) public view override returns (uint128 deltaLiquidity) {
-        return pools[poolId].getMaxLiquidity(deltaAsset, deltaQuote);
+        return pools[poolId].getPoolMaxLiquidity(deltaAsset, deltaQuote);
     }
 
     function getLiquidityDeltas(
         uint64 poolId,
         int128 deltaLiquidity
     ) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
-        return pools[poolId].getLiquidityDeltas(deltaLiquidity);
+        return pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
     }
 
     function getAmounts(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
-        return pools[poolId].getAmounts();
+        return pools[poolId].getPoolAmounts();
     }
 
     function getAmountOut(uint64 poolId, bool sellAsset, uint amountIn) public view returns (uint output) {
         HyperPool memory pool = pools[poolId];
-        (output, ) = pool.getAmountOut({
+        (output, ) = pool.getPoolAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
             timeSinceUpdate: block.timestamp - pool.lastTimestamp // invariant: should not underflow.

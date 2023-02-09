@@ -148,7 +148,7 @@ contract TestHyperSwap is TestHyperSetup {
 
         uint maxInput = getMaxSwapAssetInWad(pool);
         uint input = (maxInput * 1 ether) / 2 ether; // half of max input.
-        (uint out, ) = pool.getAmountOut(true, input, 0);
+        (uint out, ) = pool.getPoolAmountOut(true, input, 0);
         out = (out * 9000) / 10000; // 90% of output, so invariant is positive.
 
         uint prevInvariantGrowth = pool.invariantGrowthGlobal;

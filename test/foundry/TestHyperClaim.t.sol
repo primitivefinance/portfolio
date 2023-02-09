@@ -125,10 +125,10 @@ contract TestHyperClaim is TestHyperSetup {
         basicAllocate();
 
         HyperPool memory pool = defaultPool();
-        (uint virtualAsset0, ) = pool.getVirtualReserves();
+        (uint virtualAsset0, ) = pool.getPoolVirtualReserves();
         basicSwap(); // swaps __asset__ in, so pays fees in asset.
         pool = defaultPool();
-        (uint virtualAsset1, ) = pool.getVirtualReserves();
+        (uint virtualAsset1, ) = pool.getPoolVirtualReserves();
         console.log("diff", virtualAsset0, virtualAsset1);
 
         // uint real0 = _getReserve(hx(), defaultScenario.asset);

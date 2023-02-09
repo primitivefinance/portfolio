@@ -264,7 +264,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
             HyperPool memory pool = getPool(address(_hyper), poolId);
             // HyperCurve memory curve = pool.params;
 
-            (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getAmounts();
+            (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getPoolAmounts();
 
             (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
 
