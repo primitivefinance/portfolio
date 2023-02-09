@@ -102,7 +102,7 @@ contract TestHyperSwap is TestHyperSetup {
         (uint out, ) = pool.getAmountOut(true, maxInput - 1, 0);
 
         uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
-        (uint output, uint remainder) = __hyperTestingContract__.swap(
+        (, uint remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
             maxInput - 1,
