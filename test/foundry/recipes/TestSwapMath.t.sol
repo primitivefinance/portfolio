@@ -86,7 +86,7 @@ contract TestSwapMath is Test {
 
         uint256 startPrice = 10 ether;
         uint256 R_x = SwapMath.Price.getXWithPrice(startPrice, params.stk, params.vol, params.tau);
-        uint256 R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
+        // uint256 R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
         uint256 d_x = (R_x * 0.02 ether) / 1 ether; // swap in 2% of the pool's y reserves
         uint256 actual = SwapMath.computeMarginalPriceAssetIn(
             d_x,
