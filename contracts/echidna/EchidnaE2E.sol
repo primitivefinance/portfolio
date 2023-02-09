@@ -13,7 +13,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     WETH _weth;
     Hyper _hyper;
 
-    constructor() public {
+    constructor() {
         _weth = new WETH();
         _hyper = new Hyper(address(_weth));
         EchidnaERC20 _asset = create_token("Asset Token", "ADEC6", 6);
