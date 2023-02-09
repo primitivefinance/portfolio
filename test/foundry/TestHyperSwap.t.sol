@@ -13,15 +13,15 @@ contract TestHyperSwap is TestHyperSetup {
 
     // todo: fake test
     function testSwap_should_succeed() public allocateFirst {
-        HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
+        // HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
         uint input = DEFAULT_SWAP_INPUT;
         uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
-        (uint out, ) = pool.getAmountOut(true, input, 0);
+        // (uint out, ) = pool.getAmountOut(true, input, 0);
 
-        (uint a, uint b) = pool.getVirtualReserves();
+        // (uint a, uint b) = pool.getVirtualReserves();
 
-        (uint output, uint remainder) = __hyperTestingContract__.swap(
+        (uint output, ) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
             input,
@@ -30,7 +30,7 @@ contract TestHyperSwap is TestHyperSetup {
 
         assertEq(output, expected, "expected-output");
 
-        (uint amount0, uint amount1) = pool.getAmounts();
+        // (uint amount0, uint amount1) = pool.getAmounts();
     }
 
     function testSwap_back_and_forth_outputs_less() public allocateFirst {
