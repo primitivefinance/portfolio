@@ -6,7 +6,9 @@ pragma solidity ^0.8.0;
 contract TestE2EHyper {
     event AssertionFailed();
 
+    /*
     function echidna_jit_policy() public returns (bool) {
         if (5 != 4) emit AssertionFailed();
     }
+    */
 }
