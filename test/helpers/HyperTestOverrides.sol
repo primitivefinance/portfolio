@@ -8,15 +8,15 @@ import "contracts/test/TestERC20.sol";
 contract HyperTimeOverride is Hyper {
     constructor(address weth) Hyper(weth) {}
 
-    function _liquidityPolicy() internal view override returns (uint) {
+    function _liquidityPolicy() internal view override returns (uint256) {
         return jitDelay;
     }
 
     // ===== Added ==== //
 
-    uint public jitDelay;
+    uint256 public jitDelay;
 
-    function setJitPolicy(uint delay) public {
+    function setJitPolicy(uint256 delay) public {
         jitDelay = delay;
     }
 

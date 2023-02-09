@@ -5,18 +5,18 @@ import {HyperPool, JUST_IN_TIME_LIQUIDITY_POLICY, HyperPair} from "contracts/Hyp
 import "./setup/TestHyperSetup.sol";
 
 struct Amounts {
-    uint expectedDelta0;
-    uint expectedDelta1;
-    uint computedDelta0;
-    uint computedDelta1;
-    uint prevReserve0;
-    uint prevReserve1;
-    uint postReserve0;
-    uint postReserve1;
+    uint256 expectedDelta0;
+    uint256 expectedDelta1;
+    uint256 computedDelta0;
+    uint256 computedDelta1;
+    uint256 prevReserve0;
+    uint256 prevReserve1;
+    uint256 postReserve0;
+    uint256 postReserve1;
 }
 
 contract TestHyperAllocate is TestHyperSetup {
-    using SafeCastLib for uint;
+    using SafeCastLib for uint256;
 
     Amounts _amounts;
 
@@ -66,11 +66,11 @@ contract TestHyperAllocate is TestHyperSetup {
         // HyperCurve memory curve = getCurve(address(__hyperTestingContract__), uint32(defaultScenario.poolId));
         // HyperPair memory pair = getPair(address(__hyperTestingContract__), uint24(defaultScenario.poolId >> 40));
 
-        uint tau = pool.lastTau(); // seconds
+        uint256 tau = pool.lastTau(); // seconds
 
         uint256 theoreticalR2 = Price.getXWithPrice(price, pool.params.maxPrice, pool.params.volatility, tau);
 
-        uint delLiquidity = 1e12;
+        uint256 delLiquidity = 1e12;
         __hyperTestingContract__.allocate(defaultScenario.poolId, delLiquidity);
 
         uint256 globalR1 = getReserve(address(__hyperTestingContract__), address(defaultScenario.quote));
@@ -81,9 +81,9 @@ contract TestHyperAllocate is TestHyperSetup {
     }
 
     function testAllocateUseMax() public postTestInvariantChecks {
-        uint assetBalance = defaultScenario.asset.balanceOf(address(this));
-        uint quoteBalance = defaultScenario.quote.balanceOf(address(this));
-        uint maxLiquidity = __hyperTestingContract__.getMaxLiquidity(
+        uint256 assetBalance = defaultScenario.asset.balanceOf(address(this));
+        uint256 quoteBalance = defaultScenario.quote.balanceOf(address(this));
+        uint256 maxLiquidity = __hyperTestingContract__.getMaxLiquidity(
             defaultScenario.poolId,
             assetBalance,
             quoteBalance
@@ -98,7 +98,7 @@ contract TestHyperAllocate is TestHyperSetup {
         quoteBalance = getBalance(address(__hyperTestingContract__), address(this), quote);
         maxLiquidity = __hyperTestingContract__.getMaxLiquidity(defaultScenario.poolId, assetBalance, quoteBalance);
 
-        (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getLiquidityDeltas(
+        (uint256 deltaAsset, uint256 deltaQuote) = __hyperTestingContract__.getLiquidityDeltas(
             defaultScenario.poolId,
             -int128(maxLiquidity.safeCastTo128()) // negative delta rounds output amounts down
         );
@@ -113,8 +113,8 @@ contract TestHyperAllocate is TestHyperSetup {
         assertEq(deltaAsset, reserveAsset, "delta-asset");
         assertEq(deltaQuote, reserveQuote, "delta-quote");
         assertEq(maxLiquidity, pool.liquidity, "delta-liquidity");
-        uint nextAssetBalance = getReserve(address(__hyperTestingContract__), asset) - (deltaAsset); // round up
-        uint nextQuoteBalance = getReserve(address(__hyperTestingContract__), quote) - (deltaQuote);
+        uint256 nextAssetBalance = getReserve(address(__hyperTestingContract__), asset) - (deltaAsset); // round up
+        uint256 nextQuoteBalance = getReserve(address(__hyperTestingContract__), quote) - (deltaQuote);
         assertApproxEqAbs(assetBalance, nextAssetBalance, 1, "asset-balance"); // sometimes rounded up
         assertApproxEqAbs(quoteBalance, nextQuoteBalance, 1, "quote-balance"); // sometimes rounded up
     }
@@ -129,10 +129,10 @@ contract TestHyperAllocate is TestHyperSetup {
         vm.assume(deltaLiquidity != 0);
         vm.assume(deltaLiquidity < (2 ** 126 - 1e36)); // note: if its 2^127, it could still overflow since liquidity is multiplied against token amounts in getLiquidityDeltas.
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        uint lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
+        uint256 lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
             ? pool.pair.decimalsQuote
             : pool.pair.decimalsAsset;
-        uint minLiquidity = 10 ** (18 - lowerDecimals);
+        uint256 minLiquidity = 10 ** (18 - lowerDecimals);
         vm.assume(deltaLiquidity > minLiquidity);
         // TODO: Add use max flag support.
         _assertAllocate(deltaLiquidity);
@@ -151,7 +151,7 @@ contract TestHyperAllocate is TestHyperSetup {
         // create a pool wtih two low decimal tokens, so that 1 wei of liquidity will round token amounts to zero.
         address small_decimal_token = address(new TestERC20("small decimals", "DEC6", 6));
         deal(small_decimal_token, address(this), 100 ether);
-        TestERC20(small_decimal_token).approve(address(__hyperTestingContract__), type(uint).max);
+        TestERC20(small_decimal_token).approve(address(__hyperTestingContract__), type(uint256).max);
 
         bytes memory data = createPool(
             address(__token_18__),
@@ -178,15 +178,15 @@ contract TestHyperAllocate is TestHyperSetup {
 
         HyperPool memory pool = getPool(address(__hyperTestingContract__), poolId);
         {
-            uint delLiquidity = 1;
-            uint prevReserveX = __hyperTestingContract__.getReserve(pool.pair.tokenAsset);
-            uint prevReserveY = __hyperTestingContract__.getReserve(pool.pair.tokenQuote);
-            (uint prevX, uint prevY, uint prevL) = (pool.virtualX, pool.virtualY, pool.liquidity);
+            uint256 delLiquidity = 1;
+            uint256 prevReserveX = __hyperTestingContract__.getReserve(pool.pair.tokenAsset);
+            uint256 prevReserveY = __hyperTestingContract__.getReserve(pool.pair.tokenQuote);
+            (uint256 prevX, uint256 prevY, uint256 prevL) = (pool.virtualX, pool.virtualY, pool.liquidity);
             __hyperTestingContract__.allocate(poolId, delLiquidity);
             pool = getPool(address(__hyperTestingContract__), poolId);
-            (uint nextX, uint nextY, uint nextL) = (pool.virtualX, pool.virtualY, pool.liquidity);
-            uint nextReserveX = __hyperTestingContract__.getReserve(pool.pair.tokenAsset);
-            uint nextReserveY = __hyperTestingContract__.getReserve(pool.pair.tokenQuote);
+            (uint256 nextX, uint256 nextY, uint256 nextL) = (pool.virtualX, pool.virtualY, pool.liquidity);
+            uint256 nextReserveX = __hyperTestingContract__.getReserve(pool.pair.tokenAsset);
+            uint256 nextReserveY = __hyperTestingContract__.getReserve(pool.pair.tokenQuote);
             assertEq(nextL, prevL + delLiquidity, "liquidity-mismatch");
             assertEq(nextX, prevX, "asset-mismatch"); // virtual reserves dont change
             assertEq(nextY, prevY, "quote-mismatch"); // virtual reserves dont change
@@ -202,7 +202,7 @@ contract TestHyperAllocate is TestHyperSetup {
         assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
         // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
-        (uint expectedDeltaAsset, uint expectedDeltaQuote) = __hyperTestingContract__.getLiquidityDeltas(
+        (uint256 expectedDeltaAsset, uint256 expectedDeltaQuote) = __hyperTestingContract__.getLiquidityDeltas(
             defaultScenario.poolId,
             int128(deltaLiquidity)
         );
@@ -211,7 +211,7 @@ contract TestHyperAllocate is TestHyperSetup {
 
         // Execution
         HyperState memory prev = getState();
-        (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.allocate(defaultScenario.poolId, deltaLiquidity);
+        (uint256 deltaAsset, uint256 deltaQuote) = __hyperTestingContract__.allocate(defaultScenario.poolId, deltaLiquidity);
         HyperState memory post = getState();
 
         // Postconditions
@@ -231,18 +231,18 @@ contract TestHyperAllocate is TestHyperSetup {
             assertEq(post.physicalBalanceAsset, prev.physicalBalanceAsset + expectedDeltaAsset, "physical-asset");
             assertEq(post.physicalBalanceQuote, prev.physicalBalanceQuote + expectedDeltaQuote, "physical-quote");
 
-            uint feeDelta0 = post.feeGrowthAssetPosition - prev.feeGrowthAssetPosition;
-            uint feeDelta1 = post.feeGrowthAssetPool - prev.feeGrowthAssetPool;
+            uint256 feeDelta0 = post.feeGrowthAssetPosition - prev.feeGrowthAssetPosition;
+            uint256 feeDelta1 = post.feeGrowthAssetPool - prev.feeGrowthAssetPool;
             assertTrue(feeDelta0 == feeDelta1, "asset-growth");
 
-            uint feeDelta2 = post.feeGrowthQuotePosition - prev.feeGrowthQuotePosition;
-            uint feeDelta3 = post.feeGrowthQuotePool - prev.feeGrowthQuotePool;
+            uint256 feeDelta2 = post.feeGrowthQuotePosition - prev.feeGrowthQuotePosition;
+            uint256 feeDelta3 = post.feeGrowthQuotePool - prev.feeGrowthQuotePool;
             assertTrue(feeDelta2 == feeDelta3, "quote-growth");
         }
 
         // Unallocate
         vm.warp(block.timestamp + JUST_IN_TIME_LIQUIDITY_POLICY); // TODO: make this public function.
-        (uint unallocatedAsset, uint unallocatedQuote) = __hyperTestingContract__.unallocate(
+        (uint256 unallocatedAsset, uint256 unallocatedQuote) = __hyperTestingContract__.unallocate(
             defaultScenario.poolId,
             deltaLiquidity
         );

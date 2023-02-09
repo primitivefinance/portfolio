@@ -6,7 +6,7 @@ import "./setup/InvariantTargetContract.sol";
 contract InvariantAllocateUnallocate is InvariantTargetContract {
     constructor(address hyper_, address asset_, address quote_) InvariantTargetContract(hyper_, asset_, quote_) {}
 
-    function allocate(uint deltaLiquidity, uint index) public {
+    function allocate(uint256 deltaLiquidity, uint256 index) public {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
         // Allocate to a random pool.
@@ -17,33 +17,33 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     }
 
     // avoid stack too deep
-    uint expectedDeltaAsset;
-    uint expectedDeltaQuote;
+    uint256 expectedDeltaAsset;
+    uint256 expectedDeltaQuote;
     bool transferAssetIn;
     bool transferQuoteIn;
     int assetCredit;
     int quoteCredit;
-    uint deltaAsset;
-    uint deltaQuote;
-    uint userAssetBalance;
-    uint userQuoteBalance;
-    uint physicalAssetPayment;
-    uint physicalQuotePayment;
+    uint256 deltaAsset;
+    uint256 deltaQuote;
+    uint256 userAssetBalance;
+    uint256 userQuoteBalance;
+    uint256 physicalAssetPayment;
+    uint256 physicalQuotePayment;
 
     HyperState prev;
     HyperState post;
 
-    function _assertAllocate(uint deltaLiquidity) internal {
+    function _assertAllocate(uint256 deltaLiquidity) internal {
         // TODO: cleanup reset of these
         transferAssetIn = true;
         transferQuoteIn = true;
 
         // Preconditions
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
-        uint lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
+        uint256 lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
             ? pool.pair.decimalsQuote
             : pool.pair.decimalsAsset;
-        uint minLiquidity = 10 ** (18 - lowerDecimals);
+        uint256 minLiquidity = 10 ** (18 - lowerDecimals);
         vm.assume(deltaLiquidity > minLiquidity);
         assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
         // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
@@ -69,15 +69,15 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // If there is a net balance, user can use it to pay their cost.
         // Total payment the user must make.
-        physicalAssetPayment = uint(assetCredit) > expectedDeltaAsset ? 0 : expectedDeltaAsset - uint(assetCredit);
-        physicalQuotePayment = uint(quoteCredit) > expectedDeltaQuote ? 0 : expectedDeltaQuote - uint(quoteCredit);
+        physicalAssetPayment = uint256(assetCredit) > expectedDeltaAsset ? 0 : expectedDeltaAsset - uint256(assetCredit);
+        physicalQuotePayment = uint256(quoteCredit) > expectedDeltaQuote ? 0 : expectedDeltaQuote - uint256(quoteCredit);
 
-        physicalAssetPayment = uint(userAssetBalance) > physicalAssetPayment
+        physicalAssetPayment = uint256(userAssetBalance) > physicalAssetPayment
             ? 0
-            : physicalAssetPayment - uint(userAssetBalance);
-        physicalQuotePayment = uint(userQuoteBalance) > physicalQuotePayment
+            : physicalAssetPayment - uint256(userAssetBalance);
+        physicalQuotePayment = uint256(userQuoteBalance) > physicalQuotePayment
             ? 0
-            : physicalQuotePayment - uint(userQuoteBalance);
+            : physicalQuotePayment - uint256(userQuoteBalance);
 
         // If user can pay for the allocate using their internal balance of tokens, don't need to transfer tokens in.
         // Won't need to transfer in tokens if user payment is zero.
@@ -105,17 +105,17 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             "position-liquidity-increases"
         );
 
-        assertEq(post.reserveAsset, prev.reserveAsset + physicalAssetPayment + uint(assetCredit), "reserve-asset");
-        assertEq(post.reserveQuote, prev.reserveQuote + physicalQuotePayment + uint(quoteCredit), "reserve-quote");
+        assertEq(post.reserveAsset, prev.reserveAsset + physicalAssetPayment + uint256(assetCredit), "reserve-asset");
+        assertEq(post.reserveQuote, prev.reserveQuote + physicalQuotePayment + uint256(quoteCredit), "reserve-quote");
         assertEq(post.physicalBalanceAsset, prev.physicalBalanceAsset + physicalAssetPayment, "physical-asset");
         assertEq(post.physicalBalanceQuote, prev.physicalBalanceQuote + physicalQuotePayment, "physical-quote");
 
-        uint feeDelta0 = post.feeGrowthAssetPosition - prev.feeGrowthAssetPosition;
-        uint feeDelta1 = post.feeGrowthAssetPool - prev.feeGrowthAssetPool;
+        uint256 feeDelta0 = post.feeGrowthAssetPosition - prev.feeGrowthAssetPosition;
+        uint256 feeDelta1 = post.feeGrowthAssetPool - prev.feeGrowthAssetPool;
         assertTrue(feeDelta0 == feeDelta1, "asset-growth");
 
-        uint feeDelta2 = post.feeGrowthQuotePosition - prev.feeGrowthQuotePosition;
-        uint feeDelta3 = post.feeGrowthQuotePool - prev.feeGrowthQuotePool;
+        uint256 feeDelta2 = post.feeGrowthQuotePosition - prev.feeGrowthQuotePosition;
+        uint256 feeDelta3 = post.feeGrowthQuotePool - prev.feeGrowthQuotePool;
         assertTrue(feeDelta2 == feeDelta3, "quote-growth");
 
         emit FinishedCall("Allocate");
@@ -125,7 +125,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
     event FinishedCall(string);
 
-    function unallocate(uint deltaLiquidity, uint index) external {
+    function unallocate(uint256 deltaLiquidity, uint256 index) external {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
         // Unallocate from a random pool.
@@ -135,7 +135,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         _assertUnallocate(deltaLiquidity);
     }
 
-    function _assertUnallocate(uint deltaLiquidity) internal {
+    function _assertUnallocate(uint256 deltaLiquidity) internal {
         // TODO: Add use max flag support.
 
         // Get some liquidity.
@@ -149,7 +149,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
             // Unallocate
-            uint timestamp = block.timestamp + 4; // todo: fix default jit policy
+            uint256 timestamp = block.timestamp + 4; // todo: fix default jit policy
             vm.warp(timestamp);
 
             (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getLiquidityDeltas(
@@ -157,7 +157,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
                 -int128(uint128(deltaLiquidity))
             );
             prev = getState();
-            (uint unallocatedAsset, uint unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
+            (uint256 unallocatedAsset, uint256 unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
             HyperState memory end = getState();
 
             assertEq(unallocatedAsset, expectedDeltaAsset, "asset-delta");
@@ -186,12 +186,12 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     function checkVirtualInvariant() internal {
         // HyperPool memory pool = getPool(address(__hyper__), __poolId__);
         // TODO: Breaks when we call this function on a pool with zero liquidity...
-        (uint dAsset, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
+        (uint256 dAsset, uint256 dQuote) = __hyper__.getVirtualReserves(__poolId__);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 
-        uint bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
-        uint bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
+        uint256 bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
+        uint256 bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
 
         emit log("bAsset", bAsset);
         emit log("bQuote", bQuote);
@@ -207,6 +207,6 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         emit FinishedCall("Check Virtual Invariant");
     }
 
-    event log(string, uint);
+    event log(string, uint256);
     event log(string, int);
 }

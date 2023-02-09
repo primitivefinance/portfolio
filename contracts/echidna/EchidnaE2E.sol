@@ -1238,7 +1238,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
 
     // Swaps
-    function swap_should_succeed(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_should_succeed(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
@@ -1278,7 +1278,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
 
         swap_should_fail(pool.params, id, true, id, id, "BUG: Swap on a nonexistent pool should fail.");
     }
-    function swap_on_zero_amount_should_fail(uint id) public {
+    function swap_on_zero_amount_should_fail(uint256 id) public {
         // Will always return a pool that exists
         (HyperPool memory pool, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         uint256 amount = 0;
@@ -1309,7 +1309,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         asset = EchidnaERC20(pair.tokenAsset);
     }
 
-    function swap_assets_in_always_decreases_price(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_assets_in_always_decreases_price(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
         require(sellAsset);
 
         // address[] memory owners = new address[](1);
@@ -1382,7 +1382,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 postReserveBuy;
     }
 
-    function swap_quote_in_always_increases_price(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_quote_in_always_increases_price(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
         require(!sellAsset);
 
         // address[] memory owners = new address[](1);
@@ -1447,7 +1447,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         }
     }
 
-    function swap_asset_in_increases_reserve(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_asset_in_increases_reserve(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
         require(sellAsset);
 
         // address[] memory owners = new address[](1);
@@ -1511,7 +1511,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         );
     }
 
-    function swap_quote_in_increases_reserve(uint id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_quote_in_increases_reserve(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
         require(!sellAsset);
 
         // address[] memory owners = new address[](1);
@@ -1576,18 +1576,18 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
 
     function check_external_swap_invariants(
-        uint prevPrice,
-        uint postPrice,
-        uint prevLiquidity,
-        uint postLiquidity,
-        uint prevReserveSell,
-        uint postReserveSell,
-        uint prevReserveBuy,
-        uint postReserveBuy,
-        uint prevFeeGrowthSell,
-        uint postFeeGrowthSell,
-        uint prevFeeGrowthBuy,
-        uint postFeeGrowthBuy
+        uint256 prevPrice,
+        uint256 postPrice,
+        uint256 prevLiquidity,
+        uint256 postLiquidity,
+        uint256 prevReserveSell,
+        uint256 postReserveSell,
+        uint256 prevReserveBuy,
+        uint256 postReserveBuy,
+        uint256 prevFeeGrowthSell,
+        uint256 postFeeGrowthSell,
+        uint256 prevFeeGrowthBuy,
+        uint256 postFeeGrowthBuy
     ) internal pure {
         prevFeeGrowthBuy;
 

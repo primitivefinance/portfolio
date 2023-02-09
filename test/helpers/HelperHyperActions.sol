@@ -37,7 +37,7 @@ contract HelperHyperActions {
         data = ProcessingLib.encodeJumpInstruction(instructions);
     }
 
-    function allocatePool(address hyper, uint64 poolId, uint amount) internal {
+    function allocatePool(address hyper, uint64 poolId, uint256 amount) internal {
         bytes memory data = ProcessingLib.encodeAllocate(
             0, // useMax = false
             poolId,

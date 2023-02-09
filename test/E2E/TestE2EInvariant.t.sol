@@ -11,7 +11,7 @@ import {InvariantSendTokens} from "./InvariantSendTokens.sol";
 import {InvariantWarper} from "./InvariantWarper.sol";
 import {InvariantCreatePool} from "./InvariantCreatePool.sol";
 
-bytes32 constant SLOT_LOCKED = bytes32(uint(10));
+bytes32 constant SLOT_LOCKED = bytes32(uint256(10));
 
 /**
  * @dev Most important test suite, verifies the critical invariants of Hyper.
@@ -66,12 +66,12 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     }
 
     function invariant_asset_balance_gte_reserves() public {
-        (uint reserve, uint physical, ) = getBalances(address(__asset__));
+        (uint256 reserve, uint256 physical, ) = getBalances(address(__asset__));
         assertTrue(physical >= reserve, "invariant-asset-physical-balance");
     }
 
     function invariant_quote_balance_gte_reserves() public {
-        (uint reserve, uint physical, ) = getBalances(address(__quote__));
+        (uint256 reserve, uint256 physical, ) = getBalances(address(__quote__));
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
     }
 
@@ -89,8 +89,8 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
 
         if (pool.liquidity > 0) {
-            (uint dAsset, ) = __hyper__.getVirtualReserves(__poolId__);
-            uint bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
+            (uint256 dAsset, ) = __hyper__.getVirtualReserves(__poolId__);
+            uint256 bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }
     }
@@ -99,8 +99,8 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
 
         if (pool.liquidity > 0) {
-            (, uint dQuote) = __hyper__.getVirtualReserves(__poolId__);
-            uint bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
+            (, uint256 dQuote) = __hyper__.getVirtualReserves(__poolId__);
+            uint256 bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
             assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
         }
     }
@@ -108,8 +108,8 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     function invariant_liquidity_sum() public {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
 
-        uint sum;
-        for (uint i; i != __users__.length; ++i) {
+        uint256 sum;
+        for (uint256 i; i != __users__.length; ++i) {
             HyperPosition memory pos = getPosition(address(__hyper__), __users__[i], __poolId__);
             sum += pos.freeLiquidity;
         }
@@ -119,13 +119,13 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
 
     function invariant_reentrancy() public {
         bytes32 locked = vm.load(address(__hyper__), SLOT_LOCKED);
-        assertEq(uint(locked), 1, "invariant-locked");
+        assertEq(uint256(locked), 1, "invariant-locked");
 
-        uint balance = address(__hyper__).balance;
+        uint256 balance = address(__hyper__).balance;
         assertEq(balance, 0, "invariant-ether");
     }
 
-    function getBalances(address token) internal view returns (uint reserve, uint physical, uint balances) {
+    function getBalances(address token) internal view returns (uint256 reserve, uint256 physical, uint256 balances) {
         reserve = getReserve(address(__hyper__), token);
         physical = getPhysicalBalance(address(__hyper__), token);
         balances = getBalanceSum(address(__hyper__), token, __users__);
@@ -136,16 +136,16 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         __poolIds__.push(poolId);
     }
 
-    function getRandomUser(uint id) public returns (address) {
+    function getRandomUser(uint256 id) public returns (address) {
         assertTrue(__users__.length > 0);
-        uint index = id % __users__.length;
+        uint256 index = id % __users__.length;
         address user = __users__[index];
         return user;
     }
 
-    function getRandomPoolId(uint id) public returns (uint64) {
+    function getRandomPoolId(uint256 id) public returns (uint64) {
         assertTrue(__poolIds__.length > 0);
-        uint index = id % __poolIds__.length;
+        uint256 index = id % __poolIds__.length;
         uint64 poolId = __poolIds__[index];
         return poolId;
     }

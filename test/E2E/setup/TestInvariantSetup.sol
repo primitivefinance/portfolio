@@ -10,7 +10,7 @@ contract TestInvariantSetup {
     }
 
     function targetContracts() public view returns (address[] memory) {
-        require(_targetContracts.length != uint(0), "no-target-contracts");
+        require(_targetContracts.length != uint256(0), "no-target-contracts");
         return _targetContracts;
     }
 }

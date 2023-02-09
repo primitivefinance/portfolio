@@ -15,13 +15,13 @@ contract TestHyperSwap is TestHyperSetup {
     function testSwap_should_succeed() public allocateFirst {
         // HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        uint input = DEFAULT_SWAP_INPUT;
-        uint expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
-        // (uint out, ) = pool.getAmountOut(true, input, 0);
+        uint256 input = DEFAULT_SWAP_INPUT;
+        uint256 expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
+        // (uint256 out, ) = pool.getAmountOut(true, input, 0);
 
-        // (uint a, uint b) = pool.getVirtualReserves();
+        // (uint256 a, uint256 b) = pool.getVirtualReserves();
 
-        (uint output, ) = __hyperTestingContract__.swap(
+        (uint256 output, ) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
             input,
@@ -30,25 +30,25 @@ contract TestHyperSwap is TestHyperSetup {
 
         assertEq(output, expected, "expected-output");
 
-        // (uint amount0, uint amount1) = pool.getAmounts();
+        // (uint256 amount0, uint256 amount1) = pool.getAmounts();
     }
 
     function testSwap_back_and_forth_outputs_less() public allocateFirst {
         uint256 start = 10000;
-        uint limit = 1;
+        uint256 limit = 1;
 
         bool direction = false;
-        (uint output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, start, limit);
+        (uint256 output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, start, limit);
 
         direction = true;
-        (uint finalOutput, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, output, limit);
+        (uint256 finalOutput, ) = __hyperTestingContract__.swap(defaultScenario.poolId, direction, output, limit);
 
         assertGt(start, finalOutput);
     }
 
     function testSwap_revert_PoolExpired() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        uint end = pool.params.createdAt + Assembly.convertDaysToSeconds(pool.params.duration);
+        uint256 end = pool.params.createdAt + Assembly.convertDaysToSeconds(pool.params.duration);
         vm.warp(end + 1);
         vm.expectRevert(PoolExpired.selector);
         __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, type(uint128).max);
@@ -75,12 +75,12 @@ contract TestHyperSwap is TestHyperSetup {
     function testSwap_pays_fee_maxInput() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        uint maxInput = getMaxSwapAssetInWad(pool);
-        uint extra = 1;
-        // (uint out, ) = pool.getAmountOut(true, maxInput + extra, 0);
+        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        uint256 extra = 1;
+        // (uint256 out, ) = pool.getAmountOut(true, maxInput + extra, 0);
 
-        uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
-        (, uint remainder) = __hyperTestingContract__.swap(
+        uint256 prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        (, uint256 remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
             maxInput + extra,
@@ -88,7 +88,7 @@ contract TestHyperSwap is TestHyperSetup {
         );
 
         pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        uint postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        uint256 postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
 
         assertEq(remainder, extra, "expected-output");
         assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
@@ -98,11 +98,11 @@ contract TestHyperSwap is TestHyperSetup {
     function testSwap_pays_fee() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        uint maxInput = getMaxSwapAssetInWad(pool);
-        // (uint out, ) = pool.getAmountOut(true, maxInput - 1, 0);
+        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        // (uint256 out, ) = pool.getAmountOut(true, maxInput - 1, 0);
 
-        uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
-        (, uint remainder) = __hyperTestingContract__.swap(
+        uint256 prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        (, uint256 remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
             maxInput - 1,
@@ -110,7 +110,7 @@ contract TestHyperSwap is TestHyperSetup {
         );
 
         pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        uint postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        uint256 postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
 
         assertEq(remainder, 0, "expected-output");
         assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
@@ -124,11 +124,11 @@ contract TestHyperSwap is TestHyperSetup {
 
         pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        uint maxInput = getMaxSwapAssetInWad(pool);
-        (uint out, ) = pool.getAmountOut(true, maxInput - 1, 0);
+        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        (uint256 out, ) = pool.getAmountOut(true, maxInput - 1, 0);
 
-        uint prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
-        (uint output, uint remainder) = __hyperTestingContract__.swap(
+        uint256 prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        (uint256 output, uint256 remainder) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
             maxInput - 1,
@@ -136,7 +136,7 @@ contract TestHyperSwap is TestHyperSetup {
         );
 
         pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        uint postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
+        uint256 postFeeGrowthAsset = pool.feeGrowthGlobalAsset;
 
         assertEq(remainder, 0, "expected-output");
         assertTrue(postFeeGrowthAsset > prevFeeGrowthAsset, "fee-did-not-increase");
@@ -146,12 +146,12 @@ contract TestHyperSwap is TestHyperSetup {
         __hyperTestingContract__.allocate(_scenario_controlled.poolId, 10 ether);
         HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_controlled.poolId);
 
-        uint maxInput = getMaxSwapAssetInWad(pool);
-        uint input = (maxInput * 1 ether) / 2 ether; // half of max input.
-        (uint out, ) = pool.getPoolAmountOut(true, input, 0);
+        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        uint256 input = (maxInput * 1 ether) / 2 ether; // half of max input.
+        (uint256 out, ) = pool.getPoolAmountOut(true, input, 0);
         out = (out * 9000) / 10000; // 90% of output, so invariant is positive.
 
-        uint prevInvariantGrowth = pool.invariantGrowthGlobal;
+        uint256 prevInvariantGrowth = pool.invariantGrowthGlobal;
 
         bytes memory data = Enigma.encodeSwap(
             0,
@@ -166,7 +166,7 @@ contract TestHyperSwap is TestHyperSetup {
         assertTrue(success, "swap failed");
 
         pool = getPool(address(__hyperTestingContract__), _scenario_controlled.poolId);
-        uint postInvariantGrowth = pool.invariantGrowthGlobal;
+        uint256 postInvariantGrowth = pool.invariantGrowthGlobal;
 
         assertTrue(postInvariantGrowth > prevInvariantGrowth, "invariant-did-not-increase");
     }

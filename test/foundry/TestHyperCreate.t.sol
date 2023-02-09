@@ -195,7 +195,7 @@ contract TestHyperCreatePool is TestHyperSetup {
     bytes arithmeticError = abi.encodeWithSelector(0x4e487b71, 0x11); // 0x4e487b71 is Panic(uint256), and 0x11 is the panic code for arithmetic overflow.
 
     function testCreateAboveMaxPairs_Reverts() public {
-        bytes32 slot = bytes32(uint(5)); // slot is packed so has the pair + pool nonces.
+        bytes32 slot = bytes32(uint256(5)); // slot is packed so has the pair + pool nonces.
         vm.store(address(__hyperTestingContract__), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
         assertEq(__hyperTestingContract__.getPairNonce(), type(uint24).max, "not set to max value");
         address token = address(new TestERC20("t", "t", 18));
@@ -206,7 +206,7 @@ contract TestHyperCreatePool is TestHyperSetup {
     }
 
     function testCreateAboveMaxPools_Reverts() public {
-        bytes32 slot = bytes32(uint(5)); // slot is packed so has the pair + pool nonces.
+        bytes32 slot = bytes32(uint256(5)); // slot is packed so has the pair + pool nonces.
         vm.store(address(__hyperTestingContract__), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
         assertEq(__hyperTestingContract__.getPoolNonce(), type(uint32).max, "not set to max value");
 

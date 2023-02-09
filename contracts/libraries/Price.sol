@@ -36,7 +36,7 @@ library Price {
 
     // ===== Class Methods ===== //
 
-    function invariantOf(RMM memory args, uint R_y, uint R_x) internal pure returns (int256) {
+    function invariantOf(RMM memory args, uint256 R_y, uint256 R_x) internal pure returns (int256) {
         return Invariant.invariant(R_y, R_x, args.strike, convertPercentageToWad(args.sigma), args.tau);
     }
 
@@ -60,7 +60,7 @@ library Price {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, eps);
     }
 
-    function computeReserves(RMM memory args, uint prc, int128 inv) internal pure returns (uint R_y, uint R_x) {
+    function computeReserves(RMM memory args, uint256 prc, int128 inv) internal pure returns (uint256 R_y, uint256 R_x) {
         R_x = getXWithPrice(prc, args.strike, args.sigma, args.tau);
         R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, inv);
     }
@@ -77,11 +77,11 @@ library Price {
         uint256 prc,
         int256 invariant,
         uint256 epsilon
-    ) internal pure returns (uint p_t, int128 i_t, uint t_e) {
+    ) internal pure returns (uint256 p_t, int128 i_t, uint256 t_e) {
         RMM memory curve = RMM(stk, vol, tau);
         p_t = curve.computePriceWithChangeInTau(prc, epsilon);
 
-        uint x_1 = curve.getXWithPrice(prc);
+        uint256 x_1 = curve.getXWithPrice(prc);
         curve.tau -= epsilon;
         uint256 y_2 = curve.getYWithX(x_1, invariant);
 
@@ -167,15 +167,15 @@ library Price {
         }
 
         uint256 sigmaWad = convertPercentageToWad(uint256(params.sigma));
-        uint part0 = WAD.divWadDown(sigmaWad.mulWadDown(tauYears.sqrt() * 1e9));
-        part0 = part0.mulWadDown(uint(int256(prc.divWadDown(params.strike)).lnWad()));
+        uint256 part0 = WAD.divWadDown(sigmaWad.mulWadDown(tauYears.sqrt() * 1e9));
+        part0 = part0.mulWadDown(uint256(int256(prc.divWadDown(params.strike)).lnWad()));
 
-        uint part1 = (sigmaWad * sigmaWad) / DOUBLE_WAD;
+        uint256 part1 = (sigmaWad * sigmaWad) / DOUBLE_WAD;
         part1 = part1.mulWadDown(tauYears);
 
-        uint part2 = sigmaWad.mulWadDown((tauYears - epsilonYears).sqrt() * 1e9);
+        uint256 part2 = sigmaWad.mulWadDown((tauYears - epsilonYears).sqrt() * 1e9);
 
-        R_y = params.strike.mulWadDown(uint(Gaussian.cdf(int(part0 + part1 - part2))));
+        R_y = params.strike.mulWadDown(uint256(Gaussian.cdf(int(part0 + part1 - part2))));
     }
 
     /**

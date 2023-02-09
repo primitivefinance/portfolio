@@ -18,7 +18,7 @@ pragma solidity 0.8.13;
 
 error InvalidLiquidity();
 
-uint constant SECONDS_PER_DAY = 86_400 seconds;
+uint256 constant SECONDS_PER_DAY = 86_400 seconds;
 uint8 constant MIN_DECIMALS = 6;
 uint8 constant MAX_DECIMALS = 18;
 
@@ -80,7 +80,7 @@ function computeCheckpointDistance(uint256 present, uint256 past) pure returns (
     }
 }
 
-function convertDaysToSeconds(uint amountDays) pure returns (uint amountSeconds) {
+function convertDaysToSeconds(uint256 amountDays) pure returns (uint256 amountSeconds) {
     assembly {
         amountSeconds := mul(amountDays, SECONDS_PER_DAY)
     }
@@ -131,39 +131,39 @@ function toAmount(bytes calldata raw) pure returns (uint128 amount) {
     if (power != 0) amount = amount * uint128(10 ** power);
 }
 
-function computeScalar(uint decimals) pure returns (uint scalar) {
+function computeScalar(uint256 decimals) pure returns (uint256 scalar) {
     return 10 ** (MAX_DECIMALS - decimals); // can revert on underflow
 }
 
-function scaleToWad(uint amountDec, uint decimals) pure returns (uint outputWad) {
-    uint factor = computeScalar(decimals);
+function scaleToWad(uint256 amountDec, uint256 decimals) pure returns (uint256 outputWad) {
+    uint256 factor = computeScalar(decimals);
     assembly {
         outputWad := mul(amountDec, factor)
     }
 }
 
-function scaleFromWadUp(uint amountWad, uint decimals) pure returns (uint outputDec) {
-    uint factor = computeScalar(decimals);
+function scaleFromWadUp(uint256 amountWad, uint256 decimals) pure returns (uint256 outputDec) {
+    uint256 factor = computeScalar(decimals);
     assembly {
         outputDec := add(div(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
     }
 }
 
-function scaleFromWadDown(uint amountWad, uint decimals) pure returns (uint outputDec) {
-    uint factor = computeScalar(decimals);
+function scaleFromWadDown(uint256 amountWad, uint256 decimals) pure returns (uint256 outputDec) {
+    uint256 factor = computeScalar(decimals);
     assembly {
         outputDec := div(amountWad, factor)
     }
 }
 
-function scaleFromWadUpSigned(int amountWad, uint decimals) pure returns (int outputDec) {
+function scaleFromWadUpSigned(int amountWad, uint256 decimals) pure returns (int outputDec) {
     int factor = int(computeScalar(decimals));
     assembly {
         outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
     }
 }
 
-function scaleFromWadDownSigned(int amountWad, uint decimals) pure returns (int outputDec) {
+function scaleFromWadDownSigned(int amountWad, uint256 decimals) pure returns (int outputDec) {
     int factor = int(computeScalar(decimals));
     assembly {
         outputDec := sdiv(amountWad, factor)

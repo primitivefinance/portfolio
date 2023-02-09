@@ -6,19 +6,19 @@ import "./setup/InvariantTargetContract.sol";
 contract InvariantSendTokens is InvariantTargetContract {
     constructor(address hyper_, address asset_, address quote_) InvariantTargetContract(hyper_, asset_, quote_) {}
 
-    event SentTokens(address indexed token, uint amount);
+    event SentTokens(address indexed token, uint256 amount);
 
-    function sendAssetTokens(uint amount) external {
+    function sendAssetTokens(uint256 amount) external {
         amount = bound(amount, 1, 2 ** 127);
         transfer(__asset__, amount);
     }
 
-    function sendQuoteTokens(uint amount) external {
+    function sendQuoteTokens(uint256 amount) external {
         amount = bound(amount, 1, 2 ** 127);
         transfer(__quote__, amount);
     }
 
-    function transfer(TestERC20 token, uint amount) internal {
+    function transfer(TestERC20 token, uint256 amount) internal {
         token.mint(address(__hyper__), amount);
         emit SentTokens(address(token), amount);
     }

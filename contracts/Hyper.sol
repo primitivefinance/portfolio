@@ -20,12 +20,12 @@ import "./interfaces/IERC20.sol";
 
 contract Hyper is IHyper {
     using Price for Price.RMM;
-    using SafeCastLib for uint;
+    using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
     using {Assembly.isBetween} for uint8;
     using {Assembly.scaleFromWadDownSigned} for int;
-    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint;
+    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
 
     function VERSION() public pure returns (string memory) {
         assembly {
@@ -127,12 +127,12 @@ contract Hyper is IHyper {
     }
 
     /** @dev Virtual balance of `token`. */
-    function getReserve(address token) public view returns (uint) {
+    function getReserve(address token) public view returns (uint256) {
         return __account__.reserves[token];
     }
 
     /** @dev Internal balance of `owner` of `token`. */
-    function getBalance(address owner, address token) public view returns (uint) {
+    function getBalance(address owner, address token) public view returns (uint256) {
         return __account__.balances[owner][token];
     }
 
@@ -146,18 +146,18 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function allocate(
         uint64 poolId,
-        uint amount
-    ) external payable lock interactions returns (uint deltaAsset, uint deltaQuote) {
-        bool useMax = amount == type(uint).max;
+        uint256 amount
+    ) external payable lock interactions returns (uint256 deltaAsset, uint256 deltaQuote) {
+        bool useMax = amount == type(uint256).max;
         (deltaAsset, deltaQuote) = _allocate(useMax, poolId, (useMax ? 1 : amount).safeCastTo128());
     }
 
     /// @inheritdoc IHyperActions
     function unallocate(
         uint64 poolId,
-        uint amount
-    ) external lock interactions returns (uint deltaAsset, uint deltaQuote) {
-        bool useMax = amount == type(uint).max;
+        uint256 amount
+    ) external lock interactions returns (uint256 deltaAsset, uint256 deltaQuote) {
+        bool useMax = amount == type(uint256).max;
         (deltaAsset, deltaQuote) = _unallocate(useMax, poolId, (useMax ? 1 : amount).safeCastTo128());
     }
 
@@ -165,9 +165,9 @@ contract Hyper is IHyper {
     function swap(
         uint64 poolId,
         bool sellAsset,
-        uint amount,
-        uint limit
-    ) external payable lock interactions returns (uint output, uint remainder) {
+        uint256 amount,
+        uint256 limit
+    ) external payable lock interactions returns (uint256 output, uint256 remainder) {
         if (limit == type(uint256).max) limit = type(uint128).max;
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = useMax ? type(uint128).max : amount.safeCastTo128();
@@ -186,8 +186,8 @@ contract Hyper is IHyper {
     function draw(address token, uint256 amount, address to) external lock interactions {
         if (to == address(this)) revert InvalidTransfer(); // todo: Investigate attack vectors if this was not here.
 
-        uint balance = getBalance(msg.sender, token);
-        if (amount == type(uint).max) amount = balance;
+        uint256 balance = getBalance(msg.sender, token);
+        if (amount == type(uint256).max) amount = balance;
         if (amount > balance) revert DrawBalance();
 
         _applyDebit(token, amount);
@@ -199,7 +199,7 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function fund(address token, uint256 amount) external override lock interactions {
-        if (amount == type(uint).max) amount = OS.__balanceOf__(token, msg.sender);
+        if (amount == type(uint256).max) amount = OS.__balanceOf__(token, msg.sender);
         __account__.dangerousFund(token, address(this), amount); // warning: external call to msg.sender.
     }
 
@@ -210,7 +210,7 @@ contract Hyper is IHyper {
         // interactions modifier does the work.
     }
 
-    function claim(uint64 poolId, uint deltaAsset, uint deltaQuote) external lock interactions {
+    function claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) external lock interactions {
         HyperPool memory pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
@@ -281,7 +281,7 @@ contract Hyper is IHyper {
         bool useMax,
         uint64 poolId,
         uint128 deltaLiquidity
-    ) internal returns (uint deltaAsset, uint deltaQuote) {
+    ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (useMax) deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
         if (deltaLiquidity == 0) revert ZeroLiquidity();
 
@@ -307,7 +307,7 @@ contract Hyper is IHyper {
 
     function _changeLiquidity(
         ChangeLiquidityParams memory args
-    ) internal returns (uint feeAsset, uint feeQuote, uint invariantGrowth) {
+    ) internal returns (uint256 feeAsset, uint256 feeQuote, uint256 invariantGrowth) {
         (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
         (feeAsset, feeQuote, invariantGrowth) = pos.syncPositionFees(
@@ -324,7 +324,7 @@ contract Hyper is IHyper {
         HyperPosition storage position = positions[args.owner][args.poolId];
 
         if (args.deltaLiquidity < 0) {
-            uint distance = position.getTimeSinceChanged(block.timestamp);
+            uint256 distance = position.getTimeSinceChanged(block.timestamp);
             if (pools[args.poolId].params.jit > distance) revert JitLiquidity(distance);
         }
 
@@ -356,7 +356,7 @@ contract Hyper is IHyper {
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
 
-        uint minAmountOut = args.output;
+        uint256 minAmountOut = args.output;
         bool sellAsset = args.direction == 0;
 
         HyperPool memory pool = pools[args.poolId];
@@ -389,7 +389,7 @@ contract Hyper is IHyper {
         if (!pool.exists()) revert NonExistentPool(args.poolId);
 
         _state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
-        _state.fee = msg.sender == pool.controller ? pool.params.priorityFee : uint(pool.params.fee);
+        _state.fee = msg.sender == pool.controller ? pool.params.priorityFee : uint256(pool.params.fee);
         _state.feeGrowthGlobal = _state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
         _state.tokenInput = _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote;
         _state.tokenOutput = _state.sell ? pool.pair.tokenQuote : pool.pair.tokenAsset;
@@ -397,10 +397,10 @@ contract Hyper is IHyper {
         Price.RMM memory rmm = pool.getRMM();
         Iteration memory iteration;
         {
-            (, int256 invariant, uint updatedTau) = _computeSyncedPrice(args.poolId);
+            (, int256 invariant, uint256 updatedTau) = _computeSyncedPrice(args.poolId);
             rmm.tau = updatedTau;
 
-            uint internalBalance = getBalance(msg.sender, _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote);
+            uint256 internalBalance = getBalance(msg.sender, _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote);
             remainder = args.useMax == 1 ? internalBalance : args.input;
             remainder = remainder.scaleToWad(_state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote);
             output = args.output;
@@ -491,8 +491,8 @@ contract Hyper is IHyper {
         }
 
         {
-            uint inputDec;
-            uint outputDec;
+            uint256 inputDec;
+            uint256 outputDec;
             if (_state.sell) {
                 inputDec = pool.pair.decimalsAsset;
                 outputDec = pool.pair.decimalsQuote;
@@ -525,7 +525,7 @@ contract Hyper is IHyper {
 
         {
             uint64 id = args.poolId;
-            uint price = getLatestPrice(id);
+            uint256 price = getLatestPrice(id);
             emit Swap(id, price, _state.tokenInput, iteration.input, _state.tokenOutput, iteration.output, iteration.feeAmount);
         }
 
@@ -541,7 +541,7 @@ contract Hyper is IHyper {
      */
     function _computeSyncedPrice(
         uint64 poolId
-    ) internal view returns (uint256 price, int256 invariant, uint updatedTau) {
+    ) internal view returns (uint256 price, int256 invariant, uint256 updatedTau) {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
         Price.RMM memory curve = pool.getRMM();
@@ -549,7 +549,7 @@ contract Hyper is IHyper {
         updatedTau = pool.computeTau(block.timestamp);
         curve.tau = updatedTau;
 
-        (uint x, uint y) = pool.getAmountsWad();
+        (uint256 x, uint256 y) = pool.getAmountsWad();
         invariant = curve.invariantOf({R_y: y, R_x: x});
         price = curve.getPriceWithX({R_x: x});
     }
@@ -639,7 +639,7 @@ contract Hyper is IHyper {
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
 
-        uint32 timestamp = uint(block.timestamp).safeCastTo32();
+        uint32 timestamp = uint256(block.timestamp).safeCastTo32();
         HyperPool memory pool;
         pool.controller = controller;
         pool.lastTimestamp = timestamp;
@@ -666,7 +666,7 @@ contract Hyper is IHyper {
         poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
         if (pools[poolId].exists()) revert PoolExists(); // todo: poolNonce always increments, so this never gets hit, remove
 
-        (uint y, uint x) = pool.getRMM().computeReserves(price, 0); // todo: write better docs for whats going on here
+        (uint256 y, uint256 x) = pool.getRMM().computeReserves(price, 0); // todo: write better docs for whats going on here
         (pool.virtualY, pool.virtualX) = (y.safeCastTo128(), x.safeCastTo128());
 
         pools[poolId] = pool; // effect
@@ -796,13 +796,13 @@ contract Hyper is IHyper {
         uint256 loops = tokens.length;
         if (loops == 0) return __account__.reset(); // exit early.
 
-        uint x;
-        uint i = loops;
+        uint256 x;
+        uint256 i = loops;
         do {
             // Loop backwards to pop tokens off.
             address token = tokens[i - 1];
             // Apply credits or debits to net balance.
-            (uint credited, uint debited, uint remainder) = __account__.settle(token, address(this));
+            (uint256 credited, uint256 debited, uint256 remainder) = __account__.settle(token, address(this));
             // Reserves were increased, we paid a debit, therefore need to decrease reserves by `debited` amount.
             if (debited > 0) {
                 emit DecreaseUserBalance(msg.sender, token, debited);
@@ -825,9 +825,9 @@ contract Hyper is IHyper {
 
         Payment[] memory payments = _payments;
 
-        uint px = payments.length;
+        uint256 px = payments.length;
         while (px != 0) {
-            uint index = px - 1;
+            uint256 index = px - 1;
             OS.__dangerousTransferFrom__(payments[index].token, address(this), payments[index].amount);
             unchecked {
                 --px;
@@ -841,11 +841,11 @@ contract Hyper is IHyper {
     // ===== View ===== //
 
     /** @dev Can be manipulated. */
-    function getLatestPrice(uint64 poolId) public view returns (uint price) {
+    function getLatestPrice(uint64 poolId) public view returns (uint256 price) {
         (price, , ) = _computeSyncedPrice(poolId);
     }
 
-    function getTimePassed(uint64 poolId) public view returns (uint) {
+    function getTimePassed(uint64 poolId) public view returns (uint256) {
         return block.timestamp - pools[poolId].lastTimestamp;
     }
 
@@ -855,8 +855,8 @@ contract Hyper is IHyper {
 
     function getMaxLiquidity(
         uint64 poolId,
-        uint deltaAsset,
-        uint deltaQuote
+        uint256 deltaAsset,
+        uint256 deltaQuote
     ) public view override returns (uint128 deltaLiquidity) {
         return pools[poolId].getPoolMaxLiquidity(deltaAsset, deltaQuote);
     }
@@ -872,7 +872,7 @@ contract Hyper is IHyper {
         return pools[poolId].getPoolAmounts();
     }
 
-    function getAmountOut(uint64 poolId, bool sellAsset, uint amountIn) public view returns (uint output) {
+    function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) public view returns (uint256 output) {
         HyperPool memory pool = pools[poolId];
         (output, ) = pool.getPoolAmountOut({
             sellAsset: sellAsset,

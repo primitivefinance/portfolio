@@ -7,16 +7,16 @@ contract TestPriceUtils is TestPriceSetup {
     // ===== Utils ===== //
 
     function testConvertPercentageReturnsOne() public {
-        uint percentage = Price.PERCENTAGE;
-        uint expected = Price.WAD;
-        uint converted = Price.convertPercentageToWad(percentage);
+        uint256 percentage = Price.PERCENTAGE;
+        uint256 expected = Price.WAD;
+        uint256 converted = Price.convertPercentageToWad(percentage);
         assertEq(converted, expected);
     }
 
-    function testFuzzConvertPercentageReturnsComputedValue(uint percentage) public {
+    function testFuzzConvertPercentageReturnsComputedValue(uint256 percentage) public {
         vm.assume(percentage < type(uint64).max);
-        uint expected = (percentage * Price.WAD) / Price.PERCENTAGE;
-        uint converted = Price.convertPercentageToWad(percentage);
+        uint256 expected = (percentage * Price.WAD) / Price.PERCENTAGE;
+        uint256 converted = Price.convertPercentageToWad(percentage);
         assertEq(converted, expected);
     }
 }

@@ -84,7 +84,7 @@ function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes 
     bytes memory payload = bytes.concat(INSTRUCTION_JUMP, bytes1(len));
 
     // for each instruction set...
-    for (uint i; i != len; ++i) {
+    for (uint256 i; i != len; ++i) {
         bytes memory instruction = instructions[i];
         uint8 size = uint8(instruction.length);
 
