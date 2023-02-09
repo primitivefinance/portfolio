@@ -197,7 +197,7 @@ contract TestHyperClaim is TestHyperSetup {
 
         // save the total fee growth for the asset per liquidity.
         HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId);
-        uint totalLiquidity = pool.liquidity; // 12_000
+        // uint totalLiquidity = pool.liquidity; // 12_000
         uint totalFeeAssetPerLiquidity = pool.feeGrowthGlobalAsset; // 0.00125
 
         // eve claims earned fees, which should be proportional to her share of the liquidity
