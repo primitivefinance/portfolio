@@ -86,7 +86,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
     }
 
     // ---------- Pool Properties -------
-    function pool_fee_growth_greater_than_position_fee_growth() public {
+    function pool_fee_growth_greater_than_position_fee_growth() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
