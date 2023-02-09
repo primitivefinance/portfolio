@@ -22,7 +22,7 @@ contract TestHyperProcessing is TestHyperSetup {
 
     function testGetAmounts() public {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId);
-        HyperCurve memory curve = pool.params;
+        // HyperCurve memory curve = pool.params;
         (uint deltaAsset, uint deltaQuote) = __hyperTestingContract__.getAmounts(_scenario_18_18.poolId);
         uint maxDelta = 0.001 ether; // 1ether = 100%, 0.001 ether = 0.10%
         assertApproxEqRel(
@@ -40,7 +40,7 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testGetLiquidityMinted() public view {
-        uint deltaLiquidity = __hyperTestingContract__.getMaxLiquidity(_scenario_18_18.poolId, 1, 1e19);
+        // uint deltaLiquidity = __hyperTestingContract__.getMaxLiquidity(_scenario_18_18.poolId, 1, 1e19);
     }
 
     // ===== Enigma ===== //
