@@ -123,7 +123,7 @@ contract StatelessSwaps is Helper, Test {
             Price.RMM memory rmm = Price.RMM({strike: stk, sigma: vol, tau: tau});
 
             // Compute reserves to determine max input and output.
-            (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, price);
+            (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, price, 0);
 
             uint256 maxInput;
             uint256 maxOutput;
@@ -222,7 +222,7 @@ contract StatelessSwaps is Helper, Test {
             uint16(volatility),
             uint16(duration),
             uint16(jit),
-            Price.computeTickWithPrice(stk),
+            stk,
             price
         );
 

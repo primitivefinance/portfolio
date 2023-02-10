@@ -12,7 +12,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(pool.lastPrice != 0);
+        require(_hyper.getLatestPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero
@@ -132,7 +132,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(pool.lastPrice != 0);
+        require(_hyper.getLatestPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         uint128 deltaLiquidity = 0;
@@ -230,7 +230,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(pool.lastPrice != 0);
+        require(_hyper.getLatestPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero

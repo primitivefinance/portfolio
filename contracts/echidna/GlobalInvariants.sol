@@ -97,10 +97,10 @@ contract GlobalInvariants is
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", pool.lastPrice);
-            emit LogUint256("strike price", curve.strike());
+            emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
+            emit LogUint256("strike price", curve.maxPrice);
 
-            assert(pool.lastPrice <= curve.strike());
+            assert(_hyper.getLatestPrice(poolId) <= curve.maxPrice);
         }
     }
 
@@ -112,10 +112,10 @@ contract GlobalInvariants is
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", pool.lastPrice);
-            emit LogUint256("strike price", curve.strike());
+            emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
+            emit LogUint256("strike price", curve.maxPrice);
 
-            if (curve.strike() == 0) {
+            if (curve.maxPrice == 0) {
                 emit AssertionFailed("BUG: Strike price should never be 0.");
             }
         }
@@ -143,8 +143,8 @@ contract GlobalInvariants is
             HyperPool memory pool = getPool(address(_hyper), poolId);
             emit LogUint256("last timestamp", uint256(pool.lastTimestamp));
 
-            if (pool.lastPrice != 0) {
-                emit LogUint256("pool's last price", pool.lastPrice);
+            if (_hyper.getLatestPrice(poolId) != 0) {
+                emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
                 if (pool.liquidity == 0) {
                     emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
                 }
@@ -230,7 +230,7 @@ contract GlobalInvariants is
                 emit AssertionFailed("BUG amountAssetWad is greater than 1e18");
             }
             // Inclusive of strike price?
-            if (amountQuoteWad > curve.strike()) {
+            if (amountQuoteWad > curve.maxPrice) {
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
                 emit AssertionFailed("BUG amountQuoteWad is greater than strike");
             }

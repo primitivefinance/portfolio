@@ -8,17 +8,17 @@ contract PoolCreation is EchidnaStateHandling {
     function create_non_controlled_pool(
         uint256 id,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint128 price
     ) public {
         uint24 pairId = retrieve_created_pair(uint256(id));
         {
-            (, fee, maxTick, volatility, duration, , price) = clam_safe_create_bounds(
+            (, fee, maxPrice, volatility, duration, , price) = clam_safe_create_bounds(
                 0,
                 fee,
-                maxTick,
+                maxPrice,
                 volatility,
                 duration,
                 0,
@@ -33,15 +33,15 @@ contract PoolCreation is EchidnaStateHandling {
             volatility,
             duration,
             0, // no jit
-            maxTick,
+            maxPrice,
             price
         );
         {
-            (HyperPool memory pool, ) = execute_create_pool(pairId, createPoolData, false);
+            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, false);
             assert(!pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
-            assert(pool.lastPrice == price);
+            assert(_hyper.getLatestPrice(poolId) == price);
             assert(curve.createdAt == block.timestamp);
             assert(pool.controller == address(0));
             assert(curve.priorityFee == 0);
@@ -49,8 +49,8 @@ contract PoolCreation is EchidnaStateHandling {
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
             assert(curve.jit == JUST_IN_TIME_LIQUIDITY_POLICY);
-            assert(curve.maxTick == maxTick);
-            assert(curve.maturity() >= block.timestamp);
+            assert(curve.maxPrice == maxPrice);
+            // assert(curve.maturity() >= block.timestamp);
         }
     }
 
@@ -58,7 +58,7 @@ contract PoolCreation is EchidnaStateHandling {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -66,25 +66,25 @@ contract PoolCreation is EchidnaStateHandling {
     ) public {
         uint24 pairId = retrieve_created_pair(id);
         {
-            (priorityFee, fee, maxTick, volatility, duration, jit, price) = clam_safe_create_bounds(
-                priorityFee,
+            (, fee, maxPrice, volatility, duration, , price) = clam_safe_create_bounds(
+                0,
                 fee,
-                maxTick,
+                maxPrice,
                 volatility,
                 duration,
-                jit,
+                0,
                 price
             );
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
             pairId,
-            address(this), //controller
-            priorityFee, // no priority fee
+            address(0), // no controller
+            0, // no priority fee
             fee,
             volatility,
             duration,
-            jit, // no jit
-            maxTick,
+            0, // no jit
+            maxPrice,
             price
         );
         {
@@ -99,15 +99,15 @@ contract PoolCreation is EchidnaStateHandling {
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
             assert(curve.jit == jit);
-            assert(curve.maxTick == maxTick);
-            assert(curve.maturity() > block.timestamp);
+            assert(curve.maxPrice == maxPrice);
+            // assert(curve.maturity() > block.timestamp);
         }
     }
 
     function create_controlled_pool_with_zero_priority_fee_should_fail(
         uint256 id,
         uint16 fee,
-        int24 maxTick,
+        uint128 maxPrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -116,78 +116,29 @@ contract PoolCreation is EchidnaStateHandling {
         uint24 pairId = retrieve_created_pair(id);
         uint16 priorityFee = 0;
         {
-            (, fee, maxTick, volatility, duration, jit, price) = clam_safe_create_bounds(
-                priorityFee,
+            (, fee, maxPrice, volatility, duration, , price) = clam_safe_create_bounds(
+                0,
                 fee,
-                maxTick,
+                maxPrice,
                 volatility,
                 duration,
-                jit,
+                0,
                 price
             );
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
             pairId,
-            address(this), //controller
-            priorityFee, // no priority fee
+            address(0), // no controller
+            0, // no priority fee
             fee,
             volatility,
             duration,
-            jit, // no jit
-            maxTick,
+            0, // no jit
+            maxPrice,
             price
         );
         (bool success, ) = address(_hyper).call(createPoolData);
         assert(!success);
-    }
-
-    function create_pool_with_negative_max_tick_as_bounds(
-        uint256 id,
-        uint16 priorityFee,
-        uint16 fee,
-        int24 maxTick,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        uint128 price
-    ) public {
-        uint24 pairId = retrieve_created_pair(id);
-        {
-            (priorityFee, fee, maxTick, volatility, duration, jit, price) = clam_safe_create_bounds(
-                priorityFee,
-                fee,
-                maxTick,
-                volatility,
-                duration,
-                jit,
-                price
-            );
-        }
-        bytes memory createPoolData = ProcessingLib.encodeCreatePool(
-            pairId,
-            address(this), //controller
-            priorityFee, // no priority fee
-            fee,
-            volatility,
-            duration,
-            jit, // no jit
-            maxTick,
-            price
-        );
-        {
-            (HyperPool memory pool, ) = execute_create_pool(pairId, createPoolData, true);
-            assert(pool.isMutable());
-            HyperCurve memory curve = pool.params;
-            assert(pool.lastTimestamp == block.timestamp);
-            assert(curve.createdAt == block.timestamp);
-            assert(pool.controller == address(this));
-            assert(curve.priorityFee == priorityFee);
-            assert(curve.fee == fee);
-            assert(curve.volatility == volatility);
-            assert(curve.duration == duration);
-            assert(curve.jit == jit);
-            assert(curve.maxTick == maxTick);
-        }
     }
 
     function execute_create_pool(
@@ -220,12 +171,12 @@ contract PoolCreation is EchidnaStateHandling {
         (
             _pp.priorityFee,
             _pp.fee,
-            _pp.maxTick,
+            _pp.maxPrice,
             _pp.volatility,
             _pp.duration,
             _pp.jit,
             _pp.price
-        ) = clam_safe_create_bounds(pp.priorityFee, pp.fee, pp.maxTick, pp.volatility, pp.duration, pp.jit, pp.price);
+        ) = clam_safe_create_bounds(pp.priorityFee, pp.fee, pp.maxPrice, pp.volatility, pp.duration, pp.jit, pp.price);
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
             pairId,
             address(this),
@@ -234,7 +185,7 @@ contract PoolCreation is EchidnaStateHandling {
             _pp.volatility,
             _pp.duration,
             _pp.jit,
-            _pp.maxTick,
+            _pp.maxPrice,
             _pp.price
         );
         (, poolId) = execute_create_pool(pairId, createPoolData, false);

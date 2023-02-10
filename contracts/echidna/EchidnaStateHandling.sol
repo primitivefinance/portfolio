@@ -24,10 +24,10 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
     struct PoolParams {
         uint16 priorityFee;
         uint16 fee;
-        int24 maxTick;
         uint16 volatility;
         uint16 duration;
         uint16 jit;
+        uint128 maxPrice;
         uint128 price;
     }
 
