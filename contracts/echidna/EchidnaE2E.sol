@@ -1,33 +1,22 @@
 pragma solidity ^0.8.0;
 
-import "./Helper.sol";
-import "solmate/tokens/WETH.sol";
-import "../test/EchidnaERC20.sol";
-import "../Hyper.sol";
-import "../Enigma.sol" as ProcessingLib;
 import "../../test/helpers/HelperHyperProfiles.sol" as DefaultValues;
-import "../../test/helpers/HelperHyperView.sol";
-import "./EchidnaStateHandling.sol";
+import "./GlobalInvariants.sol";
 
-contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
-    WETH _weth;
-    Hyper _hyper;
-
-    constructor() public {
-        _weth = new WETH();
-        _hyper = new Hyper(address(_weth));
+contract EchidnaE2E is GlobalInvariants {
+    constructor() GlobalInvariants() {
         EchidnaERC20 _asset = create_token("Asset Token", "ADEC6", 6);
         EchidnaERC20 _quote = create_token("Quote Token", "QDEC18", 18);
         add_created_hyper_token(_asset);
         add_created_hyper_token(_quote);
         create_pair_with_safe_preconditions(1, 2);
-        create_non_controlled_pool(0,1,0,0,0,100);
+        create_non_controlled_pool(0, 1, 0, 0, 0, 100);
     }
 
     OS.AccountSystem hyperAccount;
 
     // ******************** Check Proper System Deployment ********************
-    function check_proper_deployment() public {
+    function check_proper_deployment() public view {
         assert(address(_weth) != address(0));
         assert(address(_hyper) != address(0));
 
@@ -981,12 +970,7 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         uint256 deltaAsset,
         uint256 deltaQuote
     ) public {
-        (
-            HyperPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         HyperPosition memory preClaimPosition = getPosition(address(_hyper), address(this), poolId);
@@ -998,6 +982,12 @@ contract EchidnaE2E is HelperHyperView, Helper, EchidnaStateHandling {
         } catch {
             emit AssertionFailed("BUG: claim function should have succeeded");
         }
+    }
+
+    function create_special_pool() public {
+        require(!specialPoolCreated, "Special Pool already created");
+        uint24 pairId = create_special_pair();
+        create_special_pool(pairId, PoolParams(0, 0, 1, 0, 0, 0, 100));
     }
 
     // Future invariant: Funding with WETH and then depositing with ETH should have the same impact on the pool
