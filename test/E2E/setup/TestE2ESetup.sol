@@ -104,7 +104,6 @@ contract TestE2ESetup is Helpers, Test {
     // ===== Test Scenarios ===== //
 
     function initScenarios() internal {
-        __hyper__.setTimestamp(uint128(block.timestamp)); // Important
         // Create default pool
         bytes memory data = createPool(
             address(__asset__),
@@ -115,7 +114,7 @@ contract TestE2ESetup is Helpers, Test {
             uint16(DEFAULT_SIGMA),
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
@@ -140,11 +139,6 @@ contract TestE2ESetup is Helpers, Test {
             deal(address(__asset__), __users__[i], deltaAsset); // TODO: Use regular ERC20, since we can deal.
             deal(address(__quote__), __users__[i], deltaQuote); // TODO: Use regular ERC20, since we can deal.
         }
-    }
-
-    function customWarp(uint time) public virtual {
-        vm.warp(time);
-        __hyper__.setTimestamp(uint128(time));
     }
 
     event SetNewPoolId(uint64);

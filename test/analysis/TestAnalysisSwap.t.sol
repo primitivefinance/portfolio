@@ -56,7 +56,7 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
     Uni pool;
     uint24 fee = 3000;
     uint64 poolId = 0x0000010100000001;
-    int24 tick;
+    uint128 maxPrice;
     uint stk;
     uint price;
 
@@ -68,13 +68,12 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
         price = 1e36 / (((price * price * 10 ** ERC20(USDC).decimals())) >> (96 * 2));
         stk = (price * 5) / 4;
         console.log("stk", stk);
-        tick = Price.computeTickWithPrice(stk);
         console.log("Got price of WETH-USDC 30bps", price);
-        console.log("Got tick at price", uint24(tick));
+        console.log("Got strike", stk);
 
         vm.deal(address(this), 1_000 ether);
         (bool success, bytes memory revertData) = address(hyper).call{value: 1_000 ether}(
-            createPool(WETH, USDC, address(this), 1, 30, 5_500, 365, 1, tick, uint128(price))
+            createPool(WETH, USDC, address(this), 1, 30, 5_500, 365, 1, uint128(stk), uint128(price))
         );
         assertTrue(success, "create pool failed");
 
@@ -83,73 +82,12 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
         hyper.allocate(poolId, 1_000 ether);
     }
 
-    function __testAnalysisSwapQuote() public {
-        (uint uWeth, uint uUsdc) = (ERC20(WETH).balanceOf(address(pool)), ERC20(USDC).balanceOf(address(pool)));
-        console.log("WETH in Uniswap: ", uWeth);
-        console.log("USDC in Uniswap: ", uUsdc);
-
-        (uint bWeth, uint bUsdc) = hyper.getVirtualReserves(poolId);
-        console.log("WETH in Hyper: ", bWeth);
-        console.log("USDC in Hyper: ", bUsdc);
-
-        console.log("Diff in WETH, uni - hyper: ");
-        console.logInt(int(uWeth) - int(bWeth));
-        console.log("Diff in USDC, uni - hyper: ");
-        console.logInt(int(uUsdc) - int(bUsdc));
-
-        bytes memory quote = abi.encodeWithSelector(Quoter.quoteExactInputSingle.selector, WETH, USDC, fee, 1 ether, 0);
-        //(bool success, bytes memory quoteData) = address(quoter).staticcall(quote);
-        //uint uQuote = abi.decode(quoteData, (uint));
-        uint uQuote = quoter.quoteExactInputSingle(WETH, USDC, fee, 1 ether, 0);
-        console.log("Got uniswap quote: ", uQuote);
-
-        uint hQuote = hyper.getAmountOut(poolId, true, 1 ether);
-        //(uint hQuote, ) = hyper.swap(poolId, true, 1 ether, 0);
-        console.log("Got hyper quote: ", hQuote);
-
-        console.log("Diff in quote, uni - hyper: ");
-        console.logInt(int(uQuote) - int(hQuote));
-
-        uint optimized;
-        uint i;
-        int24 startTick = tick;
-        int24 endTick = startTick;
-        uint16 vol = 2_000;
-        uint16 dur = 365;
-
-        while (optimized < uQuote && i != 25) {
-            uint strike = Price.computePriceWithTick(endTick);
-            if (dur > 20) {
-                // optimize duration first
-                hyper.changeParameters(poolId, 0, 0, 0, dur, 0, 0);
-                console.log("dur: ", dur);
-                dur -= 35;
-            } else if (strike < price) {
-                // optimize vol
-                hyper.changeParameters(poolId, 0, 0, vol, 0, 0, 0);
-                console.log("vol: ", vol);
-                vol -= 100;
-            } else {
-                // optimize strike
-                hyper.changeParameters(poolId, 0, 0, 0, 0, 0, endTick);
-                console.log("strike price: ", strike);
-                endTick -= 250;
-            }
-            optimized = hyper.getAmountOut(poolId, true, 1 ether);
-            console.log("target - optimized", uQuote - optimized);
-
-            ++i;
-        }
-
-        console.log("DONE");
-    }
-
     function __testFuzzSwapOutput(uint16 vol, uint16 dur, uint128 strike) public {
         vol = uint16(bound(vol, 500, 2_000));
         dur = uint16(bound(dur, 10, 100));
         strike = uint128(bound(strike, stk, price * 2)); // between strike and twice the price
 
-        hyper.changeParameters(poolId, 0, 0, vol, dur, 0, Price.computeTickWithPrice(strike));
+        hyper.changeParameters(poolId, 0, 0, 0);
 
         uint target = 1261714834;
         uint actual = hyper.getAmountOut(poolId, true, 1 ether);

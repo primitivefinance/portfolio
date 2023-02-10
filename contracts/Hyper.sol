@@ -185,7 +185,10 @@ contract Hyper is IHyper {
     /// @inheritdoc IHyperActions
     function draw(address token, uint256 amount, address to) external lock interactions {
         if (to == address(this)) revert InvalidTransfer(); // todo: Investigate attack vectors if this was not here.
-        if (amount > getBalance(msg.sender, token)) revert DrawBalance();
+
+        uint balance = getBalance(msg.sender, token);
+        if (amount == type(uint).max) amount = balance;
+        if (amount > balance) revert DrawBalance();
 
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
@@ -196,7 +199,8 @@ contract Hyper is IHyper {
 
     /// @inheritdoc IHyperActions
     function fund(address token, uint256 amount) external override lock interactions {
-        __account__.dangerousFund(token, address(this), amount); // transferFrom(msg.sender)
+        if (amount == type(uint).max) amount = OS.__balanceOf__(token, msg.sender);
+        __account__.dangerousFund(token, address(this), amount); // warning: external call to msg.sender.
     }
 
     /// @inheritdoc IHyperActions
@@ -211,7 +215,7 @@ contract Hyper is IHyper {
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
-        pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote, pool.invariantGrowthGlobal);
 
         // 2^256 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
         uint256 claimedAssets = deltaAsset == type(uint256).max ? pos.tokensOwedAsset : deltaAsset;
@@ -223,21 +227,6 @@ contract Hyper is IHyper {
         if (claimedAssets > 0) _applyCredit(pool.pair.tokenAsset, claimedAssets);
         if (claimedQuotes > 0) _applyCredit(pool.pair.tokenQuote, claimedQuotes);
 
-        uint128 deltaReward = pos.tokensOwedReward;
-        pos.tokensOwedReward -= deltaReward;
-
-        // todo: a hack that utilizes Hyper contract as a fee bucket for priority swaps.
-        // Currently uses WETH as the reward token. However, these priority fees
-        // are paid based on liquidity.
-        // If 1 WAD of liquidity is worth a small amount, the priority fee cost
-        // a lot relative to the liquidity's value.
-        // A better change is making this reward token configurable.
-        if (deltaReward > 0) {
-            _applyCredit(WETH, deltaReward); // gift to `msg.sender`.
-            if (getBalance(address(this), WETH) < deltaReward) revert InvalidReward();
-            __account__.debit(address(this), WETH, deltaReward); // only place hyper's balance is used
-        }
-
         emit Collect(
             poolId,
             msg.sender,
@@ -245,8 +234,8 @@ contract Hyper is IHyper {
             pool.pair.tokenAsset,
             claimedQuotes,
             pool.pair.tokenQuote,
-            deltaReward,
-            WETH
+            0,
+            address(0)
         );
     }
 
@@ -270,11 +259,12 @@ contract Hyper is IHyper {
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
         (deltaAsset, deltaQuote) = pool.getLiquidityDeltas(toInt128(deltaLiquidity)); // note: rounds up.
+        if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
             poolId: poolId,
-            timestamp: _blockTimestamp(),
+            timestamp: block.timestamp,
             deltaAsset: deltaAsset,
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
@@ -303,7 +293,7 @@ contract Hyper is IHyper {
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
             poolId: poolId,
-            timestamp: _blockTimestamp(),
+            timestamp: block.timestamp,
             deltaAsset: deltaAsset,
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
@@ -315,10 +305,16 @@ contract Hyper is IHyper {
         emit Unallocate(poolId, pool.pair.tokenAsset, pool.pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
-    function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint feeAsset, uint feeQuote) {
+    function _changeLiquidity(
+        ChangeLiquidityParams memory args
+    ) internal returns (uint feeAsset, uint feeQuote, uint invariantGrowth) {
         (HyperPool storage pool, HyperPosition storage pos) = (pools[args.poolId], positions[args.owner][args.poolId]);
 
-        (feeAsset, feeQuote) = pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote);
+        (feeAsset, feeQuote, invariantGrowth) = pos.syncPositionFees(
+            pool.feeGrowthGlobalAsset,
+            pool.feeGrowthGlobalQuote,
+            pool.invariantGrowthGlobal
+        );
 
         _changePosition(args);
     }
@@ -328,7 +324,7 @@ contract Hyper is IHyper {
         HyperPosition storage position = positions[args.owner][args.poolId];
 
         if (args.deltaLiquidity < 0) {
-            uint distance = position.getTimeSinceChanged(_blockTimestamp());
+            uint distance = position.getTimeSinceChanged(block.timestamp);
             if (pools[args.poolId].params.jit > distance) revert JitLiquidity(distance);
         }
 
@@ -360,10 +356,11 @@ contract Hyper is IHyper {
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
 
-        uint limitPrice = args.output;
+        uint minAmountOut = args.output;
         bool sellAsset = args.direction == 0;
 
         HyperPool memory pool = pools[args.poolId];
+        if (block.timestamp > pool.params.maturity()) revert PoolExpired();
         if (args.useMax == 0) {
             input = args.input;
         } else {
@@ -379,9 +376,7 @@ contract Hyper is IHyper {
 
         (poolId, remainder, input, output) = _swap(args);
 
-        uint nextPrice = pools[args.poolId].lastPrice;
-        if (!sellAsset && nextPrice > limitPrice) revert SwapLimitReached();
-        if (sellAsset && limitPrice > nextPrice) revert SwapLimitReached();
+        if (minAmountOut > args.output) revert SwapLimitReached();
     }
 
     /** @dev Swaps in direction (0 or 1) input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset). */
@@ -399,10 +394,10 @@ contract Hyper is IHyper {
         _state.tokenInput = _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote;
         _state.tokenOutput = _state.sell ? pool.pair.tokenQuote : pool.pair.tokenAsset;
 
-        Price.RMM memory rmm = Price.RMM({strike: pool.params.strike(), sigma: pool.params.volatility, tau: 0});
+        Price.RMM memory rmm = pool.getRMM();
         Iteration memory _swap;
         {
-            (uint256 price, int24 tick, uint updatedTau) = _computeSyncedPrice(args.poolId);
+            (, int256 invariant, uint updatedTau) = _computeSyncedPrice(args.poolId);
             rmm.tau = updatedTau;
 
             uint internalBalance = getBalance(msg.sender, _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote);
@@ -413,14 +408,17 @@ contract Hyper is IHyper {
 
             // Keeps WAD values
             _swap = Iteration({
-                price: price,
-                tick: tick,
+                virtualX: 0,
+                virtualY: 0,
+                invariant: invariant,
                 feeAmount: 0,
                 remainder: remainder,
                 liquidity: pool.liquidity,
                 input: 0,
                 output: output
             });
+
+            (_swap.virtualX, _swap.virtualY) = pool.getAmountsWad();
         }
 
         if (rmm.tau == 0) revert PoolExpired();
@@ -435,7 +433,6 @@ contract Hyper is IHyper {
         uint256 nextIndependent;
         uint256 liveDependent;
         uint256 nextDependent;
-        uint256 priorityFeeAmount;
 
         {
             uint256 maxInput;
@@ -445,19 +442,14 @@ contract Hyper is IHyper {
 
             // Virtual reserves
             if (_state.sell) {
-                (liveDependent, liveIndependent) = rmm.computeReserves(_swap.price);
+                (liveIndependent, liveDependent) = (_swap.virtualX, _swap.virtualY);
                 maxInput = (FixedPointMathLib.WAD - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
             } else {
-                (liveIndependent, liveDependent) = rmm.computeReserves(_swap.price);
+                (liveDependent, liveIndependent) = (_swap.virtualX, _swap.virtualY);
                 maxInput = (rmm.strike - liveIndependent).mulWadDown(_swap.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            priorityFeeAmount = msg.sender == pool.controller ? (pool.liquidity * _state.fee) / 10_000 : 0;
-            _swap.feeAmount = priorityFeeAmount != 0
-                ? 0
-                : ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * _state.fee) / 10_000;
-            _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
-            if (priorityFeeAmount != 0) _state.priorityFeeGrowthGlobal = priorityFeeAmount.divWadDown(_swap.liquidity); // todo: update for handling config reward token?
+            _swap.feeAmount = ((_swap.remainder > maxInput ? maxInput : _swap.remainder) * _state.fee) / 10_000;
 
             deltaInput = _swap.remainder > maxInput ? maxInput : _swap.remainder; // swaps up to the maximum input
             deltaInputLessFee = deltaInput - _swap.feeAmount;
@@ -470,25 +462,32 @@ contract Hyper is IHyper {
         }
 
         {
-            uint256 nextPrice;
             int256 liveInvariantWad;
             int256 nextInvariantWad;
 
             if (_state.sell) {
-                liveInvariantWad = rmm.invariantOf(liveDependent, liveIndependent);
+                (_swap.virtualX, _swap.virtualY) = (nextIndependent, nextDependent);
+                liveInvariantWad = _swap.invariant;
                 nextInvariantWad = rmm.invariantOf(nextDependent, nextIndependent);
-                nextPrice = rmm.getPriceWithX(nextIndependent);
             } else {
-                liveInvariantWad = rmm.invariantOf(liveIndependent, liveDependent);
+                (_swap.virtualX, _swap.virtualY) = (nextDependent, nextIndependent);
+                liveInvariantWad = _swap.invariant;
                 nextInvariantWad = rmm.invariantOf(nextIndependent, nextDependent);
-                nextPrice = rmm.getPriceWithX(nextDependent);
             }
 
+            _swap.invariant = int128(nextInvariantWad);
+
+            // todo: improve documentation for scaling invariant down, e.g. you can't have a negative invariant of a fraction of a token
             liveInvariantWad = liveInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote); // invariant is denominated in quote token.
             nextInvariantWad = nextInvariantWad.scaleFromWadDownSigned(pool.pair.decimalsQuote);
             if (nextInvariantWad < liveInvariantWad) revert InvalidInvariant(liveInvariantWad, nextInvariantWad);
 
-            _swap.price = (nextPrice * (0.001 ether + 1)) / 0.001 ether;
+            // Apply priority invariant growth.
+            if (msg.sender == pool.controller) {
+                int256 delta = nextInvariantWad - liveInvariantWad;
+                uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
+                if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(_swap.liquidity);
+            }
         }
 
         {
@@ -502,6 +501,10 @@ contract Hyper is IHyper {
                 outputDec = pool.pair.decimalsAsset;
             }
 
+            if (_swap.invariant > 0) {
+                _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(_swap.feeAmount, _swap.liquidity);
+            }
+
             _swap.input = _swap.input.scaleFromWadDown(inputDec);
             _swap.output = _swap.output.scaleFromWadDown(outputDec);
         }
@@ -509,28 +512,22 @@ contract Hyper is IHyper {
         // Apply pool effects.
         _syncPool(
             args.poolId,
-            Price.computeTickWithPrice(_swap.price),
-            _swap.price,
+            _swap.virtualX,
+            _swap.virtualY,
             _swap.liquidity,
             _state.sell ? _state.feeGrowthGlobal : 0,
             _state.sell ? 0 : _state.feeGrowthGlobal,
-            _state.priorityFeeGrowthGlobal
+            _state.invariantGrowthGlobal
         );
 
         _increaseReserves(_state.tokenInput, _swap.input);
         _decreaseReserves(_state.tokenOutput, _swap.output);
 
-        // Apply reserve effects.
-        if (priorityFeeAmount != 0) {
-            // Uses hyper's internal balance as a fee bucket for priority swaps.
-            // todo: investigate two different pools accruing priority rewards in the same bucket,
-            // and if it's possible to "steal" another pool's accrued priority rewards.
-            _increaseReserves(WETH, priorityFeeAmount);
-            emit IncreaseUserBalance(address(this), WETH, priorityFeeAmount);
-            __account__.credit(address(this), WETH, priorityFeeAmount);
+        {
+            uint64 id = args.poolId;
+            uint price = getLatestPrice(id);
+            emit Swap(id, price, _state.tokenInput, _swap.input, _state.tokenOutput, _swap.output, _swap.feeAmount);
         }
-
-        emit Swap(args.poolId, _swap.price, _state.tokenInput, _swap.input, _state.tokenOutput, _swap.output);
 
         delete _state;
         return (args.poolId, _swap.remainder, _swap.input, _swap.output);
@@ -542,17 +539,19 @@ contract Hyper is IHyper {
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _computeSyncedPrice(uint64 poolId) internal view returns (uint256 price, int24 tick, uint updatedTau) {
+    function _computeSyncedPrice(
+        uint64 poolId
+    ) internal view returns (uint256 price, int256 invariant, uint updatedTau) {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
+        Price.RMM memory curve = pool.getRMM();
 
-        (price, tick, updatedTau) = (pool.lastPrice, pool.lastTick, pool.tau(_blockTimestamp()));
+        updatedTau = pool.tau(block.timestamp);
+        curve.tau = updatedTau;
 
-        uint passed = getTimePassed(poolId);
-        if (passed > 0) {
-            uint256 lastTau = pool.lastTau(); // pool.params.maturity() - pool.lastTimestamp.
-            (price, tick) = pool.computePriceChangeWithTime(lastTau, passed);
-        }
+        (uint x, uint y) = pool.getAmountsWad();
+        invariant = curve.invariantOf({R_y: y, R_x: x});
+        price = curve.getPriceWithX({R_x: x});
     }
 
     /**
@@ -560,29 +559,32 @@ contract Hyper is IHyper {
      */
     function _syncPool(
         uint64 poolId,
-        int24 tick,
-        uint256 price,
+        uint256 nextVirtualX,
+        uint256 nextVirtualY,
         uint256 liquidity,
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote,
-        uint256 feeGrowthGlobalReward
+        uint256 invariantGrowthGlobal
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
-        uint256 timestamp = _blockTimestamp();
         timeDelta = getTimePassed(poolId);
 
-        if (pool.lastTick != tick) pool.lastTick = tick;
-        if (pool.lastPrice != price) pool.lastPrice = price.safeCastTo128();
+        if (pool.virtualX != nextVirtualX) pool.virtualX = nextVirtualX.safeCastTo128();
+        if (pool.virtualY != nextVirtualY) pool.virtualY = nextVirtualY.safeCastTo128();
         if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
-        if (pool.lastTimestamp != timestamp) pool.syncPoolTimestamp(timestamp);
+        if (pool.lastTimestamp != block.timestamp) pool.syncPoolTimestamp(block.timestamp);
 
         pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
-        pool.feeGrowthGlobalReward = Assembly.computeCheckpoint(pool.feeGrowthGlobalReward, feeGrowthGlobalReward);
+        pool.invariantGrowthGlobal = Assembly.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
     }
 
     // ===== Initializing Pools ===== //
+
+    function createPair(address asset, address quote) external lock interactions returns (uint24 pairId) {
+        return _createPair(asset, quote);
+    }
 
     function _createPair(address asset, address quote) internal returns (uint24 pairId) {
         if (asset == quote) revert SameTokenError();
@@ -609,8 +611,7 @@ contract Hyper is IHyper {
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
     }
 
-    /** @dev If pairId == 0, its a magic variable that uses current pair nonce. */
-    function _createPool(
+    function createPool(
         uint24 pairId,
         address controller,
         uint16 priorityFee,
@@ -618,17 +619,30 @@ contract Hyper is IHyper {
         uint16 vol,
         uint16 dur,
         uint16 jit,
-        int24 max,
+        uint128 maxPrice,
+        uint128 price
+    ) external lock interactions returns (uint64 poolId) {
+        return _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
+    }
+
+    /** @dev If pairId == 0, its a magic variable that uses current pair nonce. */
+    function _createPool(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        uint128 maxPrice,
         uint128 price
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
 
-        uint32 timestamp = uint(_blockTimestamp()).safeCastTo32();
+        uint32 timestamp = uint(block.timestamp).safeCastTo32();
         HyperPool memory pool;
         pool.controller = controller;
         pool.lastTimestamp = timestamp;
-        pool.lastPrice = price;
-        pool.lastTick = Price.computeTickWithPrice(pool.lastPrice);
         bool hasController = pool.controller != address(0);
         if (hasController && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
 
@@ -636,11 +650,11 @@ contract Hyper is IHyper {
         pool.pair = pairs[pairNonce];
 
         HyperCurve memory params = HyperCurve({
-            maxTick: max,
+            maxPrice: maxPrice,
             jit: hasController ? jit : uint8(_liquidityPolicy()),
             fee: fee,
-            duration: dur,
-            volatility: vol,
+            duration: duration,
+            volatility: volatility,
             priorityFee: hasController ? priorityFee : 0, // min fee
             createdAt: timestamp
         });
@@ -652,39 +666,26 @@ contract Hyper is IHyper {
         poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
         if (pools[poolId].exists()) revert PoolExists(); // todo: poolNonce always increments, so this never gets hit, remove
 
+        (uint y, uint x) = pool.getRMM().computeReserves(price, 0); // todo: write better docs for whats going on here
+        (pool.virtualY, pool.virtualX) = (y.safeCastTo128(), x.safeCastTo128());
+
         pools[poolId] = pool; // effect
 
         emit CreatePool(poolId, hasController, pool.pair.tokenAsset, pool.pair.tokenQuote, price);
     }
 
-    function changeParameters(
-        uint64 poolId,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        int24 maxTick
-    ) external lock interactions {
+    function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external lock interactions {
         HyperPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
         HyperCurve memory modified = pool.params;
         if (jit != 0) modified.jit = jit;
-        if (maxTick != 0) modified.maxTick = maxTick;
         if (fee != 0) modified.fee = fee;
-        if (volatility != 0) modified.volatility = volatility;
-        if (duration != 0) modified.duration = duration;
         if (priorityFee != 0) modified.priorityFee = priorityFee;
 
         pool.changePoolParameters(modified);
 
-        emit ChangeParameters(poolId, priorityFee, fee, volatility, duration, jit, maxTick);
-    }
-
-    /** @dev Overridable in tests.  */
-    function _blockTimestamp() internal view virtual returns (uint128) {
-        return uint128(block.timestamp);
+        emit ChangeParameters(poolId, priorityFee, fee, jit);
     }
 
     /** @dev Overridable in tests.  */
@@ -764,10 +765,10 @@ contract Hyper is IHyper {
                 uint16 vol,
                 uint16 dur,
                 uint16 jit,
-                int24 max,
+                uint128 maxPrice,
                 uint128 price
             ) = Enigma.decodeCreatePool(data);
-            _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
+            _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
         } else if (instruction == Enigma.CREATE_PAIR) {
             (address asset, address quote) = Enigma.decodeCreatePair(data);
             _createPair(asset, quote);
@@ -845,7 +846,7 @@ contract Hyper is IHyper {
     }
 
     function getTimePassed(uint64 poolId) public view returns (uint) {
-        return _blockTimestamp() - pools[poolId].lastTimestamp;
+        return block.timestamp - pools[poolId].lastTimestamp;
     }
 
     function getVirtualReserves(uint64 poolId) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
@@ -876,7 +877,7 @@ contract Hyper is IHyper {
         (output, ) = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
-            timeSinceUpdate: _blockTimestamp() - pool.lastTimestamp // invariant: should not underflow.
+            timeSinceUpdate: block.timestamp - pool.lastTimestamp // invariant: should not underflow.
         });
     }
 }

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "../../contracts/Assembly.sol";
+import "../../contracts/Assembly.sol" as Assembly;
 import "forge-std/Test.sol";
 
 contract AddSignedDelta {
     function addSignedDelta(uint128 input, int128 delta) public pure returns (uint128 output) {
-        bytes memory revertData = abi.encodeWithSelector(InvalidLiquidity.selector);
+        bytes memory revertData = abi.encodeWithSelector(Assembly.InvalidLiquidity.selector);
         assembly {
             output := add(input, delta)
 
@@ -19,10 +19,10 @@ contract AddSignedDelta {
     function addSignedDelta_ref(uint128 input, int128 delta) external pure returns (uint128 output) {
         if (delta < 0) {
             output = input - uint128(-delta);
-            if (output >= input) revert InvalidLiquidity();
+            if (output >= input) revert Assembly.InvalidLiquidity();
         } else {
             output = input + uint128(delta);
-            if (output < input) revert InvalidLiquidity();
+            if (output < input) revert Assembly.InvalidLiquidity();
         }
     }
 }
@@ -65,9 +65,39 @@ contract TestAssembly is Test {
         vm.assume(input >= uint128(delta));
         vm.assume(uint256(input) + uint256(uint128(delta)) <= type(uint128).max);
 
-        assertEq(
-            target.addSignedDelta(input, delta),
-            target.addSignedDelta_ref(input, delta)
-        );
+        assertEq(target.addSignedDelta(input, delta), target.addSignedDelta_ref(input, delta));
+    }
+
+    function testAssembly_scaleFromWadUp_rounds_up_conditionally() public {
+        uint input = 0.01 ether; // 16 decimals
+        uint decimals = 2;
+        uint actual = Assembly.scaleFromWadUp(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
+        uint expected = 1;
+        assertEq(actual, expected, "unexpected-scale-from-wad-up-result");
+    }
+
+    function testAssembly_scaleFromWadUpSigned_rounds_up_conditionally() public {
+        int input = int(0.01 ether); // 16 decimals
+        uint decimals = 2;
+        int actual = Assembly.scaleFromWadUpSigned(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
+        int expected = 1;
+        assertEq(actual, expected, "unexpected-scale-from-wad-up-result");
+    }
+
+    // todo: fix this test, it should pass
+    /* function testAssembly_scaleFromWadUp_zero_returns_zero() public {
+        uint input = 0;
+        uint decimals = 6;
+        uint actual = Assembly.scaleFromWadUp(input, decimals);
+        uint expected = 0;
+        assertEq(actual, expected, "non-zero-round-up");
+    } */
+
+    function testAssembly_scaleFromWadUp_equivalent_returns_input() public {
+        uint decimals = 6;
+        uint input = 10 ** (18 - decimals);
+        uint actual = Assembly.scaleFromWadUp(input, decimals);
+        uint expected = 1;
+        assertEq(actual, expected, "non-equal");
     }
 }

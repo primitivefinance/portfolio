@@ -15,7 +15,8 @@ interface IHyperEvents {
         address indexed tokenIn,
         uint256 input,
         address indexed tokenOut,
-        uint256 output
+        uint256 output,
+        uint256 fee
     );
     event Allocate(
         uint64 indexed poolId,
@@ -34,15 +35,8 @@ interface IHyperEvents {
         uint256 deltaLiquidity
     );
 
-    event ChangeParameters(
-        uint64 indexed poolId,
-        uint16 priorityFee,
-        uint16 indexed fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        int24 indexed maxTick
-    );
+    /** @dev Emits a `0` for unchanged parameters. */
+    event ChangeParameters(uint64 indexed poolId, uint16 indexed priorityFee, uint16 indexed fee, uint16 jit);
     event Collect(
         uint64 poolId,
         address account,
@@ -86,14 +80,14 @@ interface IHyperGetters {
         external
         view
         returns (
-            int24 lastTick,
+            uint128 virtualX,
+            uint128 virtualY,
+            uint128 liquidity,
             uint32 lastTimestamp,
             address controller,
-            uint256 feeGrowthGlobalReward,
+            uint256 invariantGrowthGlobal,
             uint256 feeGrowthGlobalAsset,
             uint256 feeGrowthGlobalQuote,
-            uint128 lastPrice,
-            uint128 liquidity,
             HyperCurve memory,
             HyperPair memory
         );
@@ -107,12 +101,12 @@ interface IHyperGetters {
         returns (
             uint128 freeLiquidity,
             uint256 lastTimestamp,
-            uint256 feeGrowthRewardLast,
+            uint256 invariantGrowthLast,
             uint256 feeGrowthAssetLast,
             uint256 feeGrowthQuoteLast,
             uint128 tokensOwedAsset,
             uint128 tokensOwedQuote,
-            uint128 tokensOwedReward
+            uint128 invariantOwed
         );
 
     function getPairNonce() external view returns (uint24);
@@ -157,15 +151,7 @@ interface IHyperActions {
 
     function deposit() external payable;
 
-    function changeParameters(
-        uint64 poolId,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
-        int24 maxTick
-    ) external;
+    function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
 }
 
 interface IHyper is IHyperActions, IHyperEvents, IHyperGetters {}

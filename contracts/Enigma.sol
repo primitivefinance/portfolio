@@ -138,10 +138,10 @@ function encodeCreatePool(
     uint16 vol,
     uint16 dur,
     uint16 jit,
-    int24 max,
+    uint128 maxPrice,
     uint128 price
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, max, price);
+    data = abi.encodePacked(CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
 }
 
 function decodeCreatePool(
@@ -156,11 +156,11 @@ function decodeCreatePool(
         uint16 vol,
         uint16 dur,
         uint16 jit,
-        int24 max,
+        uint128 maxPrice,
         uint128 price
     )
 {
-    if (data.length != 53) revert InvalidBytesLength(53, data.length);
+    if (data.length != 66) revert InvalidBytesLength(66, data.length);
     pairId = uint24(bytes3(data[1:4]));
     controller = address(bytes20(data[4:24]));
     priorityFee = uint16(bytes2(data[24:26]));
@@ -168,8 +168,8 @@ function decodeCreatePool(
     vol = uint16(bytes2(data[28:30]));
     dur = uint16(bytes2(data[30:32]));
     jit = uint16(bytes2(data[32:34]));
-    max = int24(uint24(bytes3(data[34:37])));
-    price = uint128(bytes16(data[37:]));
+    maxPrice = uint128(bytes16(data[34:50]));
+    price = uint128(bytes16(data[50:]));
 }
 
 function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {

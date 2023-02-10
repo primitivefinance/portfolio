@@ -122,7 +122,6 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     }
 
     function initScenarios() internal {
-        __hyperTestingContract__.setTimestamp(uint128(block.timestamp)); // Important
         // Create default pool
         bytes memory data = createPool(
             address(__token_18__),
@@ -133,7 +132,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             uint16(DEFAULT_SIGMA),
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
@@ -153,7 +152,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             uint16(DEFAULT_SIGMA),
             uint16(DEFAULT_DURATION_DAYS),
             DEFAULT_JIT,
-            DEFAULT_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
@@ -171,6 +170,8 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             "18-18 decimal pair"
         );
         scenarios.push(_scenario_18_18);
+
+        createControlledPool();
     }
 
     uint64 public constant FIRST_POOL = 0x0000010000000001;
@@ -217,11 +218,6 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         vm.label(address(__badToken__), "BadToken");
     }
 
-    function customWarp(uint time) internal {
-        vm.warp(time);
-        __hyperTestingContract__.setTimestamp(uint128(time));
-    }
-
     function createControlledPool() internal {
         bytes memory data = Enigma.encodeCreatePool(
             uint24(1), // first pair, is it good in this test?
@@ -231,7 +227,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             DEFAULT_VOLATILITY,
             DEFAULT_DURATION,
             DEFAULT_JIT,
-            DEFAULT_MAX_TICK,
+            DEFAULT_STRIKE,
             DEFAULT_PRICE
         );
 
@@ -269,7 +265,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
             defaultScenario.poolId,
             false,
             (pool.getMaxSwapQuoteInWad() * 1 ether) / 2 ether,
-            type(uint256).max
+            1
         );
 
         assertTrue(output > 0, "no swap happened!");
@@ -281,6 +277,10 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     function _alloc(uint64 id) internal {
         __hyperTestingContract__.allocate(id, 1 ether);
+    }
+
+    function _unalloc(uint64 id) internal {
+        __hyperTestingContract__.unallocate(id, type(uint).max);
     }
 
     function basicUnallocate() internal {
@@ -300,9 +300,26 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         );
     }
 
+    function _draw(TestScenario memory scenario) internal {
+        __hyperTestingContract__.draw(
+            address(scenario.asset),
+            __hyperTestingContract__.getBalance(address(this), address(scenario.asset)),
+            address(this)
+        );
+        __hyperTestingContract__.draw(
+            address(scenario.quote),
+            __hyperTestingContract__.getBalance(address(this), address(scenario.quote)),
+            address(this)
+        );
+    }
+
     function defaultPool() internal view returns (HyperPool memory) {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
         return pool;
+    }
+
+    function _poolOf(uint64 id) internal view returns (HyperPool memory) {
+        return getPool(address(__hyperTestingContract__), id);
     }
 
     function defaultRevertCatcherPosition() internal view returns (HyperPosition memory) {

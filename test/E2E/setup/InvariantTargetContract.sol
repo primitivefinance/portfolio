@@ -14,8 +14,6 @@ interface Context {
 
     function addPoolId(uint64 poolId) external;
 
-    function customWarp(uint time) external;
-
     function getRandomUser(uint id) external view returns (address);
 
     function __weth__() external view returns (TestERC20);

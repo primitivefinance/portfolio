@@ -5,7 +5,7 @@ pragma solidity 0.8.13;
 
   -------------
 
-  Using yul to handle low-level coversions
+  Using yul to handle low-level conversions
   can easily be a foot shotgun.
 
   We like the gas reductions.
@@ -136,7 +136,7 @@ function scaleToWad(uint amountDec, uint decimals) pure returns (uint outputWad)
 function scaleFromWadUp(uint amountWad, uint decimals) pure returns (uint outputDec) {
     uint factor = computeScalar(decimals);
     assembly {
-        outputDec := add(div(amountWad, factor), 1)
+        outputDec := add(div(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
     }
 }
 
@@ -148,14 +148,14 @@ function scaleFromWadDown(uint amountWad, uint decimals) pure returns (uint outp
 }
 
 function scaleFromWadUpSigned(int amountWad, uint decimals) pure returns (int outputDec) {
-    uint factor = computeScalar(decimals);
+    int factor = int(computeScalar(decimals));
     assembly {
-        outputDec := add(sdiv(amountWad, factor), 1)
+        outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
     }
 }
 
 function scaleFromWadDownSigned(int amountWad, uint decimals) pure returns (int outputDec) {
-    uint factor = computeScalar(decimals);
+    int factor = int(computeScalar(decimals));
     assembly {
         outputDec := sdiv(amountWad, factor)
     }
