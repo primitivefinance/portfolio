@@ -8,6 +8,7 @@ contract Helper {
     event LogBool(string msg, bool value);
     event LogInt24(string msg, int24 value);
     event LogInt128(string msg, int128 value);
+    event LogInt256(string msg, int256 value);
 
     uint256 constant MIN_PRICE = 1;
     uint256 constant MAX_PRICE = type(uint128).max;
@@ -41,15 +42,18 @@ contract Helper {
         maxPrice = uint128(between(maxPrice, MIN_PRICE, MAX_PRICE));
         return (priorityFee, fee, maxPrice, volatility, duration, jit, price);
     }
+
     // ******************** Helper ********************
 
-    function between(uint256 random, uint256 low, uint256 high) public pure returns (uint256) {
+    function between(uint256 random, uint256 low, uint256 high) internal pure returns (uint256) {
         return low + (random % (high - low));
     }
 
     function convertToInt128(uint128 a) internal pure returns (int128 b) {
         assembly {
-            if gt(a, 0x7fffffffffffffffffffffffffffffff) { revert(0, 0) }
+            if gt(a, 0x7fffffffffffffffffffffffffffffff) {
+                revert(0, 0)
+            }
 
             b := a
         }
