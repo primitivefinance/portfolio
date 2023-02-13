@@ -1,4 +1,5 @@
 pragma solidity ^0.8.0;
+
 import "./PairCreation.sol";
 import "./PoolCreation.sol";
 import "./ChangeParameters.sol";
@@ -49,7 +50,7 @@ contract GlobalInvariants is
             // reserve/poolLiquidity
             // compare after
 
-            (uint assetAmount, uint quoteAmount) = _hyper.getAmounts(poolId);
+            (uint256 assetAmount, uint256 quoteAmount) = _hyper.getAmounts(poolId);
 
             assert(assetReserveBalance >= assetAmount);
             assert(quoteReserveBalance >= quoteAmount);
@@ -80,7 +81,7 @@ contract GlobalInvariants is
     // ---------- Pool Properties -------
 
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
-        (HyperPool memory pool, , , ) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool,,,) = retrieve_random_pool_and_tokens(id);
         // if the pool has a controller, the priority fee should never be zero
         emit LogBool("is mutable", pool.isMutable());
         if (pool.controller != address(0)) {
@@ -158,7 +159,7 @@ contract GlobalInvariants is
 
     function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
         require(deltaLiquidity != 0);
-        (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
@@ -244,7 +245,7 @@ contract GlobalInvariants is
             uint64 poolId = poolIds[i];
             HyperPool memory pool = getPool(address(_hyper), poolId);
 
-            (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getAmounts();
+            (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getPoolAmounts();
 
             (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
 
