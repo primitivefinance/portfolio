@@ -227,16 +227,7 @@ contract Hyper is IHyper {
         if (claimedAssets > 0) _applyCredit(pool.pair.tokenAsset, claimedAssets);
         if (claimedQuotes > 0) _applyCredit(pool.pair.tokenQuote, claimedQuotes);
 
-        emit Collect(
-            poolId,
-            msg.sender,
-            claimedAssets,
-            pool.pair.tokenAsset,
-            claimedQuotes,
-            pool.pair.tokenQuote,
-            0,
-            address(0)
-        );
+        emit Collect(poolId, msg.sender, claimedAssets, pool.pair.tokenAsset, claimedQuotes, pool.pair.tokenQuote);
     }
 
     // ===== Effects ===== //
@@ -449,7 +440,9 @@ contract Hyper is IHyper {
                 maxInput = (rmm.strike - liveIndependent).mulWadDown(iteration.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
             }
 
-            iteration.feeAmount = ((iteration.remainder > maxInput ? maxInput : iteration.remainder) * _state.fee) / 10_000;
+            iteration.feeAmount =
+                ((iteration.remainder > maxInput ? maxInput : iteration.remainder) * _state.fee) /
+                10_000;
 
             deltaInput = iteration.remainder > maxInput ? maxInput : iteration.remainder; // swaps up to the maximum input
             deltaInputLessFee = deltaInput - iteration.feeAmount;
@@ -526,7 +519,16 @@ contract Hyper is IHyper {
         {
             uint64 id = args.poolId;
             uint256 price = getLatestPrice(id);
-            emit Swap(id, price, _state.tokenInput, iteration.input, _state.tokenOutput, iteration.output, iteration.feeAmount);
+            emit Swap(
+                id,
+                price,
+                _state.tokenInput,
+                iteration.input,
+                _state.tokenOutput,
+                iteration.output,
+                iteration.feeAmount,
+                iteration.invariant
+            );
         }
 
         delete _state;

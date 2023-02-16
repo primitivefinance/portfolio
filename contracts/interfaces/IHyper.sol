@@ -4,11 +4,42 @@ pragma solidity 0.8.13;
 import {HyperCurve, HyperPair} from "../HyperLib.sol";
 
 interface IHyperEvents {
+    /**
+     * @dev Ether transfers into Hyper via payable `deposit` function.
+     */
     event Deposit(address indexed account, uint256 amount);
-    event DecreaseUserBalance(address indexed account, address indexed token, uint256 amount);
-    event DecreaseReserveBalance(address indexed token, uint256 amount);
+
+    /**
+     * @notice Assigns `amount` of `token` to `account`.
+     * @dev Emitted on `unallocate`, `swap`, or `fund`.
+     */
     event IncreaseUserBalance(address indexed account, address indexed token, uint256 amount);
+
+    /**
+     * @notice Unassigns `amount` of `token` from `account`.
+     * @dev Emitted on `allocate`, `swap`, or `draw`.
+     */
+    event DecreaseUserBalance(address indexed account, address indexed token, uint256 amount);
+
+    /**
+     * @notice Assigns an additional `amount` of `token` to Hyper's internally tracked balance.
+     * @dev Emitted on `swap`, `allocate`, and when a user is gifted surplus tokens.
+     */
     event IncreaseReserveBalance(address indexed token, uint256 amount);
+
+    /**
+     * @notice Unassigns `amount` of `token` from Hyper's internally tracked balance.
+     * @dev Emitted on `swap`, `unallocate`, and when paying with an internal balance.
+     */
+    event DecreaseReserveBalance(address indexed token, uint256 amount);
+
+    /**
+     * @dev Assigns `input` amount of `tokenIn` to Hyper's reserves.
+     * Unassigns `output` amount of `tokenOut` from Hyper's reserves.
+     * @param price Post-swap approximated marginal price in wad units.
+     * @param feeAmountDec Amount of `tokenIn` tokens paid as a fee.
+     * @param invariantWad Post-swap invariant in wad units.
+     */
     event Swap(
         uint64 indexed poolId,
         uint256 price,
@@ -16,8 +47,13 @@ interface IHyperEvents {
         uint256 input,
         address indexed tokenOut,
         uint256 output,
-        uint256 fee
+        uint256 feeAmountDec,
+        int256 invariantWad
     );
+
+    /**
+     * @dev Assigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId.
+     */
     event Allocate(
         uint64 indexed poolId,
         address indexed asset,
@@ -26,6 +62,10 @@ interface IHyperEvents {
         uint256 deltaQuote,
         uint256 deltaLiquidity
     );
+
+    /**
+     * @dev Unassigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId.
+     */
     event Unallocate(
         uint64 indexed poolId,
         address indexed asset,
@@ -37,15 +77,17 @@ interface IHyperEvents {
 
     /** @dev Emits a `0` for unchanged parameters. */
     event ChangeParameters(uint64 indexed poolId, uint16 indexed priorityFee, uint16 indexed fee, uint16 jit);
+
+    /**
+     * @notice Reduces `feeAssetDec` amount of `asset` and `feeQuoteDec` amount of `quote` from the position's state.
+     */
     event Collect(
         uint64 poolId,
-        address account,
-        uint256 feeAsset,
+        address indexed account,
+        uint256 feeAssetDec,
         address indexed asset,
-        uint256 feeQuote,
-        address indexed quote,
-        uint256 feeReward,
-        address indexed reward
+        uint256 feeQuoteDec,
+        address indexed quote
     );
     event CreatePair(
         uint24 indexed pairId,
@@ -141,7 +183,10 @@ interface IHyperActions {
      * @return deltaAsset Amount of asset tokens paid by the sender
      * @return deltaQuote Amount of quote tokens paid by the sender
      */
-    function allocate(uint64 poolId, uint256 deltaLiquidity) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
+    function allocate(
+        uint64 poolId,
+        uint256 deltaLiquidity
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
      * @notice Removes `amount` units of liquidity from the pool `poolId`

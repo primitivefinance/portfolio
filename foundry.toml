@@ -37,6 +37,15 @@ primitive = "http://${PRIMITIVE_RPC}:8545"
 ganache = "http://127.0.0.1:8546"
 prod = "${MAINNET_URL}"
 
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = 'long'
+multiline_func_header = 'params_first'
+quote_style = 'double'
+wrap_comments = true
+
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
 
