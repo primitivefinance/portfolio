@@ -116,6 +116,9 @@ interface IHyperGetters {
         uint24 pairId
     ) external view returns (address tokenAsset, uint8 decimalsAsset, address tokenQuote, uint8 decimalsQuote);
 
+    /**
+     * @dev Structs in memory are returned as tuples, e.g. (foo, bar...).
+     */
     function pools(
         uint64 poolId
     )
@@ -177,31 +180,24 @@ interface IHyperGetters {
 
 interface IHyperActions {
     /**
-     * @notice Allocates `deltaLiquidity` units of liquidity into the pool `poolId`
-     * @param poolId Id of the pool receiving the liquidity
-     * @param deltaLiquidity Amount of units of liquidity to allocate into the pool
-     * @return deltaAsset Amount of asset tokens paid by the sender
-     * @return deltaQuote Amount of quote tokens paid by the sender
+     * @notice Increases liquidity of `poolId` and position of `msg.sender` by `amount`.
+     * @param amount Amount of wad units of liquidity added to pool and position.
+     * @return deltaAsset Quantity of asset tokens assigned to `poolId`.
+     * @return deltaQuote Quantity of quote tokens assigned to `poolId`.
      */
-    function allocate(
-        uint64 poolId,
-        uint256 deltaLiquidity
-    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
+    function allocate(uint64 poolId, uint256 amount) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
-     * @notice Removes `amount` units of liquidity from the pool `poolId`
-     * @param poolId Id of the pool to unallocate from
-     * @param amount Amount of units of liquidity to unallocate from the pool
-     * @return deltaAsset Amount of asset tokens received by the sender
-     * @return deltaQuote Amount of quote tokens received by the sender
+     * @notice Decreases liquidity of `poolId` and position of `msg.sender` by `amount`.
+     * @return deltaAsset Quantity of asset tokens unassigned to `poolId`.
+     * @return deltaQuote Quantity of quote tokens unassigned to `poolId`.
      */
     function unallocate(uint64 poolId, uint256 amount) external returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
-     * @notice Swaps asset and quote tokens within the pool `poolId`
-     * @param poolId Id of the pool to swap into
-     * @param sellAsset True if asset tokens should be swapped for quote tokens
-     * @param amount Amount of tokens to swap
+     * @notice Swaps asset and quote tokens within the pool `poolId`.
+     * @param sellAsset True if asset tokens should be swapped for quote tokens.
+     * @param amount Amount of tokens to swap, which are assigned to `poolId`.
      * @param limit Maximum amount of tokens to pay for the swap
      * @return output Amount of tokens received by the user
      * @return remainder Amount of tokens unused by the swap and refunded to the user
@@ -214,34 +210,30 @@ interface IHyperActions {
     ) external payable returns (uint256 output, uint256 remainder);
 
     /**
-     * @notice Deposits `amount` `token` into the user internal balance
-     * @param token Token to deposit
-     * @param amount Amount to deposit
+     * @notice Assigns `amount` of `token` to `msg.sender` internal balance.
+     * @dev Uses `IERC20.transferFrom`.
      */
     function fund(address token, uint256 amount) external;
 
     /**
-     * @notice Draws `amount` `token` from the user internal balance
-     * @param token Token to draw
-     * @param amount Amount to draw
-     * @param to Address receiving the tokens
+     * @notice Unassigns `amount` of `token` from `msg.sender` and transfers it to the `to` address.
+     * @dev Uses `IERC20.transfer`.
      */
     function draw(address token, uint256 amount, address to) external;
 
     /**
-     * @notice Deposits ETH into the user internal balance
-     * @dev Amount of ETH must be sent as `msg.value`, the ETH will be wrapped
+     * @notice Deposits ETH into the user internal balance.
+     * @dev Amount of ETH must be sent as `msg.value`, the ETH will be wrapped.
      */
     function deposit() external payable;
 
     /**
-     * @notice Updates the parameters of the pool `poolId`
+     * @notice Updates the parameters of the pool `poolId`.
      * @dev The sender must be the pool controller, leaving a function parameter
      * as '0' will not change the pool parameter.
-     * @param poolId Id of the pool to update
-     * @param priorityFee New priority fee of the pool
-     * @param fee New fee of the pool
-     * @param jit New JIT policy of the pool
+     * @param priorityFee New priority fee of the pool in basis points (1 = 0.01%).
+     * @param fee New fee of the pool in basis points (1 = 0.01%).
+     * @param jit New JIT policy of the pool in seconds (1 = 1 second).
      */
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
 }
