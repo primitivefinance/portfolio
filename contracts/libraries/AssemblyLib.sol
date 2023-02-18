@@ -95,6 +95,16 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     }
 }
 
+function toInt128(uint128 a) pure returns (int128 b) {
+    assembly {
+        if gt(a, 0x7fffffffffffffffffffffffffffffff) {
+            revert(0, 0)
+        }
+
+        b := a
+    }
+}
+
 /**
  * @dev Separates the upper and lower bits of a byte
  * @param data Byte to separate

@@ -251,7 +251,7 @@ abstract contract HyperVirtual is Objective {
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = getPoolLiquidityDeltas(pool, toInt128(deltaLiquidity)); // note: rounds up.
+        (deltaAsset, deltaQuote) = getPoolLiquidityDeltas(pool, Assembly.toInt128(deltaLiquidity)); // note: rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
@@ -262,7 +262,7 @@ abstract contract HyperVirtual is Objective {
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
             tokenQuote: pool.pair.tokenQuote,
-            deltaLiquidity: toInt128(deltaLiquidity)
+            deltaLiquidity: Assembly.toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
@@ -281,7 +281,7 @@ abstract contract HyperVirtual is Objective {
         HyperPool memory pool = pools[poolId];
         if (!checkPool(pool)) revert NonExistentPool(poolId);
 
-        (deltaAsset, deltaQuote) = getPoolLiquidityDeltas(pool, -toInt128(deltaLiquidity)); // rounds down
+        (deltaAsset, deltaQuote) = getPoolLiquidityDeltas(pool, -Assembly.toInt128(deltaLiquidity)); // rounds down
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -291,7 +291,7 @@ abstract contract HyperVirtual is Objective {
             deltaQuote: deltaQuote,
             tokenAsset: pool.pair.tokenAsset,
             tokenQuote: pool.pair.tokenQuote,
-            deltaLiquidity: -toInt128(deltaLiquidity)
+            deltaLiquidity: -Assembly.toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
