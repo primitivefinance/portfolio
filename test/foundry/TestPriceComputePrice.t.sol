@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestPriceSetup.sol";
 
 contract TestPriceComputePrice is TestPriceSetup {
-    using Price for Price.RMM;
+    using RMM01Lib for RMM01Lib.RMM;
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
@@ -39,7 +39,7 @@ contract TestPriceComputePrice is TestPriceSetup {
     }
 
     function test_computePriceWithChangeInTau_epsilon_tau_returns_strike() public {
-        Price.RMM memory info = cases[0];
+        RMM01Lib.RMM memory info = cases[0];
         uint256 price = DEFAULT_PRICE;
         uint256 epsilon = info.tau;
         uint256 actual = info.computePriceWithChangeInTau(price, epsilon);
@@ -47,7 +47,7 @@ contract TestPriceComputePrice is TestPriceSetup {
     }
 
     function testFuzz_computePriceWithChangeInTau(uint32 epsilon) public {
-        Price.RMM memory info = cases[0];
+        RMM01Lib.RMM memory info = cases[0];
         // Fuzzing Filters
         vm.assume(epsilon > 0); // Fuzzing non-zero test cases only.
         vm.assume(epsilon < info.tau); // Epsilon > tau is the same as epsilon == tau.

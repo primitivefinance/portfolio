@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
 import "contracts/HyperLib.sol";
-import "contracts/libraries/Price.sol";
+import "contracts/libraries/RMM01Lib.sol";
 
 import "forge-std/Test.sol";
 import {TestERC20, HyperTimeOverride, FixedPointMathLib} from "test/helpers/HyperTestOverrides.sol";

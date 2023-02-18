@@ -70,7 +70,7 @@ library GeometricMath {
 
 contract GeometricPortfolio is HyperVirtual {
     using GeometricMath for HyperPool;
-    using Price for Price.RMM;
+    using RMM01Lib for RMM01Lib.RMM;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -120,7 +120,7 @@ contract GeometricPortfolio is HyperVirtual {
         int256 invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
         pool.syncPoolTimestamp(block.timestamp);
 
-        Price.RMM memory rmm = pool.getRMM();
+        RMM01Lib.RMM memory rmm = pool.getRMM();
 
         if (rmm.tau == 0) return (false, invariant);
 

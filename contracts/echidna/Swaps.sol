@@ -29,10 +29,10 @@ contract Swaps is EchidnaStateHandling {
         HyperCurve memory curve = pool.params;
         uint stk = curve.maxPrice;
         // Scoping due to stack-depth.
-        Price.RMM memory rmm = pool.getRMM();
+        RMM01Lib.RMM memory rmm = pool.getRMM();
 
         // Compute reserves to determine max input and output.
-        (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, stk, 0);
+        (uint256 R_y, uint256 R_x) = RMM01Lib.computeReserves(rmm, stk, 0);
 
         if (sellAsset) {
             // console.log("selling");
@@ -80,7 +80,7 @@ contract Swaps is EchidnaStateHandling {
             emit LogUint256("block.timestamp", block.timestamp);
             swap_should_fail(poolId, true, id, id, "BUG: Swap on an expired pool should have failed.");
         } else {
-            uint256 stk = Price.computePriceWithTick(Price.computeTickWithPrice(curve.maxPrice));
+            uint256 stk = RMM01Lib.computePriceWithTick(RMM01Lib.computeTickWithPrice(curve.maxPrice));
             emit LogUint256("stk", stk);
 
             (uint input, uint output) = clam_safe_input_output_value(sellAsset, liquidity, pool);

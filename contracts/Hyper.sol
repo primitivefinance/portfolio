@@ -793,7 +793,7 @@ abstract contract HyperVirtual is Objective {
 }
 
 contract Hyper is HyperVirtual {
-    using Price for Price.RMM;
+    using RMM01Lib for RMM01Lib.RMM;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -846,7 +846,7 @@ contract Hyper is HyperVirtual {
         (, int256 invariant, uint256 updatedTau) = _computeSyncedPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
-        Price.RMM memory rmm = pools[poolId].getRMM();
+        RMM01Lib.RMM memory rmm = pools[poolId].getRMM();
 
         if (rmm.tau == 0) return (false, invariant);
 
@@ -925,7 +925,7 @@ contract Hyper is HyperVirtual {
     ) internal view returns (uint256 price, int256 invariant, uint256 updatedTau) {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
-        Price.RMM memory curve = pool.getRMM();
+        RMM01Lib.RMM memory curve = pool.getRMM();
 
         updatedTau = pool.computeTau(block.timestamp);
         curve.tau = updatedTau;

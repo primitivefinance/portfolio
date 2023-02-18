@@ -16,7 +16,7 @@ pragma solidity 0.8.13;
  */
 
 import "solmate/utils/FixedPointMathLib.sol";
-import "contracts/libraries/Price.sol";
+import "contracts/libraries/RMM01Lib.sol";
 
 using FixedPointMathLib for uint256;
 
@@ -70,9 +70,9 @@ function computeMarginalPriceQuoteIn(
     uint256 volSqrtTau;
     uint256 gamma;
     {
-        uint256 tauWadYears = Price.convertSecondsToWadYears(params.tau);
-        uint256 volWad = Price.convertPercentageToWad(params.vol);
-        uint256 feeWad = Price.convertPercentageToWad(params.fee);
+        uint256 tauWadYears = RMM01Lib.convertSecondsToWadYears(params.tau);
+        uint256 volWad = RMM01Lib.convertPercentageToWad(params.vol);
+        uint256 feeWad = RMM01Lib.convertPercentageToWad(params.fee);
         uint256 sqrtTau = tauWadYears.sqrt();
         gamma = FixedPointMathLib.WAD - feeWad;
         volSqrtTau = (sqrtTau * HALF_SCALAR).mulWadDown(volWad);
@@ -124,9 +124,9 @@ function computeMarginalPriceAssetIn(
     uint256 volSqrtTau;
     uint256 gamma;
     {
-        uint256 tauWadYears = Price.convertSecondsToWadYears(params.tau);
-        uint256 volWad = Price.convertPercentageToWad(params.vol);
-        uint256 feeWad = Price.convertPercentageToWad(params.fee);
+        uint256 tauWadYears = RMM01Lib.convertSecondsToWadYears(params.tau);
+        uint256 volWad = RMM01Lib.convertPercentageToWad(params.vol);
+        uint256 feeWad = RMM01Lib.convertPercentageToWad(params.fee);
         gamma = FixedPointMathLib.WAD - feeWad;
         sqrtTau = tauWadYears.sqrt();
         volSqrtTau = (sqrtTau * HALF_SCALAR).mulWadDown(volWad);

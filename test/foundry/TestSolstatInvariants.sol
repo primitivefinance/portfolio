@@ -5,7 +5,7 @@ import "solstat/Gaussian.sol";
 import {GaussianRef} from "./solstat/GaussianRef.sol";
 import {Invariant} from "solstat/Invariant.sol";
 import "solstat/Units.sol" as Units;
-import "contracts/libraries/Price.sol";
+import "contracts/libraries/RMM01Lib.sol";
 
 import "./setup/TestSolstatHelper.sol";
 
@@ -75,7 +75,7 @@ contract TestSolmateInvariants is TestSolstatHelper {
 
         // fl(e^(x+1)) <= e^(x+1) = (e^x)e = (fl(e^x) + ∆)e, where 0 <= ∆ < 1
         // fl(e^(x+1)) < (fl(e^x) + 1)ceil(e)
-        assertLt(y2, (y1 + 1) * E_UP / 1e18);
+        assertLt(y2, ((y1 + 1) * E_UP) / 1e18);
     }
 
     function test_expWad_max_error_around_symmetry_0(int256 x) public {
@@ -213,8 +213,8 @@ contract TestSolstatInvariants is TestSolstatHelper {
         price = bound(price, 0.00000001e18, 1_000_000e18);
         delta = bound(delta, 1, 1 + 1_000_000e18 - price);
 
-        int24 tick1 = Price.computeTickWithPrice(price);
-        int24 tick2 = Price.computeTickWithPrice(price + delta);
+        int24 tick1 = RMM01Lib.computeTickWithPrice(price);
+        int24 tick2 = RMM01Lib.computeTickWithPrice(price + delta);
 
         assertGte(tick2, tick1);
     }
@@ -306,10 +306,13 @@ contract TestSolstatInvariants is TestSolstatHelper {
         assertGte(y1, y2);
     }
 
-    function test_price_should_decrease_when_selling(uint256 x2, uint256 prc1, uint256 stk, uint256 vol, uint256 tau)
-        public
-        canRevert
-    {
+    function test_price_should_decrease_when_selling(
+        uint256 x2,
+        uint256 prc1,
+        uint256 stk,
+        uint256 vol,
+        uint256 tau
+    ) public canRevert {
         stk = bound(stk, 1, 100_000_000e18);
         vol = bound(vol, 0.00001e18, 2.5e18);
         tau = bound(tau, 1 days, 5 * 365 days);
@@ -319,9 +322,9 @@ contract TestSolstatInvariants is TestSolstatHelper {
         console.log("vol", vol);
         console.log("tau", tau);
 
-        uint256 x1 = Price.getXWithPrice(prc1, stk, vol * 10_000 / 1e18, tau);
+        uint256 x1 = RMM01Lib.getXWithPrice(prc1, stk, (vol * 10_000) / 1e18, tau);
         x2 = bound(x2, x1, 1e18 - 1);
-        uint256 prc2 = Price.getPriceWithX(x2, stk, vol * 10_000 / 1e18, tau);
+        uint256 prc2 = RMM01Lib.getPriceWithX(x2, stk, (vol * 10_000) / 1e18, tau);
 
         console.log("x1", x1);
         console.log("prc1", prc1);
@@ -331,10 +334,13 @@ contract TestSolstatInvariants is TestSolstatHelper {
         assertLte(prc2, prc1);
     }
 
-    function test_reserve_y_should_decrease_when_selling(uint256 x, uint256 prc1, uint256 stk, uint256 vol, uint256 tau)
-        public
-        canRevert
-    {
+    function test_reserve_y_should_decrease_when_selling(
+        uint256 x,
+        uint256 prc1,
+        uint256 stk,
+        uint256 vol,
+        uint256 tau
+    ) public canRevert {
         stk = bound(stk, 1, 100_000_000e18);
         vol = bound(vol, 0.00001e18, 2.5e18);
         tau = bound(tau, 1 days, 5 * 365 days);
@@ -344,18 +350,18 @@ contract TestSolstatInvariants is TestSolstatHelper {
         console.log("vol", vol);
         console.log("tau", tau);
 
-        uint256 x1 = Price.getXWithPrice(prc1, stk, vol * 10_000 / 1e18, tau);
-        uint256 y1 = Price.getYWithX(x1, stk, vol * 10_000 / 1e18, tau, 0);
+        uint256 x1 = RMM01Lib.getXWithPrice(prc1, stk, (vol * 10_000) / 1e18, tau);
+        uint256 y1 = RMM01Lib.getYWithX(x1, stk, (vol * 10_000) / 1e18, tau, 0);
 
         if (x1 == 0) return;
 
         // Since the actual `x` never gets stored in Hyper.sol,
         // and is always computed by the price, this variable is temporary only.
         x = bound(x, x1, 1e18 - 1);
-        uint256 prc2 = Price.getPriceWithX(x, stk, vol * 10_000 / 1e18, tau);
+        uint256 prc2 = RMM01Lib.getPriceWithX(x, stk, (vol * 10_000) / 1e18, tau);
 
-        uint256 x2 = Price.getXWithPrice(prc2, stk, vol * 10_000 / 1e18, tau);
-        uint256 y2 = Price.getYWithX(x2, stk, vol * 10_000 / 1e18, tau, 0);
+        uint256 x2 = RMM01Lib.getXWithPrice(prc2, stk, (vol * 10_000) / 1e18, tau);
+        uint256 y2 = RMM01Lib.getYWithX(x2, stk, (vol * 10_000) / 1e18, tau, 0);
 
         console.log("x1", x1);
         console.log("y1", y1);
@@ -384,23 +390,23 @@ contract TestSolstatInvariants is TestSolstatHelper {
         console.log("vol", vol);
         console.log("tau", tau);
 
-        uint256 x1 = Price.getXWithPrice(prc1, stk, vol * 10_000 / 1e18, tau);
-        uint256 y1 = Price.getYWithX(x1, stk, vol * 10_000 / 1e18, tau, 0);
+        uint256 x1 = RMM01Lib.getXWithPrice(prc1, stk, (vol * 10_000) / 1e18, tau);
+        uint256 y1 = RMM01Lib.getYWithX(x1, stk, (vol * 10_000) / 1e18, tau, 0);
 
         if (x1 == 0) return;
 
         x2 = bound(x2, x1, 1e18 - 1);
         y2 = bound(y2, 1, 1e18 - 1);
-        uint256 prc2 = Price.getPriceWithX(x2, stk, vol * 10_000 / 1e18, tau);
+        uint256 prc2 = RMM01Lib.getPriceWithX(x2, stk, (vol * 10_000) / 1e18, tau);
 
-        // uint256 x2 = Price.getXWithPrice(prc2, stk, vol * 10_000 / 1e18, tau);
-        // uint256 y2 = Price.getYWithX(x2, stk, vol * 10_000 / 1e18, tau, 0);
+        // uint256 x2 = RMM01Lib.getXWithPrice(prc2, stk, vol * 10_000 / 1e18, tau);
+        // uint256 y2 = RMM01Lib.getYWithX(x2, stk, vol * 10_000 / 1e18, tau, 0);
 
         // int256 inv1 = Invariant.invariant(y1, x1, stk, vol, tau);
         // int256 inv2 = Invariant.invariant(y2, x2, stk, vol, tau);
         // Simplifies to:
         int256 inv1 = int256(y1 - y1);
-        int256 inv2 = int256(y2 - Price.getYWithX(x2, stk, vol * 10_000 / 1e18, tau, 0));
+        int256 inv2 = int256(y2 - RMM01Lib.getYWithX(x2, stk, (vol * 10_000) / 1e18, tau, 0));
 
         console.log("x1", x1);
         console.log("y1", y1);
@@ -414,9 +420,13 @@ contract TestSolstatInvariants is TestSolstatHelper {
         assertLte(y2, y1);
     }
 
-    function test_sell_invariant_error_margin_with_x(uint256 x1, uint256 y2, uint256 stk, uint256 vol, uint256 tau)
-        public
-    {
+    function test_sell_invariant_error_margin_with_x(
+        uint256 x1,
+        uint256 y2,
+        uint256 stk,
+        uint256 vol,
+        uint256 tau
+    ) public {
         x1 = bound(x1, 1, 1e18 - 1);
         // x2 = bound(x2, x1, 1e18);
         stk = bound(stk, 1, type(uint128).max - 1);
@@ -665,7 +675,7 @@ contract TestSolstatDifferential is TestSolstatHelper {
         unchecked {
             // If this function doesn't revert, the unchecked result must be the same.
             int256 z = Units.muli(x, y, denominator);
-            assertEq(z, x * y / denominator);
+            assertEq(z, (x * y) / denominator);
         }
     }
 

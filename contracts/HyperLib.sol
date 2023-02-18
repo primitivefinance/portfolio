@@ -15,12 +15,12 @@ pragma solidity 0.8.13;
  */
 
 import "solmate/utils/SafeCastLib.sol";
-import "./libraries/Price.sol";
+import "./libraries/RMM01Lib.sol";
 import "./libraries/AssemblyLib.sol" as Assembly;
 import "./libraries/EnigmaLib.sol" as Enigma;
 import "./libraries/AccountLib.sol" as Account;
 
-using Price for Price.RMM;
+using RMM01Lib for RMM01Lib.RMM;
 using SafeCastLib for uint256;
 using FixedPointMathLib for uint256;
 using FixedPointMathLib for int256;
@@ -253,8 +253,8 @@ function getPoolLiquidityDeltas(
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
 
     (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
-    uint256 scaleDownFactorAsset = Assembly.computeScalar(self.pair.decimalsAsset) * Price.WAD;
-    uint256 scaleDownFactorQuote = Assembly.computeScalar(self.pair.decimalsQuote) * Price.WAD;
+    uint256 scaleDownFactorAsset = Assembly.computeScalar(self.pair.decimalsAsset) * RMM01Lib.WAD;
+    uint256 scaleDownFactorQuote = Assembly.computeScalar(self.pair.decimalsQuote) * RMM01Lib.WAD;
 
     uint256 delta;
     if (deltaLiquidity > 0) {
@@ -295,8 +295,8 @@ function isMutable(HyperPool memory self) pure returns (bool) {
     return self.controller != address(0);
 }
 
-function getRMM(HyperPool memory self) pure returns (Price.RMM memory) {
-    return Price.RMM({strike: self.params.maxPrice, sigma: self.params.volatility, tau: self.lastTau()});
+function getRMM(HyperPool memory self) pure returns (RMM01Lib.RMM memory) {
+    return RMM01Lib.RMM({strike: self.params.maxPrice, sigma: self.params.volatility, tau: self.lastTau()});
 }
 
 function lastTau(HyperPool memory self) pure returns (uint256) {
@@ -352,7 +352,7 @@ function getMaxSwapAssetInWad(HyperPool memory self) pure returns (uint256) {
 }
 
 function getMaxSwapQuoteInWad(HyperPool memory self) pure returns (uint256) {
-    Price.RMM memory rmm = self.getRMM();
+    RMM01Lib.RMM memory rmm = self.getRMM();
     (, uint256 y) = self.getAmountsWad();
     uint256 maxInput = rmm.strike - y;
     maxInput = maxInput.mulWadDown(self.liquidity);
@@ -360,7 +360,7 @@ function getMaxSwapQuoteInWad(HyperPool memory self) pure returns (uint256) {
 }
 
 function getNextInvariant(HyperPool memory self, uint256 timeSinceUpdate) pure returns (int128 invariant, uint256 tau) {
-    Price.RMM memory curve = self.getRMM();
+    RMM01Lib.RMM memory curve = self.getRMM();
 
     curve.tau -= timeSinceUpdate; // update to next curve at new time.
     (uint256 x, uint256 y) = self.getAmountsWad();
@@ -380,8 +380,8 @@ function getPoolAmountOut(
     uint256 timeSinceUpdate
 ) pure returns (uint256, uint256) {
     Iteration memory data;
-    Price.RMM memory liveCurve = self.getRMM();
-    Price.RMM memory nextCurve = liveCurve;
+    RMM01Lib.RMM memory liveCurve = self.getRMM();
+    RMM01Lib.RMM memory nextCurve = liveCurve;
 
     {
         // fill in data

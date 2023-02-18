@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./setup/TestPriceSetup.sol";
 
 contract TestPriceComputeReserves is TestPriceSetup {
-    using Price for Price.RMM;
+    using RMM01Lib for RMM01Lib.RMM;
 
     function testComputedAssetReserveWithDefaultPrice() public {
         uint256 actual = cases[0].getXWithPrice(DEFAULT_PRICE);

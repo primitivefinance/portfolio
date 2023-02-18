@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "solmate/tokens/WETH.sol";
 import "solmate/utils/SafeCastLib.sol";
 import "contracts/HyperLib.sol";
-import "contracts/libraries/Price.sol";
+import "contracts/libraries/RMM01Lib.sol";
 
 import "forge-std/Test.sol";
 import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher, FixedPointMathLib} from "test/helpers/HyperTestOverrides.sol";
@@ -255,7 +255,12 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     function _swap(uint64 id) internal {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), id);
-        (uint256 output, ) = __hyperTestingContract__.swap(id, true, (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether, 1);
+        (uint256 output, ) = __hyperTestingContract__.swap(
+            id,
+            true,
+            (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether,
+            1
+        );
         assertTrue(output > 0, "no swap happened!");
     }
 

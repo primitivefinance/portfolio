@@ -2,18 +2,18 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "contracts/libraries/Price.sol";
+import "contracts/libraries/RMM01Lib.sol";
 import "test/helpers/HelperHyperProfiles.sol";
 
 contract TestPriceSetup is HelperHyperProfiles, Test {
-    Price.RMM[] cases;
+    RMM01Lib.RMM[] cases;
 
     function setUp() public {
         addTestCase(DEFAULT_STRIKE, DEFAULT_SIGMA, DEFAULT_MATURITY);
     }
 
-    function addTestCase(uint256 strike, uint256 sigma, uint256 tau) internal returns (Price.RMM memory) {
-        Price.RMM memory info = Price.RMM(strike, sigma, tau);
+    function addTestCase(uint256 strike, uint256 sigma, uint256 tau) internal returns (RMM01Lib.RMM memory) {
+        RMM01Lib.RMM memory info = RMM01Lib.RMM(strike, sigma, tau);
         cases.push(info);
         return info;
     }

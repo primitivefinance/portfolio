@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 import "solstat/Invariant.sol";
 
-using Price for Price.RMM global;
+using RMM01Lib for RMM01Lib.RMM global;
 
 /**
  * @dev     Library for RMM to compute reserves, prices, and changes in reserves over time.
@@ -14,7 +14,7 @@ using Price for Price.RMM global;
  *          percentage - 10_000 == 100%
  *
  */
-library Price {
+library RMM01Lib {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 
@@ -60,7 +60,11 @@ library Price {
         return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, eps);
     }
 
-    function computeReserves(RMM memory args, uint256 prc, int128 inv) internal pure returns (uint256 R_y, uint256 R_x) {
+    function computeReserves(
+        RMM memory args,
+        uint256 prc,
+        int128 inv
+    ) internal pure returns (uint256 R_y, uint256 R_x) {
         R_x = getXWithPrice(prc, args.strike, args.sigma, args.tau);
         R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, inv);
     }
