@@ -13,65 +13,12 @@ pragma solidity 0.8.13;
 
  */
 
-import "./HyperLib.sol";
-import "./interfaces/IHyper.sol";
-import "./interfaces/IERC20.sol";
-
-/**
- * @notice Virtual interface to implement the logic for a "Portfolio".
- */
-abstract contract PortfolioVirtual {
-    function afterSwapEffects(
-        uint64 poolId,
-        Iteration memory iteration,
-        SwapState memory state
-    ) internal virtual returns (bool);
-
-    function beforeSwap(uint64 poolId) internal virtual returns (bool success, int256 invariant);
-
-    function canUpdatePosition(
-        HyperPool memory pool,
-        HyperPosition memory position,
-        int256 delta
-    ) public view virtual returns (bool);
-
-    function checkPool(HyperPool memory pool) public view virtual returns (bool);
-
-    function checkInvariant(
-        HyperPool memory pool,
-        int256 invariant,
-        uint reserve0,
-        uint reserve1
-    ) public view virtual returns (bool success, int nextInvariant);
-
-    function computeMaxInput(
-        HyperPool memory pool,
-        bool direction,
-        uint reserveIn,
-        uint liquidity
-    ) public view virtual returns (uint);
-
-    function computeReservesFromPrice(
-        HyperPool memory pool,
-        uint price
-    ) public view virtual returns (uint reserve0, uint reserve1);
-
-    function estimatePrice(uint64 poolId) public view virtual returns (uint price);
-
-    function getPoolMaxLiquidity(HyperPool memory pool, uint amount0, uint amount1) public view virtual returns (uint);
-
-    function getPoolLiquidityDeltas(
-        HyperPool memory pool,
-        int128 delta
-    ) public view virtual returns (uint amount0, uint amount1);
-
-    function getReserves(HyperPool memory pool) public view virtual returns (uint reserve0, uint reserve1);
-}
+import "./Objective.sol";
 
 /**
  * @notice Hyper is the core logic to manage capital using trading functions.
  */
-abstract contract HyperVirtual is IHyper, PortfolioVirtual {
+abstract contract HyperVirtual is Objective {
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -295,8 +242,8 @@ abstract contract HyperVirtual is IHyper, PortfolioVirtual {
 
         if (useMax) {
             deltaLiquidity = SafeCastLib.safeCastTo128(
-                getPoolMaxLiquidity({
-                    pool: pool,
+                getMaxLiquidity({
+                    poolId: poolId,
                     amount0: getBalance(msg.sender, pool.pair.tokenAsset),
                     amount1: getBalance(msg.sender, pool.pair.tokenQuote)
                 })
@@ -820,6 +767,29 @@ abstract contract HyperVirtual is IHyper, PortfolioVirtual {
     function getTimePassed(uint64 poolId) public view returns (uint256) {
         return block.timestamp - pools[poolId].lastTimestamp;
     }
+
+    function getVirtualReserves(uint64 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+        return pools[poolId].getPoolVirtualReserves();
+    }
+
+    function getMaxLiquidity(
+        uint64 poolId,
+        uint256 amount0,
+        uint256 amount1
+    ) public view returns (uint128 deltaLiquidity) {
+        return pools[poolId].getPoolMaxLiquidity(amount0, amount1);
+    }
+
+    function getLiquidityDeltas(
+        uint64 poolId,
+        int128 deltaLiquidity
+    ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+        return pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
+    }
+
+    function getAmounts(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
+        return pools[poolId].getPoolAmounts();
+    }
 }
 
 contract Hyper is HyperVirtual {
@@ -940,21 +910,6 @@ contract Hyper is HyperVirtual {
         price = getLatestPrice(poolId);
     }
 
-    function getPoolMaxLiquidity(
-        HyperPool memory pool,
-        uint amount0,
-        uint amount1
-    ) public view override returns (uint liquidity) {
-        liquidity = pool.getPoolMaxLiquidity(amount0, amount1);
-    }
-
-    function getPoolLiquidityDeltas(
-        HyperPool memory pool,
-        int128 delta
-    ) public view override returns (uint amount0, uint amount1) {
-        (amount0, amount1) = pool.getPoolLiquidityDeltas(delta);
-    }
-
     function getReserves(HyperPool memory pool) public view override returns (uint reserve0, uint reserve1) {
         (reserve0, reserve1) = pool.getAmountsWad();
     }
@@ -1020,30 +975,11 @@ contract Hyper is HyperVirtual {
         (invariant, ) = pool.getNextInvariant(elapsed);
     }
 
-    function getVirtualReserves(uint64 poolId) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
-        return pools[poolId].getPoolVirtualReserves();
-    }
-
-    function getMaxLiquidity(
+    function getAmountOut(
         uint64 poolId,
-        uint256 deltaAsset,
-        uint256 deltaQuote
-    ) public view override returns (uint128 deltaLiquidity) {
-        return pools[poolId].getPoolMaxLiquidity(deltaAsset, deltaQuote);
-    }
-
-    function getLiquidityDeltas(
-        uint64 poolId,
-        int128 deltaLiquidity
-    ) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
-        return pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
-    }
-
-    function getAmounts(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
-        return pools[poolId].getPoolAmounts();
-    }
-
-    function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) public view returns (uint256 output) {
+        bool sellAsset,
+        uint256 amountIn
+    ) public view override(Objective) returns (uint256 output) {
         HyperPool memory pool = pools[poolId];
         (output, ) = pool.getPoolAmountOut({
             sellAsset: sellAsset,
