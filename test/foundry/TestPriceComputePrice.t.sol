@@ -5,6 +5,7 @@ import "./setup/TestPriceSetup.sol";
 
 contract TestPriceComputePrice is TestPriceSetup {
     using RMM01Lib for RMM01Lib.RMM;
+    using RMM01ExtendedLib for RMM01Lib.RMM;
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
 

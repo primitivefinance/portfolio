@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "contracts/libraries/RMM01Lib.sol";
+import "contracts/test/RMM01ExtendedLib.sol";
 import "test/helpers/HelperHyperProfiles.sol";
 
 contract TestPriceSetup is HelperHyperProfiles, Test {

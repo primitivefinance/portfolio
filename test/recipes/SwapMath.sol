@@ -21,7 +21,6 @@ import "contracts/libraries/RMM01Lib.sol";
 using FixedPointMathLib for uint256;
 
 uint256 constant HALF_SCALAR = 1e9;
-uint256 constant WAD = 1 ether;
 
 /**
  @custom:math 1 / φ( Φ^(−1) (x) )

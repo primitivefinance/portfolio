@@ -253,8 +253,8 @@ function getPoolLiquidityDeltas(
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
 
     (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
-    uint256 scaleDownFactorAsset = Assembly.computeScalar(self.pair.decimalsAsset) * RMM01Lib.WAD;
-    uint256 scaleDownFactorQuote = Assembly.computeScalar(self.pair.decimalsQuote) * RMM01Lib.WAD;
+    uint256 scaleDownFactorAsset = Assembly.computeScalar(self.pair.decimalsAsset) * WAD;
+    uint256 scaleDownFactorQuote = Assembly.computeScalar(self.pair.decimalsQuote) * WAD;
 
     uint256 delta;
     if (deltaLiquidity > 0) {
