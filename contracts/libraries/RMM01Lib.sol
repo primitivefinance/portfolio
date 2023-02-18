@@ -35,6 +35,10 @@ library RMM01Lib {
     error UndefinedPrice();
     error OverflowWad(int256 wad);
 
+    function getRMM(HyperPool memory self) internal pure returns (RMM memory) {
+        return RMM({strike: self.params.maxPrice, sigma: self.params.volatility, tau: self.lastTau()});
+    }
+
     // ===== Class Methods ===== //
 
     function invariantOf(RMM memory args, uint256 R_y, uint256 R_x) internal pure returns (int256) {
@@ -189,7 +193,7 @@ library RMM01Lib {
     }
 
     function getMaxSwapQuoteInWad(HyperPool memory self) internal pure returns (uint256) {
-        RMM01Lib.RMM memory rmm = self.getRMM();
+        RMM01Lib.RMM memory rmm = getRMM(self);
         (, uint256 y) = self.getAmountsWad();
         uint256 maxInput = rmm.strike - y;
         maxInput = maxInput.mulWadDown(self.liquidity);
@@ -200,7 +204,7 @@ library RMM01Lib {
         HyperPool memory self,
         uint256 timeSinceUpdate
     ) internal pure returns (int128 invariant, uint256 tau) {
-        RMM01Lib.RMM memory curve = self.getRMM();
+        RMM01Lib.RMM memory curve = getRMM(self);
 
         curve.tau -= timeSinceUpdate; // update to next curve at new time.
         (uint256 x, uint256 y) = self.getAmountsWad();
@@ -220,7 +224,7 @@ library RMM01Lib {
         uint256 timeSinceUpdate
     ) internal pure returns (uint256, uint256) {
         Iteration memory data;
-        RMM01Lib.RMM memory liveCurve = self.getRMM();
+        RMM01Lib.RMM memory liveCurve = getRMM(self);
         RMM01Lib.RMM memory nextCurve = liveCurve;
 
         {

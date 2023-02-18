@@ -35,7 +35,6 @@ using {
     getAmountsWad,
     getPoolLiquidityDeltas,
     getPoolMaxLiquidity,
-    getRMM,
     getPoolVirtualReserves,
     isMutable,
     syncPoolTimestamp,
@@ -179,6 +178,8 @@ struct Payment {
     uint256 amount;
 }
 
+// ===== Effects ===== //
+
 function changePoolLiquidity(HyperPool storage self, int128 liquidityDelta) {
     self.liquidity = Assembly.addSignedDelta(self.liquidity, liquidityDelta);
 }
@@ -289,10 +290,6 @@ function exists(HyperPool memory self) pure returns (bool) {
 
 function isMutable(HyperPool memory self) pure returns (bool) {
     return self.controller != address(0);
-}
-
-function getRMM(HyperPool memory self) pure returns (RMM01Lib.RMM memory) {
-    return RMM01Lib.RMM({strike: self.params.maxPrice, sigma: self.params.volatility, tau: self.lastTau()});
 }
 
 function lastTau(HyperPool memory self) pure returns (uint256) {

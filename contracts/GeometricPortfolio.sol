@@ -56,10 +56,6 @@ contract GeometricPortfolio is HyperVirtual {
         int256 invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
         pool.syncPoolTimestamp(block.timestamp);
 
-        RMM01Lib.RMM memory rmm = pool.getRMM();
-
-        if (rmm.tau == 0) return (false, invariant);
-
         return (true, invariant);
     }
 
