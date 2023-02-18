@@ -54,7 +54,7 @@ contract TestGeometric is Test {
         pool.virtualY = 1 ether;
 
         uint weight = 0.5 ether;
-        int invariant = GeometricMath.invariantOf(pool, pool.virtualX, pool.virtualY, weight);
+        int invariant = RMM02Lib.invariantOf(pool, pool.virtualX, pool.virtualY, weight);
         console.logInt(invariant);
     }
 
@@ -64,7 +64,7 @@ contract TestGeometric is Test {
         pool.virtualY = 1 ether;
 
         uint weight = 0.5 ether;
-        uint a0 = GeometricMath.getAmountOut(pool, weight, true, 0.1 ether, 0);
+        uint a0 = RMM02Lib.getAmountOut(pool, weight, true, 0.1 ether, 0);
         console.log("out", a0);
     }
 
@@ -74,7 +74,7 @@ contract TestGeometric is Test {
         pool.virtualY = 1 ether;
         uint weight = 0.5 ether;
         uint amountIn = 0.1 ether;
-        uint out = GeometricMath.getAmountOut(pool, weight, true, amountIn, 0);
+        uint out = RMM02Lib.getAmountOut(pool, weight, true, amountIn, 0);
         console.log("got output", out);
         bytes memory data = Enigma.encodeSwap(uint8(0), poolId, 0, uint128(amountIn), 0, uint128(out), uint8(0));
         uint prevBal = instance.getBalance(address(this), address(token1));
