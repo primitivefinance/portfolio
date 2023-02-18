@@ -31,6 +31,7 @@ uint8 constant MAX_DECIMALS = 18;
  * @custom:example
  * ```
  * bool valid = isBetween(50, 0, 100);
+ * assertTrue(value);
  * ```
  */
 function isBetween(uint256 value, uint256 lower, uint256 upper) pure returns (bool valid) {

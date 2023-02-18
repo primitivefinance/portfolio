@@ -16,9 +16,9 @@ pragma solidity 0.8.13;
 
 import "solmate/utils/SafeCastLib.sol";
 import "./libraries/Price.sol";
-import "./Assembly.sol" as Assembly;
-import "./Enigma.sol" as Enigma;
-import "./OS.sol" as OS;
+import "./libraries/AssemblyLib.sol" as Assembly;
+import "./libraries/EnigmaLib.sol" as Enigma;
+import "./libraries/AccountLib.sol" as Account;
 
 using Price for Price.RMM;
 using SafeCastLib for uint256;

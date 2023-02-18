@@ -33,7 +33,7 @@ pragma solidity 0.8.13;
 
  */
 
-import "./Assembly.sol" as Assembly;
+import "./AssemblyLib.sol" as Assembly;
 
 uint8 constant JUMP_PROCESS_START_POINTER = 2;
 bytes1 constant UNKNOWN = 0x00;

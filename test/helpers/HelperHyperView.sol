@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "contracts/Enigma.sol" as Processor;
-import "contracts/OS.sol" as Operating;
+import "contracts/libraries/EnigmaLib.sol" as Processor;
+import "contracts/libraries/AccountLib.sol" as Operating;
 import {HyperPair, HyperCurve, HyperPool, HyperPosition} from "contracts/HyperLib.sol";
 import {TestERC20} from "contracts/test/TestERC20.sol";
 
@@ -141,7 +141,11 @@ contract HelperHyperView {
         return sum;
     }
 
-    function getPositionLiquiditySum(address hyper, uint64 poolId, address[] memory owners) public view returns (uint256) {
+    function getPositionLiquiditySum(
+        address hyper,
+        uint64 poolId,
+        address[] memory owners
+    ) public view returns (uint256) {
         uint256 sum;
         for (uint256 i; i != owners.length; ++i) {
             sum += getPosition(hyper, owners[i], poolId).freeLiquidity;
@@ -160,7 +164,12 @@ contract HelperHyperView {
         }
     }
 
-    function helperGetAmountOut(address hyper, uint64 poolId, bool sellAsset, uint256 input) public view returns (uint256) {
+    function helperGetAmountOut(
+        address hyper,
+        uint64 poolId,
+        bool sellAsset,
+        uint256 input
+    ) public view returns (uint256) {
         HyperPool memory pool = getPool(hyper, poolId);
         uint256 passed = IHyperStruct(hyper).getTimePassed(poolId);
         (uint256 output, ) = pool.getPoolAmountOut(sellAsset, input, passed);

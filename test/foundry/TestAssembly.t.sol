@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "../../contracts/Assembly.sol" as Assembly;
+import "../../contracts/libraries/AssemblyLib.sol" as Assembly;
 import "forge-std/Test.sol";
 
 contract AddSignedDelta {

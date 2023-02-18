@@ -44,7 +44,7 @@ abstract contract HyperVirtual is Objective {
         }
     }
 
-    OS.AccountSystem public __account__;
+    Account.AccountSystem public __account__;
 
     address public immutable WETH;
     uint24 public getPairNonce;
@@ -192,13 +192,13 @@ abstract contract HyperVirtual is Objective {
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
 
-        if (token == WETH) OS.__dangerousUnwrapEther__(WETH, to, amount);
-        else OS.SafeTransferLib.safeTransfer(OS.ERC20(token), to, amount);
+        if (token == WETH) Account.__dangerousUnwrapEther__(WETH, to, amount);
+        else Account.SafeTransferLib.safeTransfer(Account.ERC20(token), to, amount);
     }
 
     /// @inheritdoc IHyperActions
     function fund(address token, uint256 amount) external override lock interactions {
-        if (amount == type(uint256).max) amount = OS.__balanceOf__(token, msg.sender);
+        if (amount == type(uint256).max) amount = Account.__balanceOf__(token, msg.sender);
         __account__.dangerousFund(token, address(this), amount); // warning: external call to msg.sender.
     }
 
@@ -716,7 +716,7 @@ abstract contract HyperVirtual is Objective {
 
      */
     function _settlement() internal {
-        if (!__account__.prepared) revert OS.NotPreparedToSettle();
+        if (!__account__.prepared) revert Account.NotPreparedToSettle();
 
         address[] memory tokens = __account__.warm;
         uint256 loops = tokens.length;
@@ -754,7 +754,7 @@ abstract contract HyperVirtual is Objective {
         uint256 px = payments.length;
         while (px != 0) {
             uint256 index = px - 1;
-            OS.__dangerousTransferFrom__(payments[index].token, address(this), payments[index].amount);
+            Account.__dangerousTransferFrom__(payments[index].token, address(this), payments[index].amount);
             unchecked {
                 --px;
             }
