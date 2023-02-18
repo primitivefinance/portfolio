@@ -16,7 +16,7 @@ pragma solidity 0.8.13;
  */
 
 import "solmate/utils/FixedPointMathLib.sol";
-import "../libraries/Price.sol";
+import "contracts/libraries/Price.sol";
 
 using FixedPointMathLib for uint256;
 
