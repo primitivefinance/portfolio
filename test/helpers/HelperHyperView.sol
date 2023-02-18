@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "contracts/libraries/EnigmaLib.sol" as Processor;
 import "contracts/libraries/AccountLib.sol" as Operating;
+import "contracts/libraries/RMM01Lib.sol";
 import {HyperPair, HyperCurve, HyperPool, HyperPosition} from "contracts/HyperLib.sol";
 import {TestERC20} from "contracts/test/TestERC20.sol";
 
@@ -45,6 +46,8 @@ interface TokenLike {
 }
 
 contract HelperHyperView {
+    using RMM01Lib for HyperPool;
+
     function getPool(address hyper, uint64 poolId) public view returns (HyperPool memory) {
         return IHyperStruct(hyper).pools(poolId);
     }

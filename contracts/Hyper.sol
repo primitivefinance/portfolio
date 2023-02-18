@@ -348,8 +348,7 @@ abstract contract HyperVirtual is Objective {
             input = getBalance(msg.sender, tokenInput);
         }
 
-        uint256 passed = getTimePassed(args.poolId);
-        (output, ) = pool.getPoolAmountOut(sellAsset, input, passed);
+        output = _estimateAmountOut(pool, sellAsset, input);
 
         args.input = input.safeCastTo128();
         args.output = output.safeCastTo128();
@@ -765,7 +764,11 @@ abstract contract HyperVirtual is Objective {
     }
 
     function getTimePassed(uint64 poolId) public view returns (uint256) {
-        return block.timestamp - pools[poolId].lastTimestamp;
+        return getTimePassed(pools[poolId]);
+    }
+
+    function getTimePassed(HyperPool memory pool) public view returns (uint256) {
+        return block.timestamp - pool.lastTimestamp;
     }
 
     function getVirtualReserves(uint64 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
@@ -794,6 +797,7 @@ abstract contract HyperVirtual is Objective {
 
 contract Hyper is HyperVirtual {
     using RMM01Lib for RMM01Lib.RMM;
+    using RMM01Lib for HyperPool;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -962,6 +966,15 @@ contract Hyper is HyperVirtual {
     }
 
     // ===== View ===== //
+
+    function _estimateAmountOut(
+        HyperPool memory pool,
+        bool sellAsset,
+        uint amountIn
+    ) internal view override returns (uint output) {
+        uint256 passed = getTimePassed(pool);
+        (output, ) = pool.getPoolAmountOut(sellAsset, amountIn, passed);
+    }
 
     /** @dev Can be manipulated. */
     function getLatestPrice(uint64 poolId) public view returns (uint256 price) {

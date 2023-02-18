@@ -48,6 +48,12 @@ abstract contract Objective is IHyper {
 
     function getReserves(HyperPool memory pool) public view virtual returns (uint reserve0, uint reserve1);
 
+    function _estimateAmountOut(
+        HyperPool memory pool,
+        bool sellAsset,
+        uint amountIn
+    ) internal view virtual returns (uint output);
+
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,

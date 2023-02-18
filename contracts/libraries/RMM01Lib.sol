@@ -2,6 +2,7 @@
 pragma solidity 0.8.13;
 
 import "solstat/Invariant.sol";
+import {HyperPool, Iteration, SwapInputTooSmall, Assembly} from "../HyperLib.sol";
 
 using RMM01Lib for RMM01Lib.RMM global;
 
@@ -23,6 +24,7 @@ uint256 constant YEAR = 31556953 seconds;
 library RMM01Lib {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+    using {Assembly.scaleFromWadDown, Assembly.scaleToWad, Assembly.scaleFromWadUp} for uint;
 
     struct RMM {
         uint256 strike; // wad
@@ -175,5 +177,110 @@ library RMM01Lib {
         assembly {
             pctWad := div(mul(pct, WAD), PERCENTAGE)
         }
+    }
+
+    // ===== Swaps ===== //
+
+    function getMaxSwapAssetInWad(HyperPool memory self) internal pure returns (uint256) {
+        (uint256 x, ) = self.getAmountsWad();
+        uint256 maxInput = FixedPointMathLib.WAD - x;
+        maxInput = maxInput.mulWadDown(self.liquidity);
+        return maxInput.scaleFromWadDown(self.pair.decimalsAsset);
+    }
+
+    function getMaxSwapQuoteInWad(HyperPool memory self) internal pure returns (uint256) {
+        RMM01Lib.RMM memory rmm = self.getRMM();
+        (, uint256 y) = self.getAmountsWad();
+        uint256 maxInput = rmm.strike - y;
+        maxInput = maxInput.mulWadDown(self.liquidity);
+        return maxInput.scaleFromWadDown(self.pair.decimalsQuote);
+    }
+
+    function getNextInvariant(
+        HyperPool memory self,
+        uint256 timeSinceUpdate
+    ) internal pure returns (int128 invariant, uint256 tau) {
+        RMM01Lib.RMM memory curve = self.getRMM();
+
+        curve.tau -= timeSinceUpdate; // update to next curve at new time.
+        (uint256 x, uint256 y) = self.getAmountsWad();
+
+        invariant = int128(curve.invariantOf(y, x)); // todo: fix casting
+        tau = curve.tau;
+    }
+
+    /**
+     * @dev This is an approximation of the amount out and it is not exactly precise to the optimal amount.
+     * @custom:error Maximum absolute error of 1e-6.
+     */
+    function getPoolAmountOut(
+        HyperPool memory self,
+        bool sellAsset,
+        uint256 amountIn,
+        uint256 timeSinceUpdate
+    ) internal pure returns (uint256, uint256) {
+        Iteration memory data;
+        RMM01Lib.RMM memory liveCurve = self.getRMM();
+        RMM01Lib.RMM memory nextCurve = liveCurve;
+
+        {
+            // fill in data
+            data.remainder = amountIn.scaleToWad(sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote);
+            data.liquidity = self.liquidity;
+            (data.virtualX, data.virtualY) = self.getAmountsWad();
+            nextCurve.tau -= timeSinceUpdate;
+            data.invariant = nextCurve.invariantOf(data.virtualY, data.virtualX);
+        }
+
+        uint256 fee = self.controller != address(0) ? self.params.priorityFee : self.params.fee;
+        uint256 prevInd;
+        uint256 prevDep;
+        uint256 nextInd;
+        uint256 nextDep;
+        {
+            uint256 maxInput;
+            uint256 delInput;
+
+            // if sellAsset, ind = x && dep = y, else ind = y && dep = x
+            if (sellAsset) {
+                (prevInd, prevDep) = (data.virtualX, data.virtualY);
+                maxInput = (FixedPointMathLib.WAD - prevInd).mulWadDown(data.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
+            } else {
+                (prevDep, prevInd) = (data.virtualX, data.virtualY);
+                maxInput = (liveCurve.strike - prevInd).mulWadDown(data.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+            }
+
+            data.feeAmount = ((data.remainder > maxInput ? maxInput : data.remainder) * fee) / 10_000;
+            delInput = data.remainder > maxInput ? maxInput : data.remainder;
+            nextInd = prevInd + (delInput - data.feeAmount).divWadDown(data.liquidity);
+
+            // Compute the output of the swap by computing the difference between the dependent reserves.
+            if (sellAsset) nextDep = nextCurve.getYWithX(nextInd, data.invariant);
+            else nextDep = nextCurve.getXWithY(nextInd, data.invariant);
+
+            data.remainder -= delInput;
+            data.input += delInput;
+
+            if (nextDep > prevDep) revert SwapInputTooSmall();
+            data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
+        }
+
+        {
+            // Scale down amounts from WAD.
+            uint256 inputDec;
+            uint256 outputDec;
+            if (sellAsset) {
+                inputDec = self.pair.decimalsAsset;
+                outputDec = self.pair.decimalsQuote;
+            } else {
+                inputDec = self.pair.decimalsQuote;
+                outputDec = self.pair.decimalsAsset;
+            }
+
+            data.input = data.input.scaleFromWadUp(inputDec);
+            data.output = data.output.scaleFromWadDown(outputDec);
+        }
+
+        return (data.output, data.remainder);
     }
 }

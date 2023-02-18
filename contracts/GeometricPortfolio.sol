@@ -155,6 +155,15 @@ contract GeometricPortfolio is HyperVirtual {
         price = pools[poolId].computePrice(weight);
     }
 
+    function _estimateAmountOut(
+        HyperPool memory pool,
+        bool sellAsset,
+        uint amountIn
+    ) internal view override returns (uint output) {
+        uint256 passed = getTimePassed(pool);
+        (output, ) = pool.getPoolAmountOut(sellAsset, amountIn, weight);
+    }
+
     /** @dev Immediately next invariant value. */
     function getInvariant(uint64 poolId) public view returns (int256 invariant) {
         HyperPool memory pool = pools[poolId];

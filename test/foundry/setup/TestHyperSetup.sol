@@ -28,6 +28,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
     using SafeCastLib for uint256;
+    using RMM01Lib for HyperPool;
 
     WETH public __weth__;
     Hyper public __hyper__; // Actual contract
