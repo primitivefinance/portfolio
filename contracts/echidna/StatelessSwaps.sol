@@ -82,11 +82,7 @@ contract StatelessSwaps is Helper, Test {
         uint256 tau
     ) public {
         stk = bound(stk, 1, type(uint128).max);
-        price = bound(
-            price,
-            (RMM01Lib.computePriceWithTick(RMM01Lib.computeTickWithPrice(stk) + 1) + 1e18 - 1) / 1e18,
-            type(uint128).max
-        ); // to prevent lnWad's "UNDEFINED" when `price * 1e18 / stk == 0`.
+        price = bound(price, stk, type(uint128).max); // to prevent lnWad's "UNDEFINED" when `price * 1e18 / stk == 0`.
         vol = bound(vol, 100, 25_000);
         tau = bound(tau, 1, 500);
 
@@ -116,7 +112,6 @@ contract StatelessSwaps is Helper, Test {
         }
 
         // Update stk to what Hyper stores, otherwise calculations will be inexcat.
-        stk = RMM01Lib.computePriceWithTick(RMM01Lib.computeTickWithPrice(stk));
         emit LogUint256("stk", stk);
         {
             // Scoping due to stack-depth.

@@ -27,7 +27,6 @@ library RMM01Lib {
     error UndefinedPrice();
     error OverflowWad(int256 wad);
 
-    int256 internal constant TICK_BASE = 1_0001e14;
     uint256 internal constant DOUBLE_WAD = 2 ether;
     uint256 internal constant PERCENTAGE = 10_000;
     uint256 internal constant SQRT_WAD = 1e9;
@@ -277,35 +276,6 @@ library RMM01Lib {
         int256 exponent = first - halfSigmaTau;
         int256 exp = exponent.expWad();
         prc = uint256(exp).mulWadDown(stk);
-    }
-
-    // ===== Tick Math ===== //
-
-    /**
-     * @dev Computes a price value from a tick key.
-     *
-     * @custom:math price = e^(ln(1.0001) * tick)
-     *
-     * @param tick Key of a slot in a price/liquidity grid.
-     * @return price WAD Value on a key (tick) value pair of a price grid.
-     */
-    function computePriceWithTick(int24 tick) internal pure returns (uint256 price) {
-        int256 tickWad = int256(tick) * int256(FixedPointMathLib.WAD);
-        price = uint256(FixedPointMathLib.powWad(TICK_BASE, tickWad));
-    }
-
-    /**
-     * @dev Computes a tick value from the price.
-     *
-     * @custom:math tick = ln(price) / ln(1.0001)
-     *
-     * @param price WAD Value on a key (tick) value pair of a price grid.
-     * @return tick Key of a slot in a price/liquidity grid.
-     */
-    function computeTickWithPrice(uint256 price) internal pure returns (int24 tick) {
-        uint256 numerator = uint256(int256(price).lnWad());
-        uint256 denominator = uint256(TICK_BASE.lnWad());
-        tick = int24(int256((numerator)) / int256(denominator) + 1);
     }
 
     // ===== Utils ===== //

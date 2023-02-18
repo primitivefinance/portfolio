@@ -80,7 +80,7 @@ contract Swaps is EchidnaStateHandling {
             emit LogUint256("block.timestamp", block.timestamp);
             swap_should_fail(poolId, true, id, id, "BUG: Swap on an expired pool should have failed.");
         } else {
-            uint256 stk = RMM01Lib.computePriceWithTick(RMM01Lib.computeTickWithPrice(curve.maxPrice));
+            uint256 stk = curve.maxPrice;
             emit LogUint256("stk", stk);
 
             (uint input, uint output) = clam_safe_input_output_value(sellAsset, liquidity, pool);

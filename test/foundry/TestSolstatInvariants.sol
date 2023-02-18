@@ -209,16 +209,6 @@ contract TestSolstatBounds is TestSolstatHelper {
 }
 
 contract TestSolstatInvariants is TestSolstatHelper {
-    function test_tick_is_increasing(uint256 price, uint256 delta) public {
-        price = bound(price, 0.00000001e18, 1_000_000e18);
-        delta = bound(delta, 1, 1 + 1_000_000e18 - price);
-
-        int24 tick1 = RMM01Lib.computeTickWithPrice(price);
-        int24 tick2 = RMM01Lib.computeTickWithPrice(price + delta);
-
-        assertGte(tick2, tick1);
-    }
-
     /* ---------------- FAIL ---------------- */
 
     function test_cdf_is_increasing(int256 x1, int256 x2) public canRevert {
