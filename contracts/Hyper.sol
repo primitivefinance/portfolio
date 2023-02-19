@@ -120,6 +120,11 @@ abstract contract HyperVirtual is Objective {
         Enigma.__startProcess__(_process);
     }
 
+    function multiprocess(bytes calldata data) external payable lock interactions {
+        if (data[0] != Enigma.INSTRUCTION_JUMP) _process(data);
+        else Enigma._jumpProcess(data, _process);
+    }
+
     /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
     function getNetBalance(address token) public view returns (int256) {
         return __account__.getNetBalance(token, address(this));
