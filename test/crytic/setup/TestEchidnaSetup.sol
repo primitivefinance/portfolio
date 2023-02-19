@@ -2,14 +2,12 @@
 pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
-import "contracts/libraries/RMM01Lib.sol";
-import "contracts/HyperLib.sol";
+import "contracts/Hyper.sol";
+import "contracts/test/TestERC20.sol";
 import "test/helpers/HelperHyperActions.sol";
 import "test/helpers/HelperHyperInvariants.sol";
 import "test/helpers/HelperHyperProfiles.sol";
 import "test/helpers/HelperHyperView.sol";
-
-import {TestERC20, HyperTimeOverride} from "test/helpers/HyperTestOverrides.sol";
 
 uint256 constant STARTING_BALANCE = 4000e18;
 
@@ -26,7 +24,7 @@ contract TestEchidnaEvents {
 contract Addresses {
     User public __user__;
     WETH public __weth__;
-    HyperTimeOverride public __hyper__;
+    Hyper public __hyper__;
     TestERC20 public __usdc__;
     TestERC20 public __token_18__;
 }
@@ -57,7 +55,7 @@ contract TestEchidnaSetup is
         __weth__ = new WETH();
 
         // --- Hyper Contracts --- //
-        __hyper__ = new HyperTimeOverride(address(__weth__));
+        __hyper__ = new Hyper(address(__weth__));
 
         // --- Tokens --- //
         __usdc__ = new TestERC20("USD Coin", "USDC", 6);

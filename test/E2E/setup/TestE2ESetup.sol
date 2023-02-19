@@ -2,11 +2,11 @@
 pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
-import "contracts/HyperLib.sol";
+import "contracts/Hyper.sol";
 import "contracts/libraries/RMM01Lib.sol";
 
 import "forge-std/Test.sol";
-import {TestERC20, HyperTimeOverride, FixedPointMathLib} from "test/helpers/HyperTestOverrides.sol";
+import {TestERC20, FixedPointMathLib} from "test/helpers/HyperTestOverrides.sol";
 
 import "test/helpers/HelperHyperActions.sol";
 import "test/helpers/HelperHyperInvariants.sol";
@@ -29,7 +29,7 @@ contract TestE2ESetup is Helpers, Test {
     WETH public __weth__;
     TestERC20 public __quote__;
     TestERC20 public __asset__;
-    HyperTimeOverride public __hyper__; // Actual contract
+    Hyper public __hyper__; // Actual contract
 
     // ===== Set up ===== //
 
@@ -65,7 +65,7 @@ contract TestE2ESetup is Helpers, Test {
     // ===== Contracts Context ===== //
     function initContracts() internal {
         __weth__ = new WETH();
-        __hyper__ = new HyperTimeOverride(address(__weth__));
+        __hyper__ = new Hyper(address(__weth__));
         __quote__ = new TestERC20("USD Coin", "USDC", 6);
         __asset__ = new TestERC20("18 Decimals", "18DEC", 18);
 
@@ -75,7 +75,7 @@ contract TestE2ESetup is Helpers, Test {
     function setLabels() internal {
         vm.label(address(this), "Self");
         vm.label(address(__weth__), "Weth");
-        vm.label(address(__hyper__), "HyperTimeOverride");
+        vm.label(address(__hyper__), "Hyper");
         vm.label(address(__quote__), "QuoteToken");
         vm.label(address(__asset__), "AssetToken");
     }

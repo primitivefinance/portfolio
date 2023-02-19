@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "test/helpers/HelperHyperView.sol";
-import {HyperPool, HyperPosition, HyperTimeOverride, TestERC20} from "test/helpers/HyperTestOverrides.sol";
+import "contracts/Hyper.sol";
+import {HyperPool, HyperPosition, TestERC20} from "test/helpers/HyperTestOverrides.sol";
 
 interface Context {
     function users() external view returns (address[] memory);
@@ -28,13 +29,13 @@ contract InvariantTargetContract is HelperHyperView, Test {
     Context ctx;
 
     uint64 public __poolId__ = 0x0000010000000001;
-    HyperTimeOverride public __hyper__; // Actual contract
+    Hyper public __hyper__; // Actual contract
     TestERC20 public __quote__;
     TestERC20 public __asset__;
 
     constructor(address hyper_, address asset_, address quote_) {
         ctx = Context(msg.sender);
-        __hyper__ = HyperTimeOverride(payable(hyper_));
+        __hyper__ = Hyper(payable(hyper_));
         __asset__ = TestERC20(asset_);
         __quote__ = TestERC20(quote_);
 

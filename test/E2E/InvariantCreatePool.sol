@@ -2,7 +2,6 @@
 pragma solidity ^0.8.0;
 
 import "contracts/HyperLib.sol" as HyperTypes;
-import "contracts/libraries/EnigmaLib.sol" as Enigma;
 import "./setup/InvariantTargetContract.sol";
 
 contract InvariantCreatePool is InvariantTargetContract {

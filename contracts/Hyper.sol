@@ -56,6 +56,7 @@ abstract contract HyperVirtual is Objective {
     mapping(address => mapping(uint64 => HyperPosition)) public positions;
 
     uint256 public locked = 1;
+    uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
     Payment[] private _payments;
     SwapState internal _state; // todo: should remain private, with special internal functions to manipulate.
 
@@ -618,7 +619,7 @@ abstract contract HyperVirtual is Objective {
 
         HyperCurve memory params = HyperCurve({
             maxPrice: maxPrice,
-            jit: hasController ? jit : uint8(_liquidityPolicy()),
+            jit: hasController ? jit : uint8(_liquidityPolicy),
             fee: fee,
             duration: duration,
             volatility: volatility,
@@ -653,11 +654,6 @@ abstract contract HyperVirtual is Objective {
         pool.changePoolParameters(modified);
 
         emit ChangeParameters(poolId, priorityFee, fee, jit);
-    }
-
-    /** @dev Overridable in tests.  */
-    function _liquidityPolicy() internal view virtual returns (uint256) {
-        return JUST_IN_TIME_LIQUIDITY_POLICY;
     }
 
     // ===== Accounting System ===== //
