@@ -35,7 +35,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     using RMM01Lib for HyperPool;
 
     WETH public __weth__;
-    Hyper public __hyperTestingContract__; // Inherits HyperTimeOverrides, adds endpoints to process functions.
+    IHyper public __hyperTestingContract__; // Inherits HyperTimeOverrides, adds endpoints to process functions.
     RevertCatcher public __revertCatcher__;
 
     TestERC20 public __usdc__;
@@ -86,7 +86,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         __weth__ = new WETH();
 
         // --- Hyper Contracts --- //
-        __hyperTestingContract__ = new Hyper(address(__weth__));
+        __hyperTestingContract__ = IHyper(new Hyper(address(__weth__)));
         __revertCatcher__ = new RevertCatcher(address(__hyperTestingContract__));
         __contracts__.push(address(__hyperTestingContract__));
         __contracts__.push(address(__revertCatcher__));
