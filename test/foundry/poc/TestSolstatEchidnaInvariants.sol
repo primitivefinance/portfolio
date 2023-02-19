@@ -2,29 +2,29 @@
 pragma solidity ^0.8.0;
 
 import "solstat/Gaussian.sol";
-import {GaussianRef} from "./solstat/GaussianRef.sol";
+import {GaussianRef} from "test/foundry/solstat/GaussianRef.sol";
 import {Invariant} from "solstat/Invariant.sol";
 import "solstat/Units.sol" as Units;
 import "contracts/libraries/RMM01Lib.sol";
 
-import "./setup/TestSolstatHelper.sol";
+/// @notice requires editing "lib/forge-std/lib/ds-test/src/test.sol"
+///         in order to make `fail()` overridable:
+///         `function fail() internal` -> `function fail() internal virtual`.
+import "../../E2E/setup/TestEchidnaSolstatHelper.sol";
 
-uint256 constant ONE = 1e18;
 int256 constant NEG_ONE = -1;
-int256 constant INT256_MAX = 0x7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
-
-int256 constant E_DOWN = 2_718281828459045235;
-int256 constant E_UP = 2_718281828459045236;
-int256 constant EXP_MIN = -42139678854452767551;
-int256 constant EXP_MIN_SQRT_DOWN = -6491508212;
-int256 constant EXP_MAX = 135305999368893231589;
-int256 constant EXP_MAX_SQRT = 11632110701;
+int256 constant E_DOWN = 2_718281828459045235; // floor(e^1)
+int256 constant E_UP = 2_718281828459045236; // ceil(e^1)
 int256 constant PDF_0_UP = 398942280401432678; // ceil(1 / sqrt(2*pi))
+int256 constant EXP_MIN = -42139678854452767551;
+int256 constant EXP_MAX = 135305999368893231589;
+int256 constant EXP_MIN_SQRT = -6491508212;
+int256 constant EXP_MAX_SQRT = 11632110701;
 
 /// @dev need to check that certain assumptions can be made about
 ///      solmate's implementations, otherwise there's no point in
 ///      checking for breaking invariants in functions that build on these.
-contract TestSolmateInvariants is TestSolstatHelper {
+contract TestEchidnaSolmateInvariants is TestEchidnaSolstatHelper {
     function test_expWad_is_bounded(int256 x) public {
         x = bound(x, EXP_MIN, EXP_MAX);
 
@@ -36,10 +36,10 @@ contract TestSolmateInvariants is TestSolstatHelper {
         assertGte(y, 0);
     }
 
-    function test_expWad_mul_ONE_doesnt_overflow(int256 x) public view {
+    function test_expWad_mul_ONE_doesnt_overflow(int256 x) public {
         x = bound(x, EXP_MIN, EXP_MAX);
 
-        int256 y = x * int256(ONE);
+        int256 y = x * 1e18;
 
         logInt("x", x);
         logInt("y", y);
@@ -60,7 +60,7 @@ contract TestSolmateInvariants is TestSolstatHelper {
         assertGte(y2, y1);
     }
 
-    function test_expWad_rounds_down(int256 x1) public canRevert {
+    function test_expWad_rounds_down(int256 x1) public {
         x1 = bound(x1, EXP_MIN + 1, EXP_MAX - 1);
 
         int256 x2 = x1 + 1;
@@ -112,7 +112,7 @@ contract TestSolmateInvariants is TestSolstatHelper {
         assertGte(y2, y1);
     }
 
-    function test_sqrt_rounds_down(uint256 x) public canRevert {
+    function test_sqrt_rounds_down(uint256 x) public {
         uint256 y = FixedPointMathLib.sqrt(x);
 
         console.log("x", x);
@@ -142,10 +142,10 @@ contract TestSolmateInvariants is TestSolstatHelper {
     }
 }
 
-contract TestSolstatBounds is TestSolstatHelper {
+contract TestEchidnaSolstatBounds is TestEchidnaSolstatHelper {
     /* ---------------- FAIL ---------------- */
 
-    function test_cdf_is_bounded(int256 x) public canRevert {
+    function test_cdf_is_bounded(int256 x) public {
         // Note: this test seems to pass, however, because `erfc` is
         // being used it is likely that the unbounded values were not
         // triggered/found.
@@ -165,7 +165,7 @@ contract TestSolstatBounds is TestSolstatHelper {
         test_erfc_is_bounded(-57896044618658097711785492504343953926634992332820282019727663624789469313869);
     }
 
-    function test_erfc_is_bounded(int256 x) public canRevert {
+    function test_erfc_is_bounded(int256 x) public {
         // Note: foundry has a hard time disproving this,
         // but the example above and the test below shows that the values can lie far out of bounds.
         x = bound(x, type(int256).min, type(int256).max);
@@ -179,8 +179,8 @@ contract TestSolstatBounds is TestSolstatHelper {
         assertLt(y, 2e18); // NOTE: should not be inclusive if rounding down.
     }
 
-    function test_pdf_is_bounded(int256 x) public canRevert {
-        // x = bound(x, 2 * EXP_MIN_SQRT_DOWN, -2 * EXP_MIN_SQRT_DOWN);
+    function test_pdf_is_bounded(int256 x) public {
+        // x = bound(x, 2 * EXP_MIN_SQRT, -2 * EXP_MIN_SQRT);
 
         int256 y = Gaussian.pdf(x);
 
@@ -208,10 +208,10 @@ contract TestSolstatBounds is TestSolstatHelper {
     }
 }
 
-contract TestSolstatInvariants is TestSolstatHelper {
+contract TestEchidnaSolstatInvariants is TestEchidnaSolstatHelper {
     /* ---------------- FAIL ---------------- */
 
-    function test_cdf_is_increasing(int256 x1, int256 x2) public canRevert {
+    function test_cdf_is_increasing(int256 x1, int256 x2) public {
         x2 = bound(x2, x1, type(int256).max);
 
         int256 y1 = Gaussian.cdf(x1);
@@ -220,7 +220,7 @@ contract TestSolstatInvariants is TestSolstatHelper {
         assertGte(y2, y1);
     }
 
-    function test_cdf_is_gt_half(int256 x) public canRevert {
+    function test_cdf_is_gt_half(int256 x) public {
         int256 y = Gaussian.cdf(x);
 
         // NOTE very large values suddenly turn to 0.
@@ -229,7 +229,7 @@ contract TestSolstatInvariants is TestSolstatHelper {
         if (x < -1e18) assertLt(y, 0.5e18);
     }
 
-    function test_pdf_is_decreasing(int256 x1, int256 x2) public canRevert {
+    function test_pdf_is_decreasing(int256 x1, int256 x2) public {
         x1 = bound(x1, 0, type(int256).max);
         x2 = bound(x2, x1, type(int256).max);
 
@@ -244,7 +244,7 @@ contract TestSolstatInvariants is TestSolstatHelper {
         assertLte(y2, y1);
     }
 
-    function test_erfc_is_decreasing(int256 x1, int256 x2) public canRevert {
+    function test_erfc_is_decreasing(int256 x1, int256 x2) public {
         x1 = bound(x1, type(int256).min, type(int256).max);
         x2 = bound(x2, x1, type(int256).max);
 
@@ -259,7 +259,7 @@ contract TestSolstatInvariants is TestSolstatHelper {
         assertLte(y2, y1);
     }
 
-    function test_ierfc_is_decreasing(int256 x1, int256 x2) public canRevert {
+    function test_ierfc_is_decreasing(int256 x1, int256 x2) public {
         x1 = bound(x1, 0, 2e18);
         x2 = bound(x2, x1, 2e18);
 
@@ -302,7 +302,7 @@ contract TestSolstatInvariants is TestSolstatHelper {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) public canRevert {
+    ) public {
         stk = bound(stk, 1, 100_000_000e18);
         vol = bound(vol, 0.00001e18, 2.5e18);
         tau = bound(tau, 1 days, 5 * 365 days);
@@ -330,7 +330,7 @@ contract TestSolstatInvariants is TestSolstatHelper {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) public canRevert {
+    ) public {
         stk = bound(stk, 1, 100_000_000e18);
         vol = bound(vol, 0.00001e18, 2.5e18);
         tau = bound(tau, 1 days, 5 * 365 days);
@@ -370,7 +370,7 @@ contract TestSolstatInvariants is TestSolstatHelper {
         uint256 stk,
         uint256 vol,
         uint256 tau
-    ) public canRevert {
+    ) public {
         stk = bound(stk, 1, 100_000_000e18);
         vol = bound(vol, 0.00001e18, 2.5e18);
         tau = bound(tau, 1 days, 5 * 365 days);
@@ -453,10 +453,11 @@ contract TestSolstatInvariants is TestSolstatHelper {
     }
 }
 
-contract TestSolstatError is TestSolstatHelper {
+// TODO: run with echidna's optimization mode
+contract TestEchidnaSolstatError is TestEchidnaSolstatHelper {
     /* ---------------- PASS ---------------- */
 
-    function test_pdf_max_error_around_symmetry_0(int256 x) public canRevert {
+    function test_pdf_max_error_around_symmetry_0(int256 x) public returns (int256) {
         x = bound(x, -100e18, 100e18);
         int256 y = Gaussian.pdf(x);
 
@@ -471,12 +472,14 @@ contract TestSolstatError is TestSolstatHelper {
         logInt("min. err", err);
         console.log();
 
-        assertLte(err, maxErr * 1e2);
+        // assertLte(err, maxErr * 1e2);
+
+        return err;
     }
 
     /* ---------------- FAIL ---------------- */
 
-    function test_cdf_max_error(int256 x1, int256 x2) public canRevert {
+    function test_cdf_max_error(int256 x1, int256 x2) public returns (int256) {
         x1 = bound(x1, type(int256).min, type(int256).max);
         x2 = bound(x2, x1, type(int256).max);
 
@@ -491,14 +494,17 @@ contract TestSolstatError is TestSolstatHelper {
         logInt("y2", y2);
 
         int256 err = y1 - y2;
-        int256 maxErr = 1000000000000000000; // note: did not explore much
+        int256 maxErr = 1000000000000000000;
+
         logInt("min. err", err);
         console.log();
 
-        assertLte(err, maxErr * 1);
+        // assertLte(err, maxErr * 1);
+
+        return err;
     }
 
-    function test_erfc_max_error(int256 x1, int256 x2) public canRevert {
+    function test_erfc_max_error(int256 x1, int256 x2) public returns (int256) {
         x1 = bound(x1, type(int256).min, type(int256).max);
         x2 = bound(x2, x1, type(int256).max);
 
@@ -518,10 +524,12 @@ contract TestSolstatError is TestSolstatHelper {
         logInt("min. err", err);
         console.log();
 
-        assertLte(err, maxErr * 1);
+        // assertLte(err, maxErr * 1);
+
+        return err;
     }
 
-    function test_erfc_max_error_around_symmetry_0(int256 x) public canRevert {
+    function test_erfc_max_error_around_symmetry_0(int256 x) public returns (int256) {
         x = bound(x, -100e18, 100e18);
 
         int256 y = Gaussian.erfc(x);
@@ -537,10 +545,12 @@ contract TestSolstatError is TestSolstatHelper {
         logInt("min. err", err);
         console.log();
 
-        assertLte(err, maxErr * 1e2);
+        // assertLte(err, maxErr * 1e2);
+
+        return err;
     }
 
-    function test_ierfc_max_error(int256 x1, int256 x2) public canRevert {
+    function test_ierfc_max_error(int256 x1, int256 x2) public returns (int256) {
         x1 = bound(x1, 1, 2e18 - 1); // Technically should not include the bounds.
         x2 = bound(x2, x1, 2e18 - 1);
 
@@ -560,10 +570,12 @@ contract TestSolstatError is TestSolstatHelper {
         logInt("min. err", err);
         console.log();
 
-        assertLte(err, maxErr * 1e1);
+        // assertLte(err, maxErr * 1e1);
+
+        return err;
     }
 
-    function test_ierfc_max_error_around_symmetry_1(int256 x) public canRevert {
+    function test_ierfc_max_error_around_symmetry_1(int256 x) public returns (int256) {
         x = bound(x, 1, 2e18 - 1);
 
         int256 y = Gaussian.ierfc(x);
@@ -579,12 +591,14 @@ contract TestSolstatError is TestSolstatHelper {
         logInt("min. err", int256(abs(err)));
         console.log();
 
-        assertLte(err, maxErr * 1e1);
+        // assertLte(err, maxErr * 1e1);
+
+        return err;
     }
 
-    function test_pdf_max_error(int256 x1, int256 x2) public canRevert {
-        x1 = bound(x1, 2 * EXP_MIN_SQRT_DOWN, 0);
-        x2 = bound(x2, 2 * EXP_MIN_SQRT_DOWN, x1);
+    function test_pdf_max_error(int256 x1, int256 x2) public returns (int256) {
+        x1 = bound(x1, 2 * EXP_MIN_SQRT, 0);
+        x2 = bound(x2, 2 * EXP_MIN_SQRT, x1);
 
         int256 y1 = Gaussian.pdf(x1);
         int256 y2 = Gaussian.pdf(x2);
@@ -602,11 +616,13 @@ contract TestSolstatError is TestSolstatHelper {
         logInt("min. err", err);
         console.log();
 
-        assertLte(err, maxErr * 1e1);
+        // assertLte(err, maxErr * 1e1);
+
+        return err;
     }
 }
 
-contract TestSolstatDifferential is TestSolstatHelper {
+contract TestEchidnaSolstatDifferential is TestEchidnaSolstatHelper {
     /* ---------------- wrapper functions ---------------- */
 
     function erfc(int256 x) external pure returns (int256 y) {
@@ -661,7 +677,7 @@ contract TestSolstatDifferential is TestSolstatHelper {
         }
     }
 
-    function test_differential_units_muli(int256 x, int256 y, int256 denominator) public canRevert {
+    function test_differential_units_muli(int256 x, int256 y, int256 denominator) public {
         unchecked {
             // If this function doesn't revert, the unchecked result must be the same.
             int256 z = Units.muli(x, y, denominator);
@@ -669,7 +685,7 @@ contract TestSolstatDifferential is TestSolstatHelper {
         }
     }
 
-    function test_differential_units_abs(int256 x) public canRevert {
+    function test_differential_units_abs(int256 x) public {
         unchecked {
             uint256 z = Units.abs(x);
             assertEq(z, uint256(x < 0 ? -x : x));
@@ -711,197 +727,4 @@ contract TestSolstatDifferential is TestSolstatHelper {
 
         assertEqCall(calldata2, calldata1);
     }
-
-    // for the fixed versions, we want to check that the
-    // results are equal, only when the fixed version did not
-    // revert due to overflow.
-
-    // function test_differential_erfc_fixed(int256 x) public canRevert {
-    //     x = bound(x, EXP_MIN + 1, EXP_MAX - 1);
-    //     // note: should be checking that if erfc_fixed succeeds,
-    //     // then erfc should succeed as well, i.e. adding `canRevert`
-    //     // only to `erfc_fixed`. However, due to incorrect assembly,
-    //     // `erfc` can actually revert in cases when it shouldn't.
-    //     int256 y1 = Gaussian.erfc_fixed(x);
-    //     int256 y2 = Gaussian.erfc(x);
-
-    //     assertEq(y1, y2);
-    // }
-
-    // function test_differential_pdf_fixed(int256 x) public canRevert {
-    //     x = bound(x, 2 * EXP_MIN_SQRT_DOWN, -2 * EXP_MIN_SQRT_DOWN);
-    //     int256 y1 = Gaussian.pdf_fixed(x);
-    //     int256 y2 = Gaussian.pdf(x);
-
-    //     assertEq(y1, y2);
-    // }
 }
-
-contract TestSolstatGasERFC is TestSolstatHelper {
-    function test_gas_erfc(int256 x) external {
-        vm.pauseGasMetering();
-        x = bound(x, EXP_MIN + 1, EXP_MAX - 1);
-        vm.resumeGasMetering();
-
-        wasteGas(0);
-
-        Gaussian.erfc(x);
-    }
-
-    function test_gas_erfc_solidity(int256 x) external {
-        vm.pauseGasMetering();
-        x = bound(x, EXP_MIN + 1, EXP_MAX - 1);
-        vm.resumeGasMetering();
-
-        wasteGas(0);
-
-        // note: gas usage should be close to equal
-        // when testing the same functions.
-        Gaussian.erfc(x);
-        // GaussianRef.erfc_solidity(x);
-    }
-}
-
-contract TestSolstatGasIERFC is TestSolstatHelper {
-    function test_gas_ierfc(int256 x) external canRevert {
-        vm.pauseGasMetering();
-        x = bound(x, 0, 2e18);
-        vm.resumeGasMetering();
-
-        wasteGas(0);
-
-        Gaussian.ierfc(x);
-    }
-
-    function test_gas_ierfc_solidity(int256 x) external canRevert {
-        vm.pauseGasMetering();
-        x = bound(x, 0, 2e18);
-        vm.resumeGasMetering();
-
-        wasteGas(15);
-
-        Gaussian.ierfc(x);
-        // GaussianRef.ierfc_solidity(x);
-    }
-}
-
-contract TestSolstatGasAbs is TestSolstatHelper {
-    function test_gas_abs(int256 x) external canRevert {
-        vm.pauseGasMetering();
-        x = bound(x, -type(int256).max, type(int256).max);
-        vm.resumeGasMetering();
-
-        wasteGas(0);
-
-        Units.abs(x);
-    }
-
-    function test_gas_abs_solidity(int256 x) external canRevert {
-        vm.pauseGasMetering();
-        x = bound(x, -type(int256).max, type(int256).max);
-        vm.resumeGasMetering();
-
-        wasteGas(10);
-
-        // Units.abs(x);
-        GaussianRef.abs_solidity(x);
-    }
-}
-
-contract TestSolstatGasPdf is TestSolstatHelper {
-    function test_gas_pdf(int256 x) external canRevert {
-        wasteGas(14);
-
-        Gaussian.pdf(x);
-    }
-
-    function test_gas_pdf_solidity(int256 x) external canRevert {
-        wasteGas(0);
-
-        // Gaussian.pdf(x);
-        GaussianRef.pdf_solidity(x);
-    }
-}
-
-contract TestSolstatGasPPF is TestSolstatHelper {
-    function test_gas_ppf(int256 x) external canRevert {
-        vm.pauseGasMetering();
-        x = bound(x, 0, 1e18);
-        vm.resumeGasMetering();
-
-        wasteGas(14);
-
-        Gaussian.ppf(x);
-    }
-
-    function test_gas_ppf_solidity(int256 x) external canRevert {
-        vm.pauseGasMetering();
-        x = bound(x, 0, 1e18);
-        vm.resumeGasMetering();
-
-        wasteGas(1);
-
-        // Gaussian.ppf(x);
-        GaussianRef.ppf_solidity(x);
-    }
-}
-
-/// @dev Test invariants on implementations that check for overflow
-// contract TestSolstatInvariantsFixed is TestSolstatHelper {
-//     function test_pdf_fixed_is_decreasing(int256 x1, int256 x2) public canRevert {
-//         // x1 = bound(x1, 0, -2 * EXP_MIN_SQRT_DOWN);
-//         // x2 = bound(x2, x1, -2 * EXP_MIN_SQRT_DOWN);
-
-//         x1 = bound(x1, type(int256).min, 0);
-//         x2 = bound(x2, x1, 0);
-
-//         // int256 y1 = Gaussian.pdf(x1);
-//         // int256 y2 = Gaussian.pdf(x2);
-//         int256 y1 = Gaussian.pdf_fixed(x1);
-//         int256 y2 = Gaussian.pdf_fixed(x2);
-
-//         logInt("x1", x1);
-//         logInt("x2", x2);
-//         logInt("y1", y1);
-//         logInt("y2", y2);
-
-//         assertGte(y2, y1);
-//     }
-
-//     function test_erfc_fixed_is_decreasing(int256 x1, int256 x2) public canRevert {
-//         x1 = bound(x1, 0, type(int256).max);
-//         x2 = bound(x2, x1, type(int256).max);
-
-//         int256 y1 = Gaussian.erfc_fixed(x1);
-//         int256 y2 = Gaussian.erfc_fixed(x2);
-
-//         logInt("x1", x1);
-//         logInt("y1", y1);
-//         logInt("x2", x2);
-//         logInt("y2", y2);
-
-//         assertLte(y2, y1);
-//     }
-
-//     function test_pdf_fixed(int256 x1, int256 x2) public canRevert {
-//         x1 = bound(x1, 2 * EXP_MIN_SQRT_DOWN, 0);
-//         x2 = bound(x2, 2 * EXP_MIN_SQRT_DOWN, x1);
-
-//         int256 y1 = Gaussian.pdf_fixed(x1);
-//         int256 y2 = Gaussian.pdf_fixed(x2);
-
-//         console.log("\nPDF");
-//         console.log();
-//         logInt("x1", x1);
-//         logInt("y1", y1);
-//         logInt("x2", x2);
-//         logInt("y2", y2);
-
-//         int256 err = y2 - y1;
-
-//         logInt("min. err", err);
-//         console.log();
-
-//         assertLte(err, 0);
-//     }
-// }

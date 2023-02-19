@@ -62,7 +62,6 @@ contract TestAssembly is Test {
     function test_addSignedDelta_should_match(uint128 input, int128 delta) public {
         vm.assume(input > 0);
         vm.assume(delta > 0);
-        vm.assume(input >= uint128(delta));
         vm.assume(uint256(input) + uint256(uint128(delta)) <= type(uint128).max);
 
         assertEq(target.addSignedDelta(input, delta), target.addSignedDelta_ref(input, delta));

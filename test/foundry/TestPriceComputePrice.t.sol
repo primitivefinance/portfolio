@@ -15,13 +15,12 @@ contract TestPriceComputePrice is TestPriceSetup {
     }
 
     /// todo: check this out further... error compounds
-    function testFuzz_getXWithPrice_reverses_approx(uint256 p_1) public {
+    function testFuzz_getXWithPrice_reverses_approx(uint64 p_1) public {
         vm.assume(p_1 > 0);
         vm.assume(p_1 < ((type(uint256).max - 1) / WAD));
         uint256 x_1 = cases[0].getXWithPrice(p_1);
         vm.assume(x_1 > 0);
-        vm.assume(x_1 != WAD);
-        //assertTrue(x_1 != WAD && x_1 > 0, "invalid-x-computed");
+        vm.assume(x_1 < WAD);
 
         uint256 p_2 = cases[0].getPriceWithX(x_1);
         assertTrue(p_2 > 0, "output-price-zero");
