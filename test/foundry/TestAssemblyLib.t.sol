@@ -27,7 +27,7 @@ contract AddSignedDelta {
     }
 }
 
-contract TestAssembly is Test {
+contract TestAssemblyLib is Test {
     AddSignedDelta public target;
 
     function setUp() public {

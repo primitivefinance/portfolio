@@ -1,13 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "./setup/TestPriceSetup.sol";
+import "forge-std/Test.sol";
+import "contracts/libraries/RMM01Lib.sol";
+import "contracts/test/RMM01ExtendedLib.sol";
+import "test/helpers/HelperHyperProfiles.sol";
 
-contract TestPriceComputePrice is TestPriceSetup {
+contract TestRMM01Lib is HelperHyperProfiles, Test {
     using RMM01Lib for RMM01Lib.RMM;
     using RMM01ExtendedLib for RMM01Lib.RMM;
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+
+    RMM01Lib.RMM[] cases;
+
+    function setUp() public {
+        addTestCase(DEFAULT_STRIKE, DEFAULT_SIGMA, DEFAULT_MATURITY);
+    }
+
+    function addTestCase(uint256 strike, uint256 sigma, uint256 tau) internal returns (RMM01Lib.RMM memory) {
+        RMM01Lib.RMM memory info = RMM01Lib.RMM(strike, sigma, tau);
+        cases.push(info);
+        return info;
+    }
 
     function test_getPriceWithX_defaults_return_expected_price() public {
         uint256 actual = cases[0].getPriceWithX(DEFAULT_ASSET_RESERVE);
@@ -172,4 +187,50 @@ contract TestPriceComputePrice is TestPriceSetup {
         assertTrue(actual != 10 ether, "found the bug");
         assertTrue(!((actual <= 10 ether + 1191e3) && (actual >= 10 ether - 1191e3)), "found value!");
     } */
+
+    function testComputedAssetReserveWithDefaultPrice() public {
+        uint256 actual = cases[0].getXWithPrice(DEFAULT_PRICE);
+        assertEq(actual, DEFAULT_ASSET_RESERVE);
+    }
+
+    function testComputedQuoteReserveWithDefaultAssetReserve() public {
+        uint256 actual = cases[0].getYWithX(DEFAULT_ASSET_RESERVE, 0);
+        assertEq(actual, DEFAULT_QUOTE_RESERVE);
+    }
+
+    function testComputedAssetReserveWithDefaultQuoteReserve() public {
+        uint256 actual = cases[0].getXWithY(DEFAULT_QUOTE_RESERVE, 0);
+        assertEq(actual, DEFAULT_ASSET_RESERVE);
+    }
+
+    function testComputedReservesWithDefaultPrice() public {
+        (uint256 actualQuoteReserve, uint256 actualAssetReserve) = cases[0].computeReserves(DEFAULT_PRICE, 0);
+        assertEq(actualQuoteReserve, DEFAULT_QUOTE_RESERVE);
+        assertEq(actualAssetReserve, DEFAULT_ASSET_RESERVE);
+    }
+
+    function testFuzz_computeReserves_no_reverts(uint256 price) public pure {
+        vm.assume(price > 0);
+        vm.assume(price < type(uint128).max);
+        // (uint256 y, uint256 x) = cases[0].computeReserves(price, 0);
+    }
+
+    function testConvertPercentageReturnsOne() public {
+        uint256 percentage = PERCENTAGE;
+        uint256 expected = WAD;
+        uint256 converted = RMM01Lib.convertPercentageToWad(percentage);
+        assertEq(converted, expected);
+    }
+
+    function testFuzzConvertPercentageReturnsComputedValue(uint256 percentage) public {
+        vm.assume(percentage < type(uint64).max);
+        uint256 expected = (percentage * WAD) / PERCENTAGE;
+        uint256 converted = RMM01Lib.convertPercentageToWad(percentage);
+        assertEq(converted, expected);
+    }
+
+    function testInvariantReturnsZeroWithDefaultPool() public {
+        int256 actual = cases[0].invariantOf(DEFAULT_QUOTE_RESERVE, DEFAULT_ASSET_RESERVE);
+        assertEq(actual, 0);
+    }
 }
