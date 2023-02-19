@@ -16,6 +16,11 @@ import "./HelperUtils.sol" as Utils;
 /**
  * @dev Hyper's test suite is setup to easily extend the tests with new configurations, actors, or environment states.
  *
+ * For every test:
+ * Do you have the `useActor` modifier?
+ * Do you use a config modifier, like `defaultConfig`?
+ * Do you check if the test is ready with the `isArmed` modifier?
+ *
  * | Problem                                                 | Solution                                                                  |
  * | ------------------------------------------------------- | ------------------------------------------------------------------------- |
  * | Different contracts with same interface                 | Internal virtual function in test setup that returns test subject.        |
@@ -38,6 +43,13 @@ contract Setup is Test {
      */
     SubjectsState private _subjects;
 
+    modifier isArmed() {
+        require(ghost().poolId != 0, "did you forget to use a config modifier?");
+        require(ghost().subject != address(0), "did you forget to deploy a subject?");
+        require(ghost().actor != address(0), "did you forget to set an actor?");
+        _;
+    }
+
     modifier useActor() {
         vm.startPrank(actor());
         _;
@@ -59,14 +71,6 @@ contract Setup is Test {
             .save();
 
         _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
-
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(_subjects.tokens[0])))
-            .edit("quote", abi.encode(address(_subjects.tokens[1])))
-            .generate(address(subject()));
-
-        set_pool_id(poolId);
 
         console.log("Setup finished");
     }
@@ -91,6 +95,13 @@ contract Setup is Test {
     }
 
     /**
+     * @dev Subjects are the contracts being tested on or used in testing.
+     */
+    function subjects() internal virtual returns (SubjectsState storage) {
+        return _subjects;
+    }
+
+    /**
      * @notice Contract that is being tested.
      * @dev Target subject is a ghost variable because it changes in the environment.
      */
@@ -106,5 +117,63 @@ contract Setup is Test {
      */
     function actor() internal virtual returns (address) {
         return _ghost.actor;
+    }
+
+    // === Configs === //
+    modifier defaultConfig() {
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .generate(address(subject()));
+
+        set_pool_id(poolId);
+        _;
+    }
+
+    modifier sixDecimalQuoteConfig() {
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[2])))
+            .generate(address(subject()));
+
+        set_pool_id(poolId);
+        _;
+    }
+
+    modifier wethConfig() {
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().weth)))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .generate(address(subject()));
+
+        set_pool_id(poolId);
+        _;
+    }
+
+    modifier durationConfig(uint16 duration) {
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .edit("duration", abi.encode(duration))
+            .generate(address(subject()));
+
+        set_pool_id(poolId);
+        _;
+    }
+
+    modifier volatilityConfig(uint16 volatility) {
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .edit("volatility", abi.encode(volatility))
+            .generate(address(subject()));
+
+        set_pool_id(poolId);
+        _;
     }
 }

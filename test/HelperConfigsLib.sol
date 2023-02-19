@@ -54,6 +54,10 @@ library Configs {
             self.asset = abi.decode(data, (address));
         } else if (what == "quote") {
             self.quote = abi.decode(data, (address));
+        } else if (what == "duration") {
+            self.durationDays = abi.decode(data, (uint16));
+        } else if (what == "volatility") {
+            self.volatilityBps = abi.decode(data, (uint16));
         }
         return self;
     }
