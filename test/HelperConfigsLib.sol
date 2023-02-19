@@ -26,6 +26,15 @@ function safeCastTo16(uint256 x) pure returns (uint16 y) {
     y = uint16(x);
 }
 
+/**
+ * @dev Manages the different parameters that can be tested against.
+ *
+ * User Manual:
+ * - Make a fresh config with defaults using `Configs.fresh()`.
+ * - Use `edit` to make modifications to the config.
+ * - Must `edit` the `asset` and `quote` parameters of the config.
+ * - Call `generate()` on a config to create the pool in the test subject (a Hyper contract).
+ */
 library Configs {
     using SafeCastLib for uint;
     using {safeCastTo16} for uint;

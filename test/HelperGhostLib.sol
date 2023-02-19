@@ -14,6 +14,15 @@ struct GhostState {
     uint64 poolId;
 }
 
+/**
+ * @dev Manages the state that exists only within the testing environment.
+ *
+ * User Manual:
+ * - Edit ghost variables via `file`.
+ * - Fetch ghost variables via view functions.
+ * - Fetch the tokens of the subject configuration as the `Coin` type, with utility functions.
+ * - Fetch the subject's state as structs instead of variables, e.g. HyperPair, HyperPool, or HyperPosition.
+ */
 library Ghost {
     error InvalidFileKey(bytes32 what);
 

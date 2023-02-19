@@ -19,7 +19,10 @@ struct SubjectsState {
 
 /**
  * @dev Handles the deployment of the contracts used in the test environment.
- * Chain deployments from `startDeploy` and then call `stopDeploy`.
+ *
+ * User Manual:
+ * - Chain deployments from `startDeploy` and `stopDeploy`.
+ * - Change test subject with `change_subject`.
  */
 library Subjects {
     struct Deploy {

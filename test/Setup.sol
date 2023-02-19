@@ -14,7 +14,7 @@ import "./HelperSubjectsLib.sol";
 import "./HelperUtils.sol" as Utils;
 
 /**
- * @dev Hyper's test suite is setup to easily extend the tests with new configurations, actors, or environment states.
+ * @dev Hyper's test environment is setup to easily extend the tests with new configurations, actors, or environment states.
  *
  * For every test:
  * Do you have the `useActor` modifier?
@@ -43,19 +43,6 @@ contract Setup is Test {
      */
     SubjectsState private _subjects;
 
-    modifier isArmed() {
-        require(ghost().poolId != 0, "did you forget to use a config modifier?");
-        require(ghost().subject != address(0), "did you forget to deploy a subject?");
-        require(ghost().actor != address(0), "did you forget to set an actor?");
-        _;
-    }
-
-    modifier useActor() {
-        vm.startPrank(actor());
-        _;
-        vm.stopPrank();
-    }
-
     /**
      * @notice Deploys WETH, subject, and three tokens. Creates a default pool.
      * @dev Initializes the actor, subject, and poolId ghost state.
@@ -65,8 +52,8 @@ contract Setup is Test {
             .startDeploy(vm)
             .wrapper()
             .subject()
-            .token("token", abi.encode("Standard", "A-STD-18", uint8(18)))
-            .token("token", abi.encode("Standard", "Q-STD-18", uint8(18)))
+            .token("token", abi.encode("Asset-Std", "A-STD-18", uint8(18)))
+            .token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18)))
             .token("token", abi.encode("USDC", "USDC-6", uint8(6)))
             .stopDeploy();
 
@@ -119,7 +106,21 @@ contract Setup is Test {
         return _ghost.actor;
     }
 
-    // === Configs === //
+    // === Modifiers for Tests === //
+
+    modifier isArmed() {
+        require(ghost().poolId != 0, "did you forget to use a config modifier?");
+        require(ghost().subject != address(0), "did you forget to deploy a subject?");
+        require(ghost().actor != address(0), "did you forget to set an actor?");
+        _;
+    }
+
+    modifier useActor() {
+        vm.startPrank(actor());
+        _;
+        vm.stopPrank();
+    }
+
     /**
      * @dev Uses a default parameter set to create a pool.
      * @custom:example
