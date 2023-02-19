@@ -32,6 +32,14 @@ library Configs {
 
     /**
      * @dev Creates a new config with defaults.
+     * @custom:example
+     * ```
+     * // Get the hyper contract that is the subject of the test.
+     * address hyper = address(subject());
+     * // Creates the pool with the fresh config.
+     * Configs.fresh().{edit asset}.{edit quote}.generate(hyper);
+     * // note: Must edit the `asset` and `quote`, or `generate` will revert.
+     * ```
      */
     function fresh() internal returns (ConfigState memory) {
         ConfigState memory config = ConfigState({
@@ -49,6 +57,15 @@ library Configs {
         return config;
     }
 
+    /**
+     * @dev Modifies a parameter of the default config. Chain edits to modify the full config.
+     * @custom:example
+     * ```
+     * // Expects abi encoded arguments as the `data`. Types must match expected types.
+     * // Creates a new pool with `asset_address`.
+     * Configs.fresh().edit("asset", abi.encode(asset_address)).generate(hyper);
+     * ```
+     */
     function edit(ConfigState memory self, bytes32 what, bytes memory data) internal pure returns (ConfigState memory) {
         if (what == "asset") {
             self.asset = abi.decode(data, (address));
@@ -62,6 +79,18 @@ library Configs {
         return self;
     }
 
+    /**
+     * @notice Uses a config and `hyper` address to create the pool in the contract.
+     * @dev Will create a pair if the `asset` and `quote` are not an existing pair.
+     * @custom:example
+     * ```
+     * uint64 poolId = Configs
+     *      .fresh()
+     *      .edit("asset", abi.encode(address(subjects().tokens[0])))
+     *      .edit("quote", abi.encode(address(subjects().tokens[1])))
+     *      .generate(address(subject()));
+     * ```
+     */
     function generate(ConfigState memory self, address hyper) internal returns (uint64 poolId) {
         require(self.asset != address(0), "did you set asset in config?");
         require(self.quote != address(0), "did you set quote in config?");

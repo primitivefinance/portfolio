@@ -62,13 +62,13 @@ contract Setup is Test {
      */
     function setUp() public virtual {
         _subjects
-            .deploy(vm)
+            .startDeploy(vm)
             .wrapper()
             .subject()
             .token("token", abi.encode("Standard", "A-STD-18", uint8(18)))
             .token("token", abi.encode("Standard", "Q-STD-18", uint8(18)))
             .token("token", abi.encode("USDC", "USDC-6", uint8(6)))
-            .save();
+            .stopDeploy();
 
         _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
 
@@ -120,6 +120,13 @@ contract Setup is Test {
     }
 
     // === Configs === //
+    /**
+     * @dev Uses a default parameter set to create a pool.
+     * @custom:example
+     * ```
+     * function test_basic_deposit() public defaultConfig {...}
+     * ```
+     */
     modifier defaultConfig() {
         uint64 poolId = Configs
             .fresh()

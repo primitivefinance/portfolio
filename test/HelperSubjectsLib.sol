@@ -19,7 +19,7 @@ struct SubjectsState {
 
 /**
  * @dev Handles the deployment of the contracts used in the test environment.
- * Chain deployments from `deploy` and then call `save`.
+ * Chain deployments from `startDeploy` and then call `stopDeploy`.
  */
 library Subjects {
     struct Deploy {
@@ -29,7 +29,7 @@ library Subjects {
     error UnknownToken(bytes32);
 
     modifier ready(SubjectsState storage self) {
-        require(address(self.vm) != address(0), "did you call deploy(vm) first?");
+        require(address(self.vm) != address(0), "did you call startDeploy(vm) first?");
         _;
     }
 
@@ -38,10 +38,36 @@ library Subjects {
     }
 
     /**
-     * @dev Loads the vm instance into context to label the following deployed contracts.
-     * Should be removed via `save` after all contracts are deployed.
+     * @dev Modifies the subject of the tests. Use this to change the target portfolio being tested.
+     * @custom:example
+     * ```
+     * pragma solidity ^0.8.0;
+     *
+     * import "./Setup.sol";
+     *
+     * contract TestOtherPortfolio is Test{test name}, Setup {
+     *    function setUp() public {
+     *      super.setUp();
+     *      address new_subject = address(new SubjectContract(...));
+     *      subjects().change_subject(new_subject);
+     *    }
+     *
+     *    // All tests inherited from Test{test name} will run using the new_subject.
+     * }
      */
-    function deploy(SubjectsState storage self, Vm vm) internal returns (SubjectsState storage) {
+    function change_subject(SubjectsState storage self, address subject) internal {
+        self.last = IHyper(subject);
+    }
+
+    /**
+     * @dev Loads the vm instance into context to label the following deployed contracts.
+     * Should be removed via `stopDeploy` after all contracts are deployed.
+     * @custom:example
+     * ```
+     * self.startDeploy(vm).{...deploy_functions()}.stopDeploy();
+     * ```
+     */
+    function startDeploy(SubjectsState storage self, Vm vm) internal returns (SubjectsState storage) {
         self.vm = vm;
 
         // Only change if unset or not the existing address.
@@ -52,18 +78,42 @@ library Subjects {
         return self;
     }
 
+    /**
+     * @dev Chain from `startDeploy()` to startDeploy the WETH contract subject.
+     * Must have `vm` in context via inheriting `forge-std/Test.sol`.
+     * @custom:example
+     * ```
+     * self.startDeploy(vm).wrapper().stopDeploy();
+     * ```
+     */
     function wrapper(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
         self.weth = new WETH();
         self.vm.label(address(self.weth), "WETH");
         return self;
     }
 
+    /**
+     * @dev Chain from `startDeploy()` to startDeploy the default Hyper contract subject.
+     * Must have `vm` in context via inheriting `forge-std/Test.sol`.
+     * @custom:example
+     * ```
+     * self.startDeploy(vm).subject().stopDeploy();
+     * ```
+     */
     function subject(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
         self.last = IHyper(new Hyper(address(self.weth)));
         self.vm.label(address(self.last), "Subject");
         return self;
     }
 
+    /**
+     * @dev Chain from `startDeploy()` to startDeploy a token subject.
+     * Must have `vm` in context via inheriting `forge-std/Test.sol`.
+     * @custom:example
+     * ```
+     * self.startDeploy(vm).token("token", abi.encode("Name", "Symbol", 18)).stopDeploy();
+     * ```
+     */
     function token(
         SubjectsState storage self,
         bytes32 what,
@@ -80,7 +130,12 @@ library Subjects {
         return self;
     }
 
-    function save(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
+    /**
+     * @dev Used at the end of a startDeploy chain to remove the `vm` instance from the SubjectsState.
+     * Removing vm will cause startDeploy related calls to revert if attempted without leading
+     * the chain with `startDeploy()`.
+     */
+    function stopDeploy(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
         delete self.vm;
         return self;
     }
