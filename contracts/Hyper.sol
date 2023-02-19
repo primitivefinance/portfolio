@@ -57,7 +57,7 @@ abstract contract HyperVirtual is Objective {
 
     uint256 public locked = 1;
     Payment[] private _payments;
-    SwapState private _state;
+    SwapState internal _state; // todo: should remain private, with special internal functions to manipulate.
 
     modifier lock() {
         if (locked != 1) revert InvalidReentrancy();
@@ -481,7 +481,18 @@ abstract contract HyperVirtual is Objective {
             iteration.output = iteration.output.scaleFromWadDown(outputDec);
         }
 
-        afterSwapEffects(args.poolId, iteration, _state); // todo: syncPoolState can be moved back in here... this is in control of too much.
+        afterSwapEffects(args.poolId, iteration); // todo: This needs to be locked down, I don't like it in its current state.
+
+        // Apply pool effects.
+        _syncPool(
+            args.poolId,
+            iteration.virtualX,
+            iteration.virtualY,
+            iteration.liquidity,
+            _state.sell ? _state.feeGrowthGlobal : 0,
+            _state.sell ? 0 : _state.feeGrowthGlobal,
+            _state.invariantGrowthGlobal
+        );
 
         _increaseReserves(_state.tokenInput, iteration.input);
         _decreaseReserves(_state.tokenOutput, iteration.output);
@@ -503,6 +514,32 @@ abstract contract HyperVirtual is Objective {
 
         delete _state;
         return (args.poolId, iteration.remainder, iteration.input, iteration.output);
+    }
+
+    /**
+     * @dev Effects on a Pool after a successful swap order condition has been met.
+     */
+    function _syncPool(
+        uint64 poolId,
+        uint256 nextVirtualX,
+        uint256 nextVirtualY,
+        uint256 liquidity,
+        uint256 feeGrowthGlobalAsset,
+        uint256 feeGrowthGlobalQuote,
+        uint256 invariantGrowthGlobal
+    ) internal returns (uint256 timeDelta) {
+        HyperPool storage pool = pools[poolId];
+
+        timeDelta = getTimePassed(poolId);
+
+        if (pool.virtualX != nextVirtualX) pool.virtualX = nextVirtualX.safeCastTo128();
+        if (pool.virtualY != nextVirtualY) pool.virtualY = nextVirtualY.safeCastTo128();
+        if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
+        if (pool.lastTimestamp != block.timestamp) pool.syncPoolTimestamp(block.timestamp);
+
+        pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
+        pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
+        pool.invariantGrowthGlobal = Assembly.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
     }
 
     // ===== Initializing Pools ===== //
@@ -817,11 +854,7 @@ contract Hyper is HyperVirtual {
 
     // Implemented
 
-    function afterSwapEffects(
-        uint64 poolId,
-        Iteration memory iteration,
-        SwapState memory state
-    ) internal override returns (bool) {
+    function afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
         HyperPool storage pool = pools[poolId];
 
         int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
@@ -829,19 +862,8 @@ contract Hyper is HyperVirtual {
         if (msg.sender == pool.controller) {
             int256 delta = iteration.invariant - liveInvariantWad;
             uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-            if (deltaAbs != 0) state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity);
+            if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity); // todo: don't like this setting internal _state...
         }
-
-        // Apply pool effects.
-        _syncPool(
-            poolId,
-            iteration.virtualX,
-            iteration.virtualY,
-            iteration.liquidity,
-            state.sell ? state.feeGrowthGlobal : 0,
-            state.sell ? 0 : state.feeGrowthGlobal,
-            state.invariantGrowthGlobal
-        );
 
         return true;
     }
@@ -937,32 +959,6 @@ contract Hyper is HyperVirtual {
         (uint256 x, uint256 y) = pool.getAmountsWad();
         invariant = curve.invariantOf({R_y: y, R_x: x});
         price = curve.getPriceWithX({R_x: x});
-    }
-
-    /**
-     * @dev Effects on a Pool after a successful swap order condition has been met.
-     */
-    function _syncPool(
-        uint64 poolId,
-        uint256 nextVirtualX,
-        uint256 nextVirtualY,
-        uint256 liquidity,
-        uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote,
-        uint256 invariantGrowthGlobal
-    ) internal returns (uint256 timeDelta) {
-        HyperPool storage pool = pools[poolId];
-
-        timeDelta = getTimePassed(poolId);
-
-        if (pool.virtualX != nextVirtualX) pool.virtualX = nextVirtualX.safeCastTo128();
-        if (pool.virtualY != nextVirtualY) pool.virtualY = nextVirtualY.safeCastTo128();
-        if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
-        if (pool.lastTimestamp != block.timestamp) pool.syncPoolTimestamp(block.timestamp);
-
-        pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
-        pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
-        pool.invariantGrowthGlobal = Assembly.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
     }
 
     // ===== View ===== //

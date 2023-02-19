@@ -26,25 +26,10 @@ contract GeometricPortfolio is HyperVirtual {
 
     // Implemented
 
-    function afterSwapEffects(
-        uint64 poolId,
-        Iteration memory iteration,
-        SwapState memory state
-    ) internal override returns (bool) {
+    function afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
         HyperPool storage pool = pools[poolId];
 
         int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
-
-        // Apply pool effects.
-        _syncPool(
-            poolId,
-            iteration.virtualX,
-            iteration.virtualY,
-            iteration.liquidity,
-            state.sell ? state.feeGrowthGlobal : 0,
-            state.sell ? 0 : state.feeGrowthGlobal,
-            state.invariantGrowthGlobal
-        );
 
         return true;
     }
@@ -116,32 +101,6 @@ contract GeometricPortfolio is HyperVirtual {
 
     function getReserves(HyperPool memory pool) public view override returns (uint reserve0, uint reserve1) {
         (reserve0, reserve1) = pool.getAmountsWad();
-    }
-
-    /**
-     * @dev Effects on a Pool after a successful swap order condition has been met.
-     */
-    function _syncPool(
-        uint64 poolId,
-        uint256 nextVirtualX,
-        uint256 nextVirtualY,
-        uint256 liquidity,
-        uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote,
-        uint256 invariantGrowthGlobal
-    ) internal returns (uint256 timeDelta) {
-        HyperPool storage pool = pools[poolId];
-
-        timeDelta = getTimePassed(poolId);
-
-        if (pool.virtualX != nextVirtualX) pool.virtualX = nextVirtualX.safeCastTo128();
-        if (pool.virtualY != nextVirtualY) pool.virtualY = nextVirtualY.safeCastTo128();
-        if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
-        if (pool.lastTimestamp != block.timestamp) pool.syncPoolTimestamp(block.timestamp);
-
-        pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
-        pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
-        pool.invariantGrowthGlobal = Assembly.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
     }
 
     // ===== View ===== //

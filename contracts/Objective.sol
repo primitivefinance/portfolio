@@ -9,11 +9,7 @@ import "./interfaces/IERC20.sol";
  * @notice Virtual interface to implement the logic for a "Portfolio".
  */
 abstract contract Objective is IHyper {
-    function afterSwapEffects(
-        uint64 poolId,
-        Iteration memory iteration,
-        SwapState memory state
-    ) internal virtual returns (bool);
+    function afterSwapEffects(uint64 poolId, Iteration memory iteration) internal virtual returns (bool);
 
     function beforeSwap(uint64 poolId) internal virtual returns (bool success, int256 invariant);
 
