@@ -69,8 +69,12 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // If there is a net balance, user can use it to pay their cost.
         // Total payment the user must make.
-        physicalAssetPayment = uint256(assetCredit) > expectedDeltaAsset ? 0 : expectedDeltaAsset - uint256(assetCredit);
-        physicalQuotePayment = uint256(quoteCredit) > expectedDeltaQuote ? 0 : expectedDeltaQuote - uint256(quoteCredit);
+        physicalAssetPayment = uint256(assetCredit) > expectedDeltaAsset
+            ? 0
+            : expectedDeltaAsset - uint256(assetCredit);
+        physicalQuotePayment = uint256(quoteCredit) > expectedDeltaQuote
+            ? 0
+            : expectedDeltaQuote - uint256(quoteCredit);
 
         physicalAssetPayment = uint256(userAssetBalance) > physicalAssetPayment
             ? 0

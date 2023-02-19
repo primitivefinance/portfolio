@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "solstat/Gaussian.sol";
-import {GaussianRef} from "../solstat/GaussianRef.sol";
+import {GaussianRef} from "./solstat/GaussianRef.sol";
 import {Invariant} from "solstat/Invariant.sol";
 import "solstat/Units.sol" as Units;
 import "contracts/libraries/RMM01Lib.sol";

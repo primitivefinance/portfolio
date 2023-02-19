@@ -66,12 +66,12 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     }
 
     function invariant_asset_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical,) = getBalances(address(__asset__));
+        (uint256 reserve, uint256 physical, ) = getBalances(address(__asset__));
         assertTrue(physical >= reserve, "invariant-asset-physical-balance");
     }
 
     function invariant_quote_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical,) = getBalances(address(__quote__));
+        (uint256 reserve, uint256 physical, ) = getBalances(address(__quote__));
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
     }
 
@@ -81,7 +81,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     }
 
     function invariant_account_prepared() public {
-        (bool prepared,) = __hyper__.__account__();
+        (bool prepared, ) = __hyper__.__account__();
         assertTrue(!prepared, "invariant-prepared");
     }
 
@@ -89,7 +89,7 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
         HyperPool memory pool = getPool(address(__hyper__), __poolId__);
 
         if (pool.liquidity > 0) {
-            (uint256 dAsset,) = __hyper__.getVirtualReserves(__poolId__);
+            (uint256 dAsset, ) = __hyper__.getVirtualReserves(__poolId__);
             uint256 bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }

@@ -59,7 +59,7 @@ library GaussianRef {
     function erfc_solidity(int256 input) internal pure returns (int256 output) {
         unchecked {
             int256 z = int256(abs_solidity(input));
-            int256 t = SCALAR_SQRD / (ONE + z * ONE / TWO); // 1 / (1 + z / 2).
+            int256 t = SCALAR_SQRD / (ONE + (z * ONE) / TWO); // 1 / (1 + z / 2).
 
             int256 step = ERFC_J;
             step = ERFC_I + mulWadUnchecked(t, step);
@@ -107,13 +107,13 @@ library GaussianRef {
 
     function mulWadUnchecked(int256 x, int256 y) internal pure returns (int256 z) {
         unchecked {
-            z = x * y / 1e18;
+            z = (x * y) / 1e18;
         }
     }
 
     function divWadUnchecked(int256 x, int256 y) internal pure returns (int256 z) {
         unchecked {
-            z = x * 1e18 / y;
+            z = (x * 1e18) / y;
         }
     }
 
@@ -139,12 +139,12 @@ library GaussianRef {
             if (logInput == 0) revert Infinity();
 
             int256 ln = FixedPointMathLib.lnWad(logInput);
-            int256 t = HALF_SCALAR * int256(uint256(NEGATIVE_TWO * ln / 1e18).sqrt());
+            int256 t = HALF_SCALAR * int256(uint256((NEGATIVE_TWO * ln) / 1e18).sqrt());
 
             int256 r1 = IERFC_B + mulWadUnchecked(t, IERFC_C);
             int256 r2 = ONE + mulWadUnchecked(t, IERFC_D + mulWadUnchecked(t, IERFC_E));
 
-            int256 r = r1 * 1e18 / r2 - t;
+            int256 r = (r1 * 1e18) / r2 - t;
             r = mulWadUnchecked(IERFC_A, r);
 
             // for (uint256 itr; itr < 2; ++itr) {
@@ -154,7 +154,7 @@ library GaussianRef {
 
             int256 t1 = -mulWadUnchecked(r, err);
             t1 = t1 + mulWadUnchecked(IERFC_F, expWad);
-            r = r + err * 1e18 / t1;
+            r = r + (err * 1e18) / t1;
 
             // r = r + err / (IERFC_F * expWad - r * err);
 
@@ -166,17 +166,17 @@ library GaussianRef {
 
     function cdf_solidity(int256 x) internal pure returns (int256 z) {
         unchecked {
-            z = erfc_solidity(-(x * ONE / SQRT2)) / 2;
+            z = erfc_solidity(-((x * ONE) / SQRT2)) / 2;
         }
     }
 
     function pdf_solidity(int256 x) internal pure returns (int256 z) {
         unchecked {
-            x = -x * x / 2e18;
+            x = (-x * x) / 2e18;
 
             int256 e = FixedPointMathLib.expWad(x);
 
-            z = e * ONE / SQRT_2PI;
+            z = (e * ONE) / SQRT_2PI;
         }
     }
 

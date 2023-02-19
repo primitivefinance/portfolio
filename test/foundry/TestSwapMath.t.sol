@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "test/recipes/SwapMath.sol" as SwapMath;
+import "test/helpers/SwapMath.sol" as SwapMath;
 import "forge-std/Test.sol";
 
 contract TestSwapMath is Test {

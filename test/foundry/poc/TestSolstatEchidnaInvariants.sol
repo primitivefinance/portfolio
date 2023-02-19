@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "solstat/Gaussian.sol";
-import {GaussianRef} from "test/foundry/solstat/GaussianRef.sol";
+import {GaussianRef} from "./solstat/GaussianRef.sol";
 import {Invariant} from "solstat/Invariant.sol";
 import "solstat/Units.sol" as Units;
 import "contracts/libraries/RMM01Lib.sol";
@@ -10,7 +10,7 @@ import "contracts/libraries/RMM01Lib.sol";
 /// @notice requires editing "lib/forge-std/lib/ds-test/src/test.sol"
 ///         in order to make `fail()` overridable:
 ///         `function fail() internal` -> `function fail() internal virtual`.
-import "../../E2E/setup/TestEchidnaSolstatHelper.sol";
+import "../../invariant/setup/TestEchidnaSolstatHelper.sol";
 
 int256 constant NEG_ONE = -1;
 int256 constant E_DOWN = 2_718281828459045235; // floor(e^1)
