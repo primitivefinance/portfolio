@@ -121,6 +121,13 @@ contract Setup is Test {
         vm.stopPrank();
     }
 
+    modifier usePairTokens(uint amount) {
+        // Approve and mint tokens for actor.
+        ghost().asset().prepare({owner: actor(), spender: address(subject()), amount: amount});
+        ghost().quote().prepare({owner: actor(), spender: address(subject()), amount: amount});
+        _;
+    }
+
     /**
      * @dev Uses a default parameter set to create a pool.
      * @custom:example
@@ -183,5 +190,13 @@ contract Setup is Test {
 
         set_pool_id(poolId);
         _;
+    }
+
+    // === Gas Utils === //
+    function wasteGas(uint256 slots) internal pure {
+        assembly {
+            let memPtr := mload(0x40)
+            mstore(add(memPtr, mul(32, slots)), 1) // Expand memory
+        }
     }
 }
