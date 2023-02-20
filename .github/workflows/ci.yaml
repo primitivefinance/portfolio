@@ -1,10 +1,10 @@
 on: [push]
 
-name: test
+name: unit tests (profile=test)
 
 jobs:
   check:
-    name: Hyper Tests
+    name: Forge test (profile=test)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -17,4 +17,4 @@ jobs:
           version: nightly
 
       - name: Run tests
-        run: forge test
+        run: FOUNDRY_PROFILE=test forge test
