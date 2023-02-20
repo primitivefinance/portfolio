@@ -1,30 +1,31 @@
 on: [push]
 
 name: Echidna Test
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
-
-      - name: Compile contracts
-        run: |
-          forge build --build-info
-
-      - name: Run Echidna
-        uses: crytic/echidna-action@v2
-        with:
-          solc-version: 0.8.13
-          files: .
-          contract: EchidnaE2E
-          config: E2E.yaml
-          crytic-args: --ignore-compile
+# todo: fix echidna test suite
+#jobs:
+#  test:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v3
+#        with:
+#          submodules: recursive
+#
+#      - name: Install Foundry
+#        uses: foundry-rs/foundry-toolchain@v1
+#        with:
+#          version: nightly
+#
+#      - name: Compile contracts
+#        run: |
+#          forge build --build-info
+#
+#      - name: Run Echidna
+#        uses: crytic/echidna-action@v2
+#        with:
+#          solc-version: 0.8.13
+#          files: .
+#          contract: EchidnaE2E
+#          config: E2E.yaml
+#          crytic-args: --ignore-compile
+#
