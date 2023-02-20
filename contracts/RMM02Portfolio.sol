@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "./Hyper.sol";
 import "./libraries/RMM02Lib.sol";
 
-contract GeometricPortfolio is HyperVirtual {
+contract RMM02Portfolio is HyperVirtual {
     using RMM02Lib for HyperPool;
     using RMM01Lib for RMM01Lib.RMM;
     using SafeCastLib for uint256;

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 // Test subjects
-import "contracts/Hyper.sol";
+import "contracts/RMM01Portfolio.sol";
 import "solmate/tokens/WETH.sol";
 
 // Test utils

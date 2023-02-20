@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
-import "contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper, Enigma} from "contracts/RMM01Portfolio.sol";
 import "contracts/libraries/RMM01Lib.sol";
 
 import "forge-std/Test.sol";

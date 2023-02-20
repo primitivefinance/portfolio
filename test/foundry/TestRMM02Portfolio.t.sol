@@ -2,19 +2,19 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
-import "contracts/GeometricPortfolio.sol";
+import "contracts/RMM02Portfolio.sol";
 import "contracts/test/TestERC20.sol";
 
-contract TestGeometric is Test {
+contract TestRMM02Portfolio is Test {
     WETH weth;
-    GeometricPortfolio instance;
+    RMM02Portfolio instance;
     TestERC20 token0;
     TestERC20 token1;
     uint64 poolId;
 
     function setUp() public {
         weth = new WETH();
-        instance = new GeometricPortfolio(address(weth));
+        instance = new RMM02Portfolio(address(weth));
         create_allocate();
     }
 

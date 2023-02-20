@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
-import "../../contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper} from "../../contracts/RMM01Portfolio.sol";
 import "../../contracts/test/TestERC20.sol";
 
 contract InvariantDeposit is Test {
@@ -23,9 +23,6 @@ contract InvariantDeposit is Test {
     function invariant_deposit() public {
         vm.deal(address(this), 100 ether);
         hyper.deposit{value: 100 ether}();
-        assertEq(
-            hyper.getBalance(address(this), address(weth)),
-            100 ether
-        );
+        assertEq(hyper.getBalance(address(this), address(weth)), 100 ether);
     }
 }

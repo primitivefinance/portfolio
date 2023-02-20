@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
-import "../../contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper} from "../../contracts/RMM01Portfolio.sol";
 import "../../contracts/test/TestERC20.sol";
 
 contract InvariantFund is Test {
@@ -24,9 +24,6 @@ contract InvariantFund is Test {
         usdc.mint(address(this), 100 ether);
         usdc.approve(address(hyper), 100 ether);
         hyper.fund(address(usdc), 100 ether);
-        assertEq(
-            hyper.getBalance(address(this), address(usdc)),
-            100 ether
-        );
+        assertEq(hyper.getBalance(address(this), address(usdc)), 100 ether);
     }
 }

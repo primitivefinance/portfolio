@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "../../contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper} from "../../contracts/RMM01Portfolio.sol";
 import "../helpers/HelperHyperActions.sol";
 
 interface Quoter {

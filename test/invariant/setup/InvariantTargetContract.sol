@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "test/helpers/HelperHyperView.sol";
-import "contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper, Enigma} from "contracts/RMM01Portfolio.sol";
 import {HyperPool, HyperPosition, TestERC20} from "test/helpers/HyperTestOverrides.sol";
 
 interface Context {

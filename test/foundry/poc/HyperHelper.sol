@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper, Enigma} from "contracts/RMM01Portfolio.sol";
 import "contracts/libraries/RMM01Lib.sol";
 
 contract HyperHelper is Hyper {

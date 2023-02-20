@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.0;
 
-import "contracts/Hyper.sol";
+import "contracts/RMM01Portfolio.sol";
 import "solmate/tokens/WETH.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
@@ -104,7 +104,7 @@ library Subjects {
      * ```
      */
     function subject(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
-        self.last = IHyper(new Hyper(address(self.weth)));
+        self.last = IHyper(new RMM01Portfolio(address(self.weth)));
         self.vm.label(address(self.last), "Subject");
         return self;
     }
