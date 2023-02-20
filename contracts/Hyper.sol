@@ -847,6 +847,13 @@ contract Hyper is IHyper {
         (price, , ) = _computeSyncedPrice(poolId);
     }
 
+    /** @dev Immediately next invariant value. */
+    function getInvariant(uint64 poolId) public view returns (int256 invariant) {
+        HyperPool memory pool = pools[poolId];
+        uint elapsed = block.timestamp - pool.lastTimestamp;
+        (invariant, ) = pool.getNextInvariant(elapsed);
+    }
+
     function getTimePassed(uint64 poolId) public view returns (uint256) {
         return block.timestamp - pools[poolId].lastTimestamp;
     }
