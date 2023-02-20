@@ -16,25 +16,26 @@ pragma solidity 0.8.13;
 
  */
 
-error CastOverflow(uint);
 error InvalidLiquidity();
 
-uint constant SECONDS_PER_DAY = 86_400 seconds;
+uint256 constant SECONDS_PER_DAY = 86_400 seconds;
 uint8 constant MIN_DECIMALS = 6;
 uint8 constant MAX_DECIMALS = 18;
 
+/**
+ * @dev Returns true if `value` is between a range defined by `lower` and `upper` bounds
+ * @param value Value to compare
+ * @param lower Lower bound of the range
+ * @param upper Upper bound of the range
+ * @return valid True if the value is between the range
+ * @custom:example
+ * ```
+ * bool valid = isBetween(50, 0, 100);
+ * ```
+ */
 function isBetween(uint256 value, uint256 lower, uint256 upper) pure returns (bool valid) {
-    return __between(int256(value), int256(lower), int256(upper));
-}
-
-function __between(int256 value, int256 lower, int256 upper) pure returns (bool valid) {
     assembly {
-        // Is `val` btwn lo and hi, inclusive?
-        function isValid(val, lo, hi) -> btwn {
-            btwn := iszero(sgt(mul(sub(val, lo), sub(val, hi)), 0)) // iszero(x > amount ? 1 : 0) ? true : false, (n - a) * (n - b) <= 0, n = amount, a = lower, b = upper
-        }
-
-        valid := isValid(value, lower, upper)
+        valid := and(or(eq(value, lower), gt(value, lower)), or(eq(value, upper), lt(value, upper)))
     }
 }
 
@@ -79,17 +80,9 @@ function computeCheckpointDistance(uint256 present, uint256 past) pure returns (
     }
 }
 
-function convertDaysToSeconds(uint amountDays) pure returns (uint amountSeconds) {
+function convertDaysToSeconds(uint256 amountDays) pure returns (uint256 amountSeconds) {
     assembly {
         amountSeconds := mul(amountDays, SECONDS_PER_DAY)
-    }
-}
-
-function toBytes32(bytes memory raw) pure returns (bytes32 data) {
-    assembly {
-        data := mload(add(raw, 32))
-        let shift := mul(sub(32, mload(raw)), 8)
-        data := shr(shift, data)
     }
 }
 
@@ -101,6 +94,16 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     }
 }
 
+/**
+ * @dev Separates the upper and lower bits of a byte
+ * @param data Byte to separate
+ * @return upper Upper bit of the byte
+ * @return lower Lower bit of the byte
+ * @custom:example
+ * ```
+ * (bytes1 upper, bytes1 lower) = separate(0x12);
+ * ```
+ */
 function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
     upper = data >> 4;
     lower = data & 0x0f;
@@ -122,40 +125,40 @@ function toAmount(bytes calldata raw) pure returns (uint128 amount) {
     if (power != 0) amount = amount * uint128(10 ** power);
 }
 
-function computeScalar(uint decimals) pure returns (uint scalar) {
+function computeScalar(uint256 decimals) pure returns (uint256 scalar) {
     return 10 ** (MAX_DECIMALS - decimals); // can revert on underflow
 }
 
-function scaleToWad(uint amountDec, uint decimals) pure returns (uint outputWad) {
-    uint factor = computeScalar(decimals);
+function scaleToWad(uint256 amountDec, uint256 decimals) pure returns (uint256 outputWad) {
+    uint256 factor = computeScalar(decimals);
     assembly {
         outputWad := mul(amountDec, factor)
     }
 }
 
-function scaleFromWadUp(uint amountWad, uint decimals) pure returns (uint outputDec) {
-    uint factor = computeScalar(decimals);
+function scaleFromWadUp(uint256 amountWad, uint256 decimals) pure returns (uint256 outputDec) {
+    uint256 factor = computeScalar(decimals);
     assembly {
         outputDec := add(div(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
     }
 }
 
-function scaleFromWadDown(uint amountWad, uint decimals) pure returns (uint outputDec) {
-    uint factor = computeScalar(decimals);
+function scaleFromWadDown(uint256 amountWad, uint256 decimals) pure returns (uint256 outputDec) {
+    uint256 factor = computeScalar(decimals);
     assembly {
         outputDec := div(amountWad, factor)
     }
 }
 
-function scaleFromWadUpSigned(int amountWad, uint decimals) pure returns (int outputDec) {
-    int factor = int(computeScalar(decimals));
+function scaleFromWadUpSigned(int256 amountWad, uint256 decimals) pure returns (int256 outputDec) {
+    int256 factor = int256(computeScalar(decimals));
     assembly {
         outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
     }
 }
 
-function scaleFromWadDownSigned(int amountWad, uint decimals) pure returns (int outputDec) {
-    int factor = int(computeScalar(decimals));
+function scaleFromWadDownSigned(int256 amountWad, uint256 decimals) pure returns (int256 outputDec) {
+    int256 factor = int256(computeScalar(decimals));
     assembly {
         outputDec := sdiv(amountWad, factor)
     }

@@ -9,11 +9,11 @@ contract TestHyperDraw is TestHyperSetup {
         __hyperTestingContract__.fund(address(defaultScenario.asset), 4000);
 
         // Draw
-        uint prevReserve = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
-        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 prevReserve = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
+        uint256 prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
         __hyperTestingContract__.draw(address(defaultScenario.asset), 4000, address(this));
-        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
-        uint nextReserve = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
+        uint256 nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 nextReserve = getReserve(address(__hyperTestingContract__), address(defaultScenario.asset));
 
         assertTrue(nextBalance == 0);
         assertTrue(nextBalance < prevBalance);
@@ -30,9 +30,9 @@ contract TestHyperDraw is TestHyperSetup {
         __hyperTestingContract__.deposit{value: 4000}();
 
         // Draw
-        uint prevBalance = address(this).balance;
+        uint256 prevBalance = address(this).balance;
         __hyperTestingContract__.draw(address(__weth__), 4000, address(this));
-        uint nextBalance = address(this).balance;
+        uint256 nextBalance = address(this).balance;
 
         assertTrue(nextBalance > prevBalance);
     }
@@ -40,9 +40,9 @@ contract TestHyperDraw is TestHyperSetup {
     function test_draw_max_balance() public {
         __hyperTestingContract__.fund(address(defaultScenario.asset), 4000);
 
-        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
-        __hyperTestingContract__.draw(address(defaultScenario.asset), type(uint).max, address(this));
-        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        __hyperTestingContract__.draw(address(defaultScenario.asset), type(uint256).max, address(this));
+        uint256 nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
         assertTrue(prevBalance > 0, "fund-unsuccessful");
         assertEq(nextBalance, 0, "did-not-withdraw-max");

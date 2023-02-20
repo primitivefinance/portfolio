@@ -3,7 +3,7 @@ pragma solidity 0.8.13;
 
 /**
     @dev Marginal price to trade y (∆) for x (∆′).
-    
+
     Variable | Name         | Value
     ---------|--------------|-----------
     γ        | Gamma        | 1 - fee, Percentage
@@ -18,15 +18,15 @@ pragma solidity 0.8.13;
 import "solmate/utils/FixedPointMathLib.sol";
 import "../libraries/Price.sol";
 
-using FixedPointMathLib for uint;
+using FixedPointMathLib for uint256;
 
-uint constant HALF_SCALAR = 1e9;
-uint constant WAD = 1 ether;
+uint256 constant HALF_SCALAR = 1e9;
+uint256 constant WAD = 1 ether;
 
 /**
  @custom:math 1 / φ( Φ^(−1) (x) )
  */
-function d_ppf(int256 input) view returns (int256) {
+function d_ppf(int256 input) pure returns (int256) {
     int256 numerator;
     int256 denominator;
     assembly {
@@ -44,11 +44,11 @@ function d_ppf(int256 input) view returns (int256) {
 }
 
 struct Parameters {
-    uint stk;
-    uint vol;
-    uint tau;
-    uint fee;
-    int inv;
+    uint256 stk;
+    uint256 vol;
+    uint256 tau;
+    uint256 fee;
+    int256 inv;
 }
 
 /**
@@ -58,14 +58,14 @@ struct Parameters {
     @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
  */
 function computeMarginalPriceQuoteIn(
-    uint d_y,
-    uint R_y,
-    uint stk,
-    uint vol,
-    uint tau,
-    uint fee,
-    int inv
-) view returns (uint) {
+    uint256 d_y,
+    uint256 R_y,
+    uint256 stk,
+    uint256 vol,
+    uint256 tau,
+    uint256 fee,
+    int256 inv
+) pure returns (uint256) {
     Parameters memory params = Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
     uint256 volSqrtTau;
     uint256 gamma;
@@ -92,7 +92,7 @@ function computeMarginalPriceQuoteIn(
     }
 
     uint256 part4 = (params.stk).divWadDown(gamma); // K / γ
-    uint256 part5 = part4.mulWadDown(uint(Gaussian.pdf(int256(part3)))); // (K / γ) φ( Φ^(−1)( ( y + γ∆ − k) / K ) + σ√τ)
+    uint256 part5 = part4.mulWadDown(uint256(Gaussian.pdf(int256(part3)))); // (K / γ) φ( Φ^(−1)( ( y + γ∆ − k) / K ) + σ√τ)
 
     int256 part6 = d_ppf(int256(part1)); // (Φ−1)′ ( (y + γ∆ − k) / K )
 
@@ -111,14 +111,14 @@ function computeMarginalPriceQuoteIn(
     @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
  */
 function computeMarginalPriceAssetIn(
-    uint d_x,
-    uint R_x,
-    uint stk,
-    uint vol,
-    uint tau,
-    uint fee,
-    int inv
-) view returns (uint) {
+    uint256 d_x,
+    uint256 R_x,
+    uint256 stk,
+    uint256 vol,
+    uint256 tau,
+    uint256 fee,
+    int256 inv
+) pure returns (uint256) {
     Parameters memory params = Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
     uint256 sqrtTau;
     uint256 volSqrtTau;

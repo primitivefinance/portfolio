@@ -11,16 +11,16 @@ import "test/helpers/HelperHyperView.sol";
 
 import {TestERC20, HyperTimeOverride} from "test/helpers/HyperTestOverrides.sol";
 
-uint constant STARTING_BALANCE = 4000e18;
+uint256 constant STARTING_BALANCE = 4000e18;
 
 contract TestEchidnaEvents {
     event AssertionFailed();
-    event AssertionFailed(uint);
-    event AssertionFailed(uint, uint);
-    event AssertionFailed(uint, uint, uint);
-    event AssertionFailed(string, uint);
+    event AssertionFailed(uint256);
+    event AssertionFailed(uint256, uint256);
+    event AssertionFailed(uint256, uint256, uint256);
+    event AssertionFailed(string, uint256);
     event AssertionFailed(bytes);
-    event AssertionFailed(int);
+    event AssertionFailed(int256);
 }
 
 contract Addresses {
@@ -75,7 +75,7 @@ contract TestEchidnaSetup is
     /** @dev Hook to implement to handle receive differently. */
     function receiveOverride() public virtual {}
 
-    function deal(TestERC20 token, address to, uint amount) internal {
+    function deal(TestERC20 token, address to, uint256 amount) internal {
         token.mint(to, amount);
     }
 

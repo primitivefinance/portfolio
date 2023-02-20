@@ -8,13 +8,13 @@ import {HyperPool, HyperPosition, HyperTimeOverride, TestERC20} from "test/helpe
 interface Context {
     function users() external view returns (address[] memory);
 
-    function getRandomPoolId(uint id) external view returns (uint64);
+    function getRandomPoolId(uint256 id) external view returns (uint64);
 
     function setPoolId(uint64 poolId) external;
 
     function addPoolId(uint64 poolId) external;
 
-    function getRandomUser(uint id) external view returns (address);
+    function getRandomUser(uint256 id) external view returns (address);
 
     function __weth__() external view returns (TestERC20);
 
@@ -38,8 +38,8 @@ contract InvariantTargetContract is HelperHyperView, Test {
         __asset__ = TestERC20(asset_);
         __quote__ = TestERC20(quote_);
 
-        __asset__.approve(hyper_, type(uint).max);
-        __quote__.approve(hyper_, type(uint).max);
+        __asset__.approve(hyper_, type(uint256).max);
+        __quote__.approve(hyper_, type(uint256).max);
     }
 
     /** @dev Uses the initialized context for the getState function. */

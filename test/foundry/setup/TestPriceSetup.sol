@@ -12,7 +12,7 @@ contract TestPriceSetup is HelperHyperProfiles, Test {
         addTestCase(DEFAULT_STRIKE, DEFAULT_SIGMA, DEFAULT_MATURITY);
     }
 
-    function addTestCase(uint strike, uint sigma, uint tau) internal returns (Price.RMM memory) {
+    function addTestCase(uint256 strike, uint256 sigma, uint256 tau) internal returns (Price.RMM memory) {
         Price.RMM memory info = Price.RMM(strike, sigma, tau);
         cases.push(info);
         return info;

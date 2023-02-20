@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 /**
 
   -------------
-  
+
   This is called the Enigma, it's an alternative ABI.
   Originally, it was designed to compress calldata and therefore
   save gas on optimistic rollup networks.
@@ -84,7 +84,7 @@ function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes 
     bytes memory payload = bytes.concat(INSTRUCTION_JUMP, bytes1(len));
 
     // for each instruction set...
-    for (uint i; i != len; ++i) {
+    for (uint256 i; i != len; ++i) {
         bytes memory instruction = instructions[i];
         uint8 size = uint8(instruction.length);
 
@@ -106,6 +106,17 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24) {
     return uint24(poolId >> 40);
 }
 
+/**
+ * @dev Returns the pool id given some pool parameters
+ * @param pairId Id of the pair of asset / quote tokens
+ * @param isMutable True if the pool is mutable
+ * @param poolNonce Current pool nonce of the Hyper contract
+ * @return Corresponding encoded pool id
+ * @custom:example
+ * ```
+ * uint64 poolId = encodePoolId(0, true, 1);
+ * ```
+ */
 function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64) {
     return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
 }

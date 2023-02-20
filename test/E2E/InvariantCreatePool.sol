@@ -13,7 +13,7 @@ contract InvariantCreatePool is InvariantTargetContract {
     }
 
     function create_pool(
-        uint index,
+        uint256 index,
         uint128 price,
         uint128 strike,
         uint24 sigma,
@@ -55,7 +55,7 @@ contract InvariantCreatePool is InvariantTargetContract {
         _assertCreatePool(args);
     }
 
-    function shuffle(uint random, address[] memory array) internal view returns (address[] memory output) {
+    function shuffle(uint256 random, address[] memory array) internal pure returns (address[] memory output) {
         for (uint256 i = 0; i < array.length; i++) {
             uint256 n = i + (random % (array.length - i));
             address temp = array[n];

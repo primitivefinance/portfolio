@@ -4,17 +4,10 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "solmate/utils/LibString.sol";
 
-/// @notice requires editing "lib/forge-std/lib/ds-test/src/test.sol"
-///         in order to make `fail()` overridable:
-///         `function fail() internal` -> `function fail() internal virtual`.
 contract TestEchidnaSolstatHelper is Test {
     event AssertionFailed(string msg);
 
     address private constant canRevertCaller = 0xc65f435F6dC164bE5D52Bc0a90D9A680052bFab2;
-
-    function fail() internal override {
-        emit AssertionFailed("FAIL");
-    }
 
     modifier canRevert() {
         if (msg.sender == canRevertCaller) {
@@ -50,7 +43,9 @@ contract TestEchidnaSolstatHelper is Test {
         assertEqCall(addr, calldata1, addr, calldata2, eqRevertData);
     }
 
-    function assertEqCall(address address1, bytes memory calldata1, address address2, bytes memory calldata2) internal {
+    function assertEqCall(address address1, bytes memory calldata1, address address2, bytes memory calldata2)
+        internal
+    {
         assertEqCall(address1, calldata1, address2, calldata2, true);
     }
 

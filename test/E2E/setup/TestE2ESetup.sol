@@ -13,7 +13,7 @@ import "test/helpers/HelperHyperInvariants.sol";
 import "test/helpers/HelperHyperProfiles.sol";
 import "test/helpers/HelperHyperView.sol";
 
-uint constant STARTING_BALANCE = 0;
+uint256 constant STARTING_BALANCE = 0;
 
 contract Helpers is HelperHyperActions, HelperHyperInvariants, HelperHyperProfiles, HelperHyperView {}
 
@@ -126,7 +126,7 @@ contract TestE2ESetup is Helpers, Test {
 
     /** @dev Does not include weth. */
     function approveTokens() internal {
-        for (uint z; z != __users__.length; ++z) {
+        for (uint256 z; z != __users__.length; ++z) {
             vm.prank(__users__[z]); // Sets caller
             __asset__.approve(address(__hyper__), type(uint256).max); // Approves test contracts to spend tokens.
             __quote__.approve(address(__hyper__), type(uint256).max); // Approves test contracts to spend tokens.
@@ -134,8 +134,8 @@ contract TestE2ESetup is Helpers, Test {
     }
 
     /** @dev Does not include weth. */
-    function fundUsers(uint deltaAsset, uint deltaQuote) internal {
-        for (uint i; i != __users__.length; ++i) {
+    function fundUsers(uint256 deltaAsset, uint256 deltaQuote) internal {
+        for (uint256 i; i != __users__.length; ++i) {
             deal(address(__asset__), __users__[i], deltaAsset); // TODO: Use regular ERC20, since we can deal.
             deal(address(__quote__), __users__[i], deltaQuote); // TODO: Use regular ERC20, since we can deal.
         }

@@ -4,11 +4,11 @@ pragma solidity 0.8.13;
 /**
 
   -------------
-  
+
   This is a custom account system to support Enigma's
-  jump processing. Without jump processing, the benefits 
-  are marginal at best. Combining the two reduces the 
-  marginal cost of aditional operations to only ~20% of a single operation. 
+  jump processing. Without jump processing, the benefits
+  are marginal at best. Combining the two reduces the
+  marginal cost of aditional operations to only ~20% of a single operation.
   This is by design, in order to support a system that interacts with a lot
   of different parameters, tokens, actors, and pools.
 
@@ -49,15 +49,15 @@ using {
 } for AccountSystem global;
 
 error EtherTransferFail(); // 0x75f42683
-error InsufficientReserve(uint amount, uint delta); // 0x315276c9
+error InsufficientReserve(uint256 amount, uint256 delta); // 0x315276c9
 error InvalidBalance(); // 0xc52e3eff
 error NotPreparedToSettle(); // 0xf7cede50
 
 struct AccountSystem {
     // user -> token -> internal balance.
-    mapping(address => mapping(address => uint)) balances;
+    mapping(address => mapping(address => uint256)) balances;
     // token -> virtual reserve.
-    mapping(address => uint) reserves;
+    mapping(address => uint256) reserves;
     // token -> cached status. todo: make this a bitmap
     mapping(address => bool) cached;
     // Transiently stored cached tokens, must be length zero outside of execution.
@@ -96,18 +96,18 @@ function __dangerousTransferEther__(address to, uint256 value) {
 }
 
 /** @dev External call to the `to` address is dangerous. */
-function __dangerousTransferFrom__(address token, address to, uint amount) {
+function __dangerousTransferFrom__(address token, address to, uint256 amount) {
     SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
 }
 
 /** @dev External call to the `to` address is dangerous. */
-function dangerousFund(AccountSystem storage self, address token, address to, uint amount) {
+function dangerousFund(AccountSystem storage self, address token, address to, uint256 amount) {
     self.touch(token);
     __dangerousTransferFrom__(token, to, amount); // Settlement gifts tokens to msg.sender.
 }
 
 /** @dev Increases an `owner`'s spendable balance. */
-function credit(AccountSystem storage self, address owner, address token, uint amount) {
+function credit(AccountSystem storage self, address owner, address token, uint256 amount) {
     self.touch(token);
     self.balances[owner][token] += amount;
 }
@@ -118,9 +118,9 @@ function debit(
     address owner,
     address token,
     uint256 owed
-) returns (uint paid, uint remainder) {
+) returns (uint256 paid, uint256 remainder) {
     self.touch(token);
-    uint balance = self.balances[owner][token];
+    uint256 balance = self.balances[owner][token];
     if (balance >= owed) {
         paid = owed;
         self.balances[owner][token] -= paid;
@@ -133,14 +133,14 @@ function debit(
 }
 
 /** @dev Actives a token and increases the reserves. Settlement will pick up this activated token. */
-function increase(AccountSystem storage self, address token, uint amount) {
+function increase(AccountSystem storage self, address token, uint256 amount) {
     self.touch(token);
     self.reserves[token] += amount;
 }
 
 /** @dev Actives a token and decreases the reserves. Settlement will pick up this activated token. */
-function decrease(AccountSystem storage self, address token, uint amount) {
-    uint balance = self.reserves[token];
+function decrease(AccountSystem storage self, address token, uint256 amount) {
+    uint256 balance = self.reserves[token];
     if (amount > balance) revert InsufficientReserve(balance, amount);
 
     self.touch(token);
@@ -152,16 +152,16 @@ function settle(
     AccountSystem storage self,
     address token,
     address account
-) returns (uint credited, uint debited, uint remainder) {
-    int net = self.getNetBalance(token, account);
+) returns (uint256 credited, uint256 debited, uint256 remainder) {
+    int256 net = self.getNetBalance(token, account);
     if (net > 0) {
-        credited = uint(net);
+        credited = uint256(net);
         // unaccounted for tokens, e.g. transferred directly into Hyper.
-        self.credit(msg.sender, token, uint(net)); // gift to `msg.sender`.
-        self.reserves[token] += uint(net); // add the difference back to reserves, so net is zero.
+        self.credit(msg.sender, token, uint256(net)); // gift to `msg.sender`.
+        self.reserves[token] += uint256(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {
         // missing tokens that must be paid for or transferred in.
-        remainder = uint(-net);
+        remainder = uint256(-net);
         (debited, remainder) = self.debit(msg.sender, token, remainder);
         if (debited > 0) self.reserves[token] -= debited; // using a balance means tokens are in contract already.
     }

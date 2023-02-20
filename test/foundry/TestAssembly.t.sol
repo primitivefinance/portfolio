@@ -69,35 +69,43 @@ contract TestAssembly is Test {
     }
 
     function testAssembly_scaleFromWadUp_rounds_up_conditionally() public {
-        uint input = 0.01 ether; // 16 decimals
-        uint decimals = 2;
-        uint actual = Assembly.scaleFromWadUp(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
-        uint expected = 1;
+        uint256 input = 0.01 ether; // 16 decimals
+        uint256 decimals = 2;
+        uint256 actual = Assembly.scaleFromWadUp(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
+        uint256 expected = 1;
         assertEq(actual, expected, "unexpected-scale-from-wad-up-result");
     }
 
     function testAssembly_scaleFromWadUpSigned_rounds_up_conditionally() public {
-        int input = int(0.01 ether); // 16 decimals
-        uint decimals = 2;
-        int actual = Assembly.scaleFromWadUpSigned(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
-        int expected = 1;
+        int256 input = int256(0.01 ether); // 16 decimals
+        uint256 decimals = 2;
+        int256 actual = Assembly.scaleFromWadUpSigned(input, decimals); // ((1e16 - 1) / 1e16) + 1 = 1
+        int256 expected = 1;
         assertEq(actual, expected, "unexpected-scale-from-wad-up-result");
     }
 
     // todo: fix this test, it should pass
     /* function testAssembly_scaleFromWadUp_zero_returns_zero() public {
-        uint input = 0;
-        uint decimals = 6;
-        uint actual = Assembly.scaleFromWadUp(input, decimals);
-        uint expected = 0;
+        uint256 input = 0;
+        uint256 decimals = 6;
+        uint256 actual = Assembly.scaleFromWadUp(input, decimals);
+        uint256 expected = 0;
         assertEq(actual, expected, "non-zero-round-up");
     } */
 
     function testAssembly_scaleFromWadUp_equivalent_returns_input() public {
-        uint decimals = 6;
-        uint input = 10 ** (18 - decimals);
-        uint actual = Assembly.scaleFromWadUp(input, decimals);
-        uint expected = 1;
+        uint256 decimals = 6;
+        uint256 input = 10 ** (18 - decimals);
+        uint256 actual = Assembly.scaleFromWadUp(input, decimals);
+        uint256 expected = 1;
         assertEq(actual, expected, "non-equal");
+    }
+
+    function testAssembly_isBetween(uint256 value, uint256 lower, uint256 upper) public {
+        if (value >= lower && value <= upper) {
+            assertTrue(Assembly.isBetween(value, lower, upper));
+        } else {
+            assertFalse(Assembly.isBetween(value, lower, upper));
+        }
     }
 }

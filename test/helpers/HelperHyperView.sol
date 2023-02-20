@@ -13,35 +13,35 @@ interface IHyperStruct {
 
     function pools(uint64 poolId) external view returns (HyperPool memory);
 
-    function getTimePassed(uint64 poolId) external view returns (uint);
+    function getTimePassed(uint64 poolId) external view returns (uint256);
 }
 
 interface HyperLike {
-    function getReserve(address) external view returns (uint);
+    function getReserve(address) external view returns (uint256);
 
-    function getBalance(address, address) external view returns (uint);
+    function getBalance(address, address) external view returns (uint256);
 
     function getPairNonce() external view returns (uint16);
 }
 
 struct HyperState {
-    uint reserveAsset; // getReserve
-    uint reserveQuote; // getReserve
-    uint physicalBalanceAsset; // balanceOf
-    uint physicalBalanceQuote; // balanceOf
-    uint totalBalanceAsset; // sum of all balances from getBalance
-    uint totalBalanceQuote; // sum of all balances from getBalance
-    uint totalPositionLiquidity; // sum of all position liquidity
-    uint callerPositionLiquidity; // position.freeLiquidity
-    uint totalPoolLiquidity; // pool.liquidity
-    uint feeGrowthAssetPool; // getPool
-    uint feeGrowthQuotePool; // getPool
-    uint feeGrowthAssetPosition; // getPosition
-    uint feeGrowthQuotePosition; // getPosition
+    uint256 reserveAsset; // getReserve
+    uint256 reserveQuote; // getReserve
+    uint256 physicalBalanceAsset; // balanceOf
+    uint256 physicalBalanceQuote; // balanceOf
+    uint256 totalBalanceAsset; // sum of all balances from getBalance
+    uint256 totalBalanceQuote; // sum of all balances from getBalance
+    uint256 totalPositionLiquidity; // sum of all position liquidity
+    uint256 callerPositionLiquidity; // position.freeLiquidity
+    uint256 totalPoolLiquidity; // pool.liquidity
+    uint256 feeGrowthAssetPool; // getPool
+    uint256 feeGrowthQuotePool; // getPool
+    uint256 feeGrowthAssetPosition; // getPosition
+    uint256 feeGrowthQuotePosition; // getPosition
 }
 
 interface TokenLike {
-    function balanceOf(address) external view returns (uint);
+    function balanceOf(address) external view returns (uint256);
 }
 
 contract HelperHyperView {
@@ -62,11 +62,11 @@ contract HelperHyperView {
         return IHyperStruct(hyper).positions(owner, positionId);
     }
 
-    function getReserve(address hyper, address token) public view returns (uint) {
+    function getReserve(address hyper, address token) public view returns (uint256) {
         return HyperLike(hyper).getReserve(token);
     }
 
-    function getBalance(address hyper, address owner, address token) public view returns (uint) {
+    function getBalance(address hyper, address owner, address token) public view returns (uint256) {
         return HyperLike(hyper).getBalance(owner, token);
     }
 
@@ -82,11 +82,11 @@ contract HelperHyperView {
         return hyper.positions(owner, positionId);
     }
 
-    function _getReserve(HyperLike hyper, TestERC20 token) public view returns (uint) {
+    function _getReserve(HyperLike hyper, TestERC20 token) public view returns (uint256) {
         return hyper.getReserve(address(token));
     }
 
-    function _getBalance(HyperLike hyper, address owner, TestERC20 token) public view returns (uint) {
+    function _getBalance(HyperLike hyper, address owner, TestERC20 token) public view returns (uint256) {
         return hyper.getBalance(owner, address(token));
     }
 
@@ -123,47 +123,47 @@ contract HelperHyperView {
         return state;
     }
 
-    function getPhysicalBalance(address hyper, address token) public view returns (uint) {
+    function getPhysicalBalance(address hyper, address token) public view returns (uint256) {
         return Operating.__balanceOf__(token, hyper);
     }
 
-    function getVirtualBalance(address hyper, address token, address[] memory owners) public view returns (uint) {
-        uint sum = getReserve(hyper, token) + getBalanceSum(hyper, token, owners);
+    function getVirtualBalance(address hyper, address token, address[] memory owners) public view returns (uint256) {
+        uint256 sum = getReserve(hyper, token) + getBalanceSum(hyper, token, owners);
         return sum;
     }
 
-    function getBalanceSum(address hyper, address token, address[] memory owners) public view returns (uint) {
-        uint sum;
-        for (uint x; x != owners.length; ++x) {
+    function getBalanceSum(address hyper, address token, address[] memory owners) public view returns (uint256) {
+        uint256 sum;
+        for (uint256 x; x != owners.length; ++x) {
             sum += getBalance(hyper, owners[x], token);
         }
 
         return sum;
     }
 
-    function getPositionLiquiditySum(address hyper, uint64 poolId, address[] memory owners) public view returns (uint) {
-        uint sum;
-        for (uint i; i != owners.length; ++i) {
+    function getPositionLiquiditySum(address hyper, uint64 poolId, address[] memory owners) public view returns (uint256) {
+        uint256 sum;
+        for (uint256 i; i != owners.length; ++i) {
             sum += getPosition(hyper, owners[i], poolId).freeLiquidity;
         }
 
         return sum;
     }
 
-    function getMaxSwapLimit(bool sellAsset) public pure returns (uint) {
+    function getMaxSwapLimit(bool sellAsset) public pure returns (uint256) {
         if (sellAsset) {
             // price goes down
             return 0;
         } else {
             // price goes up
-            return type(uint).max;
+            return type(uint256).max;
         }
     }
 
-    function helperGetAmountOut(address hyper, uint64 poolId, bool sellAsset, uint input) public view returns (uint) {
+    function helperGetAmountOut(address hyper, uint64 poolId, bool sellAsset, uint256 input) public view returns (uint256) {
         HyperPool memory pool = getPool(hyper, poolId);
         uint256 passed = IHyperStruct(hyper).getTimePassed(poolId);
-        (uint output, ) = pool.getAmountOut(sellAsset, input, passed);
+        (uint256 output, ) = pool.getPoolAmountOut(sellAsset, input, passed);
         return output;
     }
 }

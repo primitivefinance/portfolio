@@ -5,9 +5,9 @@ import "./setup/TestHyperSetup.sol";
 
 contract TestHyperFund is TestHyperSetup {
     function testFundIncreasesBalance() public postTestInvariantChecks {
-        uint prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 prevBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
         __hyperTestingContract__.fund(address(defaultScenario.asset), 4000);
-        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
         assertTrue(nextBalance > prevBalance, "increase-internal-bal");
     }
@@ -17,17 +17,17 @@ contract TestHyperFund is TestHyperSetup {
         _assertFundDraw(amount);
     }
 
-    function _assertFundDraw(uint amount) internal {
+    function _assertFundDraw(uint256 amount) internal {
         // Preconditions
         defaultScenario.asset.approve(address(__hyperTestingContract__), amount);
         deal(address(defaultScenario.asset), address(this), amount);
 
         // Execution
-        uint preBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 preBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
         HyperState memory prev = getState();
         __hyperTestingContract__.fund(address(defaultScenario.asset), amount);
         HyperState memory post = getState();
-        uint postBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 postBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
         // Post conditions
         assertTrue(postBal > preBal, "bal-increase");
@@ -38,7 +38,7 @@ contract TestHyperFund is TestHyperSetup {
 
         __hyperTestingContract__.draw(address(defaultScenario.asset), amount, address(this));
         HyperState memory end = getState();
-        uint endBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 endBal = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
         assertEq(endBal, preBal, "reverse-exact-bal");
         assertEq(end.reserveAsset, prev.reserveAsset, "reverse-exact-reserve");
@@ -46,9 +46,9 @@ contract TestHyperFund is TestHyperSetup {
     }
 
     function test_fund_max_balance() public postTestInvariantChecks {
-        uint tokenBalance = defaultScenario.asset.balanceOf(address(this));
-        __hyperTestingContract__.fund(address(defaultScenario.asset), type(uint).max);
-        uint nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
+        uint256 tokenBalance = defaultScenario.asset.balanceOf(address(this));
+        __hyperTestingContract__.fund(address(defaultScenario.asset), type(uint256).max);
+        uint256 nextBalance = getBalance(address(__hyperTestingContract__), address(this), address(defaultScenario.asset));
 
         assertTrue(tokenBalance > 0, "zero-balance");
         assertEq(nextBalance, tokenBalance, "did-not-max-fund");

@@ -14,7 +14,7 @@ import "test/helpers/HelperHyperInvariants.sol";
 import "test/helpers/HelperHyperProfiles.sol";
 import "test/helpers/HelperHyperView.sol";
 
-uint constant STARTING_BALANCE = 4000e18;
+uint256 constant STARTING_BALANCE = 4000e18;
 
 struct TestScenario {
     TestERC20 asset;
@@ -27,7 +27,7 @@ struct TestScenario {
 contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHyperProfiles, HelperHyperView, Test {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
-    using SafeCastLib for uint;
+    using SafeCastLib for uint256;
 
     WETH public __weth__;
     Hyper public __hyper__; // Actual contract
@@ -186,9 +186,9 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     /** @dev Does not include weth. */
     function approveTokens() internal {
-        for (uint x; x != __tokens__.length; ++x) {
-            for (uint y; y != __contracts__.length; ++y) {
-                for (uint z; z != __users__.length; ++z) {
+        for (uint256 x; x != __tokens__.length; ++x) {
+            for (uint256 y; y != __contracts__.length; ++y) {
+                for (uint256 z; z != __users__.length; ++z) {
                     vm.prank(__users__[z]); // Sets caller
                     TestERC20(__tokens__[x]).approve(__contracts__[y], type(uint256).max); // Approves test contracts to spend tokens.
                 }
@@ -198,8 +198,8 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     /** @dev Does not include weth. */
     function fundUsers() internal {
-        for (uint i; i != __users__.length; ++i) {
-            for (uint j; j != __tokens__.length; ++j) {
+        for (uint256 i; i != __users__.length; ++i) {
+            for (uint256 j; j != __tokens__.length; ++j) {
                 deal(__tokens__[j], __users__[i], STARTING_BALANCE); // TODO: Use regular ERC20, since we can deal.
             }
         }
@@ -243,7 +243,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     function basicSwap() internal {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        (uint output, ) = __hyperTestingContract__.swap(
+        (uint256 output, ) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             true,
             (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether,
@@ -255,13 +255,13 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     function _swap(uint64 id) internal {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), id);
-        (uint output, ) = __hyperTestingContract__.swap(id, true, (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether, 1);
+        (uint256 output, ) = __hyperTestingContract__.swap(id, true, (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether, 1);
         assertTrue(output > 0, "no swap happened!");
     }
 
     function basicSwapQuoteIn() internal {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
-        (uint output, ) = __hyperTestingContract__.swap(
+        (uint256 output, ) = __hyperTestingContract__.swap(
             defaultScenario.poolId,
             false,
             (pool.getMaxSwapQuoteInWad() * 1 ether) / 2 ether,
@@ -280,11 +280,11 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     }
 
     function _unalloc(uint64 id) internal {
-        __hyperTestingContract__.unallocate(id, type(uint).max);
+        __hyperTestingContract__.unallocate(id, type(uint256).max);
     }
 
     function basicUnallocate() internal {
-        __hyperTestingContract__.unallocate(defaultScenario.poolId, type(uint).max); // max
+        __hyperTestingContract__.unallocate(defaultScenario.poolId, type(uint256).max); // max
     }
 
     function maxDraw() internal {

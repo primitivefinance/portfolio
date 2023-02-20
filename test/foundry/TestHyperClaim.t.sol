@@ -13,7 +13,7 @@ import "./setup/TestHyperSetup.sol";
     - Fee growth is always based on `liquidity`.
  */
 contract TestHyperClaim is TestHyperSetup {
-    using FixedPointMathLib for uint;
+    using FixedPointMathLib for uint256;
     using Price for Price.RMM;
 
     function testClaimNoPosition_reverts() public {
@@ -29,13 +29,13 @@ contract TestHyperClaim is TestHyperSetup {
 
         HyperPosition memory pos = _getPosition(hs(), address(this), defaultScenario.poolId);
         HyperPool memory pool = _getPool(hs(), defaultScenario.poolId);
-        uint tokensOwed = Assembly
+        uint256 tokensOwed = Assembly
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity);
 
-        uint pre = _getBalance(hx(), address(this), (defaultScenario.asset));
+        uint256 pre = _getBalance(hx(), address(this), (defaultScenario.asset));
         __hyperTestingContract__.claim(defaultScenario.poolId, tokensOwed, 0);
-        uint post = _getBalance(hx(), address(this), (defaultScenario.asset));
+        uint256 post = _getBalance(hx(), address(this), (defaultScenario.asset));
 
         pos = _getPosition(hs(), address(this), defaultScenario.poolId);
 
@@ -52,12 +52,12 @@ contract TestHyperClaim is TestHyperSetup {
 
         HyperPosition memory pos = _getPosition(hs(), address(this), defaultScenario.poolId);
         HyperPool memory pool = _getPool(hs(), defaultScenario.poolId);
-        uint tokensOwed = Assembly
+        uint256 tokensOwed = Assembly
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity);
 
         __hyperTestingContract__.claim(defaultScenario.poolId, tokensOwed, 0);
-        uint post = _getBalance(hx(), address(this), (defaultScenario.asset));
+        uint256 post = _getBalance(hx(), address(this), (defaultScenario.asset));
         assertEq(post, tokensOwed, "claimed-bal");
     }
 
@@ -69,12 +69,12 @@ contract TestHyperClaim is TestHyperSetup {
 
         HyperPosition memory pos = _getPosition(hs(), address(this), defaultScenario.poolId);
         HyperPool memory pool = _getPool(hs(), defaultScenario.poolId);
-        uint tokensOwed = Assembly
+        uint256 tokensOwed = Assembly
             .computeCheckpointDistance(pool.feeGrowthGlobalQuote, pos.feeGrowthQuoteLast)
             .mulWadDown(pool.liquidity);
 
         __hyperTestingContract__.claim(defaultScenario.poolId, 0, tokensOwed);
-        uint post = _getBalance(hx(), address(this), defaultScenario.quote);
+        uint256 post = _getBalance(hx(), address(this), defaultScenario.quote);
         assertEq(post, tokensOwed, "claimed-bal");
     }
 
@@ -104,12 +104,12 @@ contract TestHyperClaim is TestHyperSetup {
 
         HyperPosition memory pos = _getPosition(hs(), address(this), scenario.poolId);
         HyperPool memory pool = _getPool(hs(), scenario.poolId);
-        uint tokensOwed = Assembly
+        uint256 tokensOwed = Assembly
             .computeCheckpointDistance(pool.invariantGrowthGlobal, pos.invariantGrowthLast)
             .mulWadDown(pool.liquidity);
 
         __hyperTestingContract__.claim(scenario.poolId, 0, 0);
-        uint post = getBalance(address(__hyperTestingContract__), address(this), address(__weth__));
+        uint256 post = getBalance(address(__hyperTestingContract__), address(this), address(__weth__));
         assertEq(post, tokensOwed, "claimed-bal");
     } */
 
@@ -125,42 +125,42 @@ contract TestHyperClaim is TestHyperSetup {
         basicAllocate();
 
         HyperPool memory pool = defaultPool();
-        (uint virtualAsset0, ) = pool.getVirtualReserves();
+        (uint256 virtualAsset0, ) = pool.getPoolVirtualReserves();
         basicSwap(); // swaps __asset__ in, so pays fees in asset.
         pool = defaultPool();
-        (uint virtualAsset1, ) = pool.getVirtualReserves();
+        (uint256 virtualAsset1, ) = pool.getPoolVirtualReserves();
         console.log("diff", virtualAsset0, virtualAsset1);
 
-        uint real0 = _getReserve(hx(), defaultScenario.asset);
-        uint real1 = _getReserve(hx(), defaultScenario.quote);
-        (uint res0, uint res1) = pool.getVirtualReserves();
-        uint liquidity = pool.liquidity;
+        // uint256 real0 = _getReserve(hx(), defaultScenario.asset);
+        // uint256 real1 = _getReserve(hx(), defaultScenario.quote);
+        // (uint256 res0, uint256 res1) = pool.getVirtualReserves();
+        // uint256 liquidity = pool.liquidity;
 
         basicUnallocate();
         maxDraw(); // zero balance to ensure we aren't paying ourself.
 
         HyperPosition memory pos = defaultPosition();
         pool = defaultPool();
-        (uint fee0, uint fee1) = (pos.tokensOwedAsset, pos.tokensOwedQuote);
+        (uint256 fee0, uint256 fee1) = (pos.tokensOwedAsset, pos.tokensOwedQuote);
         assertTrue(fee0 > 0, "fee0-zero");
         assertTrue(pool.liquidity == 0, "non-zero-liquidity");
 
-        uint entitledAssetAmount = real0 - fee0;
+        // uint256 entitledAssetAmount = real0 - fee0;
 
-        Price.RMM memory rmm = pool.getRMM();
-        uint adjustedAmt = entitledAssetAmount.divWadDown(liquidity);
-        uint expectedPrice = rmm.getPriceWithX(adjustedAmt);
+        // Price.RMM memory rmm = pool.getRMM();
+        // uint256 adjustedAmt = entitledAssetAmount.divWadDown(liquidity);
+        // uint256 expectedPrice = rmm.getPriceWithX(adjustedAmt);
 
         // Claim
-        uint prevReserve = _getReserve(hx(), defaultScenario.asset);
-        uint prevBalance = _getBalance(hx(), address(this), defaultScenario.asset);
+        uint256 prevReserve = _getReserve(hx(), defaultScenario.asset);
+        uint256 prevBalance = _getBalance(hx(), address(this), defaultScenario.asset);
         __hyperTestingContract__.claim(defaultScenario.poolId, fee0, fee1);
-        uint nextReserve = _getReserve(hx(), defaultScenario.asset);
-        uint nextBalance = _getBalance(hx(), address(this), defaultScenario.asset);
+        uint256 nextReserve = _getReserve(hx(), defaultScenario.asset);
+        uint256 nextBalance = _getBalance(hx(), address(this), defaultScenario.asset);
 
         console.log("post reserve bal", nextReserve);
         console.log("next user bal---", nextBalance);
-        console.logInt(int(nextBalance) - int(nextReserve));
+        console.logInt(int256(nextBalance) - int256(nextReserve));
         assertTrue(nextReserve >= nextBalance, "invalid-virtual-reserve-state");
 
         maxDraw(); // clear reserve
@@ -177,7 +177,7 @@ contract TestHyperClaim is TestHyperSetup {
 
     /// @custom:tob TOB-HYPR-7, Exploit Scenario 1
     function testClaim_small_liquidity_does_not_steal_fees() public {
-        uint startLiquidity = 10_000;
+        uint256 startLiquidity = 10_000;
         __hyperTestingContract__.allocate(_scenario_18_18.poolId, startLiquidity);
 
         address eve = address(0x4215);
@@ -197,15 +197,15 @@ contract TestHyperClaim is TestHyperSetup {
 
         // save the total fee growth for the asset per liquidity.
         HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_18_18.poolId);
-        uint totalLiquidity = pool.liquidity; // 12_000
-        uint totalFeeAssetPerLiquidity = pool.feeGrowthGlobalAsset; // 0.00125
+        // uint256 totalLiquidity = pool.liquidity; // 12_000
+        uint256 totalFeeAssetPerLiquidity = pool.feeGrowthGlobalAsset; // 0.00125
 
         // eve claims earned fees, which should be proportional to her share of the liquidity
         vm.prank(eve);
         __hyperTestingContract__.claim(_scenario_18_18.poolId, type(uint256).max, type(uint256).max);
 
-        uint evesShare = startLiquidity / 5; // 2000
-        uint evesClaimedFees = _getBalance(hx(), eve, _scenario_18_18.asset); // 2_000 / 12_000 = ~16% of 0.00125 fee growth = 0.0002 in fees
+        uint256 evesShare = startLiquidity / 5; // 2000
+        uint256 evesClaimedFees = _getBalance(hx(), eve, _scenario_18_18.asset); // 2_000 / 12_000 = ~16% of 0.00125 fee growth = 0.0002 in fees
 
         // check to make sure eve did not receive more than they were entitled to
         assertTrue(evesClaimedFees != 0, "eve-zero-fees");
@@ -223,8 +223,8 @@ contract TestHyperClaim is TestHyperSetup {
         // mint some tokens and do approvals
         deal(token0, address(this), 100 ether);
         deal(token1, address(this), 100 ether);
-        TestERC20(token0).approve(address(__hyperTestingContract__), type(uint).max);
-        TestERC20(token1).approve(address(__hyperTestingContract__), type(uint).max);
+        TestERC20(token0).approve(address(__hyperTestingContract__), type(uint256).max);
+        TestERC20(token1).approve(address(__hyperTestingContract__), type(uint256).max);
 
         uint16 duration = uint16(365 days / Assembly.SECONDS_PER_DAY);
 
@@ -252,26 +252,26 @@ contract TestHyperClaim is TestHyperSetup {
         );
 
         // add a tiny amount of liquidity so we can test easier
-        uint delLiquidity = 100_000 wei; // with the pool params, asset reserves will be about 300 wei.
+        uint256 delLiquidity = 100_000 wei; // with the pool params, asset reserves will be about 300 wei.
         __hyperTestingContract__.allocate(poolId, delLiquidity);
 
         // swap a small amount so we generate fees
-        uint amountIn = 10_000 wei; // 1% fees will generate 100 wei of asset fee growth
+        uint256 amountIn = 10_000 wei; // 1% fees will generate 100 wei of asset fee growth
         __hyperTestingContract__.swap(poolId, true, amountIn, 0);
 
         // withdraw all the liquidity after the swap, to sync fees.
         __hyperTestingContract__.unallocate(poolId, delLiquidity);
 
         // withdraw all internal balances
-        uint bal0 = __hyperTestingContract__.getBalance(address(this), token0);
-        uint bal1 = __hyperTestingContract__.getBalance(address(this), token1);
+        uint256 bal0 = __hyperTestingContract__.getBalance(address(this), token0);
+        uint256 bal1 = __hyperTestingContract__.getBalance(address(this), token1);
         __hyperTestingContract__.draw(token0, bal0, address(this));
         __hyperTestingContract__.draw(token1, bal1, address(this));
 
         // finally, do the claim and check the differences in reserves
-        uint prev = __hyperTestingContract__.getBalance(address(this), token0);
-        __hyperTestingContract__.claim(poolId, type(uint).max, type(uint).max);
-        uint post = __hyperTestingContract__.getBalance(address(this), token0);
+        uint256 prev = __hyperTestingContract__.getBalance(address(this), token0);
+        __hyperTestingContract__.claim(poolId, type(uint256).max, type(uint256).max);
+        uint256 post = __hyperTestingContract__.getBalance(address(this), token0);
 
         assertEq(post, (amountIn * 100) / 10_000, "expected-fees-claimed");
         assertTrue(post > prev, "no-asset-fees-claimed");

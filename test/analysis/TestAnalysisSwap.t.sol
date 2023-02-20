@@ -36,11 +36,11 @@ interface Uni {
 }
 
 interface ERC20 {
-    function approve(address, uint) external;
+    function approve(address, uint256) external;
 
     function decimals() external view returns (uint8);
 
-    function balanceOf(address) external view returns (uint);
+    function balanceOf(address) external view returns (uint256);
 }
 
 contract Addresses {
@@ -57,8 +57,8 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
     uint24 fee = 3000;
     uint64 poolId = 0x0000010100000001;
     uint128 maxPrice;
-    uint stk;
-    uint price;
+    uint256 stk;
+    uint256 price;
 
     function setUp() public {
         hyper = new Hyper(WETH);
@@ -72,7 +72,7 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
         console.log("Got strike", stk);
 
         vm.deal(address(this), 1_000 ether);
-        (bool success, bytes memory revertData) = address(hyper).call{value: 1_000 ether}(
+        (bool success, ) = address(hyper).call{value: 1_000 ether}(
             createPool(WETH, USDC, address(this), 1, 30, 5_500, 365, 1, uint128(stk), uint128(price))
         );
         assertTrue(success, "create pool failed");
@@ -89,8 +89,8 @@ contract TestAnalysisSwap is Test, Addresses, HelperHyperActions {
 
         hyper.changeParameters(poolId, 0, 0, 0);
 
-        uint target = 1261714834;
-        uint actual = hyper.getAmountOut(poolId, true, 1 ether);
+        uint256 target = 1261714834;
+        uint256 actual = hyper.getAmountOut(poolId, true, 1 ether);
         assertTrue(actual < target, "Found a value!");
         console.log("Actual", actual);
     }

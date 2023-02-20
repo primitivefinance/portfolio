@@ -5,7 +5,7 @@ import "../../../contracts/recipes/SwapMath.sol" as SwapMath;
 import "forge-std/Test.sol";
 
 contract TestSwapMath is Test {
-    function testSwapMath_D_ppf() public {
+    function testSwapMath_D_ppf() public view {
         int256 input = int256(0.5 ether);
         int256 actual = SwapMath.d_ppf(input);
         console.logInt(actual);
@@ -21,11 +21,11 @@ contract TestSwapMath is Test {
             inv: 0 // note: initialized at zero always!
         });
 
-        uint startPrice = 10 ether;
-        uint R_x = SwapMath.Price.getXWithPrice(startPrice, params.stk, params.vol, params.tau);
-        uint R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
-        uint d_y = (R_y * 0.02 ether) / 1 ether; // swap in 2% of the pool's y reserves
-        uint actual = SwapMath.computeMarginalPriceQuoteIn(
+        uint256 startPrice = 10 ether;
+        uint256 R_x = SwapMath.Price.getXWithPrice(startPrice, params.stk, params.vol, params.tau);
+        uint256 R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
+        uint256 d_y = (R_y * 0.02 ether) / 1 ether; // swap in 2% of the pool's y reserves
+        uint256 actual = SwapMath.computeMarginalPriceQuoteIn(
             d_y,
             R_y,
             params.stk,
@@ -35,7 +35,7 @@ contract TestSwapMath is Test {
             params.inv
         );
 
-        uint d_percentage = 0.02 ether; // todo: fix with better assumption. note: assuming 2% swap has at most 0.2% of price impact. Depends on params!
+        uint256 d_percentage = 0.02 ether; // todo: fix with better assumption. note: assuming 2% swap has at most 0.2% of price impact. Depends on params!
 
         console.log(d_y, actual);
         // todo: fix assertTrue(actual > startPrice, "marginal-price-decreased");
@@ -52,11 +52,11 @@ contract TestSwapMath is Test {
             inv: 0 // note: initialized at zero always!
         });
 
-        uint startPrice = 10 ether;
-        uint R_x = SwapMath.Price.getXWithPrice(startPrice, params.stk, params.vol, params.tau);
-        uint R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
-        uint d_y = 0.0617075077452 ether; // swap in 2% of the pool's y reserves
-        uint actual = SwapMath.computeMarginalPriceQuoteIn(
+        uint256 startPrice = 10 ether;
+        uint256 R_x = SwapMath.Price.getXWithPrice(startPrice, params.stk, params.vol, params.tau);
+        uint256 R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
+        uint256 d_y = 0.0617075077452 ether; // swap in 2% of the pool's y reserves
+        uint256 actual = SwapMath.computeMarginalPriceQuoteIn(
             d_y,
             R_y,
             params.stk,
@@ -66,9 +66,9 @@ contract TestSwapMath is Test {
             params.inv
         );
 
-        uint d_percentage = 0.02 ether; // todo: fix with better assumption.  note: assuming 2% swap has at most 0.2% of price impact. Depends on params!
+        uint256 d_percentage = 0.02 ether; // todo: fix with better assumption.  note: assuming 2% swap has at most 0.2% of price impact. Depends on params!
 
-        uint expected = 9.84201501876 ether;
+        uint256 expected = 9.84201501876 ether;
 
         // todo: fix assertTrue(actual > startPrice, "marginal-price-decreased");
         assertApproxEqRel(actual, expected, d_percentage, "marginal-price-error");
@@ -84,11 +84,11 @@ contract TestSwapMath is Test {
             inv: 0 // note: initialized at zero always!
         });
 
-        uint startPrice = 10 ether;
-        uint R_x = SwapMath.Price.getXWithPrice(startPrice, params.stk, params.vol, params.tau);
-        uint R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
-        uint d_x = (R_x * 0.02 ether) / 1 ether; // swap in 2% of the pool's y reserves
-        uint actual = SwapMath.computeMarginalPriceAssetIn(
+        uint256 startPrice = 10 ether;
+        uint256 R_x = SwapMath.Price.getXWithPrice(startPrice, params.stk, params.vol, params.tau);
+        // uint256 R_y = SwapMath.Price.getYWithX(R_x, params.stk, params.vol, params.tau, params.inv);
+        uint256 d_x = (R_x * 0.02 ether) / 1 ether; // swap in 2% of the pool's y reserves
+        uint256 actual = SwapMath.computeMarginalPriceAssetIn(
             d_x,
             R_x,
             params.stk,
@@ -98,7 +98,7 @@ contract TestSwapMath is Test {
             params.inv
         );
 
-        uint d_percentage = 0.02 ether; // todo: fix with better assumption. note: assuming 2% swap has at most 0.2% of price impact. Depends on params!
+        uint256 d_percentage = 0.02 ether; // todo: fix with better assumption. note: assuming 2% swap has at most 0.2% of price impact. Depends on params!
 
         // todo: fix assertTrue(actual < startPrice, "marginal-price-increased");
         assertApproxEqRel(actual, startPrice, d_percentage, "marginal-price-error");
