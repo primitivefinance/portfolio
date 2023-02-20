@@ -1,16 +1,11 @@
 pragma solidity ^0.8.0;
 
 import "./EchidnaStateHandling.sol";
-import "../Hyper.sol";
+import {RMM01Portfolio as Hyper} from "../RMM01Portfolio.sol";
 
 contract ChangeParameters is EchidnaStateHandling {
     // ******************** Change Pool Parameters ********************
-    function change_parameters(
-        uint256 id,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 jit
-    ) public {
+    function change_parameters(uint256 id, uint16 priorityFee, uint16 fee, uint16 jit) public {
         (HyperPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));

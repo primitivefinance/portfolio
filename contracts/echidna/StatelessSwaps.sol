@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/StdCheats.sol";
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
-import "contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper} from "../RMM01Portfolio.sol";
 // import {TestERC20} from "test/helpers/HyperTestOverrides.sol";
 import "test/foundry/setup/TestHyperSetup.sol";
 import "./Helper.sol";

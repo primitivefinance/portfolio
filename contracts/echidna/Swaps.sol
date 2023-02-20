@@ -2,6 +2,8 @@ pragma solidity ^0.8.0;
 import "./EchidnaStateHandling.sol";
 
 contract Swaps is EchidnaStateHandling {
+    using RMM01Lib for HyperPool;
+
     function mint_and_allocate(HyperPair memory pair, uint256 amount, uint64 poolId) internal {
         mint_and_approve(EchidnaERC20(pair.tokenAsset), amount);
         mint_and_approve(EchidnaERC20(pair.tokenQuote), amount);
