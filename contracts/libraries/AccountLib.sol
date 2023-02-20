@@ -86,12 +86,7 @@ function __wrapEther__(AccountSystem storage self, address weth) {
 /** @dev Dangerously sends ether to `to` in a low-level call. */
 function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
-    __dangerousTransferEther__(to, amount);
-}
-
-/** @dev Dangerously sends ether to `to` in a low-level call. */
-function __dangerousTransferEther__(address to, uint256 value) {
-    (bool success, ) = to.call{value: value}(new bytes(0));
+    (bool success, ) = to.call{value: amount}(new bytes(0));
     if (!success) revert EtherTransferFail();
 }
 
