@@ -92,7 +92,7 @@ contract TestHyperCreatePool is TestHyperSetup {
     }
 
     function testCreatePoolNonControlledHasDefaultJit() public {
-        __hyperTestingContract__.setJitPolicy(JUST_IN_TIME_LIQUIDITY_POLICY); // for assertion below.
+        setJitPolicy(JUST_IN_TIME_LIQUIDITY_POLICY);
         bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
         bool success = __revertCatcher__.process(data);
         assertTrue(success, "create failed");

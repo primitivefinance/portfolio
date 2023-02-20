@@ -6,6 +6,8 @@ import "./setup/TestHyperSetup.sol";
 import "test/helpers/HelperHyperProfiles.sol";
 
 contract TestHyperSwap is TestHyperSetup {
+    using RMM01Lib for HyperPool;
+
     modifier allocateFirst() {
         __hyperTestingContract__.allocate(defaultScenario.poolId, 10 ether);
         _;
@@ -75,7 +77,7 @@ contract TestHyperSwap is TestHyperSetup {
     function testSwap_pays_fee_maxInput() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        uint256 maxInput = RMM01Lib.getMaxSwapAssetInWad(pool);
         uint256 extra = 1;
         // (uint256 out, ) = pool.getAmountOut(true, maxInput + extra, 0);
 
@@ -98,7 +100,7 @@ contract TestHyperSwap is TestHyperSetup {
     function testSwap_pays_fee() public allocateFirst {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        uint256 maxInput = RMM01Lib.getMaxSwapAssetInWad(pool);
         // (uint256 out, ) = pool.getAmountOut(true, maxInput - 1, 0);
 
         uint256 prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
@@ -124,7 +126,7 @@ contract TestHyperSwap is TestHyperSetup {
 
         pool = getPool(address(__hyperTestingContract__), defaultScenario.poolId);
 
-        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        uint256 maxInput = RMM01Lib.getMaxSwapAssetInWad(pool);
         (uint256 out, ) = pool.getAmountOut(true, maxInput - 1, 0);
 
         uint256 prevFeeGrowthAsset = pool.feeGrowthGlobalAsset;
@@ -146,7 +148,7 @@ contract TestHyperSwap is TestHyperSetup {
         __hyperTestingContract__.allocate(_scenario_controlled.poolId, 10 ether);
         HyperPool memory pool = getPool(address(__hyperTestingContract__), _scenario_controlled.poolId);
 
-        uint256 maxInput = getMaxSwapAssetInWad(pool);
+        uint256 maxInput = RMM01Lib.getMaxSwapAssetInWad(pool);
         uint256 input = (maxInput * 1 ether) / 2 ether; // half of max input.
         (uint256 out, ) = pool.getPoolAmountOut(true, input, 0);
         out = (out * 9000) / 10000; // 90% of output, so invariant is positive.

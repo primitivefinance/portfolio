@@ -72,17 +72,7 @@ contract Poc is Test {
     ) internal returns (uint64) {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = (
-            Enigma.encodeCreatePool(
-                pairId,
-                controller,
-                priorityFee,
-                fee,
-                volatility,
-                duration,
-                jit,
-                maxPrice,
-                price
-            )
+            Enigma.encodeCreatePool(pairId, controller, priorityFee, fee, volatility, duration, jit, maxPrice, price)
         );
         bytes memory data = Enigma.encodeJumpInstruction(instructions);
 
@@ -175,7 +165,7 @@ contract Poc is Test {
         // Therefore we are checking for error being more than 1e10
         // error more than 1e10 means that user balance did not change as much
         // as it shuld have been considering fee amount
-        uint error =  (poolAssetDiff + poolFeeGrowth) - bobAssetDiff;
+        uint error = (poolAssetDiff + poolFeeGrowth) - bobAssetDiff;
         assertGt(error, ERROR);
         // console.log("error : %s", error);
     }
@@ -185,13 +175,13 @@ contract Poc is Test {
 
         // Allocate to the pool from Alice
         vm.startPrank(alice);
-        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY/2);
+        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY / 2);
         vm.stopPrank();
         // Stop alice
 
         // Allocate to the pool from Eve
         vm.startPrank(eve);
-        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY/2);
+        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY / 2);
         vm.stopPrank();
         // Stop Eve
 
@@ -227,7 +217,7 @@ contract Poc is Test {
         uint startingPrice = hyper.getLatestPrice(FIRST_POOL);
         skip(182 days);
         uint halfTimePrice = hyper.getLatestPrice(FIRST_POOL);
-        console.log("Price change without any other change:  %s, %s", startingPrice, halfTimePrice);
+        console.log("RMM01Lib change without any other change:  %s, %s", startingPrice, halfTimePrice);
 
         // Change in price with change in volatility
         uint64 poolId = createDefaultPool(uint24(hyper.getPairNonce()), address(this));
@@ -243,7 +233,7 @@ contract Poc is Test {
             0
         );
         uint halfTimePriceDS = hyper.getLatestPrice(poolId);
-        console.log("Price change with change in volatility: %s, %s", startingPriceDS, halfTimePriceDS);
+        console.log("RMM01Lib change with change in volatility: %s, %s", startingPriceDS, halfTimePriceDS);
 
         // Change in price with change in strike price
         poolId = createDefaultPool(uint24(hyper.getPairNonce()), address(this));
@@ -259,7 +249,7 @@ contract Poc is Test {
             DEFAULT_TICK*2
         );
         uint halfTimePriceKS = hyper.getLatestPrice(poolId);
-        console.log("Price change with change in strike:     %s, %s", startingPriceKS, halfTimePriceKS);
+        console.log("RMM01Lib change with change in strike:     %s, %s", startingPriceKS, halfTimePriceKS);
 
         // Change in price with change in maturity
         poolId = createDefaultPool(uint24(hyper.getPairNonce()), address(this));
@@ -275,7 +265,7 @@ contract Poc is Test {
             0
         );
         uint halfTimePriceTS = hyper.getLatestPrice(poolId);
-        console.log("Price change with change in maturity:   %s, %s", startingPriceTS, halfTimePriceTS);
+        console.log("RMM01Lib change with change in maturity:   %s, %s", startingPriceTS, halfTimePriceTS);
 
         assertFalse(halfTimePrice == halfTimePriceDS);
         assertFalse(halfTimePrice == halfTimePriceKS);
@@ -300,7 +290,7 @@ contract Poc is Test {
         vm.stopPrank();
 
         vm.startPrank(alice);
-        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY*9);
+        hyper.allocate(FIRST_POOL, DEFAULT_LIQUIDITY * 9);
         vm.stopPrank();
 
         vm.startPrank(bob);
@@ -313,6 +303,6 @@ contract Poc is Test {
         // output amount has not been multiplied by liquidity amount to scale it back.
         // It shows that for same amount of input the output varies at same order at
         // which liquidity varies.
-        assertEq(true, outputAt1/outputAt10 >= 10);
+        assertEq(true, outputAt1 / outputAt10 >= 10);
     }
 }

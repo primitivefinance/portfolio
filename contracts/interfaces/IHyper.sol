@@ -158,6 +158,8 @@ interface IHyperGetters {
 
     function getPoolNonce() external view returns (uint32);
 
+    function getPairId(address asset, address quote) external view returns (uint24 pairId);
+
     function getAmounts(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
 
     function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) external view returns (uint256);
@@ -236,6 +238,28 @@ interface IHyperActions {
      * @param jit New JIT policy of the pool in seconds (1 = 1 second).
      */
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
+
+    /**
+     * @notice Credits excees fees earned to `msg.sender` for a position in `poolId`.
+     */
+    function claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) external;
+
+    /**
+     * @notice Creates a new pool.
+     */
+    function createPool(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 vol,
+        uint16 dur,
+        uint16 jit,
+        uint128 maxPrice,
+        uint128 price
+    ) external returns (uint64 poolId);
+
+    function createPair(address asset, address quote) external returns (uint24 pairId);
 }
 
 interface IHyper is IHyperActions, IHyperEvents, IHyperGetters {}

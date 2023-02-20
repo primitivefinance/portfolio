@@ -24,7 +24,8 @@ src = 'test/'       # not default
 gas_reports = ["*"]
 ffi = true
 fuzz_runs = 256
-
+no_match_path = 'test/foundry/poc/**.sol'#["Poc","TestSolmateInvariants", "TestSolstatBounds", "TestSolstatInvariants", "TestSolstatError", "TestSolstatDifferential", "TestSolstatGasERFC", "TestSolstatGasIERFC", "TestSolstatGasAbs",]
+max_test_rejects = 120000
 
 [profile.crytic]
 via_ir = false

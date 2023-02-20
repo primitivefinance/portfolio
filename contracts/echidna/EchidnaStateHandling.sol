@@ -2,9 +2,9 @@ pragma solidity ^0.8.0;
 import "solmate/tokens/WETH.sol";
 import "../test/EchidnaERC20.sol";
 import "./Helper.sol";
-import "../Hyper.sol";
+import {RMM01Portfolio as Hyper, Account as AccountLib, SafeCastLib} from "../RMM01Portfolio.sol";
 import "../../test/helpers/HelperHyperView.sol";
-import "../Enigma.sol" as ProcessingLib;
+import "../libraries/EnigmaLib.sol" as ProcessingLib;
 
 contract EchidnaStateHandling is Helper, HelperHyperView {
     bool hasFunded;

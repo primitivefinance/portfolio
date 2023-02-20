@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/StdCheats.sol";
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
-import "contracts/Hyper.sol";
+import {RMM01Portfolio as Hyper} from "../RMM01Portfolio.sol";
 // import {TestERC20} from "test/helpers/HyperTestOverrides.sol";
 import "test/foundry/setup/TestHyperSetup.sol";
 import "./Helper.sol";
@@ -82,11 +82,7 @@ contract StatelessSwaps is Helper, Test {
         uint256 tau
     ) public {
         stk = bound(stk, 1, type(uint128).max);
-        price = bound(
-            price,
-            (Price.computePriceWithTick(Price.computeTickWithPrice(stk) + 1) + 1e18 - 1) / 1e18,
-            type(uint128).max
-        ); // to prevent lnWad's "UNDEFINED" when `price * 1e18 / stk == 0`.
+        price = bound(price, stk, type(uint128).max); // to prevent lnWad's "UNDEFINED" when `price * 1e18 / stk == 0`.
         vol = bound(vol, 100, 25_000);
         tau = bound(tau, 1, 500);
 
@@ -116,14 +112,13 @@ contract StatelessSwaps is Helper, Test {
         }
 
         // Update stk to what Hyper stores, otherwise calculations will be inexcat.
-        stk = Price.computePriceWithTick(Price.computeTickWithPrice(stk));
         emit LogUint256("stk", stk);
         {
             // Scoping due to stack-depth.
-            Price.RMM memory rmm = Price.RMM({strike: stk, sigma: vol, tau: tau});
+            RMM01Lib.RMM memory rmm = RMM01Lib.RMM({strike: stk, sigma: vol, tau: tau});
 
             // Compute reserves to determine max input and output.
-            (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, price, 0);
+            (uint256 R_y, uint256 R_x) = RMM01Lib.computeReserves(rmm, price, 0);
 
             uint256 maxInput;
             uint256 maxOutput;
@@ -132,15 +127,15 @@ contract StatelessSwaps is Helper, Test {
                 // console.log("liveIndependent R_x", R_x);
                 // console.log("liveDependent R_y", R_y);
                 if (R_x >= 1e18) return; // Shouldn't happen
-                maxInput = (1e18 - R_x) * liquidity / 1e18;
-                maxOutput = R_y * liquidity / 1e18;
+                maxInput = ((1e18 - R_x) * liquidity) / 1e18;
+                maxOutput = (R_y * liquidity) / 1e18;
             } else {
                 // console.log("buying");
                 emit LogUint256("liveIndependent R_y", R_y);
                 emit LogUint256("liveDependent R_x", R_x);
                 if (R_y > stk) return; // Can happen although this will lead to an overflow on computing max in the swap fn.
-                maxInput = (stk - R_y) * liquidity / 1e18; // (2-2)*2/1e18
-                maxOutput = R_x * liquidity / 1e18;
+                maxInput = ((stk - R_y) * liquidity) / 1e18; // (2-2)*2/1e18
+                maxOutput = (R_x * liquidity) / 1e18;
             }
             emit LogUint256("max input", maxInput);
             emit LogUint256("max ouput ", maxOutput);
@@ -159,12 +154,12 @@ contract StatelessSwaps is Helper, Test {
         uint256 maxErr = 100 * 1e18;
 
         // Swapping back and forth should not succeed if `output > input` under normal circumstances.
-        (bool success,) = swapBackAndForthCall(sell, uint128(input), uint128(output), uint128(input + maxErr));
+        (bool success, ) = swapBackAndForthCall(sell, uint128(input), uint128(output), uint128(input + maxErr));
 
         //
         if (success) {
-            // Price.RMM memory rmm = Price.RMM({strike: stk, sigma: vol, tau: tau});
-            // (uint256 R_y, uint256 R_x) = Price.computeReserves(rmm, price);
+            // RMM01Lib.RMM memory rmm = RMM01Lib.RMM({strike: stk, sigma: vol, tau: tau});
+            // (uint256 R_y, uint256 R_x) = RMM01Lib.computeReserves(rmm, price);
             // console.log("R_x", R_x);
             // console.log("R_y", R_y);
             // console.log("bal asset", hyper.getBalance(self, address(asset)));
@@ -262,10 +257,12 @@ contract StatelessSwaps is Helper, Test {
         }
     }
 
-    function swapBackAndForthCall(bool sell, uint128 input, uint128 output1, uint128 output2)
-        internal
-        returns (bool success, bytes memory returndata)
-    {
+    function swapBackAndForthCall(
+        bool sell,
+        uint128 input,
+        uint128 output1,
+        uint128 output2
+    ) internal returns (bool success, bytes memory returndata) {
         bytes[] memory instructions = new bytes[](2);
 
         // console.log(

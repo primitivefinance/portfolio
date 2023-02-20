@@ -3,11 +3,13 @@ pragma solidity ^0.8.0;
 
 import "solmate/tokens/WETH.sol";
 import "solmate/utils/SafeCastLib.sol";
+import {RMM01Portfolio as Hyper, IHyper} from "contracts/RMM01Portfolio.sol";
 import "contracts/HyperLib.sol";
-import "contracts/libraries/Price.sol";
+import "contracts/libraries/RMM01Lib.sol";
+import "contracts/test/TestERC20.sol";
 
 import "forge-std/Test.sol";
-import {TestERC20, Hyper, HyperTimeOverride, HyperCatchReverts, RevertCatcher, FixedPointMathLib} from "test/helpers/HyperTestOverrides.sol";
+import {RevertCatcher, FixedPointMathLib} from "test/helpers/HyperTestOverrides.sol";
 
 import "test/helpers/HelperHyperActions.sol";
 import "test/helpers/HelperHyperInvariants.sol";
@@ -15,6 +17,8 @@ import "test/helpers/HelperHyperProfiles.sol";
 import "test/helpers/HelperHyperView.sol";
 
 uint256 constant STARTING_BALANCE = 4000e18;
+
+uint constant LIQUIDITY_POLICY_STORAGE_SLOT = 11;
 
 struct TestScenario {
     TestERC20 asset;
@@ -28,11 +32,10 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
     using SafeCastLib for uint256;
+    using RMM01Lib for HyperPool;
 
     WETH public __weth__;
-    Hyper public __hyper__; // Actual contract
-    HyperTimeOverride public __hyperTimeOverride__; // Inherits Hyper, adds block.timestamp and jit policy overrides
-    HyperCatchReverts public __hyperTestingContract__; // Inherits HyperTimeOverrides, adds endpoints to process functions.
+    IHyper public __hyperTestingContract__; // Inherits HyperTimeOverrides, adds endpoints to process functions.
     RevertCatcher public __revertCatcher__;
 
     TestERC20 public __usdc__;
@@ -58,6 +61,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     function setUp() public {
         initContracts();
+        setJitPolicy(0);
         initUsers();
         initScenarios();
         initPrerequisites();
@@ -82,12 +86,8 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         __weth__ = new WETH();
 
         // --- Hyper Contracts --- //
-        __hyper__ = new Hyper(address(__weth__));
-        __hyperTimeOverride__ = new HyperTimeOverride(address(__weth__));
-        __hyperTestingContract__ = new HyperCatchReverts(address(__weth__));
+        __hyperTestingContract__ = IHyper(new Hyper(address(__weth__)));
         __revertCatcher__ = new RevertCatcher(address(__hyperTestingContract__));
-        __contracts__.push(address(__hyper__));
-        __contracts__.push(address(__hyperTimeOverride__));
         __contracts__.push(address(__hyperTestingContract__));
         __contracts__.push(address(__revertCatcher__));
 
@@ -103,6 +103,10 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         __tokens__.push(address(__badToken__));
 
         setLabels();
+    }
+
+    function setJitPolicy(uint value) internal {
+        vm.store(address(__hyperTestingContract__), bytes32(LIQUIDITY_POLICY_STORAGE_SLOT), bytes32(value));
     }
 
     function initUsers() internal {
@@ -209,9 +213,7 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
         vm.label(address(this), "Self");
         vm.label(address(__weth__), "Weth");
         vm.label(address(__revertCatcher__), "RevertCatcher");
-        vm.label(address(__hyper__), "DefaultHyper");
-        vm.label(address(__hyperTimeOverride__), "HyperTimeOverride");
-        vm.label(address(__hyperTestingContract__), "HyperCatchReverts");
+        vm.label(address(__hyperTestingContract__), "Hyper");
         vm.label(address(__usdc__), "USDC");
         vm.label(address(__token_8__), "Token8Decimals");
         vm.label(address(__token_18__), "Token18Decimals");
@@ -255,7 +257,12 @@ contract TestHyperSetup is HelperHyperActions, HelperHyperInvariants, HelperHype
 
     function _swap(uint64 id) internal {
         HyperPool memory pool = getPool(address(__hyperTestingContract__), id);
-        (uint256 output, ) = __hyperTestingContract__.swap(id, true, (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether, 1);
+        (uint256 output, ) = __hyperTestingContract__.swap(
+            id,
+            true,
+            (pool.getMaxSwapAssetInWad() * 1 ether) / 2 ether,
+            1
+        );
         assertTrue(output > 0, "no swap happened!");
     }
 

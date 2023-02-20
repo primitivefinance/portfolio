@@ -68,7 +68,7 @@ contract TestHyperAllocate is TestHyperSetup {
 
         uint256 tau = pool.lastTau(); // seconds
 
-        uint256 theoreticalR2 = Price.getXWithPrice(price, pool.params.maxPrice, pool.params.volatility, tau);
+        uint256 theoreticalR2 = RMM01Lib.getXWithPrice(price, pool.params.maxPrice, pool.params.volatility, tau);
 
         uint256 delLiquidity = 1e12;
         __hyperTestingContract__.allocate(defaultScenario.poolId, delLiquidity);
@@ -211,7 +211,10 @@ contract TestHyperAllocate is TestHyperSetup {
 
         // Execution
         HyperState memory prev = getState();
-        (uint256 deltaAsset, uint256 deltaQuote) = __hyperTestingContract__.allocate(defaultScenario.poolId, deltaLiquidity);
+        (uint256 deltaAsset, uint256 deltaQuote) = __hyperTestingContract__.allocate(
+            defaultScenario.poolId,
+            deltaLiquidity
+        );
         HyperState memory post = getState();
 
         // Postconditions

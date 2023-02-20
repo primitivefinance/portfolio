@@ -14,7 +14,7 @@ import "./setup/TestHyperSetup.sol";
  */
 contract TestHyperClaim is TestHyperSetup {
     using FixedPointMathLib for uint256;
-    using Price for Price.RMM;
+    using RMM01Lib for RMM01Lib.RMM;
 
     function testClaimNoPosition_reverts() public {
         vm.expectRevert(abi.encodeWithSelector(NonExistentPosition.selector, address(this), defaultScenario.poolId));
@@ -147,7 +147,7 @@ contract TestHyperClaim is TestHyperSetup {
 
         // uint256 entitledAssetAmount = real0 - fee0;
 
-        // Price.RMM memory rmm = pool.getRMM();
+        // RMM01Lib.RMM memory rmm = pool.getRMM();
         // uint256 adjustedAmt = entitledAssetAmount.divWadDown(liquidity);
         // uint256 expectedPrice = rmm.getPriceWithX(adjustedAmt);
 
@@ -170,7 +170,7 @@ contract TestHyperClaim is TestHyperSetup {
         assertEq(fee0, 0, "unclaimed-fees");
 
         nextReserve = _getReserve(hx(), defaultScenario.asset);
-        // todo: fix. Price deviation trick leaves dust, there should be no dust! assertEq(nextReserve, 0, "reserve-not-zero");
+        // todo: fix. RMM01Lib deviation trick leaves dust, there should be no dust! assertEq(nextReserve, 0, "reserve-not-zero");
         assertTrue(nextBalance > prevBalance, "no fee claimed");
         assertTrue(nextReserve < prevReserve, "no fee removed");
     }

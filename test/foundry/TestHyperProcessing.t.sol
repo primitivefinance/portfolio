@@ -406,7 +406,7 @@ contract TestHyperProcessing is TestHyperSetup {
 
         uint256 strike = curve.maxPrice;
         console.log(tau, strike, curve.volatility);
-        uint256 theoreticalR2 = Price.getXWithPrice(price, strike, curve.volatility, tau);
+        uint256 theoreticalR2 = RMM01Lib.getXWithPrice(price, strike, curve.volatility, tau);
 
         uint8 power = uint8(0x06); // 6 zeroes
         uint8 amount = uint8(0x04); // 4 with 6 zeroes = 4_000_000 wei
