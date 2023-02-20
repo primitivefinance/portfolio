@@ -200,15 +200,15 @@ interface IHyperActions {
      * @notice Swaps asset and quote tokens within the pool `poolId`.
      * @param sellAsset True if asset tokens should be swapped for quote tokens.
      * @param amount Amount of tokens to swap, which are assigned to `poolId`.
-     * @param limit Maximum amount of tokens to pay for the swap
-     * @return output Amount of tokens received by the user
-     * @return remainder Amount of tokens unused by the swap and refunded to the user
+     * @param minAmountOut Minimum amount of tokens required to be received by the user.
+     * @return output Amount of tokens received by the user.
+     * @return remainder Amount of tokens unused by the swap and refunded to the user.
      */
     function swap(
         uint64 poolId,
         bool sellAsset,
         uint256 amount,
-        uint256 limit
+        uint256 minAmountOut
     ) external payable returns (uint256 output, uint256 remainder);
 
     /**
