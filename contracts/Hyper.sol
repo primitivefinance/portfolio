@@ -173,6 +173,7 @@ abstract contract HyperVirtual is Objective {
         uint256 amount,
         uint256 minAmountOut
     ) external payable lock interactions returns (uint256 output, uint256 remainder) {
+        if (minAmountOut >= type(uint128).max) revert InvalidAmountOut();
         bool useMax = amount == type(uint256).max; // magic variable.
         uint128 input = useMax ? type(uint128).max : amount.safeCastTo128();
         (, remainder, , output) = _swapExactIn(

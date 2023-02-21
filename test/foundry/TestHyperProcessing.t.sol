@@ -227,7 +227,7 @@ contract TestHyperProcessing is TestHyperSetup {
     }
 
     function testSwapExpiredPoolReverts() public {
-        uint256 limit = type(uint256).max;
+        uint256 minAmountOut = 1;
         uint256 amount = 2222;
         // Add liquidity first
         bytes memory data = Enigma.encodeAllocate(
@@ -247,7 +247,7 @@ contract TestHyperProcessing is TestHyperSetup {
         );
 
         vm.expectRevert(PoolExpired.selector);
-        __hyperTestingContract__.swap(_scenario_18_18.poolId, false, amount, limit);
+        __hyperTestingContract__.swap(_scenario_18_18.poolId, false, amount, minAmountOut);
     }
 
     function testSwapExactInPoolLiquidityUnchanged() public postTestInvariantChecks {

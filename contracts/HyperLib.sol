@@ -57,6 +57,7 @@ uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 // todo: add selectors for debugging?
 error DrawBalance();
 error InsufficientPosition(uint64 poolId);
+error InvalidAmountOut();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
