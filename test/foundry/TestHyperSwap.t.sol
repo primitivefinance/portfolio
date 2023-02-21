@@ -35,6 +35,13 @@ contract TestHyperSwap is TestHyperSetup {
         // (uint256 amount0, uint256 amount1) = pool.getAmounts();
     }
 
+    function test_swap_RevertIfAmountOutIfInsufficient() public allocateFirst {
+        uint256 input = DEFAULT_SWAP_INPUT;
+        uint256 expected = DEFAULT_SWAP_OUTPUT; // 6 decimals
+        vm.expectRevert(SwapLimitReached.selector);
+        (uint256 output, ) = __hyperTestingContract__.swap(defaultScenario.poolId, true, input, 100 ether);
+    }
+
     function testSwap_back_and_forth_outputs_less() public allocateFirst {
         uint256 start = 10000;
         uint256 limit = 1;
@@ -53,7 +60,7 @@ contract TestHyperSwap is TestHyperSetup {
         uint256 end = pool.params.createdAt + Assembly.convertDaysToSeconds(pool.params.duration);
         vm.warp(end + 1);
         vm.expectRevert(PoolExpired.selector);
-        __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, type(uint128).max);
+        __hyperTestingContract__.swap(defaultScenario.poolId, false, 10000, 1);
     }
 
     function testSwap_revert_ZeroInput() public {
