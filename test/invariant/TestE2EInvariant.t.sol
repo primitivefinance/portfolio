@@ -76,13 +76,8 @@ contract TestE2EInvariant is TestInvariantSetup, TestE2ESetup {
     }
 
     function invariant_account_settled() public {
-        (, bool settled) = __hyper__.__account__();
+        bool settled = __hyper__.__account__();
         assertTrue(settled, "invariant-settled");
-    }
-
-    function invariant_account_prepared() public {
-        (bool prepared, ) = __hyper__.__account__();
-        assertTrue(!prepared, "invariant-prepared");
     }
 
     function invariant_virtual_pool_asset_reserves() public {

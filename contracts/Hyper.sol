@@ -60,14 +60,6 @@ abstract contract HyperVirtual is Objective {
     Payment[] private _payments;
     SwapState internal _state; // todo: should remain private, with special internal functions to manipulate.
 
-    modifier lock() {
-        if (locked != 1) revert InvalidReentrancy();
-
-        locked = 2;
-        _;
-        locked = 1;
-    }
-
     /**
      * @dev
      * Used on external functions to handle settlement of outstanding token balances.
@@ -87,14 +79,12 @@ abstract contract HyperVirtual is Objective {
      * Step 9. Exit interactions modifier.
      * Step 10. Exit `locked` re-entrancy guard.
      */
-    modifier interactions() {
-        if (__account__.prepared) revert InvalidReentrancy();
+    modifier lock() {
+        if (locked != 1) revert InvalidReentrancy();
 
-        __account__.prepared = false;
+        locked = 2;
         _;
-        __account__.prepared = true;
-
-        _settlement();
+        locked = 1;
 
         if (!__account__.settled) revert InvalidSettlement();
     }
@@ -139,37 +129,54 @@ abstract contract HyperVirtual is Objective {
     // ===== Actions ===== //
 
     /// @inheritdoc IHyperActions
-    function deposit() external payable override lock interactions {
+    function deposit() external payable override lock {
         if (msg.value == 0) revert ZeroValue();
         _deposit();
+
+        // Interactions
+        _settlement();
     }
 
     /// @inheritdoc IHyperActions
-    function multiprocess(bytes calldata data) external payable lock interactions {
+    function multiprocess(bytes calldata data) external payable lock {
         _deposit();
+
+        // Effects
         if (data[0] != Enigma.INSTRUCTION_JUMP) _process(data);
         else Enigma._jumpProcess(data, _process);
+
+        // Interactions
+        _settlement();
     }
 
     /// @inheritdoc IHyperActions
-    function draw(address token, uint256 amount, address to) external override lock interactions {
+    function draw(address token, uint256 amount, address to) external override lock {
         if (to == address(this)) revert InvalidTransfer(); // todo: Investigate attack vectors if this was not here.
 
         uint256 balance = getBalance(msg.sender, token);
         if (amount == type(uint256).max) amount = balance;
         if (amount > balance) revert DrawBalance();
 
+        // Touches token, updates __account__.settled = false.
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
 
         if (token == WETH) Account.__dangerousUnwrapEther__(WETH, to, amount);
         else Account.SafeTransferLib.safeTransfer(Account.ERC20(token), to, amount);
+
+        // Interactions
+        _settlement(); // Updates __account__.settled = true.
     }
 
     /// @inheritdoc IHyperActions
-    function fund(address token, uint256 amount) external override lock interactions {
+    function fund(address token, uint256 amount) external override lock {
         if (amount == type(uint256).max) amount = Account.__balanceOf__(token, msg.sender);
+
+        // Touches token, updates __account__.settled = false.
         __account__.dangerousFund(token, address(this), amount); // warning: external call to msg.sender.
+
+        // Interactions
+        _settlement(); // Updates __account__.settled = true.
     }
 
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external lock {
@@ -674,7 +681,7 @@ abstract contract HyperVirtual is Objective {
 
      */
     function _settlement() internal {
-        if (!__account__.prepared) revert Account.NotPreparedToSettle();
+        if (__account__.settled) revert Account.AlreadySettled();
 
         address[] memory tokens = __account__.warm;
         uint256 loops = tokens.length;

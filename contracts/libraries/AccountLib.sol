@@ -51,7 +51,7 @@ using {
 error EtherTransferFail(); // 0x75f42683
 error InsufficientReserve(uint256 amount, uint256 delta); // 0x315276c9
 error InvalidBalance(); // 0xc52e3eff
-error NotPreparedToSettle(); // 0xf7cede50
+error AlreadySettled();
 
 struct AccountSystem {
     // user -> token -> internal balance.
@@ -62,9 +62,7 @@ struct AccountSystem {
     mapping(address => bool) cached;
     // Transiently stored cached tokens, must be length zero outside of execution.
     address[] warm;
-    // Must be `false` outside of execution.
-    bool prepared;
-    // Must be `true` outside of execution.
+    // Must be `true` outside of execution. Mutex for settlement interactions.
     bool settled;
 }
 
@@ -179,7 +177,6 @@ function reset(AccountSystem storage self) {
     assert(self.warm.length == 0); // todo: this is a valid assertion, but should we use assert?
     self.settled = true;
     delete self.warm;
-    delete self.prepared;
 }
 
 /** @dev Used to check if a token was already activated after being interacted with again. */
