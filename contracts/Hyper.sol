@@ -89,7 +89,7 @@ abstract contract HyperVirtual is Objective {
      */
     modifier interactions() {
         if (__account__.prepared) revert InvalidReentrancy();
-        __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
+
         __account__.prepared = false;
         _;
         __account__.prepared = true;
@@ -121,11 +121,6 @@ abstract contract HyperVirtual is Objective {
         Enigma.__startProcess__(_process);
     }
 
-    function multiprocess(bytes calldata data) external payable lock interactions {
-        if (data[0] != Enigma.INSTRUCTION_JUMP) _process(data);
-        else Enigma._jumpProcess(data, _process);
-    }
-
     /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
     function getNetBalance(address token) public view returns (int256) {
         return __account__.getNetBalance(token, address(this));
@@ -144,6 +139,21 @@ abstract contract HyperVirtual is Objective {
     /** @dev Transient stored tokens */
     function getWarm() public view returns (address[] memory warm) {
         return __account__.warm;
+    }
+
+    // ===== Actions ===== //
+
+    /// @inheritdoc IHyperActions
+    function deposit() external payable override lock interactions {
+        if (msg.value == 0) revert ZeroValue();
+        _deposit();
+    }
+
+    /// @inheritdoc IHyperActions
+    function multiprocess(bytes calldata data) external payable lock interactions {
+        _deposit();
+        if (data[0] != Enigma.INSTRUCTION_JUMP) _process(data);
+        else Enigma._jumpProcess(data, _process);
     }
 
     /// @inheritdoc IHyperActions
@@ -167,14 +177,23 @@ abstract contract HyperVirtual is Objective {
         __account__.dangerousFund(token, address(this), amount); // warning: external call to msg.sender.
     }
 
-    /// @inheritdoc IHyperActions
-    function deposit() external payable override lock interactions {
-        if (msg.value == 0) revert ZeroValue();
-        emit Deposit(msg.sender, msg.value);
-        // interactions modifier does the work.
+    function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external lock {
+        HyperPool storage pool = pools[poolId];
+        if (pool.controller != msg.sender) revert NotController();
+
+        HyperCurve memory modified = pool.params;
+        if (jit != 0) modified.jit = jit;
+        if (fee != 0) modified.fee = fee;
+        if (priorityFee != 0) modified.priorityFee = priorityFee;
+
+        pool.changePoolParameters(modified);
+
+        emit ChangeParameters(poolId, priorityFee, fee, jit);
     }
 
-    function claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) external lock interactions {
+    // ===== Effects ===== //
+
+    function _claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) internal {
         HyperPool memory pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
@@ -193,8 +212,6 @@ abstract contract HyperVirtual is Objective {
 
         emit Collect(poolId, msg.sender, claimedAssets, pool.pair.tokenAsset, claimedQuotes, pool.pair.tokenQuote);
     }
-
-    // ===== Effects ===== //
 
     /** @dev Increases virtal reserves and liquidity. Debits `msg.sender`. */
     function _allocate(
@@ -556,21 +573,13 @@ abstract contract HyperVirtual is Objective {
         emit CreatePool(poolId, hasController, pool.pair.tokenAsset, pool.pair.tokenQuote, price);
     }
 
-    function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external lock interactions {
-        HyperPool storage pool = pools[poolId];
-        if (pool.controller != msg.sender) revert NotController();
+    // ===== Accounting System ===== //
 
-        HyperCurve memory modified = pool.params;
-        if (jit != 0) modified.jit = jit;
-        if (fee != 0) modified.fee = fee;
-        if (priorityFee != 0) modified.priorityFee = priorityFee;
-
-        pool.changePoolParameters(modified);
-
-        emit ChangeParameters(poolId, priorityFee, fee, jit);
+    function _deposit() internal {
+        __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
+        emit Deposit(msg.sender, msg.value);
     }
 
-    // ===== Accounting System ===== //
     /**
      * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
      *
@@ -649,6 +658,9 @@ abstract contract HyperVirtual is Objective {
         } else if (instruction == Enigma.CREATE_PAIR) {
             (address asset, address quote) = Enigma.decodeCreatePair(data);
             _createPair(asset, quote);
+        } else if (instruction == Enigma.CLAIM) {
+            (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) = Enigma.decodeClaim(data);
+            _claim(poolId, deltaAsset, deltaQuote);
         } else {
             revert InvalidInstruction();
         }

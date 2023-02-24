@@ -40,7 +40,7 @@ bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
 bytes1 constant UNALLOCATE = 0x03;
-bytes1 constant UNSET04 = 0x04;
+bytes1 constant CLAIM = 0x04;
 bytes1 constant SWAP = 0x05;
 bytes1 constant UNSET06 = 0x06;
 bytes1 constant UNSET07 = 0x07;
@@ -139,6 +139,12 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
     if (data.length != 41) revert InvalidBytesLength(41, data.length);
     tokenAsset = address(bytes20(data[1:21]));
     tokenQuote = address(bytes20(data[21:]));
+}
+
+function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) {
+    poolId = uint64(bytes8(data[1:9]));
+    deltaAsset = uint128(bytes16(data[9:25]));
+    deltaQuote = uint128(bytes16(data[25:41]));
 }
 
 function encodeCreatePool(

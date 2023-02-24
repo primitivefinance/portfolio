@@ -181,6 +181,9 @@ interface IHyperGetters {
 }
 
 interface IHyperActions {
+    /**
+     * @dev Entrypoint to manipulate balances in Hyper.
+     */
     function multiprocess(bytes calldata data) external payable;
 
     /**
@@ -210,11 +213,6 @@ interface IHyperActions {
      * @param jit New JIT policy of the pool in seconds (1 = 1 second).
      */
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
-
-    /**
-     * @notice Credits excees fees earned to `msg.sender` for a position in `poolId`.
-     */
-    function claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) external;
 }
 
 interface IHyper is IHyperActions, IHyperEvents, IHyperGetters {}
