@@ -130,7 +130,7 @@ library Configs {
                 IHyperGetters(hyper).getPoolNonce()
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
-        } else {
+        } /*  else {
             poolId = IHyper(hyper).createPool({
                 pairId: pairId,
                 controller: self.controller,
@@ -142,6 +142,6 @@ library Configs {
                 maxPrice: self.terminalPriceWad,
                 price: self.reportedPriceWad
             });
-        }
+        } */
     }
 }

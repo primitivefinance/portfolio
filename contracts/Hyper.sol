@@ -146,47 +146,6 @@ abstract contract HyperVirtual is Objective {
         return __account__.warm;
     }
 
-    // ===== Actions ===== //
-
-    /// @inheritdoc IHyperActions
-    function allocate(
-        uint64 poolId,
-        uint256 amount
-    ) external payable lock interactions returns (uint256 deltaAsset, uint256 deltaQuote) {
-        bool useMax = amount == type(uint256).max;
-        (deltaAsset, deltaQuote) = _allocate(useMax, poolId, (useMax ? 1 : amount).safeCastTo128());
-    }
-
-    /// @inheritdoc IHyperActions
-    function unallocate(
-        uint64 poolId,
-        uint256 amount
-    ) external lock interactions returns (uint256 deltaAsset, uint256 deltaQuote) {
-        bool useMax = amount == type(uint256).max;
-        (deltaAsset, deltaQuote) = _unallocate(useMax, poolId, (useMax ? 1 : amount).safeCastTo128());
-    }
-
-    /// @inheritdoc IHyperActions
-    function swap(
-        uint64 poolId,
-        bool sellAsset,
-        uint256 amount,
-        uint256 minAmountOut
-    ) external payable lock interactions returns (uint256 output, uint256 remainder) {
-        if (minAmountOut >= type(uint128).max) revert InvalidAmountOut();
-        bool useMax = amount == type(uint256).max; // magic variable.
-        uint128 input = useMax ? type(uint128).max : amount.safeCastTo128();
-        (, remainder, , output) = _swapExactIn(
-            Order({
-                useMax: useMax ? 1 : 0,
-                poolId: poolId,
-                input: input,
-                output: minAmountOut.safeCastTo128(),
-                direction: sellAsset ? 0 : 1
-            })
-        );
-    }
-
     /// @inheritdoc IHyperActions
     function draw(address token, uint256 amount, address to) external override lock interactions {
         if (to == address(this)) revert InvalidTransfer(); // todo: Investigate attack vectors if this was not here.
@@ -550,10 +509,6 @@ abstract contract HyperVirtual is Objective {
 
     // ===== Initializing Pools ===== //
 
-    function createPair(address asset, address quote) external lock interactions returns (uint24 pairId) {
-        return _createPair(asset, quote);
-    }
-
     function _createPair(address asset, address quote) internal returns (uint24 pairId) {
         if (asset == quote) revert SameTokenError();
 
@@ -577,20 +532,6 @@ abstract contract HyperVirtual is Objective {
         });
 
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
-    }
-
-    function createPool(
-        uint24 pairId,
-        address controller,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 vol,
-        uint16 dur,
-        uint16 jit,
-        uint128 maxPrice,
-        uint128 price
-    ) external lock interactions returns (uint64 poolId) {
-        return _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
     }
 
     /** @dev If pairId == 0, its a magic variable that uses current pair nonce. */

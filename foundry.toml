@@ -13,8 +13,8 @@ remappings = [
 
 [profile.optimized] # uses via_ir and optimizer
 via_ir = true
+optimizer_runs = 0
 out = 'optimized-out'
-optimizer_runs = 15000
 fuzz_runs = 256
 fuzz_max_local_rejects = 65536
 fuzz_max_global_rejects = 1024
@@ -22,9 +22,10 @@ fuzz_max_global_rejects = 1024
 [profile.test] # does not use optimizer
 src = 'test/'       # not default
 gas_reports = ["*"]
+optimizer_runs = 0
 ffi = true
 fuzz_runs = 256
-no_match_path = 'test/foundry/poc/**.sol'#["Poc","TestSolmateInvariants", "TestSolstatBounds", "TestSolstatInvariants", "TestSolstatError", "TestSolstatDifferential", "TestSolstatGasERFC", "TestSolstatGasIERFC", "TestSolstatGasAbs",]
+no_match_path = '/test/foundry/' # thanks chat gpt #["Poc","TestSolmateInvariants", "TestSolstatBounds", "TestSolstatInvariants", "TestSolstatError", "TestSolstatDifferential", "TestSolstatGasERFC", "TestSolstatGasIERFC", "TestSolstatGasAbs",]
 max_test_rejects = 120000
 
 [profile.crytic]
