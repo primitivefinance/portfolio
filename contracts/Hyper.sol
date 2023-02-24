@@ -116,11 +116,6 @@ abstract contract HyperVirtual is Objective {
         if (msg.sender != WETH) revert();
     }
 
-    /**  @dev Alternative entrypoint to process operations using encoded calldata transferred directly as `msg.data`. */
-    fallback() external payable lock interactions {
-        Enigma.__startProcess__(_process);
-    }
-
     /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
     function getNetBalance(address token) public view returns (int256) {
         return __account__.getNetBalance(token, address(this));
