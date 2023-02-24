@@ -54,11 +54,6 @@ bytes1 constant INSTRUCTION_JUMP = 0xAA;
 error InvalidJump(uint256 pointer); // 0x80f63bd1
 error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
 
-function __startProcess__(function(bytes calldata) _process) {
-    if (msg.data[0] != INSTRUCTION_JUMP) _process(msg.data);
-    else _jumpProcess(msg.data, _process);
-}
-
 /** @dev  [jump instruction, instructions.length, pointer, ...instruction, pointer, ...etc] */
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
     uint8 length = uint8(data[1]);
