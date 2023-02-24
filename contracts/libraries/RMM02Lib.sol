@@ -43,15 +43,6 @@ library RMM02Lib {
         }
     }
 
-    function getPoolAmountOut(
-        HyperPool memory self,
-        bool sellAsset,
-        uint256 amountIn,
-        uint256 weight
-    ) internal view returns (uint256, uint256) {
-        return (getAmountOut(self, weight, sellAsset, amountIn, 0), 0);
-    }
-
     // p = bi / wi / bo / wo
     // price = (bi / weight ) / (bo / (1 - weight))
     // price = bi * 1 / weight * (1 - weight) / bo

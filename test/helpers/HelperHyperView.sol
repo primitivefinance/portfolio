@@ -175,7 +175,7 @@ contract HelperHyperView {
     ) public view returns (uint256) {
         HyperPool memory pool = getPool(hyper, poolId);
         uint256 passed = IHyperStruct(hyper).getTimePassed(poolId);
-        (uint256 output, ) = pool.getPoolAmountOut(sellAsset, input, passed);
+        uint256 output = pool.getAmountOut(sellAsset, input, passed);
         return output;
     }
 }

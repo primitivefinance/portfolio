@@ -6,7 +6,6 @@ import "./libraries/RMM02Lib.sol";
 
 contract RMM02Portfolio is HyperVirtual {
     using RMM02Lib for HyperPool;
-    using RMM01Lib for RMM01Lib.RMM;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -116,7 +115,7 @@ contract RMM02Portfolio is HyperVirtual {
         uint amountIn
     ) internal view override returns (uint output) {
         uint256 passed = getTimePassed(pool);
-        (output, ) = pool.getPoolAmountOut(sellAsset, amountIn, weight);
+        output = pool.getAmountOut(weight, sellAsset, amountIn, 0);
     }
 
     /** @dev Immediately next invariant value. */

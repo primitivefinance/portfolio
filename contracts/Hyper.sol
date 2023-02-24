@@ -296,33 +296,6 @@ abstract contract HyperVirtual is Objective {
 
     // ===== Swaps ===== //
 
-    function _swapExactIn(
-        Order memory args
-    ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
-        if (args.input == 0) revert ZeroInput();
-
-        uint256 minAmountOut = args.output;
-        bool sellAsset = args.direction == 0;
-
-        HyperPool memory pool = pools[args.poolId];
-        if (block.timestamp > pool.params.maturity()) revert PoolExpired();
-        if (args.useMax == 0) {
-            input = args.input;
-        } else {
-            address tokenInput = sellAsset ? pool.pair.tokenAsset : pool.pair.tokenQuote;
-            input = getBalance(msg.sender, tokenInput);
-        }
-
-        output = _estimateAmountOut(pool, sellAsset, input);
-
-        args.input = input.safeCastTo128();
-        args.output = output.safeCastTo128();
-
-        (poolId, remainder, input, output) = _swap(args);
-
-        if (minAmountOut > args.output) revert SwapLimitReached();
-    }
-
     /** @dev Swaps in direction (0 or 1) input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset). */
     function _swap(
         Order memory args

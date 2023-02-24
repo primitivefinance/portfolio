@@ -16,7 +16,6 @@ pragma solidity 0.8.13;
 import "./Hyper.sol";
 
 contract RMM01Portfolio is HyperVirtual {
-    using RMM01Lib for RMM01Lib.RMM;
     using RMM01Lib for HyperPool;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
@@ -55,9 +54,7 @@ contract RMM01Portfolio is HyperVirtual {
         (, int256 invariant, uint256 updatedTau) = _computeSyncedPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
-        RMM01Lib.RMM memory rmm = pools[poolId].getRMM();
-
-        if (rmm.tau == 0) return (false, invariant);
+        if (pools[poolId].lastTau() == 0) return (false, invariant);
 
         return (true, invariant);
     }
@@ -85,7 +82,12 @@ contract RMM01Portfolio is HyperVirtual {
         uint reserve0,
         uint reserve1
     ) public view override returns (bool, int256 nextInvariant) {
-        int256 nextInvariant = pool.getRMM().invariantOf({R_y: reserve1, R_x: reserve0}); // fix this is inverted?
+        int256 nextInvariant = RMM01Lib.invariantOf({
+            self: pool,
+            r1: reserve0,
+            r2: reserve1,
+            timeRemainingSec: pool.lastTau()
+        }); // fix this is inverted?
 
         int256 liveInvariantWad = invariant.scaleFromWadDownSigned(pool.pair.decimalsQuote); // invariant is denominated in quote token.
         int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(pool.pair.decimalsQuote);
@@ -102,7 +104,7 @@ contract RMM01Portfolio is HyperVirtual {
         if (direction) {
             maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
         } else {
-            maxInput = (pool.getRMM().strike - reserveIn).mulWadDown(liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+            maxInput = (pool.params.maxPrice - reserveIn).mulWadDown(liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
         }
 
         return maxInput;
@@ -112,7 +114,7 @@ contract RMM01Portfolio is HyperVirtual {
         HyperPool memory pool,
         uint price
     ) public view override returns (uint reserve0, uint reserve1) {
-        (reserve1, reserve0) = pool.getRMM().computeReserves(price, 0);
+        (reserve1, reserve0) = RMM01Lib.computeReservesWithPrice({self: pool, priceWad: price, inv: 0});
     }
 
     function estimatePrice(uint64 poolId) public view override returns (uint price) {
@@ -134,14 +136,14 @@ contract RMM01Portfolio is HyperVirtual {
     ) internal view returns (uint256 price, int256 invariant, uint256 updatedTau) {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
-        RMM01Lib.RMM memory curve = pool.getRMM();
-
-        updatedTau = pool.computeTau(block.timestamp);
-        curve.tau = updatedTau;
-
-        (uint256 x, uint256 y) = pool.getAmountsWad();
-        invariant = curve.invariantOf({R_y: y, R_x: x});
-        price = curve.getPriceWithX({R_x: x});
+        uint timeSinceUpdate = getTimePassed(pool);
+        (invariant, updatedTau) = RMM01Lib.getNextInvariant({self: pool, timeSinceUpdate: timeSinceUpdate});
+        price = RMM01Lib.getPriceWithX({
+            R_x: pool.virtualX,
+            stk: pool.params.maxPrice,
+            vol: pool.params.volatility,
+            tau: updatedTau
+        });
     }
 
     // ===== View ===== //
@@ -152,7 +154,7 @@ contract RMM01Portfolio is HyperVirtual {
         uint amountIn
     ) internal view override returns (uint output) {
         uint256 passed = getTimePassed(pool);
-        (output, ) = pool.getPoolAmountOut(sellAsset, amountIn, passed);
+        output = pool.getAmountOut(sellAsset, amountIn, passed);
     }
 
     /** @dev Can be manipulated. */
@@ -173,10 +175,10 @@ contract RMM01Portfolio is HyperVirtual {
         uint256 amountIn
     ) public view override(Objective) returns (uint256 output) {
         HyperPool memory pool = pools[poolId];
-        (output, ) = pool.getPoolAmountOut({
-            sellAsset: sellAsset,
+        output = pool.getAmountOut({
+            direction: sellAsset,
             amountIn: amountIn,
-            timeSinceUpdate: block.timestamp - pool.lastTimestamp // invariant: should not underflow.
+            secondsPassed: block.timestamp - pool.lastTimestamp // invariant: should not underflow.
         });
     }
 }

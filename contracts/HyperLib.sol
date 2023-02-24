@@ -20,7 +20,6 @@ import "./libraries/AssemblyLib.sol" as Assembly;
 import "./libraries/EnigmaLib.sol" as Enigma;
 import "./libraries/AccountLib.sol" as Account;
 
-using RMM01Lib for RMM01Lib.RMM;
 using SafeCastLib for uint256;
 using FixedPointMathLib for uint256;
 using FixedPointMathLib for int256;

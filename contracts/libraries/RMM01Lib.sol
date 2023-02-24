@@ -4,9 +4,6 @@ pragma solidity 0.8.13;
 import "solstat/Invariant.sol";
 import {HyperPool, Iteration, SwapInputTooSmall, Assembly} from "../HyperLib.sol";
 
-using RMM01Lib for RMM01Lib.RMM global;
-
-uint256 constant DOUBLE_WAD = 2 ether;
 uint256 constant PERCENTAGE = 10_000;
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant WAD = 1 ether;
@@ -26,92 +23,126 @@ library RMM01Lib {
     using FixedPointMathLib for int256;
     using {Assembly.scaleFromWadDown, Assembly.scaleToWad, Assembly.scaleFromWadUp} for uint;
 
-    struct RMM {
-        uint256 strike; // wad
-        uint256 sigma; // 10_000 = 100%;
-        uint256 tau; // seconds
-    }
-
     error UndefinedPrice();
     error OverflowWad(int256 wad);
 
-    function getRMM(HyperPool memory self) internal pure returns (RMM memory) {
-        return RMM({strike: self.params.maxPrice, sigma: self.params.volatility, tau: self.lastTau()});
+    function invariantOf(HyperPool memory self, uint r1, uint r2, uint timeRemainingSec) internal pure returns (int) {
+        return
+            Invariant.invariant({
+                R_y: r2,
+                R_x: r1,
+                stk: self.params.maxPrice,
+                vol: convertPercentageToWad(self.params.volatility),
+                tau: convertSecondsToWadYears(timeRemainingSec)
+            });
     }
 
-    // ===== Class Methods ===== //
+    /**
+     * @dev This is an approximation of the amount out and it is not exactly precise to the optimal amount.
+     * @custom:error Maximum absolute error of 1e-6.
+     */
+    function getAmountOut(
+        HyperPool memory self,
+        bool direction,
+        uint amountIn,
+        uint secondsPassed
+    ) internal pure returns (uint) {
+        // Sets data.invariant, data.liquidity, and data.remainder.
+        (Iteration memory data, uint tau) = getSwapData(self, direction, amountIn, secondsPassed); // Declare and assign variables individual to save on gas spent on initializing 0 values.
 
-    function invariantOf(RMM memory args, uint256 R_y, uint256 R_x) internal pure returns (int256) {
-        return Invariant.invariant(R_y, R_x, args.strike, convertPercentageToWad(args.sigma), args.tau);
+        // Uses data.invariant, data.liquidity, and data.remainder to compute next input reserve.
+        // Uses next input reserve to compute output reserve.
+        (uint prevDep, uint nextDep) = computeSwapStep(self, data, direction, tau);
+
+        // Checks to make sure next reserve decreases and computes the difference in WAD.
+        if (nextDep > prevDep) revert SwapInputTooSmall();
+        data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
+
+        // Scale down amounts from WAD.
+        uint256 outputDec = direction ? self.pair.decimalsQuote : self.pair.decimalsAsset;
+        data.output = data.output.scaleFromWadDown(outputDec);
+
+        return data.output;
     }
 
-    function getXWithPrice(RMM memory args, uint256 prc) internal pure returns (uint256 R_x) {
-        R_x = getXWithPrice(prc, args.strike, args.sigma, args.tau);
+    function getSwapData(
+        HyperPool memory self,
+        bool direction,
+        uint amountIn,
+        uint secondsPassed
+    ) internal pure returns (Iteration memory, uint tau) {
+        uint256 fee = self.controller != address(0) ? self.params.priorityFee : self.params.fee;
+
+        Iteration memory data;
+        (data.invariant, tau) = getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
+        (data.virtualX, data.virtualY) = self.getAmountsWad();
+        data.remainder = amountIn.scaleToWad(direction ? self.pair.decimalsAsset : self.pair.decimalsQuote);
+        data.liquidity = self.liquidity;
+        data.feeAmount = (data.remainder * fee) / PERCENTAGE;
+
+        return (data, tau);
     }
 
-    function getPriceWithX(RMM memory args, uint256 R_x) internal pure returns (uint256 prc) {
-        prc = getPriceWithX(R_x, args.strike, args.sigma, args.tau);
+    function computeSwapStep(
+        HyperPool memory self,
+        Iteration memory data,
+        bool direction,
+        uint tau
+    ) internal pure returns (uint prevDep, uint nextDep) {
+        uint prevInd;
+        uint nextInd;
+        uint volatilityWad = convertPercentageToWad(self.params.volatility);
+
+        // if sellAsset, ind = x && dep = y, else ind = y && dep = x
+        if (direction) {
+            (prevInd, prevDep) = (data.virtualX, data.virtualY);
+        } else {
+            (prevDep, prevInd) = (data.virtualX, data.virtualY);
+        }
+
+        nextInd = prevInd + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
+
+        // Compute the output of the swap by computing the difference between the dependent reserves.
+        if (direction)
+            nextDep = Invariant.getY({
+                R_x: nextInd,
+                stk: self.params.maxPrice,
+                vol: volatilityWad,
+                tau: tau,
+                inv: data.invariant
+            });
+        else
+            nextDep = Invariant.getX({
+                R_y: nextInd,
+                stk: self.params.maxPrice,
+                vol: volatilityWad,
+                tau: tau,
+                inv: data.invariant
+            });
     }
 
-    function getYWithX(RMM memory args, uint256 R_x, int256 inv) internal pure returns (uint256 R_y) {
-        R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, inv);
-    }
-
-    function getXWithY(RMM memory args, uint256 R_y, int256 inv) internal pure returns (uint256 R_x) {
-        R_x = getXWithY(R_y, args.strike, args.sigma, args.tau, inv);
-    }
-
-    function computeReserves(
-        RMM memory args,
-        uint256 prc,
+    function computeReservesWithPrice(
+        HyperPool memory self,
+        uint priceWad,
         int128 inv
     ) internal pure returns (uint256 R_y, uint256 R_x) {
-        R_x = getXWithPrice(prc, args.strike, args.sigma, args.tau);
-        R_y = getYWithX(R_x, args.strike, args.sigma, args.tau, inv);
+        uint terminalPriceWad = self.params.maxPrice;
+        uint volatilityFactorWad = convertPercentageToWad(self.params.volatility);
+        uint timeRemainingSec = self.lastTau(); // uses lastTimestamp of self, is it set?
+        R_x = getXWithPrice({prc: priceWad, stk: terminalPriceWad, vol: self.params.volatility, tau: timeRemainingSec});
+        R_y = Invariant.getY({
+            R_x: R_x,
+            stk: terminalPriceWad,
+            vol: volatilityFactorWad,
+            tau: timeRemainingSec,
+            inv: inv
+        });
     }
 
     // ===== Raw Functions ===== //
 
     /**
-     * @dev R_y = tradingFunction(R_x, ...)
-     * @param R_x WAD
-     * @param stk WAD
-     * @param vol percentage
-     * @param tau seconds
-     * @param inv WAD
-     * @return R_y WAD
-     */
-    function getYWithX(
-        uint256 R_x,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau,
-        int256 inv
-    ) internal pure returns (uint256 R_y) {
-        R_y = Invariant.getY(R_x, stk, convertPercentageToWad(vol), tau, inv);
-    }
-
-    /**
-     * @dev R_x = tradingFunction(R_y, ...)
-     * @param R_y WAD
-     * @param stk WAD
-     * @param vol percentage
-     * @param tau seconds
-     * @param inv WAD
-     * @return R_x WAD
-     */
-    function getXWithY(
-        uint256 R_y,
-        uint256 stk,
-        uint256 vol,
-        uint256 tau,
-        int256 inv
-    ) internal pure returns (uint256 R_x) {
-        R_x = Invariant.getX(R_y, stk, convertPercentageToWad(vol), tau, inv);
-    }
-
-    /**
-     * @dev Used in `getAmounts` to compute the virtual amount of assets at the pool's price.
+     * @dev Used in `getAmounts` to compute the virtual amount of assets at the self's price.
      * @param prc WAD
      * @param stk WAD
      * @param vol percentage
@@ -185,106 +216,15 @@ library RMM01Lib {
 
     // ===== Swaps ===== //
 
-    function getMaxSwapAssetInWad(HyperPool memory self) internal pure returns (uint256) {
-        (uint256 x, ) = self.getAmountsWad();
-        uint256 maxInput = FixedPointMathLib.WAD - x;
-        maxInput = maxInput.mulWadDown(self.liquidity);
-        return maxInput.scaleFromWadDown(self.pair.decimalsAsset);
-    }
-
-    function getMaxSwapQuoteInWad(HyperPool memory self) internal pure returns (uint256) {
-        RMM01Lib.RMM memory rmm = getRMM(self);
-        (, uint256 y) = self.getAmountsWad();
-        uint256 maxInput = rmm.strike - y;
-        maxInput = maxInput.mulWadDown(self.liquidity);
-        return maxInput.scaleFromWadDown(self.pair.decimalsQuote);
-    }
-
     function getNextInvariant(
         HyperPool memory self,
         uint256 timeSinceUpdate
     ) internal pure returns (int128 invariant, uint256 tau) {
-        RMM01Lib.RMM memory curve = getRMM(self);
+        tau = self.lastTau();
 
-        curve.tau -= timeSinceUpdate; // update to next curve at new time.
+        tau -= timeSinceUpdate; // update to next curve at new time.
         (uint256 x, uint256 y) = self.getAmountsWad();
 
-        invariant = int128(curve.invariantOf(y, x)); // todo: fix casting
-        tau = curve.tau;
-    }
-
-    /**
-     * @dev This is an approximation of the amount out and it is not exactly precise to the optimal amount.
-     * @custom:error Maximum absolute error of 1e-6.
-     */
-    function getPoolAmountOut(
-        HyperPool memory self,
-        bool sellAsset,
-        uint256 amountIn,
-        uint256 timeSinceUpdate
-    ) internal pure returns (uint256, uint256) {
-        Iteration memory data;
-        RMM01Lib.RMM memory liveCurve = getRMM(self);
-        RMM01Lib.RMM memory nextCurve = liveCurve;
-
-        {
-            // fill in data
-            data.remainder = amountIn.scaleToWad(sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote);
-            data.liquidity = self.liquidity;
-            (data.virtualX, data.virtualY) = self.getAmountsWad();
-            nextCurve.tau -= timeSinceUpdate;
-            data.invariant = nextCurve.invariantOf(data.virtualY, data.virtualX);
-        }
-
-        uint256 fee = self.controller != address(0) ? self.params.priorityFee : self.params.fee;
-        uint256 prevInd;
-        uint256 prevDep;
-        uint256 nextInd;
-        uint256 nextDep;
-        {
-            uint256 maxInput;
-            uint256 delInput;
-
-            // if sellAsset, ind = x && dep = y, else ind = y && dep = x
-            if (sellAsset) {
-                (prevInd, prevDep) = (data.virtualX, data.virtualY);
-                maxInput = (FixedPointMathLib.WAD - prevInd).mulWadDown(data.liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
-            } else {
-                (prevDep, prevInd) = (data.virtualX, data.virtualY);
-                maxInput = (liveCurve.strike - prevInd).mulWadDown(data.liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
-            }
-
-            data.feeAmount = ((data.remainder > maxInput ? maxInput : data.remainder) * fee) / 10_000;
-            delInput = data.remainder > maxInput ? maxInput : data.remainder;
-            nextInd = prevInd + (delInput - data.feeAmount).divWadDown(data.liquidity);
-
-            // Compute the output of the swap by computing the difference between the dependent reserves.
-            if (sellAsset) nextDep = nextCurve.getYWithX(nextInd, data.invariant);
-            else nextDep = nextCurve.getXWithY(nextInd, data.invariant);
-
-            data.remainder -= delInput;
-            data.input += delInput;
-
-            if (nextDep > prevDep) revert SwapInputTooSmall();
-            data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
-        }
-
-        {
-            // Scale down amounts from WAD.
-            uint256 inputDec;
-            uint256 outputDec;
-            if (sellAsset) {
-                inputDec = self.pair.decimalsAsset;
-                outputDec = self.pair.decimalsQuote;
-            } else {
-                inputDec = self.pair.decimalsQuote;
-                outputDec = self.pair.decimalsAsset;
-            }
-
-            data.input = data.input.scaleFromWadUp(inputDec);
-            data.output = data.output.scaleFromWadDown(outputDec);
-        }
-
-        return (data.output, data.remainder);
+        invariant = int128(invariantOf({self: self, r1: x, r2: y, timeRemainingSec: tau})); // todo: fix casting
     }
 }
