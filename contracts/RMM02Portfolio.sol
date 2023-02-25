@@ -35,7 +35,7 @@ contract RMM02Portfolio is HyperVirtual {
 
     uint public weight = 0.5 ether;
 
-    function beforeSwap(uint64 poolId) internal override returns (bool, int256) {
+    function beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
         HyperPool storage pool = pools[poolId];
         int256 invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
         pool.syncPoolTimestamp(block.timestamp);
@@ -102,20 +102,15 @@ contract RMM02Portfolio is HyperVirtual {
         (reserve0, reserve1) = pool.getAmountsWad();
     }
 
+    function getVirtualReservesWad(uint64 poolId) public view override returns (uint reserve0, uint reserve1) {
+        (reserve0, reserve1) = pools[poolId].getAmountsWad();
+    }
+
     // ===== View ===== //
 
     /** @dev Can be manipulated. */
     function getLatestPrice(uint64 poolId) public view returns (uint256 price) {
         price = pools[poolId].computePrice(weight);
-    }
-
-    function _estimateAmountOut(
-        HyperPool memory pool,
-        bool sellAsset,
-        uint amountIn
-    ) internal view override returns (uint output) {
-        uint256 passed = getTimePassed(pool);
-        output = pool.getAmountOut(weight, sellAsset, amountIn, 0);
     }
 
     /** @dev Immediately next invariant value. */

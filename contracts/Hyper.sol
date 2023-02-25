@@ -121,11 +121,6 @@ abstract contract HyperVirtual is Objective {
         return __account__.balances[owner][token];
     }
 
-    /** @dev Transient stored tokens */
-    function getWarm() public view returns (address[] memory warm) {
-        return __account__.warm;
-    }
-
     // ===== Actions ===== //
 
     /// @inheritdoc IHyperActions
@@ -332,7 +327,7 @@ abstract contract HyperVirtual is Objective {
 
         Iteration memory iteration;
         {
-            (bool success, int256 invariant) = beforeSwap(args.poolId);
+            (bool success, int256 invariant) = beforeSwapEffects(args.poolId);
             if (!success) revert PoolExpired(); // todo: update for generalized error
 
             pool = pools[args.poolId]; // refetches pool
@@ -355,7 +350,7 @@ abstract contract HyperVirtual is Objective {
                 output: output
             });
 
-            (iteration.virtualX, iteration.virtualY) = getReserves(pool);
+            (iteration.virtualX, iteration.virtualY) = getVirtualReservesWad(args.poolId);
         }
 
         if (iteration.output == 0) revert ZeroOutput();
@@ -487,7 +482,7 @@ abstract contract HyperVirtual is Objective {
     ) internal returns (uint256 timeDelta) {
         HyperPool storage pool = pools[poolId];
 
-        timeDelta = getTimePassed(poolId);
+        timeDelta = _getTimePassed(pool);
 
         if (pool.virtualX != nextVirtualX) pool.virtualX = nextVirtualX.safeCastTo128();
         if (pool.virtualY != nextVirtualY) pool.virtualY = nextVirtualY.safeCastTo128();
@@ -729,11 +724,7 @@ abstract contract HyperVirtual is Objective {
         delete _payments;
     }
 
-    function getTimePassed(uint64 poolId) public view returns (uint256) {
-        return getTimePassed(pools[poolId]);
-    }
-
-    function getTimePassed(HyperPool memory pool) public view returns (uint256) {
+    function _getTimePassed(HyperPool memory pool) internal view returns (uint256) {
         return block.timestamp - pool.lastTimestamp;
     }
 

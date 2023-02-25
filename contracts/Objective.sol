@@ -9,9 +9,12 @@ import "./interfaces/IERC20.sol";
  * @notice Virtual interface to implement the logic for a "Portfolio".
  */
 abstract contract Objective is IHyper {
+    // ===== Internal Effects ===== //
     function afterSwapEffects(uint64 poolId, Iteration memory iteration) internal virtual returns (bool);
 
-    function beforeSwap(uint64 poolId) internal virtual returns (bool success, int256 invariant);
+    function beforeSwapEffects(uint64 poolId) internal virtual returns (bool success, int256 invariant);
+
+    // ===== View ===== //
 
     function canUpdatePosition(
         HyperPool memory pool,
@@ -42,13 +45,9 @@ abstract contract Objective is IHyper {
 
     function estimatePrice(uint64 poolId) public view virtual returns (uint price);
 
-    function getReserves(HyperPool memory pool) public view virtual returns (uint reserve0, uint reserve1);
+    function getVirtualReservesWad(uint64 poolId) public view virtual returns (uint reserve0, uint reserve1);
 
-    function _estimateAmountOut(
-        HyperPool memory pool,
-        bool sellAsset,
-        uint amountIn
-    ) internal view virtual returns (uint output);
+    function getReserves(HyperPool memory pool) public view virtual returns (uint reserve0, uint reserve1);
 
     function getAmountOut(
         uint64 poolId,

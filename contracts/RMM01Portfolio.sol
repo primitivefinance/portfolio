@@ -50,8 +50,8 @@ contract RMM01Portfolio is HyperVirtual {
         return true;
     }
 
-    function beforeSwap(uint64 poolId) internal override returns (bool, int256) {
-        (, int256 invariant, uint256 updatedTau) = _computeSyncedPrice(poolId);
+    function beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
+        (, int256 invariant, ) = _computeSyncedPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
         if (pools[poolId].lastTau() == 0) return (false, invariant);
@@ -122,7 +122,11 @@ contract RMM01Portfolio is HyperVirtual {
     }
 
     function getReserves(HyperPool memory pool) public view override returns (uint reserve0, uint reserve1) {
-        (reserve0, reserve1) = pool.getAmountsWad();
+        (reserve0, reserve1) = pool.getPoolAmounts();
+    }
+
+    function getVirtualReservesWad(uint64 poolId) public view override returns (uint reserve0, uint reserve1) {
+        (reserve0, reserve1) = pools[poolId].getAmountsWad();
     }
 
     /**
@@ -136,7 +140,7 @@ contract RMM01Portfolio is HyperVirtual {
     ) internal view returns (uint256 price, int256 invariant, uint256 updatedTau) {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
-        uint timeSinceUpdate = getTimePassed(pool);
+        uint timeSinceUpdate = _getTimePassed(pool);
         (invariant, updatedTau) = RMM01Lib.getNextInvariant({self: pool, timeSinceUpdate: timeSinceUpdate});
         price = RMM01Lib.getPriceWithX({
             R_x: pool.virtualX,
@@ -147,15 +151,6 @@ contract RMM01Portfolio is HyperVirtual {
     }
 
     // ===== View ===== //
-
-    function _estimateAmountOut(
-        HyperPool memory pool,
-        bool sellAsset,
-        uint amountIn
-    ) internal view override returns (uint output) {
-        uint256 passed = getTimePassed(pool);
-        output = pool.getAmountOut(sellAsset, amountIn, passed);
-    }
 
     /** @dev Can be manipulated. */
     function getLatestPrice(uint64 poolId) public view returns (uint256 price) {
