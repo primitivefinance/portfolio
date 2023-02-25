@@ -193,11 +193,18 @@ abstract contract HyperVirtual is Objective {
     // ===== Internal ===== //
 
     function _claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) internal {
-        HyperPool memory pool = pools[poolId];
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
-        pos.syncPositionFees(pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote, pool.invariantGrowthGlobal);
+        (uint growthAsset, uint growthQuote, uint growthInvariant, address asset, address quote) = (
+            pools[poolId].feeGrowthGlobalAsset,
+            pools[poolId].feeGrowthGlobalQuote,
+            pools[poolId].invariantGrowthGlobal,
+            pools[poolId].pair.tokenAsset,
+            pools[poolId].pair.tokenQuote
+        );
+
+        pos.syncPositionFees(growthAsset, growthQuote, growthInvariant);
 
         // 2^256 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
         uint256 claimedAssets = deltaAsset == type(uint256).max ? pos.tokensOwedAsset : deltaAsset;
@@ -206,10 +213,10 @@ abstract contract HyperVirtual is Objective {
         pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
         pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
 
-        if (claimedAssets > 0) _applyCredit(pool.pair.tokenAsset, claimedAssets);
-        if (claimedQuotes > 0) _applyCredit(pool.pair.tokenQuote, claimedQuotes);
+        if (claimedAssets > 0) _applyCredit(asset, claimedAssets);
+        if (claimedQuotes > 0) _applyCredit(quote, claimedQuotes);
 
-        emit Collect(poolId, msg.sender, claimedAssets, pool.pair.tokenAsset, claimedQuotes, pool.pair.tokenQuote);
+        emit Collect(poolId, msg.sender, claimedAssets, asset, claimedQuotes, quote);
     }
 
     /** @dev Increases virtal reserves and liquidity. Debits `msg.sender`. */
@@ -218,21 +225,22 @@ abstract contract HyperVirtual is Objective {
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
-        HyperPool memory pool = pools[poolId];
-        if (!checkPool(pool)) revert NonExistentPool(poolId);
+        if (!checkPool(pools[poolId])) revert NonExistentPool(poolId);
+
+        (address asset, address quote) = (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
 
         if (useMax) {
             deltaLiquidity = SafeCastLib.safeCastTo128(
                 getMaxLiquidity({
                     poolId: poolId,
-                    amount0: getBalance(msg.sender, pool.pair.tokenAsset),
-                    amount1: getBalance(msg.sender, pool.pair.tokenQuote)
+                    amount0: getBalance(msg.sender, asset),
+                    amount1: getBalance(msg.sender, quote)
                 })
             );
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = getPoolLiquidityDeltas(pool, Assembly.toInt128(deltaLiquidity)); // note: rounds up.
+        (deltaAsset, deltaQuote) = getLiquidityDeltas(poolId, Assembly.toInt128(deltaLiquidity)); // note: rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
@@ -241,13 +249,14 @@ abstract contract HyperVirtual is Objective {
             timestamp: block.timestamp,
             deltaAsset: deltaAsset,
             deltaQuote: deltaQuote,
-            tokenAsset: pool.pair.tokenAsset,
-            tokenQuote: pool.pair.tokenQuote,
+            tokenAsset: asset,
+            tokenQuote: quote,
             deltaLiquidity: Assembly.toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
-        emit Allocate(poolId, pool.pair.tokenAsset, pool.pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
+
+        emit Allocate(poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     /** @dev Reduces virtual reserves and liquidity. Credits `msg.sender`. */
@@ -256,13 +265,13 @@ abstract contract HyperVirtual is Objective {
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
+        if (!checkPool(pools[poolId])) revert NonExistentPool(poolId);
+        (address asset, address quote) = (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
+
         if (useMax) deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
+
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-
-        HyperPool memory pool = pools[poolId];
-        if (!checkPool(pool)) revert NonExistentPool(poolId);
-
-        (deltaAsset, deltaQuote) = getPoolLiquidityDeltas(pool, -Assembly.toInt128(deltaLiquidity)); // rounds down
+        (deltaAsset, deltaQuote) = getLiquidityDeltas(poolId, -Assembly.toInt128(deltaLiquidity)); // rounds down
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -270,13 +279,14 @@ abstract contract HyperVirtual is Objective {
             timestamp: block.timestamp,
             deltaAsset: deltaAsset,
             deltaQuote: deltaQuote,
-            tokenAsset: pool.pair.tokenAsset,
-            tokenQuote: pool.pair.tokenQuote,
+            tokenAsset: asset,
+            tokenQuote: quote,
             deltaLiquidity: -Assembly.toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
-        emit Unallocate(poolId, pool.pair.tokenAsset, pool.pair.tokenQuote, deltaAsset, deltaQuote, deltaLiquidity);
+
+        emit Unallocate(poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     function _changeLiquidity(
