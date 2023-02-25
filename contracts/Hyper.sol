@@ -196,12 +196,13 @@ abstract contract HyperVirtual is Objective {
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
+        HyperPool memory pool = pools[poolId];
         (uint growthAsset, uint growthQuote, uint growthInvariant, address asset, address quote) = (
-            pools[poolId].feeGrowthGlobalAsset,
-            pools[poolId].feeGrowthGlobalQuote,
-            pools[poolId].invariantGrowthGlobal,
-            pools[poolId].pair.tokenAsset,
-            pools[poolId].pair.tokenQuote
+            pool.feeGrowthGlobalAsset,
+            pool.feeGrowthGlobalQuote,
+            pool.invariantGrowthGlobal,
+            pool.pair.tokenAsset,
+            pool.pair.tokenQuote
         );
 
         pos.syncPositionFees(growthAsset, growthQuote, growthInvariant);

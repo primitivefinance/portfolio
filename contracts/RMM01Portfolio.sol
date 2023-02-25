@@ -14,6 +14,7 @@ pragma solidity 0.8.13;
  */
 
 import "./Hyper.sol";
+import "./libraries/RMM01Lib.sol";
 
 contract RMM01Portfolio is HyperVirtual {
     using RMM01Lib for HyperPool;
@@ -37,11 +38,9 @@ contract RMM01Portfolio is HyperVirtual {
     // Implemented
 
     function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
-        HyperPool storage pool = pools[poolId];
-
         int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
         // Apply priority invariant growth.
-        if (msg.sender == pool.controller) {
+        if (msg.sender == pools[poolId].controller) {
             int256 delta = iteration.invariant - liveInvariantWad;
             uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
             if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity); // todo: don't like this setting internal _state...
