@@ -106,6 +106,8 @@ abstract contract HyperVirtual is Objective {
         if (msg.sender != WETH) revert();
     }
 
+    // ===== Account Getters ===== //
+
     /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
     function getNetBalance(address token) public view returns (int256) {
         return __account__.getNetBalance(token, address(this));
@@ -121,7 +123,7 @@ abstract contract HyperVirtual is Objective {
         return __account__.balances[owner][token];
     }
 
-    // ===== Actions ===== //
+    // ===== External Actions ===== //
 
     /// @inheritdoc IHyperActions
     function deposit() external payable override lock {
@@ -188,7 +190,7 @@ abstract contract HyperVirtual is Objective {
         emit ChangeParameters(poolId, priorityFee, fee, jit);
     }
 
-    // ===== Effects ===== //
+    // ===== Internal ===== //
 
     function _claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) internal {
         HyperPool memory pool = pools[poolId];
@@ -291,7 +293,7 @@ abstract contract HyperVirtual is Objective {
             pool.invariantGrowthGlobal
         );
 
-        bool canUpdate = canUpdatePosition(pool, position, args.deltaLiquidity);
+        bool canUpdate = checkPosition(pool, position, args.deltaLiquidity);
         if (!canUpdate) revert JitLiquidity(0x16); // todo: fix, hardcoded to pass test `testUnallocatePositionJitPolicyReverts`
 
         position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
@@ -307,8 +309,6 @@ abstract contract HyperVirtual is Objective {
             _increaseReserves(quote, args.deltaQuote);
         }
     }
-
-    // ===== Swaps ===== //
 
     /** @dev Swaps in direction (0 or 1) input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset). */
     function _swap(
@@ -327,7 +327,7 @@ abstract contract HyperVirtual is Objective {
 
         Iteration memory iteration;
         {
-            (bool success, int256 invariant) = beforeSwapEffects(args.poolId);
+            (bool success, int256 invariant) = _beforeSwapEffects(args.poolId);
             if (!success) revert PoolExpired(); // todo: update for generalized error
 
             pool = pools[args.poolId]; // refetches pool
@@ -350,7 +350,7 @@ abstract contract HyperVirtual is Objective {
                 output: output
             });
 
-            (iteration.virtualX, iteration.virtualY) = getVirtualReservesWad(args.poolId);
+            (iteration.virtualX, iteration.virtualY) = getVirtualReservesPerLiquidity(args.poolId);
         }
 
         if (iteration.output == 0) revert ZeroOutput();
@@ -433,7 +433,7 @@ abstract contract HyperVirtual is Objective {
             iteration.output = iteration.output.scaleFromWadDown(outputDec);
         }
 
-        afterSwapEffects(args.poolId, iteration); // todo: This needs to be locked down, I don't like it in its current state.
+        _afterSwapEffects(args.poolId, iteration); // todo: This needs to be locked down, I don't like it in its current state.
 
         // Apply pool effects.
         _syncPool(
@@ -451,7 +451,7 @@ abstract contract HyperVirtual is Objective {
 
         {
             uint64 id = args.poolId;
-            uint256 price = estimatePrice(id); // todo: getLatestPrice(id);
+            uint256 price = getLatestEstimatedPrice(id); // todo: getLatestPrice(id);
             emit Swap(
                 id,
                 price,
@@ -493,8 +493,6 @@ abstract contract HyperVirtual is Objective {
         pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
         pool.invariantGrowthGlobal = Assembly.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
     }
-
-    // ===== Initializing Pools ===== //
 
     function _createPair(address asset, address quote) internal returns (uint24 pairId) {
         if (asset == quote) revert SameTokenError();
@@ -724,12 +722,19 @@ abstract contract HyperVirtual is Objective {
         delete _payments;
     }
 
+    // ===== Internal View ===== //
+
     function _getTimePassed(HyperPool memory pool) internal view returns (uint256) {
         return block.timestamp - pool.lastTimestamp;
     }
 
-    function getVirtualReserves(uint64 poolId) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
-        return pools[poolId].getPoolVirtualReserves();
+    // ===== Public View ===== //
+
+    function getLiquidityDeltas(
+        uint64 poolId,
+        int128 deltaLiquidity
+    ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
+        return pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
     }
 
     function getMaxLiquidity(
@@ -740,14 +745,13 @@ abstract contract HyperVirtual is Objective {
         return pools[poolId].getPoolMaxLiquidity(amount0, amount1);
     }
 
-    function getLiquidityDeltas(
-        uint64 poolId,
-        int128 deltaLiquidity
-    ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
-        return pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
+    function getReserves(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
+        return pools[poolId].getPoolAmounts();
     }
 
-    function getAmounts(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
-        return pools[poolId].getPoolAmounts();
+    function getVirtualReservesPerLiquidity(
+        uint64 poolId
+    ) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
+        return pools[poolId].getPoolVirtualReserves();
     }
 }

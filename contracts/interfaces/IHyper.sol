@@ -106,11 +106,24 @@ interface IHyperEvents {
 }
 
 interface IHyperGetters {
-    function getNetBalance(address token) external view returns (int256);
+    // ===== Account Getters ===== //
+    function getBalance(address owner, address token) external view returns (uint256);
 
     function getReserve(address token) external view returns (uint256);
 
-    function getBalance(address owner, address token) external view returns (uint256);
+    function getNetBalance(address token) external view returns (int256);
+
+    // ===== State Getters ===== //
+
+    function VERSION() external pure returns (string memory);
+
+    function WETH() external view returns (address);
+
+    function getPairNonce() external view returns (uint24);
+
+    function getPoolNonce() external view returns (uint32);
+
+    function getPairId(address asset, address quote) external view returns (uint24 pairId);
 
     function pairs(
         uint24 pairId
@@ -154,17 +167,12 @@ interface IHyperGetters {
             uint128 invariantOwed
         );
 
-    function getPairNonce() external view returns (uint24);
+    // ===== Hyper View ===== //
 
-    function getPoolNonce() external view returns (uint32);
-
-    function getPairId(address asset, address quote) external view returns (uint24 pairId);
-
-    function getAmounts(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
-
-    function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) external view returns (uint256);
-
-    function getVirtualReserves(uint64 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
+    function getLiquidityDeltas(
+        uint64 poolId,
+        int128 deltaLiquidity
+    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
     function getMaxLiquidity(
         uint64 poolId,
@@ -172,12 +180,25 @@ interface IHyperGetters {
         uint256 deltaQuote
     ) external view returns (uint128 deltaLiquidity);
 
-    function getLiquidityDeltas(
-        uint64 poolId,
-        int128 deltaLiquidity
+    /**
+     * @dev Amount of tokens received if all pool liquidity was removed.
+     */
+    function getReserves(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    /**
+     * @dev Amount of tokens scaled to WAD units per WAD liquidity.
+     */
+    function getVirtualReservesPerLiquidity(
+        uint64 poolId
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
-    function getLatestPrice(uint64 poolId) external view returns (uint256 price);
+    // ===== Objective View ===== //
+
+    // todo: ... missing some which use structs as args
+
+    function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) external view returns (uint256);
+
+    function getLatestEstimatedPrice(uint64 poolId) external view returns (uint256 price);
 }
 
 interface IHyperActions {

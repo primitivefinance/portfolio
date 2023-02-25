@@ -192,7 +192,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     function checkVirtualInvariant() internal {
         // HyperPool memory pool = getPool(address(__hyper__), __poolId__);
         // TODO: Breaks when we call this function on a pool with zero liquidity...
-        (uint256 dAsset, uint256 dQuote) = __hyper__.getVirtualReserves(__poolId__);
+        (uint256 dAsset, uint256 dQuote) = __hyper__.getReserves(__poolId__);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 

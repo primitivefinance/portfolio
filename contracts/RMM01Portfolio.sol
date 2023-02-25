@@ -36,7 +36,7 @@ contract RMM01Portfolio is HyperVirtual {
 
     // Implemented
 
-    function afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
+    function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
         HyperPool storage pool = pools[poolId];
 
         int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
@@ -50,7 +50,7 @@ contract RMM01Portfolio is HyperVirtual {
         return true;
     }
 
-    function beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
+    function _beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
         (, int256 invariant, ) = _computeSyncedPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
@@ -59,7 +59,7 @@ contract RMM01Portfolio is HyperVirtual {
         return (true, invariant);
     }
 
-    function canUpdatePosition(
+    function checkPosition(
         HyperPool memory pool,
         HyperPosition memory position,
         int delta
@@ -117,16 +117,8 @@ contract RMM01Portfolio is HyperVirtual {
         (reserve1, reserve0) = RMM01Lib.computeReservesWithPrice({self: pool, priceWad: price, inv: 0});
     }
 
-    function estimatePrice(uint64 poolId) public view override returns (uint price) {
-        price = getLatestPrice(poolId);
-    }
-
-    function getReserves(HyperPool memory pool) public view override returns (uint reserve0, uint reserve1) {
-        (reserve0, reserve1) = pool.getPoolAmounts();
-    }
-
-    function getVirtualReservesWad(uint64 poolId) public view override returns (uint reserve0, uint reserve1) {
-        (reserve0, reserve1) = pools[poolId].getAmountsWad();
+    function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint price) {
+        (price, , ) = _computeSyncedPrice(poolId);
     }
 
     /**
@@ -148,20 +140,6 @@ contract RMM01Portfolio is HyperVirtual {
             vol: pool.params.volatility,
             tau: updatedTau
         });
-    }
-
-    // ===== View ===== //
-
-    /** @dev Can be manipulated. */
-    function getLatestPrice(uint64 poolId) public view returns (uint256 price) {
-        (price, , ) = _computeSyncedPrice(poolId);
-    }
-
-    /** @dev Immediately next invariant value. */
-    function getInvariant(uint64 poolId) public view returns (int256 invariant) {
-        HyperPool memory pool = pools[poolId];
-        uint elapsed = block.timestamp - pool.lastTimestamp;
-        (invariant, ) = pool.getNextInvariant(elapsed);
     }
 
     function getAmountOut(
