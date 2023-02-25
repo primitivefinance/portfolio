@@ -24,6 +24,7 @@ src = 'test/'       # not default
 gas_reports = ["*"]
 optimizer_runs = 0
 ffi = true
+via_ir = true
 fuzz_runs = 256
 no_match_path = '/test/foundry/' # thanks chat gpt #["Poc","TestSolmateInvariants", "TestSolstatBounds", "TestSolstatInvariants", "TestSolstatError", "TestSolstatDifferential", "TestSolstatGasERFC", "TestSolstatGasIERFC", "TestSolstatGasAbs",]
 max_test_rejects = 120000

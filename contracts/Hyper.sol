@@ -27,7 +27,7 @@ abstract contract HyperVirtual is Objective {
     using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
 
     function VERSION() public pure returns (string memory) {
-        assembly {
+        assembly ("memory-safe") {
             // Load 0x20 (32) in memory at slot 0x00, this corresponds to the
             // offset location of the next data.
             mstore(0x00, 0x20)
