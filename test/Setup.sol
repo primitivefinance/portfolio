@@ -43,6 +43,8 @@ contract Setup is Test {
      */
     SubjectsState private _subjects;
 
+    receive() external payable {}
+
     /**
      * @notice Deploys WETH, subject, and three tokens. Creates a default pool.
      * @dev Initializes the actor, subject, and poolId ghost state.
@@ -189,6 +191,20 @@ contract Setup is Test {
             .generate(address(subject()));
 
         set_pool_id(poolId);
+        _;
+    }
+
+    /**
+     * @dev Sets internal default jit protection seconds value to 0.
+     */
+    modifier noJit() {
+        uint LIQUIDITY_POLICY_STORAGE_SLOT = 11;
+        vm.store(address(subject()), bytes32(LIQUIDITY_POLICY_STORAGE_SLOT), bytes32(0));
+        _;
+    }
+
+    modifier allocateSome(uint128 amt) {
+        subject().multiprocess(EnigmaLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));
         _;
     }
 

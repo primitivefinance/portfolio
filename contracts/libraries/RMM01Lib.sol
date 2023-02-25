@@ -33,7 +33,7 @@ library RMM01Lib {
                 R_x: r1,
                 stk: self.params.maxPrice,
                 vol: convertPercentageToWad(self.params.volatility),
-                tau: convertSecondsToWadYears(timeRemainingSec)
+                tau: timeRemainingSec
             });
     }
 

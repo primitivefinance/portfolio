@@ -578,8 +578,10 @@ abstract contract HyperVirtual is Objective {
     // ===== Accounting System ===== //
 
     function _deposit() internal {
-        __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
-        emit Deposit(msg.sender, msg.value);
+        if (msg.value > 0) {
+            __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
+            emit Deposit(msg.sender, msg.value);
+        }
     }
 
     /**
