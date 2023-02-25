@@ -681,7 +681,7 @@ abstract contract HyperVirtual is Objective {
 
      */
     function _settlement() internal {
-        if (__account__.settled) revert Account.AlreadySettled();
+        //if (__account__.settled) revert Account.AlreadySettled();
 
         address[] memory tokens = __account__.warm;
         uint256 loops = tokens.length;

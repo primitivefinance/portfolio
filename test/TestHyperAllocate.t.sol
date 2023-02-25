@@ -42,8 +42,7 @@ contract TestHyperAllocate is Setup {
 
         uint prev_asset = ghost().reserve(ghost().asset().to_addr());
         uint prev_quote = ghost().reserve(ghost().quote().to_addr());
-        uint delta0;
-        uint delta1;
+        (uint delta0, uint delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
         subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
         uint post_asset = ghost().reserve(ghost().asset().to_addr());
         uint post_quote = ghost().reserve(ghost().quote().to_addr());
@@ -69,8 +68,7 @@ contract TestHyperAllocate is Setup {
 
         uint prev_asset = ghost().reserve(ghost().asset().to_addr());
         uint prev_quote = ghost().reserve(ghost().quote().to_addr());
-        uint delta0;
-        uint delta1;
+        (uint delta0, uint delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
         subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
         uint post_asset = ghost().reserve(ghost().asset().to_addr());
         uint post_quote = ghost().reserve(ghost().quote().to_addr());
@@ -87,8 +85,7 @@ contract TestHyperAllocate is Setup {
 
         uint prev_asset = ghost().asset().to_token().balanceOf(address(subject()));
         uint prev_quote = ghost().quote().to_token().balanceOf(address(subject()));
-        uint delta0;
-        uint delta1;
+        (uint delta0, uint delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
         subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
         uint post_asset = ghost().asset().to_token().balanceOf(address(subject()));
         uint post_quote = ghost().quote().to_token().balanceOf(address(subject()));

@@ -122,7 +122,9 @@ library Configs {
             );
 
             bytes memory payload = EnigmaLib.encodeJumpInstruction(data);
-            (bool success, bytes memory result) = hyper.call(payload); // todo: replace with try hyper.multiprocess(payload) {} catch (bytes memory err) {}
+
+            IHyper(hyper).multiprocess(payload);
+
             bool controlled = self.controller != address(0);
             poolId = EnigmaLib.encodePoolId(
                 IHyperGetters(hyper).getPairNonce(),
@@ -130,9 +132,9 @@ library Configs {
                 IHyperGetters(hyper).getPoolNonce()
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
-        } /*  else {
-            poolId = IHyper(hyper).createPool({
-                pairId: pairId,
+        } else {
+            bytes memory payload = EnigmaLib.encodeCreatePool({
+                pairId: pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
                 controller: self.controller,
                 priorityFee: self.priorityFeeBps,
                 fee: self.feeBps,
@@ -142,6 +144,7 @@ library Configs {
                 maxPrice: self.terminalPriceWad,
                 price: self.reportedPriceWad
             });
-        } */
+            IHyper(hyper).multiprocess(payload);
+        }
     }
 }
