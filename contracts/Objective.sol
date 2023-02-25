@@ -23,22 +23,18 @@ abstract contract Objective is IHyper {
     /**
      * @dev Conditional check made before changing `pool.liquidity` and `position.freeLiquidity`..
      */
-    function checkPosition(
-        HyperPool memory pool,
-        HyperPosition memory position,
-        int256 delta
-    ) public view virtual returns (bool);
+    function checkPosition(uint64 poolId, address owner, int256 delta) public view virtual returns (bool);
 
     /**
      * @dev Conditional check before interacting with a pool.
      */
-    function checkPool(HyperPool memory pool) public view virtual returns (bool);
+    function checkPool(uint64 poolId) public view virtual returns (bool);
 
     /**
      * @dev Computes the invariant given `reserve0` and `reserve1` and returns the invariant condition status.
      */
     function checkInvariant(
-        HyperPool memory pool,
+        uint64 poolId,
         int256 invariant,
         uint reserve0,
         uint reserve1
@@ -48,7 +44,7 @@ abstract contract Objective is IHyper {
      * @dev Computes the max amount of tokens that can be swapped into the pool.
      */
     function computeMaxInput(
-        HyperPool memory pool,
+        uint64 poolId,
         bool direction,
         uint reserveIn,
         uint liquidity
@@ -58,7 +54,7 @@ abstract contract Objective is IHyper {
      * @dev Computes the reserves in WAD units using a `price`.
      */
     function computeReservesFromPrice(
-        HyperPool memory pool,
+        uint64 poolId,
         uint price
     ) public view virtual returns (uint reserve0, uint reserve1);
 

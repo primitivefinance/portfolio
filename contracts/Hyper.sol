@@ -226,7 +226,7 @@ abstract contract HyperVirtual is Objective {
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
-        if (!checkPool(pools[poolId])) revert NonExistentPool(poolId);
+        if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
         (address asset, address quote) = (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
 
@@ -266,7 +266,7 @@ abstract contract HyperVirtual is Objective {
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
-        if (!checkPool(pools[poolId])) revert NonExistentPool(poolId);
+        if (!checkPool(poolId)) revert NonExistentPool(poolId);
         (address asset, address quote) = (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
 
         if (useMax) deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
@@ -304,7 +304,7 @@ abstract contract HyperVirtual is Objective {
             pool.invariantGrowthGlobal
         );
 
-        bool canUpdate = checkPosition(pool, position, args.deltaLiquidity);
+        bool canUpdate = checkPosition(args.poolId, args.owner, args.deltaLiquidity);
         if (!canUpdate) revert JitLiquidity(0x16); // todo: fix, hardcoded to pass test `testUnallocatePositionJitPolicyReverts`
 
         position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
@@ -328,7 +328,7 @@ abstract contract HyperVirtual is Objective {
         if (args.input == 0) revert ZeroInput();
 
         HyperPool storage pool = pools[args.poolId];
-        if (!checkPool(pool)) revert NonExistentPool(args.poolId);
+        if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
         _state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
         _state.fee = msg.sender == pool.controller ? pool.params.priorityFee : uint256(pool.params.fee);
@@ -388,7 +388,7 @@ abstract contract HyperVirtual is Objective {
             } else {
                 (liveDependent, liveIndependent) = (iteration.virtualX, iteration.virtualY);
             }
-            maxInput = computeMaxInput(pool, _state.sell, liveIndependent, iteration.liquidity);
+            maxInput = computeMaxInput(args.poolId, _state.sell, liveIndependent, iteration.liquidity);
 
             iteration.feeAmount =
                 ((iteration.remainder > maxInput ? maxInput : iteration.remainder) * _state.fee) /
@@ -415,7 +415,7 @@ abstract contract HyperVirtual is Objective {
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
-                pool,
+                args.poolId,
                 iteration.invariant,
                 iteration.virtualX,
                 iteration.virtualY
@@ -544,14 +544,17 @@ abstract contract HyperVirtual is Objective {
     ) internal returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
 
-        uint32 timestamp = uint256(block.timestamp).safeCastTo32();
-        HyperPool memory pool;
+        bool hasController = controller != address(0);
+        uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable todo: fix, possible to set 0 pairId if getPairNonce is 0
+        uint32 poolNonce = ++getPoolNonce;
+        poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
+
+        HyperPool storage pool = pools[poolId];
         pool.controller = controller;
-        pool.lastTimestamp = timestamp;
-        bool hasController = pool.controller != address(0);
         if (hasController && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
 
-        uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable todo: fix, possible to set 0 pairId if getPairNonce is 0
+        uint32 timestamp = uint256(block.timestamp).safeCastTo32();
+        pool.lastTimestamp = timestamp;
         pool.pair = pairs[pairNonce];
 
         HyperCurve memory params = HyperCurve({
@@ -566,15 +569,8 @@ abstract contract HyperVirtual is Objective {
         params.validateParameters();
         pool.params = params;
 
-        uint32 poolNonce = ++getPoolNonce;
-
-        poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
-        if (checkPool(pools[poolId])) revert PoolExists(); // todo: poolNonce always increments, so this never gets hit, remove
-
-        (uint256 x, uint256 y) = computeReservesFromPrice(pool, price); // todo: write better docs for whats going on here
+        (uint256 x, uint256 y) = computeReservesFromPrice(poolId, price); // todo: write better docs for whats going on here
         (pool.virtualY, pool.virtualX) = (y.safeCastTo128(), x.safeCastTo128());
-
-        pools[poolId] = pool; // effect
 
         emit CreatePool(poolId, hasController, pool.pair.tokenAsset, pool.pair.tokenQuote, price);
     }
