@@ -64,7 +64,7 @@ contract Setup is Test {
         console.log("Setup finished");
     }
 
-    function set_pool_id(uint64 poolId) internal virtual {
+    function _set_pool_id(uint64 poolId) internal virtual {
         _ghost.file("poolId", abi.encode(poolId));
     }
 
@@ -144,7 +144,19 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
+        _;
+    }
+
+    modifier defaultControlledConfig() {
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .edit("controller", abi.encode(address(this)))
+            .generate(address(subject()));
+
+        _set_pool_id(poolId);
         _;
     }
 
@@ -155,7 +167,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[2])))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
         _;
     }
 
@@ -166,7 +178,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
         _;
     }
 
@@ -178,7 +190,7 @@ contract Setup is Test {
             .edit("duration", abi.encode(duration))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
         _;
     }
 
@@ -190,7 +202,7 @@ contract Setup is Test {
             .edit("volatility", abi.encode(volatility))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
         _;
     }
 

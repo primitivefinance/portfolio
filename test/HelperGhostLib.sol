@@ -38,6 +38,14 @@ library Ghost {
         return IHyperStruct(self.subject).positions(owner, self.poolId);
     }
 
+    function pairOf(GhostState memory self, uint24 pairId) internal view returns (HyperPair memory) {
+        return IHyperStruct(self.subject).pairs(pairId);
+    }
+
+    function poolOf(GhostState memory self, uint64 poolId) internal view returns (HyperPool memory) {
+        return IHyperStruct(self.subject).pools(poolId);
+    }
+
     function file(GhostState storage self, bytes32 what, bytes memory data) internal {
         if (what == "subject") {
             self.subject = abi.decode(data, (address));

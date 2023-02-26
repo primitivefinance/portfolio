@@ -20,6 +20,15 @@ struct ConfigState {
     uint128 reportedPriceWad;
 }
 
+uint16 constant DEFAULT_PRIORITY_FEE = 10;
+uint16 constant DEFAULT_FEE = 100; // 100 bps = 1%
+uint16 constant DEFAULT_VOLATILITY = 10_000;
+uint16 constant DEFAULT_DURATION = 365;
+uint16 constant DEFAULT_JIT = 4;
+uint128 constant DEFAULT_STRIKE = 10 ether;
+uint128 constant DEFAULT_PRICE = 10 ether;
+uint128 constant DEFAULT_LIQUIDITY = 1 ether;
+
 function safeCastTo16(uint256 x) pure returns (uint16 y) {
     require(x < 1 << 16);
 
@@ -55,13 +64,13 @@ library Configs {
             asset: address(0),
             quote: address(0),
             controller: address(0),
-            feeBps: 100,
-            priorityFeeBps: 10,
-            durationDays: 365,
-            volatilityBps: 10_000,
-            justInTimeSec: 4,
-            terminalPriceWad: 10 ether,
-            reportedPriceWad: 10 ether
+            feeBps: DEFAULT_FEE,
+            priorityFeeBps: DEFAULT_PRIORITY_FEE,
+            durationDays: DEFAULT_DURATION,
+            volatilityBps: DEFAULT_VOLATILITY,
+            justInTimeSec: DEFAULT_JIT,
+            terminalPriceWad: DEFAULT_STRIKE,
+            reportedPriceWad: DEFAULT_PRICE
         });
         return config;
     }
@@ -84,6 +93,14 @@ library Configs {
             self.durationDays = abi.decode(data, (uint16));
         } else if (what == "volatility") {
             self.volatilityBps = abi.decode(data, (uint16));
+        } else if (what == "controller") {
+            self.controller = abi.decode(data, (address));
+        } else if (what == "priorityFee") {
+            self.priorityFeeBps = abi.decode(data, (uint16));
+        } else if (what == "fee") {
+            self.feeBps = abi.decode(data, (uint16));
+        } else if (what == "jit") {
+            self.justInTimeSec = abi.decode(data, (uint16));
         }
         return self;
     }
