@@ -37,7 +37,7 @@ abstract contract HyperVirtual is Objective {
             // particular offset value will right pad the length at the end of the slot
             // and left pad the string at the beginning of the next slot, assuring the
             // right ABI format to return a string.
-            mstore(0x2b, 0x0b626574612d76302e312e30) // "beta-v0.1.0"
+            mstore(0x2b, 0x0b76312e302e302d62657461) // "v1.0.0-beta"
 
             // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
