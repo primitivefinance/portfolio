@@ -51,6 +51,8 @@ library Ghost {
             self.subject = abi.decode(data, (address));
         } else if (what == "poolId") {
             self.poolId = abi.decode(data, (uint64));
+        } else if (what == "actor") {
+            self.actor = abi.decode(data, (address));
         } else {
             revert InvalidFileKey(what);
         }

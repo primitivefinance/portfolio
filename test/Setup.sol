@@ -63,8 +63,16 @@ contract Setup is Test {
         _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
     }
 
-    function _set_pool_id(uint64 poolId) internal virtual {
+    function setGhostPoolId(uint64 poolId) public virtual {
         _ghost.file("poolId", abi.encode(poolId));
+    }
+
+    function setGhostActor(address actor) public virtual {
+        _ghost.file("actor", abi.encode(actor));
+    }
+
+    function addGhostActor(address actor) public virtual {
+        actors().add(actor);
     }
 
     /**
@@ -152,7 +160,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -164,7 +172,7 @@ contract Setup is Test {
             .edit("controller", abi.encode(address(this)))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -175,7 +183,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[2])))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -186,7 +194,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -198,7 +206,7 @@ contract Setup is Test {
             .edit("duration", abi.encode(duration))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -210,7 +218,7 @@ contract Setup is Test {
             .edit("volatility", abi.encode(volatility))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -258,7 +266,7 @@ contract Setup is Test {
     }
 
     modifier setActor(address actor) {
-        _ghost.actor = actor;
+        _ghost.file("actor", abi.encode(actor));
         _;
     }
 

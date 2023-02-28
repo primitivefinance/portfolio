@@ -11,9 +11,13 @@ import {ActorsState} from "../../HelperActorsLib.sol";
 
 interface Context {
     // Manipulate ghost environment
-    function setPoolId(uint64) external;
+    function setGhostPoolId(uint64) external;
 
-    function addPoolId(uint64) external;
+    function addGhostPoolId(uint64) external;
+
+    function setGhostActor(address) external;
+
+    function addGhostActor(address) external;
 
     // Ghost environment getters from Setup.sol
     function subject() external view returns (IHyper);
@@ -44,5 +48,16 @@ contract HandlerBase is Test {
 
     constructor() {
         ctx = Context(msg.sender);
+    }
+
+    modifier createActor() {
+        ctx.setGhostActor(msg.sender);
+        ctx.addGhostActor(msg.sender);
+        _;
+    }
+
+    modifier useActor(uint seed) {
+        ctx.setGhostActor(ctx.getRandomActor(seed));
+        _;
     }
 }

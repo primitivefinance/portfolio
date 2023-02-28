@@ -4,21 +4,19 @@ pragma solidity ^0.8.4;
 import "./setup/HandlerBase.sol";
 
 contract HandlerDeposit is HandlerBase {
-    function deposit(uint256 amount, uint256 index) external {
+    function deposit(uint256 amount, uint256 actorSeed) external createActor useActor(actorSeed) {
         amount = bound(amount, 1, 1e36);
 
-        address target = ctx.getRandomActor(index);
-
-        vm.deal(target, amount);
+        vm.deal(ctx.actor(), amount);
 
         address weth = ctx.subject().WETH();
 
-        uint256 preBal = ctx.ghost().balance(target, weth);
+        uint256 preBal = ctx.ghost().balance(ctx.actor(), weth);
         uint256 preRes = ctx.ghost().reserve(weth);
-        vm.prank(target);
+        vm.prank(ctx.actor());
         ctx.subject().deposit{value: amount}();
         uint256 postRes = ctx.ghost().reserve(weth);
-        uint256 postBal = ctx.ghost().balance(target, weth);
+        uint256 postBal = ctx.ghost().balance(ctx.actor(), weth);
 
         assertEq(postRes, preRes + amount, "weth-reserve");
         assertEq(postBal, preBal + amount, "weth-balance");

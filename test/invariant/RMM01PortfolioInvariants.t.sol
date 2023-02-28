@@ -55,6 +55,58 @@ contract RMM01PortfolioInvariants is Setup {
         targetContract(address(_sendTokens));
         targetContract(address(_warper));
         targetContract(address(_createPool));
+
+        /* bytes4[] memory selectors = new bytes4[](11);
+        selectors[0] = HandlerAllocateUnallocate.allocate.selector;
+        selectors[1] = HandlerAllocateUnallocate.unallocate.selector;
+        selectors[2] = HandlerFundDraw.fund_asset.selector;
+        selectors[3] = HandlerFundDraw.fund_quote.selector;
+        selectors[4] = HandlerDeposit.deposit.selector;
+        selectors[5] = HandlerSendTokens.sendAssetTokens.selector;
+        selectors[6] = HandlerSendTokens.sendQuoteTokens.selector;
+        selectors[7] = HandlerSendTokens.transfer.selector;
+        selectors[8] = HandlerTime.warper.selector;
+        selectors[9] = HandlerTime.warpAfterMaturity.selector;
+        selectors[10] = HandlerCreatePool.create_pool.selector; */
+
+        {
+            bytes4[] memory _allocSelectors = new bytes4[](2);
+            _allocSelectors[0] = HandlerAllocateUnallocate.allocate.selector;
+            _allocSelectors[1] = HandlerAllocateUnallocate.unallocate.selector;
+            targetSelector(FuzzSelector({addr: address(_allocateUnallocate), selectors: _allocSelectors}));
+        }
+
+        {
+            bytes4[] memory _fundDrawSelectors = new bytes4[](2);
+            _fundDrawSelectors[0] = HandlerFundDraw.fund_asset.selector;
+            _fundDrawSelectors[1] = HandlerFundDraw.fund_quote.selector;
+            targetSelector(FuzzSelector({addr: address(_fundDraw), selectors: _fundDrawSelectors}));
+        }
+
+        {
+            bytes4[] memory _tokenSelectors = new bytes4[](2);
+            _tokenSelectors[0] = HandlerSendTokens.sendAssetTokens.selector;
+            _tokenSelectors[1] = HandlerSendTokens.sendQuoteTokens.selector;
+            targetSelector(FuzzSelector({addr: address(_sendTokens), selectors: _tokenSelectors}));
+        }
+
+        {
+            bytes4[] memory _warperSelectors = new bytes4[](2);
+            _warperSelectors[0] = HandlerTime.warper.selector;
+            _warperSelectors[1] = HandlerTime.warpAfterMaturity.selector;
+            targetSelector(FuzzSelector({addr: address(_warper), selectors: _warperSelectors}));
+        }
+
+        {
+            bytes4[] memory _depositSelectors = new bytes4[](1);
+            _depositSelectors[0] = HandlerDeposit.deposit.selector;
+            targetSelector(FuzzSelector({addr: address(_deposit), selectors: _depositSelectors}));
+        }
+        {
+            bytes4[] memory _createSelectors = new bytes4[](1);
+            _createSelectors[0] = HandlerCreatePool.create_pool.selector;
+            targetSelector(FuzzSelector({addr: address(_createPool), selectors: _createSelectors}));
+        }
     }
 
     function addPoolId(uint64 poolId) public virtual {
@@ -62,7 +114,7 @@ contract RMM01PortfolioInvariants is Setup {
     }
 
     function setPoolId(uint64 poolId) public virtual {
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
     }
 
     // ===== Invariants ===== //

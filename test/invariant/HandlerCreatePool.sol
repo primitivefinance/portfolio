@@ -1,25 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import "contracts/HyperLib.sol" as HyperTypes;
 import "./setup/HandlerBase.sol";
+import "contracts/HyperLib.sol" as HyperTypes;
 
 contract HandlerCreatePool is HandlerBase {
-    Forwarder forwarder;
-
-    constructor() {
-        forwarder = new Forwarder();
-    }
-
     function create_pool(
-        uint256 index,
+        uint256 actorSeed,
         uint128 price,
         uint128 strike,
         uint24 sigma,
         uint32 maturity,
         uint32 gamma,
         uint32 priorityGamma
-    ) external {
+    ) external createActor useActor(actorSeed) {
         vm.assume(strike != 0);
         vm.assume(sigma != 0);
 
@@ -29,12 +23,12 @@ contract HandlerCreatePool is HandlerBase {
         priorityGamma = uint32(bound(sigma, gamma, 1e4 - HyperTypes.MIN_FEE));
 
         // Random user
-        address caller = ctx.getRandomActor(index);
+        address caller = ctx.actor();
         address[] memory tokens = new address[](3);
         tokens[0] = ctx.ghost().asset().to_addr();
         tokens[1] = ctx.ghost().quote().to_addr();
 
-        address[] memory shuffled = shuffle(index, tokens);
+        address[] memory shuffled = shuffle(actorSeed, tokens);
         address token0 = shuffled[0];
         address token1 = shuffled[1];
         assertTrue(token0 != token1, "same-token");
@@ -102,14 +96,7 @@ contract HandlerCreatePool is HandlerBase {
         }
         bytes memory payload = HyperTypes.Enigma.encodeJumpInstruction(instructions);
         vm.prank(args.caller);
-        console.logBytes(payload);
-        (bool success, bytes memory reason) = address(ctx.subject()).call(payload);
-        assembly {
-            log0(add(32, reason), mload(reason))
-        }
-
-        //bool success = forwarder.forward(address(subject()), payload); // TODO: Fallback function does not bubble up custom errors.
-        assertTrue(success, "hyper-call-failed");
+        ctx.subject().multiprocess(payload);
 
         // Refetch the poolId. Current poolId could be "magic" zero variable.
         pairId = ctx.subject().getPairId(args.token0, args.token1);
@@ -120,24 +107,9 @@ contract HandlerCreatePool is HandlerBase {
 
         // Add the created pool to the list of pools.
         // todo: fix assertTrue(getPool(address(subject()), poolId).lastPrice != 0, "pool-price-zero");
-        ctx.addPoolId(poolId);
+        ctx.addGhostPoolId(poolId);
 
         // Reset instructions so we don't use some old payload data...
         delete instructions;
-    }
-}
-
-interface DoJump {
-    function doJumpProcess(bytes calldata data) external payable;
-}
-
-contract Forwarder {
-    function forward(address hyper, bytes calldata data) external payable returns (bool) {
-        try DoJump(hyper).doJumpProcess{value: msg.value}(data) {} catch (bytes memory reason) {
-            assembly {
-                revert(add(32, reason), mload(reason))
-            }
-        }
-        return true;
     }
 }
