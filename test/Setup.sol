@@ -74,7 +74,7 @@ contract Setup is Test {
     }
 
     function addGhostActor(address actor) public virtual {
-        actors().add(actor);
+        _actors.add(actor);
     }
 
     /**

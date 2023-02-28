@@ -51,33 +51,29 @@ interface Context {
 abstract contract HandlerBase is CommonBase, StdCheats, StdUtils, StdAssertions {
     Context ctx;
     mapping(bytes32 => uint256) public calls;
-    bytes32 _key;
 
     constructor() {
         ctx = Context(msg.sender);
     }
 
     modifier countCall(bytes32 key) {
-        _key = key;
         calls[key]++;
         _;
-    }
-
-    function callSummary() external view {
-        console.log(name(), calls[_key]);
     }
 
     function name() public view virtual returns (string memory);
 
     modifier createActor() {
-        ctx.setGhostActor(msg.sender);
         ctx.addGhostActor(msg.sender);
+        ctx.setGhostActor(msg.sender);
         _;
     }
 
     modifier useActor(uint seed) {
         ctx.setGhostActor(ctx.getRandomActor(seed));
+        vm.startPrank(ctx.actor());
         _;
+        vm.stopPrank();
     }
 
     modifier usePool(uint seed) {

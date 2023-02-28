@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "../Setup.sol";
 import "./HelperInvariantLib.sol";
 
+import {HandlerHyper} from "./HandlerHyper.sol";
 import {HandlerAllocateUnallocate} from "./HandlerAllocateUnallocate.sol";
 import {HandlerFundDraw} from "./HandlerFundDraw.sol";
 import {HandlerDeposit} from "./HandlerDeposit.sol";
@@ -39,7 +40,20 @@ contract RMM01PortfolioInvariants is Setup {
     HandlerTime internal _warper;
     HandlerCreatePool internal _createPool;
 
+    HandlerHyper internal _hyper;
+
     function setUp() public override {
+        super.setUp();
+
+        _hyper = new HandlerHyper();
+
+        bytes4[] memory selectors = new bytes4[](1);
+        selectors[0] = HandlerHyper.deposit.selector;
+        targetSelector(FuzzSelector({addr: address(_hyper), selectors: selectors}));
+        targetContract(address(_hyper));
+    }
+
+    /* function setUp() public override {
         super.setUp();
 
         _allocateUnallocate = new HandlerAllocateUnallocate();
@@ -104,7 +118,7 @@ contract RMM01PortfolioInvariants is Setup {
             .generate(address(subject()));
 
         setGhostPoolId(poolId);
-    }
+    } */
 
     function addPoolId(uint64 poolId) public virtual {
         _ghostInvariant.add(poolId);
@@ -175,12 +189,7 @@ contract RMM01PortfolioInvariants is Setup {
     function invariant_callSummary() public view {
         console.log("Call summary:");
         console.log("-------------------");
-        _allocateUnallocate.callSummary();
-        _fundDraw.callSummary();
-        _deposit.callSummary();
-        _sendTokens.callSummary();
-        _warper.callSummary();
-        _createPool.callSummary();
+        _hyper.callSummary();
     }
 
     // ===== Helpers ===== //
