@@ -211,6 +211,16 @@ function decodeUnallocate(bytes calldata data) pure returns (uint8 useMax, uint6
     deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
 }
 
+/**
+ * @dev Encodes a swap operation
+ *      +-------------------------------------------------------------------------------+
+ *      | Description | SWAP | poolId | power0 | amount0 | power1 | amount1 | direction |
+ *      +-------------+------+--------+--------+---------+--------+---------+-----------+
+ *      | Size (byte) |   1  |    8   |    1   |    16   |    1   |    16   |      1    |
+ *      +-------------+------+--------+--------+---------+--------+---------+-----------+
+ *      | Index       |   0  |  1 - 9 |    9   | 10 - 26 |    26  | 27 - 43 |     43    |
+ *      +-------------------------------------------------------------------------------+
+ */
 function encodeSwap(
     uint8 useMax,
     uint64 poolId,
@@ -220,12 +230,9 @@ function encodeSwap(
     uint128 amount1,
     uint8 direction
 ) pure returns (bytes memory data) {
-    //    pointerToAmount1 = instruction, poolId, pointer, power0, amount0, power1 {pointer}->
-    uint8 pointerToAmount1 = 0x01 + 0x08 + 0x01 + 0x10 + 0x01;
     data = abi.encodePacked(
         Assembly.pack(bytes1(useMax), SWAP),
         poolId,
-        pointerToAmount1,
         power0,
         amount0,
         power1,
@@ -239,8 +246,7 @@ function decodeSwap(
 ) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 direction) {
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
-    uint8 pointer = uint8(data[9]);
-    input = uint128(Assembly.toAmount(data[10:pointer]));
-    output = uint128(Assembly.toAmount(data[pointer:data.length - 1]));
+    input = Assembly.toAmount(data[9:26]);
+    output = Assembly.toAmount(data[26:43]);
     direction = uint8(data[data.length - 1]);
 }
