@@ -15,12 +15,11 @@ pragma solidity 0.8.13;
  */
 
 import "solmate/utils/SafeCastLib.sol";
-import "./libraries/RMM01Lib.sol";
+import "solmate/utils/FixedPointMathLib.sol";
 import "./libraries/AssemblyLib.sol" as Assembly;
 import "./libraries/EnigmaLib.sol" as Enigma;
 import "./libraries/AccountLib.sol" as Account;
 
-using RMM01Lib for RMM01Lib.RMM;
 using SafeCastLib for uint256;
 using FixedPointMathLib for uint256;
 using FixedPointMathLib for int256;
@@ -251,8 +250,8 @@ function getPoolLiquidityDeltas(
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
 
     (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
-    uint256 scaleDownFactorAsset = Assembly.computeScalar(self.pair.decimalsAsset) * WAD;
-    uint256 scaleDownFactorQuote = Assembly.computeScalar(self.pair.decimalsQuote) * WAD;
+    uint256 scaleDownFactorAsset = Assembly.computeScalar(self.pair.decimalsAsset) * FixedPointMathLib.WAD;
+    uint256 scaleDownFactorQuote = Assembly.computeScalar(self.pair.decimalsQuote) * FixedPointMathLib.WAD;
 
     uint256 delta;
     if (deltaLiquidity > 0) {

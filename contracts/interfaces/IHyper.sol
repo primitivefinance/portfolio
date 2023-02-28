@@ -106,11 +106,24 @@ interface IHyperEvents {
 }
 
 interface IHyperGetters {
-    function getNetBalance(address token) external view returns (int256);
+    // ===== Account Getters ===== //
+    function getBalance(address owner, address token) external view returns (uint256);
 
     function getReserve(address token) external view returns (uint256);
 
-    function getBalance(address owner, address token) external view returns (uint256);
+    function getNetBalance(address token) external view returns (int256);
+
+    // ===== State Getters ===== //
+
+    function VERSION() external pure returns (string memory);
+
+    function WETH() external view returns (address);
+
+    function getPairNonce() external view returns (uint24);
+
+    function getPoolNonce() external view returns (uint32);
+
+    function getPairId(address asset, address quote) external view returns (uint24 pairId);
 
     function pairs(
         uint24 pairId
@@ -154,17 +167,12 @@ interface IHyperGetters {
             uint128 invariantOwed
         );
 
-    function getPairNonce() external view returns (uint24);
+    // ===== Hyper View ===== //
 
-    function getPoolNonce() external view returns (uint32);
-
-    function getPairId(address asset, address quote) external view returns (uint24 pairId);
-
-    function getAmounts(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
-
-    function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) external view returns (uint256);
-
-    function getVirtualReserves(uint64 poolId) external view returns (uint128 deltaAsset, uint128 deltaQuote);
+    function getLiquidityDeltas(
+        uint64 poolId,
+        int128 deltaLiquidity
+    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
     function getMaxLiquidity(
         uint64 poolId,
@@ -172,44 +180,32 @@ interface IHyperGetters {
         uint256 deltaQuote
     ) external view returns (uint128 deltaLiquidity);
 
-    function getLiquidityDeltas(
-        uint64 poolId,
-        int128 deltaLiquidity
+    /**
+     * @dev Amount of tokens received if all pool liquidity was removed.
+     */
+    function getReserves(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    /**
+     * @dev Amount of tokens scaled to WAD units per WAD liquidity.
+     */
+    function getVirtualReservesPerLiquidity(
+        uint64 poolId
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
-    function getLatestPrice(uint64 poolId) external view returns (uint256 price);
+    // ===== Objective View ===== //
+
+    // todo: ... missing some which use structs as args
+
+    function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) external view returns (uint256);
+
+    function getLatestEstimatedPrice(uint64 poolId) external view returns (uint256 price);
 }
 
 interface IHyperActions {
     /**
-     * @notice Increases liquidity of `poolId` and position of `msg.sender` by `amount`.
-     * @param amount Amount of wad units of liquidity added to pool and position.
-     * @return deltaAsset Quantity of asset tokens assigned to `poolId`.
-     * @return deltaQuote Quantity of quote tokens assigned to `poolId`.
+     * @dev Entrypoint to manipulate balances in Hyper.
      */
-    function allocate(uint64 poolId, uint256 amount) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
-
-    /**
-     * @notice Decreases liquidity of `poolId` and position of `msg.sender` by `amount`.
-     * @return deltaAsset Quantity of asset tokens unassigned to `poolId`.
-     * @return deltaQuote Quantity of quote tokens unassigned to `poolId`.
-     */
-    function unallocate(uint64 poolId, uint256 amount) external returns (uint256 deltaAsset, uint256 deltaQuote);
-
-    /**
-     * @notice Swaps asset and quote tokens within the pool `poolId`.
-     * @param sellAsset True if asset tokens should be swapped for quote tokens.
-     * @param amount Amount of tokens to swap, which are assigned to `poolId`.
-     * @param minAmountOut Minimum amount of tokens required to be received by the user.
-     * @return output Amount of tokens received by the user.
-     * @return remainder Amount of tokens unused by the swap and refunded to the user.
-     */
-    function swap(
-        uint64 poolId,
-        bool sellAsset,
-        uint256 amount,
-        uint256 minAmountOut
-    ) external payable returns (uint256 output, uint256 remainder);
+    function multiprocess(bytes calldata data) external payable;
 
     /**
      * @notice Assigns `amount` of `token` to `msg.sender` internal balance.
@@ -238,28 +234,6 @@ interface IHyperActions {
      * @param jit New JIT policy of the pool in seconds (1 = 1 second).
      */
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
-
-    /**
-     * @notice Credits excees fees earned to `msg.sender` for a position in `poolId`.
-     */
-    function claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) external;
-
-    /**
-     * @notice Creates a new pool.
-     */
-    function createPool(
-        uint24 pairId,
-        address controller,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 vol,
-        uint16 dur,
-        uint16 jit,
-        uint128 maxPrice,
-        uint128 price
-    ) external returns (uint64 poolId);
-
-    function createPair(address asset, address quote) external returns (uint24 pairId);
 }
 
 interface IHyper is IHyperActions, IHyperEvents, IHyperGetters {}

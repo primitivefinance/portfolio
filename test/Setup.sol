@@ -30,6 +30,7 @@ import "./HelperUtils.sol" as Utils;
  * | Time based test scenarios                               | Cheatcodes, and maybe a library to manage the time with more granularity. |
  */
 contract Setup is Test {
+    using SafeCastLib for uint;
     /**
      * @dev Manages the addresses calling the subjects in the environment.
      */
@@ -42,6 +43,8 @@ contract Setup is Test {
      * @dev Manages all the contracts in the environment.
      */
     SubjectsState private _subjects;
+
+    receive() external payable {}
 
     /**
      * @notice Deploys WETH, subject, and three tokens. Creates a default pool.
@@ -58,11 +61,9 @@ contract Setup is Test {
             .stopDeploy();
 
         _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
-
-        console.log("Setup finished");
     }
 
-    function set_pool_id(uint64 poolId) internal virtual {
+    function _set_pool_id(uint64 poolId) internal virtual {
         _ghost.file("poolId", abi.encode(poolId));
     }
 
@@ -142,7 +143,19 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
+        _;
+    }
+
+    modifier defaultControlledConfig() {
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .edit("controller", abi.encode(address(this)))
+            .generate(address(subject()));
+
+        _set_pool_id(poolId);
         _;
     }
 
@@ -153,7 +166,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[2])))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
         _;
     }
 
@@ -164,7 +177,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
         _;
     }
 
@@ -176,7 +189,7 @@ contract Setup is Test {
             .edit("duration", abi.encode(duration))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
         _;
     }
 
@@ -188,7 +201,55 @@ contract Setup is Test {
             .edit("volatility", abi.encode(volatility))
             .generate(address(subject()));
 
-        set_pool_id(poolId);
+        _set_pool_id(poolId);
+        _;
+    }
+
+    /**
+     * @dev Sets internal default jit protection seconds value to 0.
+     */
+    modifier noJit() {
+        uint LIQUIDITY_POLICY_STORAGE_SLOT = 11;
+        vm.store(address(subject()), bytes32(LIQUIDITY_POLICY_STORAGE_SLOT), bytes32(0));
+        _;
+    }
+
+    modifier allocateSome(uint128 amt) {
+        subject().multiprocess(EnigmaLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));
+        _;
+    }
+
+    modifier unallocateSome(uint128 amt) {
+        subject().multiprocess(EnigmaLib.encodeUnallocate(uint8(0), ghost().poolId, 0x0, amt));
+        _;
+    }
+
+    modifier swapSome(uint128 amt, bool direction) {
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, direction, amt).safeCastTo128();
+        subject().multiprocess(
+            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(direction ? 0 : 1))
+        );
+        _;
+    }
+
+    modifier swapSomeGetOut(
+        uint128 amt,
+        int amtOutDelta,
+        bool direction
+    ) {
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, direction, amt).safeCastTo128();
+        amtOut = amtOutDelta > 0
+            ? amtOut + uint(amtOutDelta).safeCastTo128()
+            : amtOut - uint(-amtOutDelta).safeCastTo128();
+
+        subject().multiprocess(
+            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(direction ? 0 : 1))
+        );
+        _;
+    }
+
+    modifier setActor(address actor) {
+        _ghost.actor = actor;
         _;
     }
 

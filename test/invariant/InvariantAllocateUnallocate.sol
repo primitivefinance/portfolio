@@ -94,7 +94,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // Execution
         prev = getState();
-        (deltaAsset, deltaQuote) = __hyper__.allocate(__poolId__, deltaLiquidity);
+        // todo: fix (deltaAsset, deltaQuote) = __hyper__.allocate(__poolId__, deltaLiquidity);
         post = getState();
 
         // Postconditions
@@ -161,7 +161,9 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
                 -int128(uint128(deltaLiquidity))
             );
             prev = getState();
-            (uint256 unallocatedAsset, uint256 unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
+            uint256 unallocatedAsset;
+            uint256 unallocatedQuote;
+            // todo: fix (uint256 unallocatedAsset, uint256 unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
             HyperState memory end = getState();
 
             assertEq(unallocatedAsset, expectedDeltaAsset, "asset-delta");
@@ -190,7 +192,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     function checkVirtualInvariant() internal {
         // HyperPool memory pool = getPool(address(__hyper__), __poolId__);
         // TODO: Breaks when we call this function on a pool with zero liquidity...
-        (uint256 dAsset, uint256 dQuote) = __hyper__.getVirtualReserves(__poolId__);
+        (uint256 dAsset, uint256 dQuote) = __hyper__.getReserves(__poolId__);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 

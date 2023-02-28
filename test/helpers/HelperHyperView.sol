@@ -13,8 +13,6 @@ interface IHyperStruct {
     function positions(address owner, uint64 positionId) external view returns (HyperPosition memory);
 
     function pools(uint64 poolId) external view returns (HyperPool memory);
-
-    function getTimePassed(uint64 poolId) external view returns (uint256);
 }
 
 interface HyperLike {
@@ -174,8 +172,8 @@ contract HelperHyperView {
         uint256 input
     ) public view returns (uint256) {
         HyperPool memory pool = getPool(hyper, poolId);
-        uint256 passed = IHyperStruct(hyper).getTimePassed(poolId);
-        (uint256 output, ) = pool.getPoolAmountOut(sellAsset, input, passed);
+        uint256 passed = block.timestamp - pool.lastTimestamp;
+        uint256 output = pool.getAmountOut(sellAsset, input, passed);
         return output;
     }
 }

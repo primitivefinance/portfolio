@@ -14,9 +14,9 @@ pragma solidity 0.8.13;
  */
 
 import "./Hyper.sol";
+import "./libraries/RMM01Lib.sol";
 
 contract RMM01Portfolio is HyperVirtual {
-    using RMM01Lib for RMM01Lib.RMM;
     using RMM01Lib for HyperPool;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
@@ -37,12 +37,10 @@ contract RMM01Portfolio is HyperVirtual {
 
     // Implemented
 
-    function afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
-        HyperPool storage pool = pools[poolId];
-
+    function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
         int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
         // Apply priority invariant growth.
-        if (msg.sender == pool.controller) {
+        if (msg.sender == pools[poolId].controller) {
             int256 delta = iteration.invariant - liveInvariantWad;
             uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
             if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity); // todo: don't like this setting internal _state...
@@ -51,49 +49,44 @@ contract RMM01Portfolio is HyperVirtual {
         return true;
     }
 
-    function beforeSwap(uint64 poolId) internal override returns (bool, int256) {
-        (, int256 invariant, uint256 updatedTau) = _computeSyncedPrice(poolId);
+    function _beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
+        (, int256 invariant, ) = _computeSyncedPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
-        RMM01Lib.RMM memory rmm = pools[poolId].getRMM();
-
-        if (rmm.tau == 0) return (false, invariant);
+        if (pools[poolId].lastTau() == 0) return (false, invariant);
 
         return (true, invariant);
     }
 
-    function canUpdatePosition(
-        HyperPool memory pool,
-        HyperPosition memory position,
-        int delta
-    ) public view override returns (bool) {
+    function checkPosition(uint64 poolId, address owner, int delta) public view override returns (bool) {
         if (delta < 0) {
-            uint256 distance = position.getTimeSinceChanged(block.timestamp);
-            return (pool.params.jit <= distance);
+            uint256 distance = positions[owner][poolId].getTimeSinceChanged(block.timestamp);
+            return (pools[poolId].params.jit <= distance);
         }
 
         return true;
     }
 
-    function checkPool(HyperPool memory pool) public view override returns (bool) {
-        return pool.exists();
+    function checkPool(uint64 poolId) public view override returns (bool) {
+        return pools[poolId].exists();
     }
 
     function checkInvariant(
-        HyperPool memory pool,
+        uint64 poolId,
         int invariant,
         uint reserve0,
         uint reserve1
     ) public view override returns (bool, int256 nextInvariant) {
-        int256 nextInvariant = pool.getRMM().invariantOf({R_y: reserve1, R_x: reserve0}); // fix this is inverted?
+        uint tau = pools[poolId].lastTau();
+        nextInvariant = RMM01Lib.invariantOf({self: pools[poolId], r1: reserve0, r2: reserve1, timeRemainingSec: tau}); // fix this is inverted?
 
-        int256 liveInvariantWad = invariant.scaleFromWadDownSigned(pool.pair.decimalsQuote); // invariant is denominated in quote token.
-        int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(pool.pair.decimalsQuote);
+        int256 liveInvariantWad = invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote); // invariant is denominated in quote token.
+        int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
         return (nextInvariantWad >= liveInvariantWad, nextInvariant);
     }
 
     function computeMaxInput(
-        HyperPool memory pool,
+        uint64 poolId,
         bool direction,
         uint reserveIn,
         uint liquidity
@@ -102,25 +95,21 @@ contract RMM01Portfolio is HyperVirtual {
         if (direction) {
             maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio between assets and liqudiity.
         } else {
-            maxInput = (pool.getRMM().strike - reserveIn).mulWadDown(liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
+            maxInput = (pools[poolId].params.maxPrice - reserveIn).mulWadDown(liquidity); // There can be maximum strike:1 liquidity ratio between quote and liquidity.
         }
 
         return maxInput;
     }
 
     function computeReservesFromPrice(
-        HyperPool memory pool,
+        uint64 poolId,
         uint price
     ) public view override returns (uint reserve0, uint reserve1) {
-        (reserve1, reserve0) = pool.getRMM().computeReserves(price, 0);
+        (reserve1, reserve0) = RMM01Lib.computeReservesWithPrice({self: pools[poolId], priceWad: price, inv: 0});
     }
 
-    function estimatePrice(uint64 poolId) public view override returns (uint price) {
-        price = getLatestPrice(poolId);
-    }
-
-    function getReserves(HyperPool memory pool) public view override returns (uint reserve0, uint reserve1) {
-        (reserve0, reserve1) = pool.getAmountsWad();
+    function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint price) {
+        (price, , ) = _computeSyncedPrice(poolId);
     }
 
     /**
@@ -134,37 +123,14 @@ contract RMM01Portfolio is HyperVirtual {
     ) internal view returns (uint256 price, int256 invariant, uint256 updatedTau) {
         HyperPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
-        RMM01Lib.RMM memory curve = pool.getRMM();
-
-        updatedTau = pool.computeTau(block.timestamp);
-        curve.tau = updatedTau;
-
-        (uint256 x, uint256 y) = pool.getAmountsWad();
-        invariant = curve.invariantOf({R_y: y, R_x: x});
-        price = curve.getPriceWithX({R_x: x});
-    }
-
-    // ===== View ===== //
-
-    function _estimateAmountOut(
-        HyperPool memory pool,
-        bool sellAsset,
-        uint amountIn
-    ) internal view override returns (uint output) {
-        uint256 passed = getTimePassed(pool);
-        (output, ) = pool.getPoolAmountOut(sellAsset, amountIn, passed);
-    }
-
-    /** @dev Can be manipulated. */
-    function getLatestPrice(uint64 poolId) public view returns (uint256 price) {
-        (price, , ) = _computeSyncedPrice(poolId);
-    }
-
-    /** @dev Immediately next invariant value. */
-    function getInvariant(uint64 poolId) public view returns (int256 invariant) {
-        HyperPool memory pool = pools[poolId];
-        uint elapsed = block.timestamp - pool.lastTimestamp;
-        (invariant, ) = pool.getNextInvariant(elapsed);
+        uint timeSinceUpdate = _getTimePassed(pool);
+        (invariant, updatedTau) = RMM01Lib.getNextInvariant({self: pool, timeSinceUpdate: timeSinceUpdate});
+        price = RMM01Lib.getPriceWithX({
+            R_x: pool.virtualX,
+            stk: pool.params.maxPrice,
+            vol: pool.params.volatility,
+            tau: updatedTau
+        });
     }
 
     function getAmountOut(
@@ -173,10 +139,10 @@ contract RMM01Portfolio is HyperVirtual {
         uint256 amountIn
     ) public view override(Objective) returns (uint256 output) {
         HyperPool memory pool = pools[poolId];
-        (output, ) = pool.getPoolAmountOut({
-            sellAsset: sellAsset,
+        output = pool.getAmountOut({
+            direction: sellAsset,
             amountIn: amountIn,
-            timeSinceUpdate: block.timestamp - pool.lastTimestamp // invariant: should not underflow.
+            secondsPassed: block.timestamp - pool.lastTimestamp // invariant: should not underflow.
         });
     }
 }

@@ -41,3 +41,14 @@ Implemented above table, here's how it turned out:
 | Redundant inputs or variables, e.g. poolId, tokens, actors. | HelperGhostLib. Loads a poolId, basically a config, and exposes functions to fetch the key info like tokens.          |
 | Multiple tokens and actors.                                 | HelperSubjectsLib and HelperActorsLib. Use subjects to manage contracts being acted upon and actors to manage actors. |
 | Common actions, e.g. approve and mint.                      | HelperUtils. Custom types that implement utility functions and expose them globally via `using .. for ... global;`.   |
+
+Swap notes
+
+Swap steps for RMM01:
+
+- Compute the invariant using block.timestamp.
+- Compute amountIn scaled to WAD.
+- Compute next reserve in WAD given fee charged on amountIn.
+- Compute next reserve out WAD given next reserve in.
+- Compute difference of next reserve out to get amountOut.
+- Scale amountOut to decimals from WAD.

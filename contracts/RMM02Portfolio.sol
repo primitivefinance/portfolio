@@ -6,7 +6,6 @@ import "./libraries/RMM02Lib.sol";
 
 contract RMM02Portfolio is HyperVirtual {
     using RMM02Lib for HyperPool;
-    using RMM01Lib for RMM01Lib.RMM;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -26,7 +25,7 @@ contract RMM02Portfolio is HyperVirtual {
 
     // Implemented
 
-    function afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
+    function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
         HyperPool storage pool = pools[poolId];
 
         int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
@@ -36,7 +35,7 @@ contract RMM02Portfolio is HyperVirtual {
 
     uint public weight = 0.5 ether;
 
-    function beforeSwap(uint64 poolId) internal override returns (bool, int256) {
+    function _beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
         HyperPool storage pool = pools[poolId];
         int256 invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
         pool.syncPoolTimestamp(block.timestamp);
@@ -44,35 +43,31 @@ contract RMM02Portfolio is HyperVirtual {
         return (true, invariant);
     }
 
-    function canUpdatePosition(
-        HyperPool memory pool,
-        HyperPosition memory position,
-        int delta
-    ) public view override returns (bool) {
+    function checkPosition(uint64 poolId, address owner, int delta) public view override returns (bool) {
         if (delta < 0) {
-            uint256 distance = position.getTimeSinceChanged(block.timestamp);
-            return (pool.params.jit <= distance);
+            uint256 distance = positions[owner][poolId].getTimeSinceChanged(block.timestamp);
+            return (pools[poolId].params.jit <= distance);
         }
 
         return true;
     }
 
-    function checkPool(HyperPool memory pool) public view override returns (bool) {
-        return pool.exists();
+    function checkPool(uint64 poolId) public view override returns (bool) {
+        return pools[poolId].exists();
     }
 
     function checkInvariant(
-        HyperPool memory pool,
+        uint64 poolId,
         int invariant,
         uint reserve0,
         uint reserve1
     ) public view override returns (bool, int256 nextInvariant) {
-        int256 nextInvariant = pool.invariantOf({r1: reserve0, r2: reserve1, weight: weight}); // fix this is inverted?
+        int256 nextInvariant = pools[poolId].invariantOf({r1: reserve0, r2: reserve1, weight: weight}); // fix this is inverted?
         return (nextInvariant >= invariant, nextInvariant);
     }
 
     function computeMaxInput(
-        HyperPool memory pool,
+        uint64 poolId,
         bool direction,
         uint reserveIn,
         uint liquidity
@@ -88,41 +83,15 @@ contract RMM02Portfolio is HyperVirtual {
     }
 
     function computeReservesFromPrice(
-        HyperPool memory pool,
+        uint64 poolId,
         uint price
     ) public view override returns (uint reserve0, uint reserve1) {
         uint balance = 1 ether;
-        (reserve0, reserve1) = pool.computeReservesWithPrice(price, weight, balance);
+        (reserve0, reserve1) = pools[poolId].computeReservesWithPrice(price, weight, balance);
     }
 
-    function estimatePrice(uint64 poolId) public view override returns (uint price) {
-        price = getLatestPrice(poolId);
-    }
-
-    function getReserves(HyperPool memory pool) public view override returns (uint reserve0, uint reserve1) {
-        (reserve0, reserve1) = pool.getAmountsWad();
-    }
-
-    // ===== View ===== //
-
-    /** @dev Can be manipulated. */
-    function getLatestPrice(uint64 poolId) public view returns (uint256 price) {
+    function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint price) {
         price = pools[poolId].computePrice(weight);
-    }
-
-    function _estimateAmountOut(
-        HyperPool memory pool,
-        bool sellAsset,
-        uint amountIn
-    ) internal view override returns (uint output) {
-        uint256 passed = getTimePassed(pool);
-        (output, ) = pool.getPoolAmountOut(sellAsset, amountIn, weight);
-    }
-
-    /** @dev Immediately next invariant value. */
-    function getInvariant(uint64 poolId) public view returns (int256 invariant) {
-        HyperPool memory pool = pools[poolId];
-        invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
     }
 
     function getAmountOut(
