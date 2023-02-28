@@ -28,7 +28,6 @@ contract TestHyperDraw is Setup {
         uint amt = 1 ether;
         subject().deposit{value: amt}();
         uint prev = address(this).balance;
-        console.log(WETH(payable(subject().WETH())).balanceOf(address(subject())));
         subject().draw(subject().WETH(), amt, address(this));
         uint post = address(this).balance;
         assertEq(post, prev + amt, "post-balance");

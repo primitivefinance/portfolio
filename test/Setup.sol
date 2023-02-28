@@ -30,6 +30,7 @@ import "./HelperUtils.sol" as Utils;
  * | Time based test scenarios                               | Cheatcodes, and maybe a library to manage the time with more granularity. |
  */
 contract Setup is Test {
+    using SafeCastLib for uint;
     /**
      * @dev Manages the addresses calling the subjects in the environment.
      */
@@ -60,8 +61,6 @@ contract Setup is Test {
             .stopDeploy();
 
         _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
-
-        console.log("Setup finished");
     }
 
     function _set_pool_id(uint64 poolId) internal virtual {
@@ -217,6 +216,40 @@ contract Setup is Test {
 
     modifier allocateSome(uint128 amt) {
         subject().multiprocess(EnigmaLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));
+        _;
+    }
+
+    modifier unallocateSome(uint128 amt) {
+        subject().multiprocess(EnigmaLib.encodeUnallocate(uint8(0), ghost().poolId, 0x0, amt));
+        _;
+    }
+
+    modifier swapSome(uint128 amt, bool direction) {
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, direction, amt).safeCastTo128();
+        subject().multiprocess(
+            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(direction ? 0 : 1))
+        );
+        _;
+    }
+
+    modifier swapSomeGetOut(
+        uint128 amt,
+        int amtOutDelta,
+        bool direction
+    ) {
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, direction, amt).safeCastTo128();
+        amtOut = amtOutDelta > 0
+            ? amtOut + uint(amtOutDelta).safeCastTo128()
+            : amtOut - uint(-amtOutDelta).safeCastTo128();
+
+        subject().multiprocess(
+            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(direction ? 0 : 1))
+        );
+        _;
+    }
+
+    modifier setActor(address actor) {
+        _ghost.actor = actor;
         _;
     }
 

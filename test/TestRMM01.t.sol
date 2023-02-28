@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "./Setup.sol";
 import "./TestHyperAllocate.t.sol";
 import "./TestHyperChangeParameters.t.sol";
+import "./TestHyperClaim.t.sol";
 import "./TestHyperCreatePair.t.sol";
 import "./TestHyperCreatePool.t.sol";
 import "./TestHyperDeposit.t.sol";
@@ -15,6 +16,7 @@ import "./TestHyperUnallocate.t.sol";
 contract TestRMM01 is
     TestHyperAllocate,
     TestHyperChangeParameters,
+    TestHyperClaim,
     TestHyperCreatePair,
     TestHyperCreatePool,
     TestHyperDeposit,

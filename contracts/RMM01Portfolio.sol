@@ -77,12 +77,8 @@ contract RMM01Portfolio is HyperVirtual {
         uint reserve0,
         uint reserve1
     ) public view override returns (bool, int256 nextInvariant) {
-        int256 nextInvariant = RMM01Lib.invariantOf({
-            self: pools[poolId],
-            r1: reserve0,
-            r2: reserve1,
-            timeRemainingSec: pools[poolId].lastTau()
-        }); // fix this is inverted?
+        uint tau = pools[poolId].lastTau();
+        nextInvariant = RMM01Lib.invariantOf({self: pools[poolId], r1: reserve0, r2: reserve1, timeRemainingSec: tau}); // fix this is inverted?
 
         int256 liveInvariantWad = invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote); // invariant is denominated in quote token.
         int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);

@@ -136,6 +136,10 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
     tokenQuote = address(bytes20(data[21:]));
 }
 
+function encodeClaim(uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) pure returns (bytes memory data) {
+    return abi.encodePacked(CLAIM, poolId, deltaAsset, deltaQuote);
+}
+
 function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) {
     poolId = uint64(bytes8(data[1:9]));
     deltaAsset = uint128(bytes16(data[9:25]));

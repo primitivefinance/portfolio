@@ -192,7 +192,7 @@ abstract contract HyperVirtual is Objective {
 
     // ===== Internal ===== //
 
-    function _claim(uint64 poolId, uint256 deltaAsset, uint256 deltaQuote) internal {
+    function _claim(uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) internal {
         HyperPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
@@ -208,8 +208,8 @@ abstract contract HyperVirtual is Objective {
         pos.syncPositionFees(growthAsset, growthQuote, growthInvariant);
 
         // 2^256 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
-        uint256 claimedAssets = deltaAsset == type(uint256).max ? pos.tokensOwedAsset : deltaAsset;
-        uint256 claimedQuotes = deltaQuote == type(uint256).max ? pos.tokensOwedQuote : deltaQuote;
+        uint256 claimedAssets = deltaAsset == type(uint128).max ? pos.tokensOwedAsset : deltaAsset;
+        uint256 claimedQuotes = deltaQuote == type(uint128).max ? pos.tokensOwedQuote : deltaQuote;
 
         pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
         pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
@@ -361,7 +361,7 @@ abstract contract HyperVirtual is Objective {
                 output: output
             });
 
-            (iteration.virtualX, iteration.virtualY) = getVirtualReservesPerLiquidity(args.poolId);
+            (iteration.virtualX, iteration.virtualY) = (pool.virtualX, pool.virtualY);
         }
 
         if (iteration.output == 0) revert ZeroOutput();
@@ -389,17 +389,14 @@ abstract contract HyperVirtual is Objective {
                 (liveDependent, liveIndependent) = (iteration.virtualX, iteration.virtualY);
             }
             maxInput = computeMaxInput(args.poolId, _state.sell, liveIndependent, iteration.liquidity);
-
             iteration.feeAmount =
                 ((iteration.remainder > maxInput ? maxInput : iteration.remainder) * _state.fee) /
                 10_000;
 
             deltaInput = iteration.remainder > maxInput ? maxInput : iteration.remainder; // swaps up to the maximum input
             deltaInputLessFee = deltaInput - iteration.feeAmount;
-
             nextIndependent = liveIndependent + deltaInputLessFee.divWadDown(iteration.liquidity);
             nextDependent = liveDependent - deltaOutput.divWadDown(iteration.liquidity);
-
             iteration.remainder -= deltaInput;
             iteration.input += deltaInput;
         }
