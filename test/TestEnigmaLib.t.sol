@@ -28,7 +28,7 @@ contract EnigmaLibTarget is Test {
 
     function doDecodeSwap(bytes calldata data)
         external
-        view
+        pure
         returns (
             uint8 useMax,
             uint64 poolId,
@@ -37,8 +37,29 @@ contract EnigmaLibTarget is Test {
             uint8 direction
         )
     {
-        console.logBytes(data[9:26]);
         return decodeSwap(data);
+    }
+
+    function doEncodeClaim(
+        uint64 poolId,
+        uint8 powerDeltaAsset,
+        uint128 deltaAsset,
+        uint8 powerDeltaQuote,
+        uint128 deltaQuote
+    ) external pure returns (bytes memory data) {
+        return encodeClaim(
+            poolId,
+            powerDeltaAsset,
+            deltaAsset,
+            powerDeltaQuote,
+            deltaQuote
+        );
+    }
+
+    function doDecodeClaim(bytes calldata data) external pure returns (
+        uint64 poolId, uint128 deltaAsset, uint128 deltaQuote
+    ) {
+        return decodeClaim(data);
     }
 }
 
@@ -67,8 +88,6 @@ contract TestEnigmaLib is Test {
             direction ? uint8(1) : uint8(0)
         );
 
-        console.logBytes(data);
-
         (
             uint8 useMax_,
             uint64 poolId_,
@@ -82,5 +101,34 @@ contract TestEnigmaLib is Test {
         assertEq(amount0 * 10 ** power0, input_);
         assertEq(amount1 * 10 ** power1, output_);
         assertEq(direction ? uint8(1) : uint8(0), direction_, "Wrong direction");
+    }
+
+    function testFuzz_encodeClaim(
+        uint64 poolId,
+        uint8 powerDeltaAsset,
+        uint128 deltaAsset,
+        uint8 powerDeltaQuote,
+        uint128 deltaQuote
+    ) public {
+        vm.assume(powerDeltaAsset <= 18);
+        vm.assume(powerDeltaQuote <= 18);
+
+        bytes memory data = target.doEncodeClaim(
+            poolId,
+            powerDeltaAsset,
+            deltaAsset,
+            powerDeltaQuote,
+            deltaQuote
+        );
+
+        (
+            uint64 poolId_,
+            uint128 deltaAsset_,
+            uint128 deltaQuote_
+        ) = target.doDecodeClaim(data);
+
+        assertEq(poolId, poolId_);
+        assertEq(deltaAsset * 10 ** powerDeltaAsset, deltaAsset_);
+        assertEq(deltaQuote * 10 ** powerDeltaQuote, deltaQuote_);
     }
 }
