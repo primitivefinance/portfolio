@@ -148,25 +148,26 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
  */
 function encodeClaim(
     uint64 poolId,
-    uint8 powerDeltaAsset,
-    uint128 deltaAsset,
-    uint8 powerDeltaQuote,
-    uint128 deltaQuote
+    uint128 fee0,
+    uint128 fee1
 ) pure returns (bytes memory data) {
+    (uint8 powerFee0, uint128 baseFee0) = Assembly.fromAmount(fee0);
+    (uint8 powerFee1, uint128 baseFee1) = Assembly.fromAmount(fee1);
+
     return abi.encodePacked(
         CLAIM,
         poolId,
-        powerDeltaAsset,
-        deltaAsset,
-        powerDeltaQuote,
-        deltaQuote
+        powerFee0,
+        baseFee0,
+        powerFee1,
+        baseFee1
     );
 }
 
-function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) {
+function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
     poolId = uint64(bytes8(data[1:9]));
-    deltaAsset = Assembly.toAmount(data[9:26]);
-    deltaQuote = uint128(bytes16(data[26:43]));
+    fee0 = Assembly.toAmount(data[9:26]);
+    fee1 = Assembly.toAmount(data[26:43]);
 }
 
 function encodeCreatePool(
