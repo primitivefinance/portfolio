@@ -41,7 +41,7 @@ contract PoolCreation is EchidnaStateHandling {
             assert(!pool.isMutable());
             HyperCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
-            assert(_hyper.getLatestPrice(poolId) == price);
+            assert(_hyper.getLatestEstimatedPrice(poolId) == price);
             assert(curve.createdAt == block.timestamp);
             assert(pool.controller == address(0));
             assert(curve.priorityFee == 0);

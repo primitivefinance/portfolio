@@ -50,7 +50,7 @@ contract GlobalInvariants is
             // reserve/poolLiquidity
             // compare after
 
-            (uint256 assetAmount, uint256 quoteAmount) = _hyper.getAmounts(poolId);
+            (uint256 assetAmount, uint256 quoteAmount) = _hyper.getReserves(poolId);
 
             assert(assetReserveBalance >= assetAmount);
             assert(quoteReserveBalance >= quoteAmount);
@@ -81,7 +81,7 @@ contract GlobalInvariants is
     // ---------- Pool Properties -------
 
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
-        (HyperPool memory pool,,,) = retrieve_random_pool_and_tokens(id);
+        (HyperPool memory pool, , , ) = retrieve_random_pool_and_tokens(id);
         // if the pool has a controller, the priority fee should never be zero
         emit LogBool("is mutable", pool.isMutable());
         if (pool.controller != address(0)) {
@@ -98,10 +98,10 @@ contract GlobalInvariants is
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
+            emit LogUint256("pool's last price", _hyper.getLatestEstimatedPrice(poolId));
             emit LogUint256("strike price", curve.maxPrice);
 
-            assert(_hyper.getLatestPrice(poolId) <= curve.maxPrice);
+            assert(_hyper.getLatestEstimatedPrice(poolId) <= curve.maxPrice);
         }
     }
 
@@ -113,7 +113,7 @@ contract GlobalInvariants is
             HyperPool memory pool = getPool(address(_hyper), poolId);
             HyperCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
+            emit LogUint256("pool's last price", _hyper.getLatestEstimatedPrice(poolId));
             emit LogUint256("strike price", curve.maxPrice);
 
             if (curve.maxPrice == 0) {
@@ -144,8 +144,8 @@ contract GlobalInvariants is
             HyperPool memory pool = getPool(address(_hyper), poolId);
             emit LogUint256("last timestamp", uint256(pool.lastTimestamp));
 
-            if (_hyper.getLatestPrice(poolId) != 0) {
-                emit LogUint256("pool's last price", _hyper.getLatestPrice(poolId));
+            if (_hyper.getLatestEstimatedPrice(poolId) != 0) {
+                emit LogUint256("pool's last price", _hyper.getLatestEstimatedPrice(poolId));
                 if (pool.liquidity == 0) {
                     emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
                 }
@@ -159,7 +159,7 @@ contract GlobalInvariants is
 
     function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
         require(deltaLiquidity != 0);
-        (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
@@ -197,7 +197,7 @@ contract GlobalInvariants is
             // The `getVirtualReserves` method always returns values less than Hyper’s respective `getReserve` function for each token of the pool’s pair.
 
             // `getVirtualReserves method`
-            (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getVirtualReserves(poolId);
+            (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getReserves(poolId);
 
             // Hyper's `getReserve` function for each of the pool's pair
             uint256 assetReserves = _hyper.getReserve(pair.tokenAsset);

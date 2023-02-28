@@ -7,14 +7,11 @@ import "../libraries/RMM01Lib.sol";
 library RMM01ExtendedLib {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
-    using RMM01Lib for RMM01Lib.RMM;
 
-    function computePriceWithChangeInTau(
-        RMM01Lib.RMM memory args,
-        uint256 prc,
-        uint256 eps
-    ) internal pure returns (uint256) {
-        return computePriceWithChangeInTau(args.strike, args.sigma, prc, args.tau, eps);
+    struct RMM {
+        uint strike;
+        uint sigma;
+        uint tau;
     }
 
     /**
@@ -36,7 +33,7 @@ library RMM01ExtendedLib {
         if (epsilon == 0) return prc;
         if (epsilon > tau) return stk;
 
-        RMM01Lib.RMM memory params = RMM01Lib.RMM(stk, vol, tau);
+        RMM memory params = RMM(stk, vol, tau);
 
         uint256 tauYears;
         assembly {
@@ -62,7 +59,7 @@ library RMM01ExtendedLib {
 
             uint256 sigmaWad = RMM01Lib.convertPercentageToWad(uint256(params.sigma));
 
-            uint256 term_5 = (sigmaWad * sigmaWad) / DOUBLE_WAD; // ( 1 / 2 )(o^2), 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
+            uint256 term_5 = (sigmaWad * sigmaWad) / Gaussian.DOUBLE_WAD; // ( 1 / 2 )(o^2), 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
             uint256 term_6 = uint256((int256(term_5.mulWadDown(term_4))).expWad()); // (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) )), exp(WAD * WAD / WAD)
             term_7 = uint256(params.strike).mulWadDown(term_6); // (K) (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) ), WAD * WAD / WAD
         }
@@ -82,7 +79,7 @@ library RMM01ExtendedLib {
         uint256 tau,
         uint256 epsilon
     ) internal pure returns (uint256 R_y) {
-        RMM01Lib.RMM memory params = RMM01Lib.RMM(stk, vol, tau);
+        RMM memory params = RMM(stk, vol, tau);
 
         uint256 tauYears;
         assembly {
@@ -98,7 +95,7 @@ library RMM01ExtendedLib {
         uint256 part0 = WAD.divWadDown(sigmaWad.mulWadDown(tauYears.sqrt() * 1e9));
         part0 = part0.mulWadDown(uint256(int256(prc.divWadDown(params.strike)).lnWad()));
 
-        uint256 part1 = (sigmaWad * sigmaWad) / DOUBLE_WAD;
+        uint256 part1 = (sigmaWad * sigmaWad) / Gaussian.DOUBLE_WAD;
         part1 = part1.mulWadDown(tauYears);
 
         uint256 part2 = sigmaWad.mulWadDown((tauYears - epsilonYears).sqrt() * 1e9);
@@ -117,14 +114,16 @@ library RMM01ExtendedLib {
         int256 invariant,
         uint256 epsilon
     ) internal pure returns (uint256 p_t, int128 i_t, uint256 t_e) {
-        RMM01Lib.RMM memory curve = RMM01Lib.RMM(stk, vol, tau);
-        p_t = computePriceWithChangeInTau(curve, prc, epsilon);
+        RMM memory curve = RMM(stk, vol, tau);
+        p_t = computePriceWithChangeInTau(stk, vol, prc, tau, epsilon);
 
-        uint256 x_1 = curve.getXWithPrice(prc);
+        uint256 x_1 = RMM01Lib.getXWithPrice(prc, stk, vol, tau);
         curve.tau -= epsilon;
-        uint256 y_2 = curve.getYWithX(x_1, invariant);
+        uint256 y_2 = Invariant.getY({R_x: x_1, stk: stk, vol: vol, tau: tau, inv: invariant});
 
-        i_t = int128(curve.invariantOf(y_2, x_1)); // todo: fix cast
+        i_t = int128(
+            Invariant.invariant({R_y: y_2, R_x: x_1, stk: stk, vol: RMM01Lib.convertPercentageToWad(vol), tau: tau})
+        ); // todo: fix cast
         t_e = tau - epsilon;
     }
 }
