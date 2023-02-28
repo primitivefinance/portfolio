@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
+import "../contracts/libraries/AssemblyLib.sol";
 
 //import "solmate/utils/SafeCast.sol";
 
@@ -11,7 +12,7 @@ contract TestHyperClaim is Setup {
 
     function test_revert_claim_no_position() public defaultConfig useActor isArmed {
         vm.expectRevert(abi.encodeWithSelector(NonExistentPosition.selector, actor(), ghost().poolId));
-        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, 0, 0));
+        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, 0, 0, 0, 0));
     }
 
     function test_claim_position_owed_amounts_returns_zero()
@@ -31,7 +32,8 @@ contract TestHyperClaim is Setup {
             .safeCastTo128();
 
         uint256 pre = ghost().balance(actor(), ghost().asset().to_addr());
-        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, tokensOwed, 0));
+        (uint8 power, uint128 base) = fromAmount(tokensOwed);
+        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, power, base, 0, 0));
         uint256 post = ghost().balance(actor(), ghost().asset().to_addr());
 
         pos = ghost().position(actor());
@@ -57,7 +59,8 @@ contract TestHyperClaim is Setup {
             .mulWadDown(pool.liquidity)
             .safeCastTo128();
 
-        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, tokensOwed, 0));
+        (uint8 power, uint128 base) = fromAmount(tokensOwed);
+        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, power, base, 0, 0));
         uint256 post = ghost().balance(actor(), ghost().asset().to_addr());
         assertEq(post, tokensOwed, "claimed-bal");
     }
@@ -80,7 +83,8 @@ contract TestHyperClaim is Setup {
             .mulWadDown(pool.liquidity)
             .safeCastTo128();
 
-        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, 0, tokensOwed));
+        (uint8 power, uint128 base) = fromAmount(tokensOwed);
+        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, 0, 0, power, base));
         uint256 post = ghost().balance(actor(), ghost().quote().to_addr());
         assertEq(post, tokensOwed, "claimed-bal");
     }
@@ -109,7 +113,9 @@ contract TestHyperClaim is Setup {
         // Claim
         uint256 prevReserve = ghost().reserve(ghost().asset().to_addr());
         uint256 prevBalance = ghost().balance(actor(), ghost().asset().to_addr());
-        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, fee0, fee1));
+        (uint8 power0, uint128 base0) = fromAmount(fee0);
+        (uint8 power1, uint128 base1) = fromAmount(fee1);
+        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, power0, base0, power1, base1));
         uint256 nextReserve = ghost().reserve(ghost().asset().to_addr());
         uint256 nextBalance = ghost().balance(actor(), ghost().asset().to_addr());
 
@@ -164,7 +170,7 @@ contract TestHyperClaim is Setup {
         uint256 totalFeeAssetPerLiquidity = pool.feeGrowthGlobalAsset; // 0.00125
 
         // eve claims earned fees, which should be proportional to her share of the liquidity
-        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, type(uint128).max, type(uint128).max));
+        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, 0, type(uint128).max, 0, type(uint128).max));
 
         uint256 evesShare = startLiquidity / 5; // 2000
         uint256 evesClaimedFees = ghost().balance(eve, ghost().asset().to_addr()); // 2_000 / 12_000 = ~16% of 0.00125 fee growth = 0.0002 in fees
@@ -196,7 +202,7 @@ contract TestHyperClaim is Setup {
 
         // finally, do the claim and check the differences in reserves
         uint256 prev = ghost().balance(actor(), ghost().asset().to_addr());
-        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, type(uint128).max, type(uint128).max));
+        subject().multiprocess(EnigmaLib.encodeClaim(ghost().poolId, 0, type(uint128).max, 0, type(uint128).max));
         uint256 post = ghost().balance(actor(), ghost().asset().to_addr());
 
         assertEq(post, (amountIn * 100) / 10_000, "expected-fees-claimed");
