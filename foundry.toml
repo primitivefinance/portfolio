@@ -65,9 +65,9 @@ include_push_bytes = true
 
 [invariant]
 # The number of runs that must execute for each invariant test group
-runs = 256
+runs = 200
 # The number of calls executed to attempt to break invariants in one run
-depth = 20
+depth = 40
 # Fails the invariant fuzzing if a revert occurs
 fail_on_revert = false
 # Allows overriding an unsafe external call when running invariant tests. eg. reentrancy checks

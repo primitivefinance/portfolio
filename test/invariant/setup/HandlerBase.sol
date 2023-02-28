@@ -43,12 +43,26 @@ interface Context {
 }
 
 /** @dev Target contract must inherit. Read: https://github.com/dapphub/dapptools/blob/master/src/dapp/README.md#invariant-testing */
-contract HandlerBase is Test {
+abstract contract HandlerBase is Test {
     Context ctx;
+    mapping(bytes32 => uint256) public calls;
+    bytes32 _key;
 
     constructor() {
         ctx = Context(msg.sender);
     }
+
+    modifier countCall(bytes32 key) {
+        _key = key;
+        calls[key]++;
+        _;
+    }
+
+    function callSummary() external view {
+        console.log(name(), calls[_key]);
+    }
+
+    function name() public view virtual returns (string memory);
 
     modifier createActor() {
         ctx.setGhostActor(msg.sender);
@@ -58,6 +72,11 @@ contract HandlerBase is Test {
 
     modifier useActor(uint seed) {
         ctx.setGhostActor(ctx.getRandomActor(seed));
+        _;
+    }
+
+    modifier usePool(uint seed) {
+        ctx.setGhostPoolId(ctx.getRandomPoolId(seed));
         _;
     }
 }

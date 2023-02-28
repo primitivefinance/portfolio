@@ -20,6 +20,10 @@ struct AccountingState {
 }
 
 contract HandlerAllocateUnallocate is HandlerBase {
+    function name() public view override returns (string memory) {
+        return "allocate-unallocate";
+    }
+
     function fetchAccountingState() internal view returns (AccountingState memory) {
         HyperPosition memory position = ctx.ghost().position(ctx.actor());
         HyperPool memory pool = ctx.ghost().pool();
@@ -47,7 +51,10 @@ contract HandlerAllocateUnallocate is HandlerBase {
         return state;
     }
 
-    function allocate(uint256 deltaLiquidity, uint256 actorSeed) public createActor useActor(actorSeed) {
+    function allocate(
+        uint256 deltaLiquidity,
+        uint256 actorSeed
+    ) public countCall("allocate-unallocate") createActor useActor(actorSeed) {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
         // Allocate to a random pool.
@@ -170,7 +177,10 @@ contract HandlerAllocateUnallocate is HandlerBase {
 
     event FinishedCall(string);
 
-    function unallocate(uint256 deltaLiquidity, uint256 actorSeed) external createActor useActor(actorSeed) {
+    function unallocate(
+        uint256 deltaLiquidity,
+        uint256 actorSeed
+    ) external countCall("allocate-unallocate") createActor useActor(actorSeed) {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
         // Unallocate from a random pool.

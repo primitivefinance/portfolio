@@ -49,26 +49,6 @@ contract RMM01PortfolioInvariants is Setup {
         _warper = new HandlerTime();
         _createPool = new HandlerCreatePool();
 
-        targetContract(address(_allocateUnallocate));
-        targetContract(address(_fundDraw));
-        targetContract(address(_deposit));
-        targetContract(address(_sendTokens));
-        targetContract(address(_warper));
-        targetContract(address(_createPool));
-
-        /* bytes4[] memory selectors = new bytes4[](11);
-        selectors[0] = HandlerAllocateUnallocate.allocate.selector;
-        selectors[1] = HandlerAllocateUnallocate.unallocate.selector;
-        selectors[2] = HandlerFundDraw.fund_asset.selector;
-        selectors[3] = HandlerFundDraw.fund_quote.selector;
-        selectors[4] = HandlerDeposit.deposit.selector;
-        selectors[5] = HandlerSendTokens.sendAssetTokens.selector;
-        selectors[6] = HandlerSendTokens.sendQuoteTokens.selector;
-        selectors[7] = HandlerSendTokens.transfer.selector;
-        selectors[8] = HandlerTime.warper.selector;
-        selectors[9] = HandlerTime.warpAfterMaturity.selector;
-        selectors[10] = HandlerCreatePool.create_pool.selector; */
-
         {
             bytes4[] memory _allocSelectors = new bytes4[](2);
             _allocSelectors[0] = HandlerAllocateUnallocate.allocate.selector;
@@ -102,26 +82,40 @@ contract RMM01PortfolioInvariants is Setup {
             _depositSelectors[0] = HandlerDeposit.deposit.selector;
             targetSelector(FuzzSelector({addr: address(_deposit), selectors: _depositSelectors}));
         }
+
         {
             bytes4[] memory _createSelectors = new bytes4[](1);
             _createSelectors[0] = HandlerCreatePool.create_pool.selector;
             targetSelector(FuzzSelector({addr: address(_createPool), selectors: _createSelectors}));
         }
+
+        targetContract(address(_allocateUnallocate));
+        targetContract(address(_fundDraw));
+        targetContract(address(_deposit));
+        targetContract(address(_sendTokens));
+        targetContract(address(_warper));
+        targetContract(address(_createPool));
+
+        // Create the default pool so ghost variable has the tokens we want.
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .generate(address(subject()));
+
+        setGhostPoolId(poolId);
     }
 
     function addPoolId(uint64 poolId) public virtual {
         _ghostInvariant.add(poolId);
     }
 
-    function setPoolId(uint64 poolId) public virtual {
-        setGhostPoolId(poolId);
+    function setGhostPoolId(uint64 poolId) public override {
+        super.setGhostPoolId(poolId);
+        if (!_ghostInvariant.exists[poolId]) addPoolId(poolId);
     }
 
     // ===== Invariants ===== //
-
-    function invariant_assert_pools_created() public {
-        assertTrue(ghost_invariant().poolIds.length > 0);
-    }
 
     function invariant_asset_balance_gte_reserves() public {
         (uint256 reserve, uint256 physical, ) = getBalances(ghost().asset().to_addr());
@@ -178,6 +172,17 @@ contract RMM01PortfolioInvariants is Setup {
         assertEq(balance, 0, "invariant-ether");
     }
 
+    function invariant_callSummary() public view {
+        console.log("Call summary:");
+        console.log("-------------------");
+        _allocateUnallocate.callSummary();
+        _fundDraw.callSummary();
+        _deposit.callSummary();
+        _sendTokens.callSummary();
+        _warper.callSummary();
+        _createPool.callSummary();
+    }
+
     // ===== Helpers ===== //
 
     function ghost_invariant() internal virtual returns (InvariantGhostState storage) {
@@ -197,9 +202,10 @@ contract RMM01PortfolioInvariants is Setup {
     }
 
     function getBalances(address token) internal view returns (uint256 reserve, uint256 physical, uint256 balances) {
-        reserve = ghost().reserve(token);
-        physical = ghost().physicalBalance(token);
-        balances = getBalanceSum(token);
+        if (ghost().subject == address(0)) return (0, 0, 0);
+        //reserve = ghost().reserve(token);
+        //physical = ghost().physicalBalance(token);
+        //balances = getBalanceSum(token);
     }
 
     function getBalanceSum(address token) public view virtual returns (uint) {

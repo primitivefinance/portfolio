@@ -4,7 +4,14 @@ pragma solidity ^0.8.4;
 import "./setup/HandlerBase.sol";
 
 contract HandlerFundDraw is HandlerBase {
-    function fund_asset(uint256 amount, uint256 actorSeed) public createActor useActor(actorSeed) {
+    function name() public view override returns (string memory) {
+        return "fund-draw";
+    }
+
+    function fund_asset(
+        uint256 amount,
+        uint256 seed
+    ) public countCall("fund-draw") createActor useActor(seed) usePool(seed) {
         amount = bound(amount, 1, 1e36);
 
         // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
@@ -29,7 +36,10 @@ contract HandlerFundDraw is HandlerBase {
         assertEq(postRes, preRes + amount + uint256(netQuoteBalance), "fund-delta-asset-reserve");
     }
 
-    function fund_quote(uint256 amount, uint256 actorSeed) public createActor useActor(actorSeed) {
+    function fund_quote(
+        uint256 amount,
+        uint256 seed
+    ) public countCall("fund-draw") createActor useActor(seed) usePool(seed) {
         amount = bound(amount, 1, 1e36);
 
         vm.prank(ctx.actor());

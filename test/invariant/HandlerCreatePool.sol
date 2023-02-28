@@ -5,46 +5,51 @@ import "./setup/HandlerBase.sol";
 import "contracts/HyperLib.sol" as HyperTypes;
 
 contract HandlerCreatePool is HandlerBase {
-    function create_pool(
-        uint256 actorSeed,
-        uint128 price,
-        uint128 strike,
-        uint24 sigma,
-        uint32 maturity,
-        uint32 gamma,
-        uint32 priorityGamma
-    ) external createActor useActor(actorSeed) {
-        vm.assume(strike != 0);
-        vm.assume(sigma != 0);
+    function name() public view override returns (string memory) {
+        return "create";
+    }
 
-        maturity = uint32(block.timestamp + bound(maturity, 1, 365 days));
+    function create_pool(
+        uint256 seed,
+        uint128 price,
+        uint128 terminalPrice,
+        uint16 volatility,
+        uint16 duration,
+        uint16 fee,
+        uint16 priorityFee
+    ) external createActor useActor(seed) usePool(seed) countCall("create") {
+        vm.assume(terminalPrice != 0);
+
+        volatility = uint16(bound(volatility, HyperTypes.MIN_VOLATILITY, HyperTypes.MAX_VOLATILITY));
+        duration = uint16(block.timestamp + bound(duration, 1, 365 days / HyperTypes.Assembly.SECONDS_PER_DAY));
         price = uint128(bound(price, 1, 1e36));
-        gamma = uint32(bound(sigma, 1e4 - HyperTypes.MAX_FEE, 1e4 - HyperTypes.MIN_FEE));
-        priorityGamma = uint32(bound(sigma, gamma, 1e4 - HyperTypes.MIN_FEE));
+        fee = uint16(bound(fee, HyperTypes.MAX_FEE, HyperTypes.MIN_FEE));
+        priorityFee = uint16(bound(priorityFee, fee, HyperTypes.MIN_FEE));
 
         // Random user
-        address caller = ctx.actor();
-        address[] memory tokens = new address[](3);
-        tokens[0] = ctx.ghost().asset().to_addr();
-        tokens[1] = ctx.ghost().quote().to_addr();
+        {
+            address[] memory tokens = new address[](3);
+            tokens[0] = ctx.ghost().asset().to_addr();
+            tokens[1] = ctx.ghost().quote().to_addr();
 
-        address[] memory shuffled = shuffle(actorSeed, tokens);
-        address token0 = shuffled[0];
-        address token1 = shuffled[1];
-        assertTrue(token0 != token1, "same-token");
+            address[] memory shuffled = shuffle(seed, tokens);
+            address token0 = shuffled[0];
+            address token1 = shuffled[1];
+            assertTrue(token0 != token1, "same-token");
 
-        CreateArgs memory args = CreateArgs(
-            caller,
-            token0,
-            token1,
-            price,
-            strike,
-            sigma,
-            maturity,
-            gamma,
-            priorityGamma
-        );
-        _assertCreatePool(args);
+            CreateArgs memory args = CreateArgs(
+                ctx.actor(),
+                token0,
+                token1,
+                price,
+                terminalPrice,
+                volatility,
+                duration,
+                fee,
+                priorityFee
+            );
+            _assertCreatePool(args);
+        }
     }
 
     function shuffle(uint256 random, address[] memory array) internal pure returns (address[] memory output) {
@@ -63,11 +68,11 @@ contract HandlerCreatePool is HandlerBase {
         address token0;
         address token1;
         uint128 price;
-        uint128 strike;
-        uint24 sigma;
-        uint32 maturity;
-        uint32 gamma;
-        uint32 priorityGamma;
+        uint128 terminalPrice;
+        uint16 volatility;
+        uint16 duration;
+        uint16 fee;
+        uint16 priorityFee;
     }
 
     bytes[] instructions;
@@ -83,13 +88,13 @@ contract HandlerCreatePool is HandlerBase {
             instructions.push(
                 HyperTypes.Enigma.encodeCreatePool(
                     pairId,
-                    address(this),
-                    1, // priorityFee
-                    1, // fee
-                    1, // vol
-                    1, // dur
-                    5,
-                    args.strike,
+                    ctx.actor(),
+                    args.priorityFee, // priorityFee
+                    args.fee, // fee
+                    args.volatility, // vol
+                    args.duration, // dur
+                    4, // jit
+                    args.terminalPrice,
                     args.price
                 )
             ); // temp

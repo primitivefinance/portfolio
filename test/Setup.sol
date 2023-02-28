@@ -64,10 +64,12 @@ contract Setup is Test {
     }
 
     function setGhostPoolId(uint64 poolId) public virtual {
+        require(poolId != 0, "invalid-poolId");
         _ghost.file("poolId", abi.encode(poolId));
     }
 
     function setGhostActor(address actor) public virtual {
+        require(actor != address(0), "invalid-actor");
         _ghost.file("actor", abi.encode(actor));
     }
 

@@ -4,7 +4,11 @@ pragma solidity ^0.8.4;
 import "./setup/HandlerBase.sol";
 
 contract HandlerDeposit is HandlerBase {
-    function deposit(uint256 amount, uint256 actorSeed) external createActor useActor(actorSeed) {
+    function name() public view override returns (string memory) {
+        return "deposit";
+    }
+
+    function deposit(uint256 amount, uint256 actorSeed) external countCall("deposit") createActor useActor(actorSeed) {
         amount = bound(amount, 1, 1e36);
 
         vm.deal(ctx.actor(), amount);
