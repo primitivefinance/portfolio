@@ -136,6 +136,15 @@ function toAmount(bytes calldata raw) pure returns (uint128 amount) {
     if (power != 0) amount = amount * uint128(10 ** power);
 }
 
+function fromAmount(uint128 amount) pure returns (uint8 power, uint128 base) {
+    base = amount;
+
+    while (base % 10 == 0) {
+        ++power;
+        base /= 10;
+    }
+}
+
 function computeScalar(uint256 decimals) pure returns (uint256 scalar) {
     return 10 ** (MAX_DECIMALS - decimals); // can revert on underflow
 }
