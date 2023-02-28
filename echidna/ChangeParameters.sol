@@ -1,7 +1,7 @@
 pragma solidity ^0.8.0;
 
 import "./EchidnaStateHandling.sol";
-import {RMM01Portfolio as Hyper} from "../RMM01Portfolio.sol";
+import {RMM01Portfolio as Hyper} from "contracts/RMM01Portfolio.sol";
 
 contract ChangeParameters is EchidnaStateHandling {
     // ******************** Change Pool Parameters ********************

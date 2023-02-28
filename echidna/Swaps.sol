@@ -4,14 +4,14 @@ import "./EchidnaStateHandling.sol";
 contract Swaps is EchidnaStateHandling {
     using RMM01Lib for HyperPool;
 
-    function mint_and_allocate(HyperPair memory pair, uint256 amount, uint64 poolId) internal {
+    function mint_and_allocate(HyperPair memory pair, uint128 amount, uint64 poolId) internal {
         mint_and_approve(EchidnaERC20(pair.tokenAsset), amount);
         mint_and_approve(EchidnaERC20(pair.tokenQuote), amount);
-        _hyper.allocate(poolId, amount);
+        _hyper.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, amount));
     }
 
     function clamp_liquidity(uint256 id, uint64 poolId) internal returns (uint256 liquidity) {
-        (uint256 amountAsset, uint256 amountQuote) = _hyper.getAmounts(poolId);
+        (uint256 amountAsset, uint256 amountQuote) = _hyper.getReserves(poolId);
         uint256 liquidity = between(id, 1, uint128(type(int128).max));
         if (amountAsset != 0) {
             liquidity = between(liquidity, amountAsset, (uint128(type(int128).max) + amountAsset - 1) / amountAsset);
@@ -30,11 +30,9 @@ contract Swaps is EchidnaStateHandling {
         uint maxOutput;
         HyperCurve memory curve = pool.params;
         uint stk = curve.maxPrice;
-        // Scoping due to stack-depth.
-        RMM01Lib.RMM memory rmm = pool.getRMM();
 
         // Compute reserves to determine max input and output.
-        (uint256 R_y, uint256 R_x) = RMM01Lib.computeReserves(rmm, stk, 0);
+        (uint256 R_y, uint256 R_x) = RMM01Lib.computeReservesWithPrice(pool, stk, 0);
 
         if (sellAsset) {
             // console.log("selling");
@@ -138,7 +136,9 @@ contract Swaps is EchidnaStateHandling {
 
         bytes memory data = ProcessingLib.encodeJumpInstruction(instructions);
 
-        (success, returndata) = address(_hyper).call(data);
+        try _hyper.multiprocess(data) {
+            success = true;
+        } catch {}
     }
 
     function swap_on_non_existent_pool_should_fail(uint64 id) public {
@@ -171,12 +171,16 @@ contract Swaps is EchidnaStateHandling {
         uint256 limit,
         string memory failureMsg
     ) private {
-        try _hyper.swap(poolId, sellAsset, amount, limit) {
+        try
+            _hyper.multiprocess(
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            )
+        {
             emit AssertionFailed(failureMsg);
         } catch {}
     }
 
-    function swap_assets_in_always_decreases_price(uint256 amount, uint256 limit) public {
+    function swap_assets_in_always_decreases_price(uint128 amount, uint128 limit) public {
         bool sellAsset = true;
 
         // Will always return a pool that exists
@@ -205,15 +209,19 @@ contract Swaps is EchidnaStateHandling {
         _Changes_ memory c = _Changes_({
             prevReserveSell: getReserve(address(_hyper), address(_asset)),
             prevReserveBuy: getReserve(address(_hyper), address(_quote)),
-            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            prePoolLastPrice: _hyper.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
-        try _hyper.swap(poolId, sellAsset, amount, limit) {
+        try
+            _hyper.multiprocess(
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            )
+        {
             HyperPool memory postPool = getPool(address(_hyper), poolId);
-            c.postPoolLastPrice = _hyper.getLatestPrice(poolId);
+            c.postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
 
             c.postReserveSell = getReserve(address(_hyper), address(_asset));
             c.postReserveBuy = getReserve(address(_hyper), address(_quote));
@@ -267,7 +275,7 @@ contract Swaps is EchidnaStateHandling {
         _Changes_ memory c = _Changes_({
             prevReserveSell: getReserve(address(_hyper), address(_asset)),
             prevReserveBuy: getReserve(address(_hyper), address(_quote)),
-            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            prePoolLastPrice: _hyper.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
@@ -275,9 +283,9 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveSell = getReserve(address(_hyper), address(_quote));
         uint256 prevReserveBuy = getReserve(address(_hyper), address(_asset));
 
-        try _hyper.swap(poolId, sellAsset, amount, limit) {
+        try _hyper.multiprocess(EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, sellAsset)) {
             HyperPool memory postPool = getPool(address(_hyper), poolId);
-            c.postPoolLastPrice = _hyper.getLatestPrice(poolId);
+            c.postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
 
             c.postReserveSell = getReserve(address(_hyper), address(_quote));
             c.postReserveBuy = getReserve(address(_hyper), address(_asset));
@@ -336,15 +344,19 @@ contract Swaps is EchidnaStateHandling {
         _Changes_ memory c = _Changes_({
             prevReserveSell: getReserve(address(_hyper), address(_asset)),
             prevReserveBuy: getReserve(address(_hyper), address(_quote)),
-            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            prePoolLastPrice: _hyper.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
-        try _hyper.swap(poolId, sellAsset, amount, limit) {
+        try
+            _hyper.multiprocess(
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            )
+        {
             HyperPool memory postPool = getPool(address(_hyper), poolId);
-            c.postPoolLastPrice = _hyper.getLatestPrice(poolId);
+            c.postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
 
             c.postReserveSell = getReserve(address(_hyper), address(_asset));
             c.postReserveBuy = getReserve(address(_hyper), address(_quote));
@@ -392,15 +404,19 @@ contract Swaps is EchidnaStateHandling {
         _Changes_ memory c = _Changes_({
             prevReserveSell: getReserve(address(_hyper), address(_asset)),
             prevReserveBuy: getReserve(address(_hyper), address(_quote)),
-            prePoolLastPrice: _hyper.getLatestPrice(poolId),
+            prePoolLastPrice: _hyper.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
-        try _hyper.swap(poolId, sellAsset, amount, limit) {
+        try
+            _hyper.multiprocess(
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            )
+        {
             HyperPool memory postPool = getPool(address(_hyper), poolId);
-            c.postPoolLastPrice = _hyper.getLatestPrice(poolId);
+            c.postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
 
             c.postReserveSell = getReserve(address(_hyper), address(_quote));
             c.postReserveBuy = getReserve(address(_hyper), address(_asset));
@@ -458,13 +474,13 @@ contract Swaps is EchidnaStateHandling {
         assert(postReserveBuy < prevReserveBuy);
     }
 
-    function swap_quote_with_fifteen_decimals(uint256 amount, uint256 limit) public {
+    function swap_quote_with_fifteen_decimals(uint128 amount, uint128 limit) public {
         require(specialPoolCreated, "Special Pool not created");
-        uint _amount = between(amount, 1, type(uint256).max);
-        uint _limit = between(limit, 1, type(uint256).max);
+        uint128 _amount = between(amount, 1, type(uint128).max);
+        uint128 _limit = between(limit, 1, type(uint128).max);
 
         HyperPool memory prePool = getPool(address(_hyper), specialPoolId);
-        uint256 prePoolLastPrice = _hyper.getLatestPrice(specialPoolId);
+        uint256 prePoolLastPrice = _hyper.getLatestEstimatedPrice(specialPoolId);
 
         mint_and_approve(EchidnaERC20(prePool.pair.tokenAsset), _amount);
         mint_and_approve(EchidnaERC20(prePool.pair.tokenQuote), _amount);
@@ -475,9 +491,10 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveSell = getReserve(address(_hyper), prePool.pair.tokenQuote);
         uint256 prevReserveBuy = getReserve(address(_hyper), prePool.pair.tokenAsset);
 
-        try _hyper.swap(specialPoolId, false, _amount, _limit) {
+        try _hyper.multiprocess(EnigmaLib.encodeSwap(uint8(0), specialPoolId, 0x0, _amount, 0x0, _limit, uint8(1))) {
+            // sellAsset = false
             HyperPool memory postPool = getPool(address(_hyper), specialPoolId);
-            uint256 postPoolLastPrice = _hyper.getLatestPrice(specialPoolId);
+            uint256 postPoolLastPrice = _hyper.getLatestEstimatedPrice(specialPoolId);
 
             uint256 postReserveSell = getReserve(address(_hyper), postPool.pair.tokenQuote);
             uint256 postReserveBuy = getReserve(address(_hyper), postPool.pair.tokenAsset);

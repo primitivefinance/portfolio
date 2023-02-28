@@ -6,14 +6,7 @@ import "contracts/libraries/AccountLib.sol" as Operating;
 import "contracts/libraries/RMM01Lib.sol";
 import {HyperPair, HyperCurve, HyperPool, HyperPosition} from "contracts/HyperLib.sol";
 import {TestERC20} from "contracts/test/TestERC20.sol";
-
-interface IHyperStruct {
-    function pairs(uint24 pairId) external view returns (HyperPair memory);
-
-    function positions(address owner, uint64 positionId) external view returns (HyperPosition memory);
-
-    function pools(uint64 poolId) external view returns (HyperPool memory);
-}
+import {IHyperStruct} from "../HelperGhostLib.sol";
 
 interface HyperLike {
     function getReserve(address) external view returns (uint256);

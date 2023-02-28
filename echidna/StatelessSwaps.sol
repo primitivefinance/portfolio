@@ -5,9 +5,9 @@ pragma solidity ^0.8.0;
 import "forge-std/StdCheats.sol";
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
-import {RMM01Portfolio as Hyper} from "../RMM01Portfolio.sol";
-// import {TestERC20} from "test/helpers/HyperTestOverrides.sol";
-import "test/foundry/setup/TestHyperSetup.sol";
+import "solmate/test/utils/mocks/MockERC20.sol";
+import {RMM01Portfolio as Hyper} from "contracts/RMM01Portfolio.sol";
+import "../Setup.sol";
 import "./Helper.sol";
 
 contract StatelessSwaps is Helper, Test {
@@ -15,9 +15,9 @@ contract StatelessSwaps is Helper, Test {
 
     WETH weth;
     Hyper hyper;
-    TestERC20 usdc;
-    TestERC20 asset;
-    TestERC20 quote;
+    MockERC20 usdc;
+    MockERC20 asset;
+    MockERC20 quote;
 
     address immutable self = address(this);
     address immutable alice = address(0xa11ce);
@@ -26,9 +26,9 @@ contract StatelessSwaps is Helper, Test {
 
     constructor() {
         weth = new WETH();
-        usdc = new TestERC20("USD Coin", "USDC", 6);
-        quote = new TestERC20("Quote", "QUOTE", 18);
-        asset = new TestERC20("Asset", "ASSET", 18);
+        usdc = new MockERC20("USD Coin", "USDC", 6);
+        quote = new MockERC20("Quote", "QUOTE", 18);
+        asset = new MockERC20("Asset", "ASSET", 18);
         hyper = new Hyper(address(weth));
 
         // vm.label(address(weth), "WETH");
@@ -93,7 +93,7 @@ contract StatelessSwaps is Helper, Test {
             vm.prank(alice);
             createPool(vol, tau, uint128(stk), uint128(price));
             // Allocate liquidity.
-            (uint256 amountAsset, uint256 amountQuote) = hyper.getAmounts(poolId);
+            (uint256 amountAsset, uint256 amountQuote) = hyper.getReserves(poolId);
 
             // Need to bound liquidity accordingly,
             // so that the required tokens (= amount * liquidity) don't overflow.
@@ -108,17 +108,16 @@ contract StatelessSwaps is Helper, Test {
             emit LogUint256("Allocating liquidity:", liquidity);
 
             vm.prank(alice);
-            hyper.allocate(poolId, liquidity);
+            hyper.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity)));
         }
 
         // Update stk to what Hyper stores, otherwise calculations will be inexcat.
         emit LogUint256("stk", stk);
         {
-            // Scoping due to stack-depth.
-            RMM01Lib.RMM memory rmm = RMM01Lib.RMM({strike: stk, sigma: vol, tau: tau});
+            HyperPool memory pool = IHyperStruct(address(hyper)).pools(poolId);
 
             // Compute reserves to determine max input and output.
-            (uint256 R_y, uint256 R_x) = RMM01Lib.computeReserves(rmm, price, 0);
+            (uint256 R_y, uint256 R_x) = RMM01Lib.computeReservesWithPrice(pool, price, 0);
 
             uint256 maxInput;
             uint256 maxOutput;
@@ -198,8 +197,8 @@ contract StatelessSwaps is Helper, Test {
         bytes memory returndata;
 
         if (poolId == 0) {
-            instructions[0] = ProcessingLib.encodeCreatePair(token0, token1);
-            data = ProcessingLib.encodeJumpInstruction(instructions);
+            instructions[0] = EnigmaLib.encodeCreatePair(token0, token1);
+            data = EnigmaLib.encodeJumpInstruction(instructions);
 
             (success, returndata) = address(hyper).call(data);
             if (!success) {
@@ -209,7 +208,7 @@ contract StatelessSwaps is Helper, Test {
             }
         }
 
-        instructions[0] = ProcessingLib.encodeCreatePool(
+        instructions[0] = EnigmaLib.encodeCreatePool(
             0x000000, // magic variable
             controller,
             uint16(priorityFee),
@@ -231,7 +230,7 @@ contract StatelessSwaps is Helper, Test {
         // console.log("stk", stk);
         // console.log("price %s\n", price);
 
-        data = ProcessingLib.encodeJumpInstruction(instructions);
+        data = EnigmaLib.encodeJumpInstruction(instructions);
 
         (success, returndata) = address(hyper).call(data);
         if (!success) {
@@ -276,10 +275,10 @@ contract StatelessSwaps is Helper, Test {
         //     output2
         // );
 
-        instructions[0] = ProcessingLib.encodeSwap(0, poolId, 0, input, 0, output1, sell ? 0 : 1);
-        instructions[1] = ProcessingLib.encodeSwap(0, poolId, 0, output1, 0, output2, sell ? 1 : 0);
+        instructions[0] = EnigmaLib.encodeSwap(0, poolId, 0, input, 0, output1, sell ? 0 : 1);
+        instructions[1] = EnigmaLib.encodeSwap(0, poolId, 0, output1, 0, output2, sell ? 1 : 0);
 
-        bytes memory data = ProcessingLib.encodeJumpInstruction(instructions);
+        bytes memory data = EnigmaLib.encodeJumpInstruction(instructions);
 
         (success, returndata) = address(hyper).call(data);
     }

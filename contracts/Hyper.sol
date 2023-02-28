@@ -459,7 +459,7 @@ abstract contract HyperVirtual is Objective {
 
         {
             uint64 id = args.poolId;
-            uint256 price = getLatestEstimatedPrice(id); // todo: getLatestPrice(id);
+            uint256 price = getLatestEstimatedPrice(id);
             emit Swap(
                 id,
                 price,

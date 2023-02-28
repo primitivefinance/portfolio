@@ -23,14 +23,11 @@ fuzz_max_global_rejects = 1024
 src = 'test/'       # not default
 gas_reports = ["*"]
 ffi = true
-fuzz_runs = 256
-no_match_path = '/test/foundry/' # thanks chat gpt #["Poc","TestSolmateInvariants", "TestSolstatBounds", "TestSolstatInvariants", "TestSolstatError", "TestSolstatDifferential", "TestSolstatGasERFC", "TestSolstatGasIERFC", "TestSolstatGasAbs",]
-max_test_rejects = 120000
 
-[profile.crytic]
+[profile.echidna]
 via_ir = false
-src = 'test/crytic'  # not default
-test = 'test/crytic' # not default
+src = 'test/echidna'  # not default
+test = 'test/echidna' # not default
 
 
 [rpc_endpoints]
@@ -58,7 +55,7 @@ runs = 10_000
 # to set the `max_global_rejects` value in proptest test runner config.
 # `max_local_rejects` option isn't exposed here since we're not using
 # `prop_filter`.
-max_test_rejects = 65536
+max_test_rejects = 120000
 # The weight of the dictionary
 dictionary_weight = 40
 # The flag indicating whether to include values from storage
