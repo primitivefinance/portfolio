@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 // Test subjects
 import "contracts/RMM01Portfolio.sol";
@@ -70,7 +70,7 @@ contract Setup is Test {
     /**
      * @dev Fetches the ghost state to get information or manipulate it.
      */
-    function ghost() internal virtual returns (GhostState memory) {
+    function ghost() public view virtual returns (GhostState memory) {
         return _ghost;
     }
 
@@ -93,7 +93,7 @@ contract Setup is Test {
      * @notice Contract that is being tested.
      * @dev Target subject is a ghost variable because it changes in the environment.
      */
-    function subject() internal virtual returns (IHyper) {
+    function subject() public view virtual returns (IHyper) {
         return IHyper(_ghost.subject);
     }
 
@@ -103,8 +103,17 @@ contract Setup is Test {
      * It uses the `_ghost.actor` instead of `_actor.last` because it can
      * change in the environment.
      */
-    function actor() internal virtual returns (address) {
+    function actor() public view virtual returns (address) {
         return _ghost.actor;
+    }
+
+    function getActors() public view virtual returns (address[] memory) {
+        address[] memory actors = _actors.active;
+        return actors;
+    }
+
+    function getRandomActor(uint index) public view virtual returns (address) {
+        return _actors.rand(index);
     }
 
     // === Modifiers for Tests === //

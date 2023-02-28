@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "contracts/interfaces/IHyper.sol";
 import "contracts/HyperLib.sol";
@@ -62,6 +62,10 @@ library Ghost {
 
     function balance(GhostState memory self, address account, address token) internal view returns (uint) {
         return IHyperGetters(self.subject).getBalance(account, token);
+    }
+
+    function physicalBalance(GhostState memory self, address token) internal view returns (uint) {
+        return MockERC20(token).balanceOf(self.subject);
     }
 
     function reserve(GhostState memory self, address token) internal view returns (uint) {

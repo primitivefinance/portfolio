@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 uint128 constant DEFAULT_STRIKE = 10e18;
 uint24 constant DEFAULT_SIGMA = 1e4;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "contracts/libraries/EnigmaLib.sol" as Processor;
 import "contracts/libraries/AccountLib.sol" as Operating;

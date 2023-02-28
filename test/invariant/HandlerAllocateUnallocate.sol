@@ -1,17 +1,58 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
-import "./setup/InvariantTargetContract.sol";
+import "./setup/HandlerBase.sol";
 
-contract InvariantAllocateUnallocate is InvariantTargetContract {
-    constructor(address hyper_, address asset_, address quote_) InvariantTargetContract(hyper_, asset_, quote_) {}
+struct AccountingState {
+    uint256 reserveAsset; // getReserve
+    uint256 reserveQuote; // getReserve
+    uint256 physicalBalanceAsset; // balanceOf
+    uint256 physicalBalanceQuote; // balanceOf
+    uint256 totalBalanceAsset; // sum of all balances from getBalance
+    uint256 totalBalanceQuote; // sum of all balances from getBalance
+    uint256 totalPositionLiquidity; // sum of all position liquidity
+    uint256 callerPositionLiquidity; // position.freeLiquidity
+    uint256 totalPoolLiquidity; // pool.liquidity
+    uint256 feeGrowthAssetPool; // getPool
+    uint256 feeGrowthQuotePool; // getPool
+    uint256 feeGrowthAssetPosition; // getPosition
+    uint256 feeGrowthQuotePosition; // getPosition
+}
+
+contract HandlerAllocateUnallocate is HandlerBase {
+    function fetchAccountingState() internal view returns (AccountingState memory) {
+        HyperPosition memory position = ctx.ghost().position(ctx.actor());
+        HyperPool memory pool = ctx.ghost().pool();
+        HyperPair memory pair = pool.pair;
+
+        address asset = pair.tokenAsset;
+        address quote = pair.tokenQuote;
+
+        AccountingState memory state = AccountingState(
+            ctx.ghost().reserve(asset),
+            ctx.ghost().reserve(quote),
+            ctx.ghost().asset().to_token().balanceOf(address(ctx.subject())),
+            ctx.ghost().quote().to_token().balanceOf(address(ctx.subject())),
+            ctx.getBalanceSum(asset),
+            ctx.getBalanceSum(quote),
+            ctx.getPositionsLiquiditySum(),
+            position.freeLiquidity,
+            pool.liquidity,
+            pool.feeGrowthGlobalAsset,
+            pool.feeGrowthGlobalQuote,
+            position.feeGrowthAssetLast,
+            position.feeGrowthQuoteLast
+        );
+
+        return state;
+    }
 
     function allocate(uint256 deltaLiquidity, uint256 index) public {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
         // Allocate to a random pool.
         // VERY IMPORTANT
-        setPoolId(ctx.getRandomPoolId(index));
+        ctx.setPoolId(ctx.getRandomPoolId(index));
 
         _assertAllocate(deltaLiquidity);
     }
@@ -30,8 +71,8 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     uint256 physicalAssetPayment;
     uint256 physicalQuotePayment;
 
-    HyperState prev;
-    HyperState post;
+    AccountingState prev;
+    AccountingState post;
 
     function _assertAllocate(uint256 deltaLiquidity) internal {
         // TODO: cleanup reset of these
@@ -39,7 +80,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         transferQuoteIn = true;
 
         // Preconditions
-        HyperPool memory pool = getPool(address(__hyper__), __poolId__);
+        HyperPool memory pool = ctx.ghost().pool();
         uint256 lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
             ? pool.pair.decimalsQuote
             : pool.pair.decimalsAsset;
@@ -49,23 +90,23 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
         // Amounts of tokens that will be allocated to pool.
-        (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getLiquidityDeltas(
-            __poolId__,
+        (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject().getLiquidityDeltas(
+            ctx.ghost().poolId,
             int128(uint128(deltaLiquidity))
         );
 
         // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
         // They will be credited to the msg.sender of the next call.
-        assetCredit = __hyper__.getNetBalance(address(__asset__));
-        quoteCredit = __hyper__.getNetBalance(address(__quote__));
+        assetCredit = ctx.subject().getNetBalance(ctx.ghost().asset().to_addr());
+        quoteCredit = ctx.subject().getNetBalance(ctx.ghost().quote().to_addr());
 
         // Net balances should always be positive outside of execution.
         assertTrue(assetCredit >= 0, "negative-net-asset-tokens");
         assertTrue(quoteCredit >= 0, "negative-net-quote-tokens");
 
         // Internal balance of tokens spendable by user.
-        userAssetBalance = getBalance(address(__hyper__), address(this), address(__asset__));
-        userQuoteBalance = getBalance(address(__hyper__), address(this), address(__quote__));
+        userAssetBalance = ctx.ghost().balance(address(ctx.actor()), ctx.ghost().asset().to_addr());
+        userQuoteBalance = ctx.ghost().balance(address(ctx.actor()), ctx.ghost().quote().to_addr());
 
         // If there is a net balance, user can use it to pay their cost.
         // Total payment the user must make.
@@ -89,13 +130,13 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         if (physicalQuotePayment == 0) transferQuoteIn = false;
 
         // If the user has to pay externally, give them tokens.
-        if (transferAssetIn) __asset__.mint(address(this), physicalAssetPayment);
-        if (transferQuoteIn) __quote__.mint(address(this), physicalQuotePayment);
+        if (transferAssetIn) ctx.ghost().asset().to_token().mint(address(this), physicalAssetPayment);
+        if (transferQuoteIn) ctx.ghost().quote().to_token().mint(address(this), physicalQuotePayment);
 
         // Execution
-        prev = getState();
-        // todo: fix (deltaAsset, deltaQuote) = __hyper__.allocate(__poolId__, deltaLiquidity);
-        post = getState();
+        prev = fetchAccountingState();
+        // todo: fix (deltaAsset, deltaQuote) = ctx.subject().allocate(ctx.ghost().poolId, deltaLiquidity);
+        post = fetchAccountingState();
 
         // Postconditions
 
@@ -134,7 +175,7 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
 
         // Unallocate from a random pool.
         // VERY IMPORTANT
-        setPoolId(ctx.getRandomPoolId(index));
+        ctx.setPoolId(ctx.getRandomPoolId(index));
 
         _assertUnallocate(deltaLiquidity);
     }
@@ -143,12 +184,12 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
         // TODO: Add use max flag support.
 
         // Get some liquidity.
-        HyperPosition memory pos = getPosition(address(__hyper__), address(this), __poolId__);
+        HyperPosition memory pos = ctx.ghost().position(address(this));
         require(pos.freeLiquidity >= deltaLiquidity, "Not enough liquidity");
 
         if (pos.freeLiquidity >= deltaLiquidity) {
             // Preconditions
-            HyperPool memory pool = getPool(address(__hyper__), __poolId__);
+            HyperPool memory pool = ctx.ghost().pool();
             assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
             // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
@@ -156,15 +197,15 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
             uint256 timestamp = block.timestamp + 4; // todo: fix default jit policy
             vm.warp(timestamp);
 
-            (expectedDeltaAsset, expectedDeltaQuote) = __hyper__.getLiquidityDeltas(
-                __poolId__,
+            (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject().getLiquidityDeltas(
+                ctx.ghost().poolId,
                 -int128(uint128(deltaLiquidity))
             );
-            prev = getState();
+            prev = fetchAccountingState();
             uint256 unallocatedAsset;
             uint256 unallocatedQuote;
-            // todo: fix (uint256 unallocatedAsset, uint256 unallocatedQuote) = __hyper__.unallocate(__poolId__, deltaLiquidity);
-            HyperState memory end = getState();
+            // todo: fix (uint256 unallocatedAsset, uint256 unallocatedQuote) = ctx.subject().unallocate(ctx.ghost().poolId, deltaLiquidity);
+            AccountingState memory end = fetchAccountingState();
 
             assertEq(unallocatedAsset, expectedDeltaAsset, "asset-delta");
             assertEq(unallocatedQuote, expectedDeltaQuote, "quote-delta");
@@ -190,14 +231,14 @@ contract InvariantAllocateUnallocate is InvariantTargetContract {
     }
 
     function checkVirtualInvariant() internal {
-        // HyperPool memory pool = getPool(address(__hyper__), __poolId__);
+        // HyperPool memory pool = ctx.ghost().pool();
         // TODO: Breaks when we call this function on a pool with zero liquidity...
-        (uint256 dAsset, uint256 dQuote) = __hyper__.getReserves(__poolId__);
+        (uint256 dAsset, uint256 dQuote) = ctx.subject().getReserves(ctx.ghost().poolId);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 
-        uint256 bAsset = getPhysicalBalance(address(__hyper__), address(__asset__));
-        uint256 bQuote = getPhysicalBalance(address(__hyper__), address(__quote__));
+        uint256 bAsset = ctx.ghost().asset().to_token().balanceOf(address(ctx.subject()));
+        uint256 bQuote = ctx.ghost().quote().to_token().balanceOf(address(ctx.subject()));
 
         emit log("bAsset", bAsset);
         emit log("bQuote", bQuote);

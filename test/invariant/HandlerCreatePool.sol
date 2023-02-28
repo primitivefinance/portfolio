@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "contracts/HyperLib.sol" as HyperTypes;
-import "./setup/InvariantTargetContract.sol";
+import "./setup/HandlerBase.sol";
 
-contract InvariantCreatePool is InvariantTargetContract {
+contract HandlerCreatePool is HandlerBase {
     Forwarder forwarder;
 
-    constructor(address hyper_, address asset_, address quote_) InvariantTargetContract(hyper_, asset_, quote_) {
+    constructor() {
         forwarder = new Forwarder();
     }
 
@@ -29,11 +29,10 @@ contract InvariantCreatePool is InvariantTargetContract {
         priorityGamma = uint32(bound(sigma, gamma, 1e4 - HyperTypes.MIN_FEE));
 
         // Random user
-        address caller = ctx.getRandomUser(index);
+        address caller = ctx.getRandomActor(index);
         address[] memory tokens = new address[](3);
-        tokens[0] = address(ctx.__asset__());
-        tokens[1] = address(ctx.__quote__());
-        //tokens[0] = address(ctx.__weth__());
+        tokens[0] = ctx.ghost().asset().to_addr();
+        tokens[1] = ctx.ghost().quote().to_addr();
 
         address[] memory shuffled = shuffle(index, tokens);
         address token0 = shuffled[0];
@@ -81,14 +80,14 @@ contract InvariantCreatePool is InvariantTargetContract {
 
     function _assertCreatePool(CreateArgs memory args) internal {
         bool isMutable = true;
-        uint24 pairId = __hyper__.getPairId(args.token0, args.token1);
+        uint24 pairId = ctx.subject().getPairId(args.token0, args.token1);
         {
             // HyperPair not created? Push a create pair call to the stack.
-            if (pairId == 0) instructions.push(Enigma.encodeCreatePair(args.token0, args.token1));
+            if (pairId == 0) instructions.push(HyperTypes.Enigma.encodeCreatePair(args.token0, args.token1));
 
             // Push create pool to stack
             instructions.push(
-                Enigma.encodeCreatePool(
+                HyperTypes.Enigma.encodeCreatePool(
                     pairId,
                     address(this),
                     1, // priorityFee
@@ -101,26 +100,26 @@ contract InvariantCreatePool is InvariantTargetContract {
                 )
             ); // temp
         }
-        bytes memory payload = Enigma.encodeJumpInstruction(instructions);
+        bytes memory payload = HyperTypes.Enigma.encodeJumpInstruction(instructions);
         vm.prank(args.caller);
         console.logBytes(payload);
-        (bool success, bytes memory reason) = address(__hyper__).call(payload);
+        (bool success, bytes memory reason) = address(ctx.subject()).call(payload);
         assembly {
             log0(add(32, reason), mload(reason))
         }
 
-        //bool success = forwarder.forward(address(__hyper__), payload); // TODO: Fallback function does not bubble up custom errors.
+        //bool success = forwarder.forward(address(subject()), payload); // TODO: Fallback function does not bubble up custom errors.
         assertTrue(success, "hyper-call-failed");
 
         // Refetch the poolId. Current poolId could be "magic" zero variable.
-        pairId = __hyper__.getPairId(args.token0, args.token1);
+        pairId = ctx.subject().getPairId(args.token0, args.token1);
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = Enigma.encodePoolId(pairId, isMutable, uint32(__hyper__.getPoolNonce()));
+        uint64 poolId = HyperTypes.Enigma.encodePoolId(pairId, isMutable, uint32(ctx.subject().getPoolNonce()));
 
         // Add the created pool to the list of pools.
-        // todo: fix assertTrue(getPool(address(__hyper__), poolId).lastPrice != 0, "pool-price-zero");
+        // todo: fix assertTrue(getPool(address(subject()), poolId).lastPrice != 0, "pool-price-zero");
         ctx.addPoolId(poolId);
 
         // Reset instructions so we don't use some old payload data...
