@@ -42,22 +42,18 @@ contract EnigmaLibTarget is Test {
 
     function doEncodeClaim(
         uint64 poolId,
-        uint8 powerDeltaAsset,
-        uint128 deltaAsset,
-        uint8 powerDeltaQuote,
-        uint128 deltaQuote
+        uint128 fee0,
+        uint128 fee1
     ) external pure returns (bytes memory data) {
         return encodeClaim(
             poolId,
-            powerDeltaAsset,
-            deltaAsset,
-            powerDeltaQuote,
-            deltaQuote
+            fee0,
+            fee1
         );
     }
 
     function doDecodeClaim(bytes calldata data) external pure returns (
-        uint64 poolId, uint128 deltaAsset, uint128 deltaQuote
+        uint64 poolId, uint128 fee0, uint128 fee1
     ) {
         return decodeClaim(data);
     }
@@ -105,30 +101,19 @@ contract TestEnigmaLib is Test {
 
     function testFuzz_encodeClaim(
         uint64 poolId,
-        uint8 powerDeltaAsset,
-        uint128 deltaAsset,
-        uint8 powerDeltaQuote,
-        uint128 deltaQuote
+        uint128 fee0,
+        uint128 fee1
     ) public {
-        vm.assume(powerDeltaAsset <= 18);
-        vm.assume(powerDeltaQuote <= 18);
-
-        bytes memory data = target.doEncodeClaim(
-            poolId,
-            powerDeltaAsset,
-            deltaAsset,
-            powerDeltaQuote,
-            deltaQuote
-        );
+        bytes memory data = target.doEncodeClaim(poolId, fee0, fee1);
 
         (
             uint64 poolId_,
-            uint128 deltaAsset_,
-            uint128 deltaQuote_
+            uint128 fee0_,
+            uint128 fee1_
         ) = target.doDecodeClaim(data);
 
         assertEq(poolId, poolId_);
-        assertEq(deltaAsset * 10 ** powerDeltaAsset, deltaAsset_);
-        assertEq(deltaQuote * 10 ** powerDeltaQuote, deltaQuote_);
+        assertEq(fee0, fee0_);
+        assertEq(fee1, fee1_);
     }
 }
