@@ -4,10 +4,6 @@ pragma solidity ^0.8.4;
 import "./setup/HandlerBase.sol";
 
 contract HandlerFundDraw is HandlerBase {
-    function name() public view override returns (string memory) {
-        return "fund-draw";
-    }
-
     function fund_asset(
         uint256 amount,
         uint256 seed

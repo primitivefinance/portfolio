@@ -5,12 +5,7 @@ import "../Setup.sol";
 import "./HelperInvariantLib.sol";
 
 import {HandlerHyper} from "./HandlerHyper.sol";
-import {HandlerAllocateUnallocate} from "./HandlerAllocateUnallocate.sol";
-import {HandlerFundDraw} from "./HandlerFundDraw.sol";
-import {HandlerDeposit} from "./HandlerDeposit.sol";
-import {HandlerSendTokens} from "./HandlerSendTokens.sol";
-import {HandlerTime} from "./HandlerTime.sol";
-import {HandlerCreatePool} from "./HandlerCreatePool.sol";
+import {HandlerExternal} from "./HandlerExternal.sol";
 
 bytes32 constant SLOT_LOCKED = bytes32(uint256(10));
 
@@ -33,24 +28,29 @@ contract RMM01PortfolioInvariants is Setup {
      */
     InvariantGhostState private _ghostInvariant;
 
-    HandlerAllocateUnallocate internal _allocateUnallocate;
-    HandlerFundDraw internal _fundDraw;
-    HandlerDeposit internal _deposit;
-    HandlerSendTokens internal _sendTokens;
-    HandlerTime internal _warper;
-    HandlerCreatePool internal _createPool;
-
     HandlerHyper internal _hyper;
+    HandlerExternal internal _external;
 
     function setUp() public override {
         super.setUp();
 
         _hyper = new HandlerHyper();
 
-        bytes4[] memory selectors = new bytes4[](1);
+        bytes4[] memory selectors = new bytes4[](3);
         selectors[0] = HandlerHyper.deposit.selector;
+        selectors[1] = HandlerHyper.fund_asset.selector;
+        selectors[2] = HandlerHyper.fund_quote.selector;
         targetSelector(FuzzSelector({addr: address(_hyper), selectors: selectors}));
         targetContract(address(_hyper));
+
+        // Create default pool, used in handlers via `usePool(uint)` modifier.
+        uint64 poolId = Configs
+            .fresh()
+            .edit("asset", abi.encode(address(subjects().tokens[0])))
+            .edit("quote", abi.encode(address(subjects().tokens[1])))
+            .generate(address(subject()));
+
+        setGhostPoolId(poolId);
     }
 
     /* function setUp() public override {

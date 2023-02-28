@@ -61,8 +61,6 @@ abstract contract HandlerBase is CommonBase, StdCheats, StdUtils, StdAssertions 
         _;
     }
 
-    function name() public view virtual returns (string memory);
-
     modifier createActor() {
         ctx.addGhostActor(msg.sender);
         ctx.setGhostActor(msg.sender);

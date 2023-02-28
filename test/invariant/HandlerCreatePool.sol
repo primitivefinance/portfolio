@@ -5,10 +5,6 @@ import "./setup/HandlerBase.sol";
 import "contracts/HyperLib.sol" as HyperTypes;
 
 contract HandlerCreatePool is HandlerBase {
-    function name() public view override returns (string memory) {
-        return "create";
-    }
-
     function create_pool(
         uint256 seed,
         uint128 price,

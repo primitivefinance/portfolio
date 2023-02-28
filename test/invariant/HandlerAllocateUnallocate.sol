@@ -20,10 +20,6 @@ struct AccountingState {
 }
 
 contract HandlerAllocateUnallocate is HandlerBase {
-    function name() public view override returns (string memory) {
-        return "allocate-unallocate";
-    }
-
     function fetchAccountingState() internal view returns (AccountingState memory) {
         HyperPosition memory position = ctx.ghost().position(ctx.actor());
         HyperPool memory pool = ctx.ghost().pool();

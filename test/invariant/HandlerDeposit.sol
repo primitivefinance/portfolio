@@ -4,10 +4,6 @@ pragma solidity ^0.8.4;
 import "./setup/HandlerBase.sol";
 
 contract HandlerDeposit is HandlerBase {
-    function name() public view override returns (string memory) {
-        return "deposit";
-    }
-
     function deposit(
         uint256 amount,
         uint256 seed
