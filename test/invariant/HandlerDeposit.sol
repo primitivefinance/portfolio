@@ -8,7 +8,10 @@ contract HandlerDeposit is HandlerBase {
         return "deposit";
     }
 
-    function deposit(uint256 amount, uint256 actorSeed) external countCall("deposit") createActor useActor(actorSeed) {
+    function deposit(
+        uint256 amount,
+        uint256 seed
+    ) external countCall("deposit") createActor useActor(seed) usePool(seed) {
         amount = bound(amount, 1, 1e36);
 
         vm.deal(ctx.actor(), amount);

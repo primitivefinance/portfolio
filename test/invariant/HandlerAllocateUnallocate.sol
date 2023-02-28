@@ -53,14 +53,9 @@ contract HandlerAllocateUnallocate is HandlerBase {
 
     function allocate(
         uint256 deltaLiquidity,
-        uint256 actorSeed
-    ) public countCall("allocate-unallocate") createActor useActor(actorSeed) {
+        uint256 seed
+    ) public countCall("allocate-unallocate") createActor useActor(seed) usePool(seed) {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
-
-        // Allocate to a random pool.
-        // VERY IMPORTANT
-        ctx.setGhostPoolId(ctx.getRandomPoolId(actorSeed));
-
         _assertAllocate(deltaLiquidity);
     }
 
@@ -179,13 +174,9 @@ contract HandlerAllocateUnallocate is HandlerBase {
 
     function unallocate(
         uint256 deltaLiquidity,
-        uint256 actorSeed
-    ) external countCall("allocate-unallocate") createActor useActor(actorSeed) {
+        uint256 seed
+    ) external countCall("allocate-unallocate") createActor useActor(seed) usePool(seed) {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
-
-        // Unallocate from a random pool.
-        // VERY IMPORTANT
-        ctx.setGhostPoolId(ctx.getRandomPoolId(actorSeed));
 
         _assertUnallocate(deltaLiquidity);
     }

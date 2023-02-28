@@ -27,7 +27,7 @@ library InvariantGhost {
     }
 
     function rand(InvariantGhostState storage self, uint seed) internal view returns (uint64) {
-        if (self.poolIds.length == 0) return uint64(0); // thanks horsefacts
+        if (self.poolIds.length == 0) return uint64(0xc0ffee); // thanks horsefacts
         return self.poolIds[seed % self.poolIds.length];
     }
 }

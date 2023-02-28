@@ -112,7 +112,7 @@ contract RMM01PortfolioInvariants is Setup {
 
     function setGhostPoolId(uint64 poolId) public override {
         super.setGhostPoolId(poolId);
-        if (!_ghostInvariant.exists[poolId]) addPoolId(poolId);
+        addPoolId(poolId);
     }
 
     // ===== Invariants ===== //
@@ -202,10 +202,11 @@ contract RMM01PortfolioInvariants is Setup {
     }
 
     function getBalances(address token) internal view returns (uint256 reserve, uint256 physical, uint256 balances) {
-        if (ghost().subject == address(0)) return (0, 0, 0);
-        //reserve = ghost().reserve(token);
-        //physical = ghost().physicalBalance(token);
-        //balances = getBalanceSum(token);
+        if (ghost().subject != address(0)) {
+            reserve = ghost().reserve(token);
+            physical = ghost().physicalBalance(token);
+            balances = getBalanceSum(token);
+        }
     }
 
     function getBalanceSum(address token) public view virtual returns (uint) {
