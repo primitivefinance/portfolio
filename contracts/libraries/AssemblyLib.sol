@@ -137,6 +137,7 @@ function toAmount(bytes calldata raw) pure returns (uint128 amount) {
 }
 
 function fromAmount(uint128 amount) pure returns (uint8 power, uint128 base) {
+    if (amount == 0) return (0, 0);
     base = amount;
 
     while (base % 10 == 0) {
