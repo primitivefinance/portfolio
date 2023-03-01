@@ -12,7 +12,7 @@ using Subjects for SubjectsState global;
 struct SubjectsState {
     Vm vm;
     address deployer;
-    IHyper last;
+    IPortfolio last;
     WETH weth;
     MockERC20[] tokens;
 }
@@ -59,7 +59,7 @@ library Subjects {
      * }
      */
     function change_subject(SubjectsState storage self, address subject) internal {
-        self.last = IHyper(subject);
+        self.last = IPortfolio(subject);
     }
 
     /**
@@ -96,7 +96,7 @@ library Subjects {
     }
 
     /**
-     * @dev Chain from `startDeploy()` to startDeploy the default Hyper contract subject.
+     * @dev Chain from `startDeploy()` to startDeploy the default Portfolio contract subject.
      * Must have `vm` in context via inheriting `forge-std/Test.sol`.
      * @custom:example
      * ```
@@ -104,7 +104,7 @@ library Subjects {
      * ```
      */
     function subject(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
-        self.last = IHyper(new RMM01Portfolio(address(self.weth)));
+        self.last = IPortfolio(new RMM01Portfolio(address(self.weth)));
         self.vm.label(address(self.last), "Subject");
         return self;
     }

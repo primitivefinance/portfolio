@@ -16,21 +16,21 @@ contract GlobalInvariants is
     Swaps
 {
     // ******************** System wide Invariants ********************
-    // The token balance of Hyper should be greater or equal to the reserve for all tokens
+    // The token balance of Portfolio should be greater or equal to the reserve for all tokens
     // Note: assumption that pairs are created through create_pair invariant test
-    // which will add the token to the hyperTokens list
+    // which will add the token to the PortfolioTokens list
     // this function is built so that extending the creation of new pairs should not require code changes here
     function global_token_balance_greater_or_equal_reserves() public view {
         uint256 reserveBalance = 0;
         uint256 tokenBalance = 0;
-        for (uint8 i = 0; i < EchidnaStateHandling.hyperTokens.length; i++) {
+        for (uint8 i = 0; i < EchidnaStateHandling.PortfolioTokens.length; i++) {
             EchidnaERC20 token = EchidnaStateHandling.get_token_at_index(i);
 
             // retrieve reserves of the token and add to tracked reserve balance
-            reserveBalance = getReserve(address(_hyper), address(token));
+            reserveBalance = getReserve(address(_Portfolio), address(token));
 
             // get token balance and add to tracked token balance
-            tokenBalance = token.balanceOf(address(_hyper));
+            tokenBalance = token.balanceOf(address(_Portfolio));
 
             assert(tokenBalance >= reserveBalance);
         }
@@ -40,35 +40,35 @@ contract GlobalInvariants is
         uint256 tokenBalance = 0;
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperPair memory pair = pool.pair;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPair memory pair = pool.pair;
 
             // retrieve reserves of the token and add to tracked reserve balance
-            uint256 assetReserveBalance = getReserve(address(_hyper), pair.tokenAsset);
-            uint256 quoteReserveBalance = getReserve(address(_hyper), pair.tokenQuote);
+            uint256 assetReserveBalance = getReserve(address(_Portfolio), pair.tokenAsset);
+            uint256 quoteReserveBalance = getReserve(address(_Portfolio), pair.tokenQuote);
 
             // reserve/poolLiquidity
             // compare after
 
-            (uint256 assetAmount, uint256 quoteAmount) = _hyper.getReserves(poolId);
+            (uint256 assetAmount, uint256 quoteAmount) = _Portfolio.getReserves(poolId);
 
             assert(assetReserveBalance >= assetAmount);
             assert(quoteReserveBalance >= quoteAmount);
         }
     }
 
-    // ---------- HyperPair Properties -------
+    // ---------- PortfolioPair Properties -------
     function pair_asset_never_equal_to_quote(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
-        HyperPair memory pair = getPair(address(_hyper), pairId);
+        PortfolioPair memory pair = getPair(address(_Portfolio), pairId);
         assert(pair.tokenAsset != pair.tokenQuote);
     }
 
     function pair_decimals_never_exceed_bounds(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
-        HyperPair memory pair = getPair(address(_hyper), pairId);
+        PortfolioPair memory pair = getPair(address(_Portfolio), pairId);
         assert(pair.decimalsAsset == EchidnaERC20(pair.tokenAsset).decimals());
         assert(pair.decimalsAsset >= 6);
         assert(pair.decimalsAsset <= 18);
@@ -81,7 +81,7 @@ contract GlobalInvariants is
     // ---------- Pool Properties -------
 
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
-        (HyperPool memory pool, , , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, , , ) = retrieve_random_pool_and_tokens(id);
         // if the pool has a controller, the priority fee should never be zero
         emit LogBool("is mutable", pool.isMutable());
         if (pool.controller != address(0)) {
@@ -95,13 +95,13 @@ contract GlobalInvariants is
     function pool_last_price_not_greater_than_strike() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _hyper.getLatestEstimatedPrice(poolId));
+            emit LogUint256("pool's last price", _Portfolio.getLatestEstimatedPrice(poolId));
             emit LogUint256("strike price", curve.maxPrice);
 
-            assert(_hyper.getLatestEstimatedPrice(poolId) <= curve.maxPrice);
+            assert(_Portfolio.getLatestEstimatedPrice(poolId) <= curve.maxPrice);
         }
     }
 
@@ -110,10 +110,10 @@ contract GlobalInvariants is
     function pool_strike_price_non_zero() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _hyper.getLatestEstimatedPrice(poolId));
+            emit LogUint256("pool's last price", _Portfolio.getLatestEstimatedPrice(poolId));
             emit LogUint256("strike price", curve.maxPrice);
 
             if (curve.maxPrice == 0) {
@@ -125,10 +125,10 @@ contract GlobalInvariants is
     function pool_maturity_never_less_last_timestamp() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("hyper pool last timestamp: ", pool.lastTimestamp);
+            emit LogUint256("Portfolio pool last timestamp: ", pool.lastTimestamp);
             emit LogUint256("maturity", curve.maturity());
 
             if (curve.maturity() < pool.lastTimestamp) {
@@ -141,11 +141,11 @@ contract GlobalInvariants is
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
 
-            HyperPool memory pool = getPool(address(_hyper), poolId);
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
             emit LogUint256("last timestamp", uint256(pool.lastTimestamp));
 
-            if (_hyper.getLatestEstimatedPrice(poolId) != 0) {
-                emit LogUint256("pool's last price", _hyper.getLatestEstimatedPrice(poolId));
+            if (_Portfolio.getLatestEstimatedPrice(poolId) != 0) {
+                emit LogUint256("pool's last price", _Portfolio.getLatestEstimatedPrice(poolId));
                 if (pool.liquidity == 0) {
                     emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
                 }
@@ -163,7 +163,7 @@ contract GlobalInvariants is
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
-        (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getLiquidityDeltas(poolId, deltaLiquidity);
+        (uint128 deltaAsset, uint128 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidity);
         emit LogUint256("deltaAsset", deltaAsset);
         if (deltaAsset == 0) {
             emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaAsset");
@@ -174,11 +174,11 @@ contract GlobalInvariants is
         }
     }
 
-    function pool_hyper_curve_assumptions() public view {
+    function pool_Portfolio_curve_assumptions() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioCurve memory curve = pool.params;
 
             assert(curve.fee != 0);
             assert(curve.priorityFee <= curve.fee);
@@ -188,20 +188,20 @@ contract GlobalInvariants is
         }
     }
 
-    function hyper_pool_assumptions() public {
+    function Portfolio_pool_assumptions() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperPair memory pair = pool.pair;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPair memory pair = pool.pair;
 
-            // The `getVirtualReserves` method always returns values less than Hyper’s respective `getReserve` function for each token of the pool’s pair.
+            // The `getVirtualReserves` method always returns values less than Portfolio’s respective `getReserve` function for each token of the pool’s pair.
 
             // `getVirtualReserves method`
-            (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getReserves(poolId);
+            (uint128 deltaAsset, uint128 deltaQuote) = _Portfolio.getReserves(poolId);
 
-            // Hyper's `getReserve` function for each of the pool's pair
-            uint256 assetReserves = _hyper.getReserve(pair.tokenAsset);
-            uint256 quoteReserves = _hyper.getReserve(pair.tokenQuote);
+            // Portfolio's `getReserve` function for each of the pool's pair
+            uint256 assetReserves = _Portfolio.getReserve(pair.tokenAsset);
+            uint256 quoteReserves = _Portfolio.getReserve(pair.tokenQuote);
 
             if (deltaAsset > assetReserves) {
                 emit LogUint256("deltaAsset", deltaAsset);
@@ -221,8 +221,8 @@ contract GlobalInvariants is
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioCurve memory curve = pool.params;
 
             (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
 
@@ -243,7 +243,7 @@ contract GlobalInvariants is
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
 
             (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getPoolAmounts();
 

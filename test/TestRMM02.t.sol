@@ -4,9 +4,9 @@ pragma solidity ^0.8.4;
 import "contracts/RMM02Portfolio.sol";
 
 import "./Setup.sol";
-import "./TestHyperAllocate.t.sol";
+import "./TestPortfolioAllocate.t.sol";
 
-contract TestRMM02 is TestHyperAllocate {
+contract TestRMM02 is TestPortfolioAllocate {
     function setUp() public override {
         super.setUp();
 

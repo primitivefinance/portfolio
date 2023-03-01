@@ -9,10 +9,10 @@ import {StdAssertions} from "forge-std/StdAssertions.sol";
 
 import "solmate/test/utils/mocks/MockERC20.sol";
 
-import "contracts/interfaces/IHyper.sol";
+import "contracts/interfaces/IPortfolio.sol";
 import {GhostState} from "../../HelperGhostLib.sol";
 import {ActorsState} from "../../HelperActorsLib.sol";
-import {HyperPool, HyperPosition, HyperPair, HyperCurve, Enigma, Assembly, MIN_VOLATILITY, MAX_VOLATILITY, MIN_FEE, MAX_FEE, MIN_DURATION, MAX_DURATION} from "contracts/HyperLib.sol";
+import {PortfolioPool, PortfolioPosition, PortfolioPair, PortfolioCurve, Enigma, Assembly, MIN_VOLATILITY, MAX_VOLATILITY, MIN_FEE, MAX_FEE, MIN_DURATION, MAX_DURATION} from "contracts/PortfolioLib.sol";
 
 interface Context {
     // Manipulate ghost environment
@@ -25,7 +25,7 @@ interface Context {
     function addGhostActor(address) external;
 
     // Ghost environment getters from Setup.sol
-    function subject() external view returns (IHyper);
+    function subject() external view returns (IPortfolio);
 
     function actor() external view returns (address);
 

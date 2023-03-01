@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperSwap is Setup {
+contract TestPortfolioSwap is Setup {
     function test_swap_increases_user_balance_token_out()
         public
         defaultConfig

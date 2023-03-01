@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "./setup/HandlerBase.sol";
 import "solmate/utils/SafeCastLib.sol";
 
-contract HandlerHyper is HandlerBase {
+contract HandlerPortfolio is HandlerBase {
     using SafeCastLib for uint;
 
     function callSummary() external view {
@@ -158,7 +158,7 @@ contract HandlerHyper is HandlerBase {
         bool isMutable = true;
         uint24 pairId = ctx.subject().getPairId(args.token0, args.token1);
         {
-            // HyperPair not created? Push a create pair call to the stack.
+            // PortfolioPair not created? Push a create pair call to the stack.
             if (pairId == 0) instructions.push(Enigma.encodeCreatePair(args.token0, args.token1));
 
             // Push create pool to stack
@@ -199,9 +199,9 @@ contract HandlerHyper is HandlerBase {
     }
 
     function fetchAccountingState() internal view returns (AccountingState memory) {
-        HyperPosition memory position = ctx.ghost().position(ctx.actor());
-        HyperPool memory pool = ctx.ghost().pool();
-        HyperPair memory pair = pool.pair;
+        PortfolioPosition memory position = ctx.ghost().position(ctx.actor());
+        PortfolioPool memory pool = ctx.ghost().pool();
+        PortfolioPair memory pair = pool.pair;
 
         address asset = pair.tokenAsset;
         address quote = pair.tokenQuote;
@@ -256,7 +256,7 @@ contract HandlerHyper is HandlerBase {
         transferQuoteIn = true;
 
         // Preconditions
-        HyperPool memory pool = ctx.ghost().pool();
+        PortfolioPool memory pool = ctx.ghost().pool();
         uint256 lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
             ? pool.pair.decimalsQuote
             : pool.pair.decimalsAsset;
@@ -359,12 +359,12 @@ contract HandlerHyper is HandlerBase {
         // TODO: Add use max flag support.
 
         // Get some liquidity.
-        HyperPosition memory pos = ctx.ghost().position(ctx.actor());
+        PortfolioPosition memory pos = ctx.ghost().position(ctx.actor());
         require(pos.freeLiquidity >= deltaLiquidity, "Not enough liquidity");
 
         if (pos.freeLiquidity >= deltaLiquidity) {
             // Preconditions
-            HyperPool memory pool = ctx.ghost().pool();
+            PortfolioPool memory pool = ctx.ghost().pool();
             assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
             // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
@@ -406,7 +406,7 @@ contract HandlerHyper is HandlerBase {
     }
 
     function checkVirtualInvariant() internal {
-        // HyperPool memory pool = ctx.ghost().pool();
+        // PortfolioPool memory pool = ctx.ghost().pool();
         // TODO: Breaks when we call this function on a pool with zero liquidity...
         (uint256 dAsset, uint256 dQuote) = ctx.subject().getReserves(ctx.ghost().poolId);
         emit log("dAsset", dAsset);

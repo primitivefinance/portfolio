@@ -1,6 +1,6 @@
-# Primitive Hyper
+# Primitive Portfolio
 
-Hyper is a replicating market maker.
+Portfolio is a replicating market maker.
 
 ## System Invariants
 
@@ -10,7 +10,7 @@ The system is designed around a single invariant:
 Balance >= Reserve
 ```
 
-Exposed via: `hyper.getNetBalance(token)`
+Exposed via: `Portfolio.getNetBalance(token)`
 
 For more invariants, [read this](./test/README.md).
 

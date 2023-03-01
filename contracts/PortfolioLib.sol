@@ -6,7 +6,7 @@ pragma solidity 0.8.13;
   -------------
 
   Comprehensive library with all structs, errors,
-  constants, and utils for Hyper.
+  constants, and utils for Portfolio.
 
   -------------
 
@@ -24,8 +24,8 @@ using SafeCastLib for uint256;
 using FixedPointMathLib for uint256;
 using FixedPointMathLib for int256;
 using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
-using {checkParameters, maturity, validateParameters} for HyperCurve global;
-using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for HyperPosition global;
+using {checkParameters, maturity, validateParameters} for PortfolioCurve global;
+using {changePositionLiquidity, syncPositionFees, getTimeSinceChanged} for PortfolioPosition global;
 using {
     changePoolLiquidity,
     changePoolParameters,
@@ -39,7 +39,7 @@ using {
     syncPoolTimestamp,
     lastTau,
     computeTau
-} for HyperPool global;
+} for PortfolioPool global;
 
 uint256 constant MIN_MAX_PRICE = 1;
 uint256 constant MAX_MAX_PRICE = type(uint128).max;
@@ -90,14 +90,14 @@ error ZeroOutput();
 error ZeroPrice();
 error ZeroValue();
 
-struct HyperPair {
+struct PortfolioPair {
     address tokenAsset;
     uint8 decimalsAsset;
     address tokenQuote;
     uint8 decimalsQuote;
 }
 
-struct HyperCurve {
+struct PortfolioCurve {
     // single slot
     uint128 maxPrice;
     uint16 jit;
@@ -108,7 +108,7 @@ struct HyperCurve {
     uint32 createdAt;
 }
 
-struct HyperPool {
+struct PortfolioPool {
     uint128 virtualX;
     uint128 virtualY;
     uint128 liquidity; // available liquidity to remove
@@ -117,12 +117,12 @@ struct HyperPool {
     uint256 invariantGrowthGlobal;
     uint256 feeGrowthGlobalAsset;
     uint256 feeGrowthGlobalQuote;
-    HyperCurve params;
-    HyperPair pair;
+    PortfolioCurve params;
+    PortfolioPair pair;
 }
 
 // todo: optimize slot
-struct HyperPosition {
+struct PortfolioPosition {
     uint128 freeLiquidity;
     uint256 lastTimestamp;
     uint256 invariantGrowthLast;
@@ -180,28 +180,28 @@ struct Payment {
 
 // ===== Effects ===== //
 
-function changePoolLiquidity(HyperPool storage self, int128 liquidityDelta) {
+function changePoolLiquidity(PortfolioPool storage self, int128 liquidityDelta) {
     self.liquidity = Assembly.addSignedDelta(self.liquidity, liquidityDelta);
 }
 
-function syncPoolTimestamp(HyperPool storage self, uint256 timestamp) {
+function syncPoolTimestamp(PortfolioPool storage self, uint256 timestamp) {
     self.lastTimestamp = SafeCastLib.safeCastTo32(timestamp);
 }
 
-function changePoolParameters(HyperPool storage self, HyperCurve memory updated) {
+function changePoolParameters(PortfolioPool storage self, PortfolioCurve memory updated) {
     (bool success, ) = updated.validateParameters();
     self.params = updated;
     assert(success);
 }
 
-function changePositionLiquidity(HyperPosition storage self, uint256 timestamp, int128 liquidityDelta) {
+function changePositionLiquidity(PortfolioPosition storage self, uint256 timestamp, int128 liquidityDelta) {
     self.lastTimestamp = timestamp;
     self.freeLiquidity = Assembly.addSignedDelta(self.freeLiquidity, liquidityDelta);
 }
 
 /** @dev Liquidity must be altered after syncing positions and not before. */
 function syncPositionFees(
-    HyperPosition storage self,
+    PortfolioPosition storage self,
     uint256 feeGrowthAsset,
     uint256 feeGrowthQuote,
     uint256 invariantGrowth
@@ -227,12 +227,12 @@ function syncPositionFees(
 
 // ===== View ===== //
 
-function getPoolVirtualReserves(HyperPool memory self) pure returns (uint128 reserveAsset, uint128 reserveQuote) {
+function getPoolVirtualReserves(PortfolioPool memory self) pure returns (uint128 reserveAsset, uint128 reserveQuote) {
     return self.getPoolLiquidityDeltas(-int128(self.liquidity)); // rounds down
 }
 
 function getPoolMaxLiquidity(
-    HyperPool memory self,
+    PortfolioPool memory self,
     uint256 deltaAsset,
     uint256 deltaQuote
 ) pure returns (uint128 deltaLiquidity) {
@@ -244,7 +244,7 @@ function getPoolMaxLiquidity(
 
 /** @dev Rounds positive deltas up. Rounds negative deltas down. */
 function getPoolLiquidityDeltas(
-    HyperPool memory self,
+    PortfolioPool memory self,
     int128 deltaLiquidity
 ) pure returns (uint128 deltaAsset, uint128 deltaQuote) {
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
@@ -266,47 +266,47 @@ function getPoolLiquidityDeltas(
 }
 
 /** @dev Decimal amounts per WAD of liquidity, rounded down... */
-function getPoolAmounts(HyperPool memory self) pure returns (uint256 amountAssetDec, uint256 amountQuoteDec) {
+function getPoolAmounts(PortfolioPool memory self) pure returns (uint256 amountAssetDec, uint256 amountQuoteDec) {
     (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
     amountAssetDec = amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset);
     amountQuoteDec = amountQuoteWad.scaleFromWadDown(self.pair.decimalsQuote);
 }
 
 /** @dev WAD Amounts per WAD of liquidity. */
-function getAmountsWad(HyperPool memory self) pure returns (uint256 amountAssetWad, uint256 amountQuoteWad) {
+function getAmountsWad(PortfolioPool memory self) pure returns (uint256 amountAssetWad, uint256 amountQuoteWad) {
     amountAssetWad = self.virtualX;
     amountQuoteWad = self.virtualY;
 }
 
 // ===== Derived ===== //
 
-function getTimeSinceChanged(HyperPosition memory self, uint256 timestamp) pure returns (uint256 distance) {
+function getTimeSinceChanged(PortfolioPosition memory self, uint256 timestamp) pure returns (uint256 distance) {
     return timestamp - self.lastTimestamp;
 }
 
-function exists(HyperPool memory self) pure returns (bool) {
+function exists(PortfolioPool memory self) pure returns (bool) {
     return self.lastTimestamp != 0;
 }
 
-function isMutable(HyperPool memory self) pure returns (bool) {
+function isMutable(PortfolioPool memory self) pure returns (bool) {
     return self.controller != address(0);
 }
 
-function lastTau(HyperPool memory self) pure returns (uint256) {
+function lastTau(PortfolioPool memory self) pure returns (uint256) {
     return self.computeTau(self.lastTimestamp);
 }
 
-function computeTau(HyperPool memory self, uint256 timestamp) pure returns (uint256) {
+function computeTau(PortfolioPool memory self, uint256 timestamp) pure returns (uint256) {
     uint256 end = self.params.maturity();
     if (timestamp > end) return 0;
     return end - timestamp;
 }
 
-function maturity(HyperCurve memory self) pure returns (uint32 endTimestamp) {
+function maturity(PortfolioCurve memory self) pure returns (uint32 endTimestamp) {
     return (Assembly.convertDaysToSeconds(self.duration) + self.createdAt).safeCastTo32();
 }
 
-function validateParameters(HyperCurve memory self) pure returns (bool, bytes memory) {
+function validateParameters(PortfolioCurve memory self) pure returns (bool, bytes memory) {
     (bool success, bytes memory reason) = self.checkParameters();
     if (!success) {
         assembly {
@@ -318,7 +318,7 @@ function validateParameters(HyperCurve memory self) pure returns (bool, bytes me
 }
 
 /** @dev Invalid parameters should revert. Bound checks are inclusive. */
-function checkParameters(HyperCurve memory self) pure returns (bool, bytes memory) {
+function checkParameters(PortfolioCurve memory self) pure returns (bool, bytes memory) {
     if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
     if (!Assembly.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
         return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));

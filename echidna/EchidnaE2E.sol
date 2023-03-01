@@ -1,40 +1,40 @@
 pragma solidity ^0.8.4;
 
-import "../../test/helpers/HelperHyperProfiles.sol" as DefaultValues;
+import "../../test/helpers/HelperPortfolioProfiles.sol" as DefaultValues;
 import "./GlobalInvariants.sol";
 
 contract EchidnaE2E is GlobalInvariants {
     constructor() GlobalInvariants() {
         EchidnaERC20 _asset = create_token("Asset Token", "ADEC6", 6);
         EchidnaERC20 _quote = create_token("Quote Token", "QDEC18", 18);
-        add_created_hyper_token(_asset);
-        add_created_hyper_token(_quote);
+        add_created_Portfolio_token(_asset);
+        add_created_Portfolio_token(_quote);
         create_pair_with_safe_preconditions(1, 2);
         create_non_controlled_pool(0, 1, 0, 0, 0, 100);
     }
 
-    AccountLib.AccountSystem hyperAccount;
+    AccountLib.AccountSystem PortfolioAccount;
 
     // ******************** Check Proper System Deployment ********************
     function check_proper_deployment() public view {
         assert(address(_weth) != address(0));
-        assert(address(_hyper) != address(0));
+        assert(address(_Portfolio) != address(0));
 
         // Note: This invariant may break with tokens on hooks.
-        assert(_hyper.locked() == 1);
+        assert(_Portfolio.locked() == 1);
 
         // Retrieve the AccountLib.__account__
-        bool settled = _hyper.__account__();
+        bool settled = _Portfolio.__account__();
         assert(settled);
     }
 
     // TODO: Find a better name here with `pool_` at the beginning
 
-    function check_hyper_curve_assumptions() public view {
+    function check_Portfolio_curve_assumptions() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperCurve memory curve = pool.params;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioCurve memory curve = pool.params;
 
             assert(curve.fee != 0);
             assert(curve.priorityFee <= curve.fee);
@@ -45,20 +45,20 @@ contract EchidnaE2E is GlobalInvariants {
     }
 
     // TODO: Find a better name here with `pool_` at the beginning
-    function check_hyper_pool_assumptions() public {
+    function check_Portfolio_pool_assumptions() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            HyperPool memory pool = getPool(address(_hyper), poolId);
-            HyperPair memory pair = pool.pair;
+            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPair memory pair = pool.pair;
 
-            // The `getReserves` method always returns values less than Hyper’s respective `getReserve` function for each token of the pool’s pair.
+            // The `getReserves` method always returns values less than Portfolio’s respective `getReserve` function for each token of the pool’s pair.
 
             // `getReserves method`
-            (uint128 deltaAsset, uint128 deltaQuote) = _hyper.getReserves(poolId);
+            (uint128 deltaAsset, uint128 deltaQuote) = _Portfolio.getReserves(poolId);
 
-            // Hyper's `getReserve` function for each of the pool's pair
-            uint256 assetReserves = _hyper.getReserve(pair.tokenAsset);
-            uint256 quoteReserves = _hyper.getReserve(pair.tokenQuote);
+            // Portfolio's `getReserve` function for each of the pool's pair
+            uint256 assetReserves = _Portfolio.getReserve(pair.tokenAsset);
+            uint256 quoteReserves = _Portfolio.getReserve(pair.tokenQuote);
 
             if (deltaAsset > assetReserves) {
                 emit LogUint256("deltaAsset", deltaAsset);
@@ -90,7 +90,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint16 jit,
         uint128 price
     ) public {
-        (HyperPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(preChangeState.isMutable());
@@ -106,11 +106,11 @@ contract EchidnaE2E is GlobalInvariants {
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
-        _hyper.changeParameters(poolId, priorityFee, fee, jit);
+        _Portfolio.changeParameters(poolId, priorityFee, fee, jit);
         {
-            (HyperPool memory postChangeState, , , ) = retrieve_random_pool_and_tokens(id);
-            HyperCurve memory preChangeCurve = preChangeState.params;
-            HyperCurve memory postChangeCurve = postChangeState.params;
+            (PortfolioPool memory postChangeState, , , ) = retrieve_random_pool_and_tokens(id);
+            PortfolioCurve memory preChangeCurve = preChangeState.params;
+            PortfolioCurve memory postChangeCurve = postChangeState.params;
             assert(postChangeState.lastTimestamp == preChangeState.lastTimestamp);
             assert(postChangeState.controller == address(this));
             assert(postChangeCurve.createdAt == preChangeCurve.createdAt);
@@ -136,7 +136,7 @@ contract EchidnaE2E is GlobalInvariants {
     ) public {
         maxPrice;
 
-        (HyperPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(!preChangeState.isMutable());
@@ -152,7 +152,7 @@ contract EchidnaE2E is GlobalInvariants {
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
-        try _hyper.changeParameters(poolId, priorityFee, fee, jit) {
+        try _Portfolio.changeParameters(poolId, priorityFee, fee, jit) {
             emit AssertionFailed("BUG: Changing pool parameters of a nonmutable pool should not be possible");
         } catch {}
     }
@@ -168,10 +168,10 @@ contract EchidnaE2E is GlobalInvariants {
         (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        HyperPosition memory preClaimPosition = getPosition(address(_hyper), address(this), poolId);
+        PortfolioPosition memory preClaimPosition = getPosition(address(_Portfolio), address(this), poolId);
         require(preClaimPosition.lastTimestamp != 0);
 
-        try _hyper.multiprocess(EnigmaLib.encodeClaim(poolId, deltaAsset, deltaQuote)) {
+        try _Portfolio.multiprocess(EnigmaLib.encodeClaim(poolId, deltaAsset, deltaQuote)) {
             // if tokens were owned, decrement from position
             // if tokens were owed, getBalance of tokens increased for the caller
         } catch {
@@ -191,25 +191,25 @@ contract EchidnaE2E is GlobalInvariants {
     function unallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
         uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
         uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
-        (uint256 deltaAsset, uint256 deltaQuote) = _hyper.getReserves(poolId);
+        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getReserves(poolId);
 
-        _hyper.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
-        HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+        PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
         {
             uint256 postUnallocateAssetBalance = _asset.balanceOf(address(this));
             uint256 postUnallocateQuoteBalance = _quote.balanceOf(address(this));
@@ -230,12 +230,12 @@ contract EchidnaE2E is GlobalInvariants {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
-        HyperCurve memory curve = pool.params;
+        PortfolioCurve memory curve = pool.params;
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
 
@@ -245,7 +245,7 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        // HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        // PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
 
         if (curve.maturity() <= block.timestamp) {
             emit LogUint256("Maturity timestamp", curve.maturity());
@@ -253,25 +253,25 @@ contract EchidnaE2E is GlobalInvariants {
             swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
             try
-                _hyper.multiprocess(
+                _Portfolio.multiprocess(
                     EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
                 )
             {
-                // HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+                // PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
             } catch {}
         }
     }
 
     function swap_on_zero_amount_should_fail(uint256 id) public {
         // Will always return a pool that exists
-        (HyperPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         uint256 amount = 0;
 
         swap_should_fail(pool.params, poolId, true, amount, id, "BUG: Swap with zero amount should fail.");
     }
 
     function swap_should_fail(
-        HyperCurve memory curve,
+        PortfolioCurve memory curve,
         uint64 poolId,
         bool sellAsset,
         uint256 amount,
@@ -282,7 +282,7 @@ contract EchidnaE2E is GlobalInvariants {
         limit;
 
         try
-            _hyper.multiprocess(
+            _Portfolio.multiprocess(
                 EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 0 : 1))
             )
         {
@@ -296,12 +296,12 @@ contract EchidnaE2E is GlobalInvariants {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
-        HyperCurve memory curve = pool.params;
+        PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
@@ -313,18 +313,20 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        uint256 prevReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 prevReserveBuy = getReserve(address(_hyper), address(_quote));
+        uint256 prevReserveSell = getReserve(address(_Portfolio), address(_asset));
+        uint256 prevReserveBuy = getReserve(address(_Portfolio), address(_quote));
 
-        uint256 prePoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
-        HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.multiprocess(EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1)));
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
+        uint256 prePoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
+        PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
+        _Portfolio.multiprocess(
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+        );
+        PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
 
-        uint256 postReserveSell = getReserve(address(_hyper), address(_asset));
-        uint256 postReserveBuy = getReserve(address(_hyper), address(_quote));
+        uint256 postReserveSell = getReserve(address(_Portfolio), address(_asset));
+        uint256 postReserveBuy = getReserve(address(_Portfolio), address(_quote));
 
-        uint256 postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
+        uint256 postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
 
         if (postPoolLastPrice == 0) {
             emit LogUint256("lastPrice", postPoolLastPrice);
@@ -368,12 +370,12 @@ contract EchidnaE2E is GlobalInvariants {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
-        HyperCurve memory curve = pool.params;
+        PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
@@ -386,21 +388,21 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("limit:", limit);
 
         _T_ memory t = _T_({
-            prevReserveSell: getReserve(address(_hyper), address(_quote)),
-            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
-            prePoolLastPrice: _hyper.getLatestEstimatedPrice(poolId),
+            prevReserveSell: getReserve(address(_Portfolio), address(_quote)),
+            prevReserveBuy: getReserve(address(_Portfolio), address(_asset)),
+            prePoolLastPrice: _Portfolio.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
         {
-            HyperPool memory prePool = getPool(address(_hyper), poolId);
-            _hyper.multiprocess(
+            PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
+            _Portfolio.multiprocess(
                 EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
             );
-            HyperPool memory postPool = getPool(address(_hyper), poolId);
-            t.postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
+            PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
+            t.postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
 
             if (t.postPoolLastPrice < t.prePoolLastPrice) {
                 emit LogUint256("price before swap", t.prePoolLastPrice);
@@ -410,8 +412,8 @@ contract EchidnaE2E is GlobalInvariants {
                 );
             }
 
-            t.postReserveSell = getReserve(address(_hyper), address(_quote));
-            t.postReserveBuy = getReserve(address(_hyper), address(_asset));
+            t.postReserveSell = getReserve(address(_Portfolio), address(_quote));
+            t.postReserveBuy = getReserve(address(_Portfolio), address(_asset));
 
             // feeGrowthSell = quote
             check_external_swap_invariants(
@@ -437,12 +439,12 @@ contract EchidnaE2E is GlobalInvariants {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
-        HyperCurve memory curve = pool.params;
+        PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
@@ -455,21 +457,23 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("limit:", limit);
 
         _T_ memory t = _T_({
-            prevReserveSell: getReserve(address(_hyper), address(_quote)),
-            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
-            prePoolLastPrice: _hyper.getLatestEstimatedPrice(poolId),
+            prevReserveSell: getReserve(address(_Portfolio), address(_quote)),
+            prevReserveBuy: getReserve(address(_Portfolio), address(_asset)),
+            prePoolLastPrice: _Portfolio.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
-        HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.multiprocess(EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1)));
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
-        t.postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
+        PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
+        _Portfolio.multiprocess(
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+        );
+        PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
+        t.postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
 
-        t.postReserveSell = getReserve(address(_hyper), address(_asset));
-        t.postReserveBuy = getReserve(address(_hyper), address(_quote));
+        t.postReserveSell = getReserve(address(_Portfolio), address(_asset));
+        t.postReserveBuy = getReserve(address(_Portfolio), address(_quote));
 
         if (t.postReserveSell < t.prevReserveSell) {
             emit LogUint256("asset reserve before swap", t.prevReserveSell);
@@ -500,12 +504,12 @@ contract EchidnaE2E is GlobalInvariants {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
-        HyperCurve memory curve = pool.params;
+        PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint128).max);
@@ -518,21 +522,23 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("limit:", limit);
 
         _T_ memory t = _T_({
-            prevReserveSell: getReserve(address(_hyper), address(_quote)),
-            prevReserveBuy: getReserve(address(_hyper), address(_asset)),
-            prePoolLastPrice: _hyper.getLatestEstimatedPrice(poolId),
+            prevReserveSell: getReserve(address(_Portfolio), address(_quote)),
+            prevReserveBuy: getReserve(address(_Portfolio), address(_asset)),
+            prePoolLastPrice: _Portfolio.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
-        HyperPool memory prePool = getPool(address(_hyper), poolId);
-        _hyper.multiprocess(EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1)));
-        HyperPool memory postPool = getPool(address(_hyper), poolId);
-        t.postPoolLastPrice = _hyper.getLatestEstimatedPrice(poolId);
+        PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
+        _Portfolio.multiprocess(
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+        );
+        PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
+        t.postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
 
-        t.postReserveSell = getReserve(address(_hyper), address(_quote));
-        t.postReserveBuy = getReserve(address(_hyper), address(_asset));
+        t.postReserveSell = getReserve(address(_Portfolio), address(_quote));
+        t.postReserveBuy = getReserve(address(_Portfolio), address(_asset));
 
         if (t.prevReserveSell < t.prevReserveSell) {
             emit LogUint256("quote reserve before swap", t.prevReserveSell);

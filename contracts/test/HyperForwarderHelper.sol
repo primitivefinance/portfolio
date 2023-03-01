@@ -5,7 +5,7 @@ interface IERC20 {
     function approve(address spender, uint256 amount) external;
 }
 
-contract HyperForwarderHelper {
+contract PortfolioForwarderHelper {
     Caller public caller;
 
     event Success();
@@ -19,7 +19,7 @@ contract HyperForwarderHelper {
         caller.approve(token, target, type(uint256).max);
     }
 
-    // Assumes Hyper calls this, for testing only.
+    // Assumes Portfolio calls this, for testing only.
     function pass(address target, bytes calldata data) external payable returns (bool) {
         try caller.forward{value: msg.value}(target, data) {
             emit Success();
@@ -37,7 +37,7 @@ contract HyperForwarderHelper {
     }
 }
 
-/// @dev msg.sender in Hyper calls.
+/// @dev msg.sender in Portfolio calls.
 contract Caller {
     function approve(address token, address to, uint256 amount) external {
         IERC20(token).approve(to, amount);

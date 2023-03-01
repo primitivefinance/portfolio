@@ -6,7 +6,7 @@ import "../contracts/libraries/AssemblyLib.sol";
 
 //import "solmate/utils/SafeCast.sol";
 
-contract TestHyperClaim is Setup {
+contract TestPortfolioClaim is Setup {
     using FixedPointMathLib for uint;
     using SafeCastLib for uint;
 
@@ -24,8 +24,8 @@ contract TestHyperClaim is Setup {
         useActor
         isArmed
     {
-        HyperPosition memory pos = ghost().position(actor());
-        HyperPool memory pool = ghost().pool();
+        PortfolioPosition memory pos = ghost().position(actor());
+        PortfolioPool memory pool = ghost().pool();
         uint128 tokensOwed = Assembly
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity)
@@ -51,8 +51,8 @@ contract TestHyperClaim is Setup {
         useActor
         isArmed
     {
-        HyperPosition memory pos = ghost().position(actor());
-        HyperPool memory pool = ghost().pool();
+        PortfolioPosition memory pos = ghost().position(actor());
+        PortfolioPool memory pool = ghost().pool();
         uint128 tokensOwed = Assembly
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity)
@@ -74,8 +74,8 @@ contract TestHyperClaim is Setup {
     {
         // Has asset tokens owed
 
-        HyperPosition memory pos = ghost().position(actor());
-        HyperPool memory pool = ghost().pool();
+        PortfolioPosition memory pos = ghost().position(actor());
+        PortfolioPool memory pool = ghost().pool();
         uint128 tokensOwed = Assembly
             .computeCheckpointDistance(pool.feeGrowthGlobalQuote, pos.feeGrowthQuoteLast)
             .mulWadDown(pool.liquidity)
@@ -101,8 +101,8 @@ contract TestHyperClaim is Setup {
         subject().draw(ghost().asset().to_addr(), type(uint).max, actor());
         subject().draw(ghost().quote().to_addr(), type(uint).max, actor());
 
-        HyperPosition memory pos = ghost().position(actor());
-        HyperPool memory pool = ghost().pool();
+        PortfolioPosition memory pos = ghost().position(actor());
+        PortfolioPool memory pool = ghost().pool();
         (uint128 fee0, uint128 fee1) = (uint128(pos.tokensOwedAsset), uint128(pos.tokensOwedQuote));
         assertTrue(fee0 > 0, "fee0-zero");
         assertTrue(pool.liquidity == 0, "non-zero-liquidity");
@@ -160,7 +160,7 @@ contract TestHyperClaim is Setup {
         subject().multiprocess(EnigmaLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(0))); // trade in 1500 * 1% fee = 15 / 12_000 = 0.00125 fee growth per liquidity
 
         // save the total fee growth for the asset per liquidity.
-        HyperPool memory pool = ghost().pool();
+        PortfolioPool memory pool = ghost().pool();
         // uint256 totalLiquidity = pool.liquidity; // 12_000
         uint256 totalFeeAssetPerLiquidity = pool.feeGrowthGlobalAsset; // 0.00125
 

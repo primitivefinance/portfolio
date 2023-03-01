@@ -5,14 +5,14 @@ contract AllocateUnallocate is EchidnaStateHandling {
     // ******************** Allocate ********************
     function allocate_should_succeed_with_correct_preconditions(uint256 id, uint128 deltaLiquidity) public {
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(_hyper.getLatestEstimatedPrice(poolId) != 0);
+        require(_Portfolio.getLatestEstimatedPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero
@@ -24,7 +24,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         }
 
         int128 deltaLiquidityInt = convertToInt128(uint128(deltaLiquidity));
-        (uint256 deltaAsset, uint256 deltaQuote) = _hyper.getLiquidityDeltas(poolId, deltaLiquidityInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
@@ -33,8 +33,8 @@ contract AllocateUnallocate is EchidnaStateHandling {
         execute_allocate_call(poolId, _asset, _quote, deltaAsset, deltaQuote, deltaLiquidity);
 
         if (!hasFunded) {
-            _asset.burn(address(_hyper), 20);
-            _quote.burn(address(_hyper), 20);
+            _asset.burn(address(_Portfolio), 20);
+            _quote.burn(address(_Portfolio), 20);
             hasFunded = true;
         }
     }
@@ -47,21 +47,21 @@ contract AllocateUnallocate is EchidnaStateHandling {
         uint128 deltaQuote,
         uint128 deltaLiquidity
     ) internal {
-        // Caller must have a balance and have approved hyper
+        // Caller must have a balance and have approved Portfolio
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
         address[] memory owners = new address[](1);
 
         // Save pre allocation state
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
 
-        (uint256 allocateAsset, uint256 allocateQuote) = _hyper.getLiquidityDeltas(deltaLiquidity);
-        _hyper.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity));
+        (uint256 allocateAsset, uint256 allocateQuote) = _Portfolio.getLiquidityDeltas(deltaLiquidity);
+        _Portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity));
         emit LogUint256("allocate asset return", allocateAsset);
         emit LogUint256("allocate quote return", allocateQuote);
 
-        HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+        PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
         {
             // Reserves in both tokens should increase
             if (preState.reserveAsset + deltaAsset != postState.reserveAsset) {
@@ -109,47 +109,47 @@ contract AllocateUnallocate is EchidnaStateHandling {
         }
 
         int128 deltaLiquidityInt = convertToInt128(uint128(deltaLiquidity));
-        (uint256 deltaAsset, uint256 deltaQuote) = _hyper.getLiquidityDeltas(poolId, deltaLiquidityInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
         emit LogUint256("deltaLiquidity", deltaLiquidity);
 
-        // Caller must have a balance and have approved hyper
+        // Caller must have a balance and have approved Portfolio
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        try _hyper.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
+        try _Portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
             emit AssertionFailed("BUG: allocate with non existent pool should fail");
         } catch {}
     }
 
     function allocate_with_zero_delta_liquidity_should_fail(uint256 id) public {
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(_hyper.getLatestEstimatedPrice(poolId) != 0);
+        require(_Portfolio.getLatestEstimatedPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         uint128 deltaLiquidity = 0;
 
         int128 deltaLiquidityInt = convertToInt128(uint128(deltaLiquidity));
-        (uint256 deltaAsset, uint256 deltaQuote) = _hyper.getLiquidityDeltas(poolId, deltaLiquidityInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
         emit LogUint256("deltaLiquidity", deltaLiquidity);
 
-        // Caller must have a balance and have approved hyper
+        // Caller must have a balance and have approved Portfolio
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        try _hyper.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
+        try _Portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
             emit AssertionFailed("BUG: allocate with deltaLiquidity=0 should fail");
         } catch {}
     }
@@ -162,25 +162,25 @@ contract AllocateUnallocate is EchidnaStateHandling {
     function unallocate_with_correct_preconditions_should_succeed(uint256 id, uint128 amount) public {
         address[] memory owners = new address[](1);
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
-        HyperState memory preState = getState(address(_hyper), poolId, address(this), owners);
+        PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
         uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
         uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
-        (uint256 deltaAsset, uint256 deltaQuote) = _hyper.getReserves(poolId);
+        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getReserves(poolId);
 
-        _hyper.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
-        HyperState memory postState = getState(address(_hyper), poolId, address(this), owners);
+        PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
         {
             uint256 postUnallocateAssetBalance = _asset.balanceOf(address(this));
             uint256 postUnallocateQuoteBalance = _quote.balanceOf(address(this));
@@ -198,7 +198,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
 
     // A user without a position should not be able to unallocate funds
     function unallocate_without_position_should_fail(uint256 id, uint256 amount) public {
-        (HyperPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
@@ -216,7 +216,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
     // Caller position last timestamp <= block.timestamp, with JIT policy
     // A user should not be able to unallocate more than they own
     function unallocate_should_fail(uint64 poolId, uint256 amount, string memory failureMsg) private {
-        try _hyper.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount)) {
+        try _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount)) {
             emit AssertionFailed(failureMsg);
         } catch {}
     }
@@ -224,14 +224,14 @@ contract AllocateUnallocate is EchidnaStateHandling {
     // A user calling allocate then unallocate should succeed
     function allocate_then_unallocate_should_succeed(uint256 id, uint128 amount) public {
         (
-            HyperPool memory pool,
+            PortfolioPool memory pool,
             uint64 poolId,
             EchidnaERC20 _asset,
             EchidnaERC20 _quote
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(_hyper.getLatestEstimatedPrice(poolId) != 0);
+        require(_Portfolio.getLatestEstimatedPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero
@@ -243,13 +243,13 @@ contract AllocateUnallocate is EchidnaStateHandling {
         }
 
         int128 amountInt = convertToInt128(uint128(amount));
-        (uint256 deltaAsset, uint256 deltaQuote) = _hyper.getLiquidityDeltas(poolId, amountInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, amountInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
         emit LogUint256("amount", amount);
 
         execute_allocate_call(poolId, _asset, _quote, deltaAsset, deltaQuote, amount);
-        _hyper.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
     }
 }

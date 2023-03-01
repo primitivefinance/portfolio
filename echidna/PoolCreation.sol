@@ -37,11 +37,11 @@ contract PoolCreation is EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, false);
+            (PortfolioPool memory pool, uint64 poolId) = execute_create_pool(pairId, createPoolData, false);
             assert(!pool.isMutable());
-            HyperCurve memory curve = pool.params;
+            PortfolioCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
-            assert(_hyper.getLatestEstimatedPrice(poolId) == price);
+            assert(_Portfolio.getLatestEstimatedPrice(poolId) == price);
             assert(curve.createdAt == block.timestamp);
             assert(pool.controller == address(0));
             assert(curve.priorityFee == 0);
@@ -88,9 +88,9 @@ contract PoolCreation is EchidnaStateHandling {
             price
         );
         {
-            (HyperPool memory pool, ) = execute_create_pool(pairId, createPoolData, true);
+            (PortfolioPool memory pool, ) = execute_create_pool(pairId, createPoolData, true);
             assert(pool.isMutable());
-            HyperCurve memory curve = pool.params;
+            PortfolioCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
             assert(curve.createdAt == block.timestamp);
             assert(pool.controller == address(this));
@@ -137,7 +137,7 @@ contract PoolCreation is EchidnaStateHandling {
             maxPrice,
             price
         );
-        (bool success, ) = address(_hyper).call(createPoolData);
+        (bool success, ) = address(_Portfolio).call(createPoolData);
         assert(!success);
     }
 
@@ -145,18 +145,18 @@ contract PoolCreation is EchidnaStateHandling {
         uint24 pairId,
         bytes memory createPoolData,
         bool hasController
-    ) private returns (HyperPool memory pool, uint64 poolId) {
-        uint256 preCreationPoolNonce = _hyper.getPoolNonce();
-        (bool success, ) = address(_hyper).call(createPoolData);
+    ) private returns (PortfolioPool memory pool, uint64 poolId) {
+        uint256 preCreationPoolNonce = _Portfolio.getPoolNonce();
+        (bool success, ) = address(_Portfolio).call(createPoolData);
         assert(success);
 
         // pool nonce should increase by 1 each time a pool is created
-        uint256 poolNonce = _hyper.getPoolNonce();
+        uint256 poolNonce = _Portfolio.getPoolNonce();
         assert(poolNonce == preCreationPoolNonce + 1);
 
         // pool should be created and exist
         poolId = ProcessingLib.encodePoolId(pairId, hasController, uint32(poolNonce));
-        pool = getPool(address(_hyper), poolId);
+        pool = getPool(address(_Portfolio), poolId);
         if (!pool.exists()) {
             emit AssertionFailed("BUG: Pool should return true on exists after being created.");
         }

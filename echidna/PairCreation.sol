@@ -14,10 +14,10 @@ contract PairCreation is EchidnaStateHandling {
         string memory shortform,
         uint8 decimals
     ) public returns (EchidnaERC20 token) {
-        token = new EchidnaERC20(tokenName, shortform, decimals, address(_hyper));
+        token = new EchidnaERC20(tokenName, shortform, decimals, address(_Portfolio));
         assert(token.decimals() == decimals);
         if (decimals >= 6 && decimals <= 18) {
-            add_created_hyper_token(token);
+            add_created_Portfolio_token(token);
         }
         return token;
     }
@@ -28,24 +28,24 @@ contract PairCreation is EchidnaStateHandling {
     */
     function create_pair_with_safe_preconditions(uint256 id1, uint256 id2) public {
         // retrieve an existing rpair of tokens that wee created with 6-18 decimals
-        (EchidnaERC20 asset, EchidnaERC20 quote) = get_hyper_tokens(id1, id2);
+        (EchidnaERC20 asset, EchidnaERC20 quote) = get_Portfolio_tokens(id1, id2);
         emit LogUint256("decimals asset", asset.decimals());
         emit LogUint256("decimals quote", quote.decimals());
-        emit LogUint256("pair ID", uint256(_hyper.getPairId(address(asset), address(quote))));
+        emit LogUint256("pair ID", uint256(_Portfolio.getPairId(address(asset), address(quote))));
 
         require(asset.decimals() >= 6 && asset.decimals() <= 18);
         require(quote.decimals() >= 6 && quote.decimals() <= 18);
         require(asset != quote);
         // require that this pair ID does not exist yet
-        if (_hyper.getPairId(address(asset), address(quote)) != 0) {
+        if (_Portfolio.getPairId(address(asset), address(quote)) != 0) {
             return;
         }
         // without this, Echidna may decide to call the EchidnaERC20.setDecimals
-        uint256 preCreationNonce = _hyper.getPairNonce();
+        uint256 preCreationNonce = _Portfolio.getPairNonce();
 
-        // encode createPair arguments and call hyper contract
+        // encode createPair arguments and call Portfolio contract
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(asset), address(quote));
-        (bool success, bytes memory err) = address(_hyper).call(createPairData);
+        (bool success, bytes memory err) = address(_Portfolio).call(createPairData);
         if (!success) {
             emit LogBytes("error", err);
             emit AssertionFailed("FAILED");
@@ -53,7 +53,7 @@ contract PairCreation is EchidnaStateHandling {
 
         pair_id_saved_properly(address(asset), address(quote));
 
-        uint256 pairNonce = _hyper.getPairNonce();
+        uint256 pairNonce = _Portfolio.getPairNonce();
         assert(pairNonce == preCreationNonce + 1);
     }
 
@@ -62,14 +62,14 @@ contract PairCreation is EchidnaStateHandling {
      */
     function pair_id_saved_properly(address asset, address quote) private {
         // retrieve recently created pair ID
-        uint24 pairId = _hyper.getPairId(address(asset), address(quote));
+        uint24 pairId = _Portfolio.getPairId(address(asset), address(quote));
         if (pairId == 0) {
             emit LogUint256("PairId Exists", uint256(pairId));
             assert(false);
         }
 
         // retrieve pair information and ensure pair was saved
-        HyperPair memory pair = getPair(address(_hyper), pairId);
+        PortfolioPair memory pair = getPair(address(_Portfolio), pairId);
         assert(pair.tokenAsset == address(asset));
         assert(pair.decimalsAsset == EchidnaERC20(asset).decimals());
         assert(pair.tokenQuote == address(quote));
@@ -82,7 +82,7 @@ contract PairCreation is EchidnaStateHandling {
     function create_same_pair_should_fail() public {
         EchidnaERC20 quote = create_token("Create same pair asset fail", "CSPF", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(quote), address(quote));
-        (bool success, ) = address(_hyper).call(createPairData);
+        (bool success, ) = address(_Portfolio).call(createPairData);
         assert(!success);
     }
 
@@ -91,7 +91,7 @@ contract PairCreation is EchidnaStateHandling {
         EchidnaERC20 testToken = create_token("create less min decimals asset fail", "CLMDF", uint8(decimals));
         EchidnaERC20 quote = create_token("create less min decimals quote", "CLMDQ", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(testToken), address(quote));
-        (bool success, ) = address(_hyper).call(createPairData);
+        (bool success, ) = address(_Portfolio).call(createPairData);
         assert(!success);
     }
 
@@ -100,7 +100,7 @@ contract PairCreation is EchidnaStateHandling {
         EchidnaERC20 testToken = create_token("Create more than max decimals fail", "CMTMF", uint8(decimals));
         EchidnaERC20 quote = create_token("Create more than max decimals fail quote", "CMTMF2", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(testToken), address(quote));
-        (bool success, ) = address(_hyper).call(createPairData);
+        (bool success, ) = address(_Portfolio).call(createPairData);
         assert(!success);
     }
 
@@ -108,8 +108,8 @@ contract PairCreation is EchidnaStateHandling {
         EchidnaERC20 _quote = create_token("Quote Token 15 Decimals", "QDEC15", 15);
         EchidnaERC20 _asset = create_token("Asset Token 18 Decimals", "ADEC18", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(_asset), address(_quote));
-        (bool success, ) = address(_hyper).call(createPairData);
+        (bool success, ) = address(_Portfolio).call(createPairData);
         assert(!success);
-        pairId = _hyper.getPairId(address(_asset), address(_quote));
+        pairId = _Portfolio.getPairId(address(_asset), address(_quote));
     }
 }

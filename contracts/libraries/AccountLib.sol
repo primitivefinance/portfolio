@@ -149,7 +149,7 @@ function settle(
     int256 net = self.getNetBalance(token, account);
     if (net > 0) {
         credited = uint256(net);
-        // unaccounted for tokens, e.g. transferred directly into Hyper.
+        // unaccounted for tokens, e.g. transferred directly into Portfolio.
         self.credit(msg.sender, token, uint256(net)); // gift to `msg.sender`.
         self.reserves[token] += uint256(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {

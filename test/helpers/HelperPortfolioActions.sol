@@ -2,9 +2,9 @@
 pragma solidity ^0.8.4;
 
 import "contracts/libraries/EnigmaLib.sol" as ProcessingLib;
-import "./HelperHyperProfiles.sol";
+import "./HelperPortfolioProfiles.sol";
 
-contract HelperHyperActions {
+contract HelperPortfolioActions {
     /** @dev Encodes jump process for creating a pair + curve + pool in one tx. */
     function createPool(
         address token0,
@@ -37,14 +37,14 @@ contract HelperHyperActions {
         data = ProcessingLib.encodeJumpInstruction(instructions);
     }
 
-    function allocatePool(address hyper, uint64 poolId, uint256 amount) internal {
+    function allocatePool(address portfolio, uint64 poolId, uint256 amount) internal {
         bytes memory data = ProcessingLib.encodeAllocate(
             0, // useMax = false
             poolId,
             0x0, // amount multiplier = 10^0 = 1
             uint128(amount)
         );
-        (bool success, ) = hyper.call{value: 0}(data);
+        (bool success, ) = portfolio.call{value: 0}(data);
         require(success, "failed to allocate");
     }
 }

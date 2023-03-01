@@ -1,7 +1,7 @@
 pragma solidity >=0.8.13;
 
 import "solmate/utils/FixedPointMathLib.sol";
-import {HyperPool} from "../HyperLib.sol";
+import {PortfolioPool} from "../PortfolioLib.sol";
 
 /**
  * @notice Geometric portfolio objective.
@@ -13,7 +13,7 @@ library RMM02Lib {
     /**
      * @custom:math k = 1 - (R1 / w)^(w) (R2/(1-w))^(1-w)
      */
-    function invariantOf(HyperPool memory pool, uint r1, uint r2, uint weight) internal pure returns (int) {
+    function invariantOf(PortfolioPool memory pool, uint r1, uint r2, uint weight) internal pure returns (int) {
         //(uint r1, uint r2) = (pool.virtualX, pool.virtualY);
         uint w1 = weight;
         uint w2 = 1 ether - weight;
@@ -26,7 +26,7 @@ library RMM02Lib {
     }
 
     function getAmountOut(
-        HyperPool memory pool,
+        PortfolioPool memory pool,
         uint weight,
         bool xIn,
         uint amountIn,
@@ -49,7 +49,7 @@ library RMM02Lib {
     // price * weight / (1 - weight) = bi / bo
     // price *
     function computeReservesWithPrice(
-        HyperPool memory pool,
+        PortfolioPool memory pool,
         uint price,
         uint weight,
         uint balance
@@ -62,7 +62,7 @@ library RMM02Lib {
         r2 = r1.divWadDown(price.mulWadDown(wi.divWadDown(1 ether - wo)));
     }
 
-    function computePrice(HyperPool memory pool, uint weight) internal pure returns (uint price) {
+    function computePrice(PortfolioPool memory pool, uint weight) internal pure returns (uint price) {
         price = uint(pool.virtualX).divWadDown(weight).mulWadDown((1 ether - weight).divWadDown(uint(pool.virtualY)));
     }
 }

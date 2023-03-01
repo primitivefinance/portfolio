@@ -2,7 +2,7 @@
 pragma solidity 0.8.13;
 
 import "solstat/Invariant.sol";
-import {HyperPool, Iteration, SwapInputTooSmall, Assembly} from "../HyperLib.sol";
+import {PortfolioPool, Iteration, SwapInputTooSmall, Assembly} from "../PortfolioLib.sol";
 
 uint256 constant PERCENTAGE = 10_000;
 uint256 constant SQRT_WAD = 1e9;
@@ -26,7 +26,12 @@ library RMM01Lib {
     error UndefinedPrice();
     error OverflowWad(int256 wad);
 
-    function invariantOf(HyperPool memory self, uint r1, uint r2, uint timeRemainingSec) internal pure returns (int) {
+    function invariantOf(
+        PortfolioPool memory self,
+        uint r1,
+        uint r2,
+        uint timeRemainingSec
+    ) internal pure returns (int) {
         return
             Invariant.invariant({
                 R_y: r2,
@@ -42,7 +47,7 @@ library RMM01Lib {
      * @custom:error Maximum absolute error of 1e-6.
      */
     function getAmountOut(
-        HyperPool memory self,
+        PortfolioPool memory self,
         bool direction,
         uint amountIn,
         uint secondsPassed
@@ -66,7 +71,7 @@ library RMM01Lib {
     }
 
     function getSwapData(
-        HyperPool memory self,
+        PortfolioPool memory self,
         bool direction,
         uint amountIn,
         uint secondsPassed
@@ -84,7 +89,7 @@ library RMM01Lib {
     }
 
     function computeSwapStep(
-        HyperPool memory self,
+        PortfolioPool memory self,
         Iteration memory data,
         bool direction,
         uint tau
@@ -122,7 +127,7 @@ library RMM01Lib {
     }
 
     function computeReservesWithPrice(
-        HyperPool memory self,
+        PortfolioPool memory self,
         uint priceWad,
         int128 inv
     ) internal pure returns (uint256 R_y, uint256 R_x) {
@@ -217,7 +222,7 @@ library RMM01Lib {
     // ===== Swaps ===== //
 
     function getNextInvariant(
-        HyperPool memory self,
+        PortfolioPool memory self,
         uint256 timeSinceUpdate
     ) internal pure returns (int128 invariant, uint256 tau) {
         tau = self.lastTau();

@@ -14,7 +14,7 @@ import "./HelperSubjectsLib.sol";
 import "./HelperUtils.sol" as Utils;
 
 /**
- * @dev Hyper's test environment is setup to easily extend the tests with new configurations, actors, or environment states.
+ * @dev Portfolio's test environment is setup to easily extend the tests with new configurations, actors, or environment states.
  *
  * For every test:
  * Do you have the `useActor` modifier?
@@ -107,8 +107,8 @@ contract Setup is Test {
      * @notice Contract that is being tested.
      * @dev Target subject is a ghost variable because it changes in the environment.
      */
-    function subject() public view virtual returns (IHyper) {
-        return IHyper(_ghost.subject);
+    function subject() public view virtual returns (IPortfolio) {
+        return IPortfolio(_ghost.subject);
     }
 
     /**

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import "contracts/interfaces/IHyper.sol";
-import "contracts/HyperLib.sol";
+import "contracts/interfaces/IPortfolio.sol";
+import "contracts/PortfolioLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import {Coin} from "./HelperUtils.sol";
 
@@ -21,29 +21,29 @@ struct GhostState {
  * - Edit ghost variables via `file`.
  * - Fetch ghost variables via view functions.
  * - Fetch the tokens of the subject configuration as the `Coin` type, with utility functions.
- * - Fetch the subject's state as structs instead of variables, e.g. HyperPair, HyperPool, or HyperPosition.
+ * - Fetch the subject's state as structs instead of variables, e.g. PortfolioPair, PortfolioPool, or PortfolioPosition.
  */
 library Ghost {
     error InvalidFileKey(bytes32 what);
 
-    function pair(GhostState memory self) internal view returns (HyperPair memory) {
+    function pair(GhostState memory self) internal view returns (PortfolioPair memory) {
         return self.pool().pair;
     }
 
-    function pool(GhostState memory self) internal view returns (HyperPool memory) {
-        return IHyperStruct(self.subject).pools(self.poolId);
+    function pool(GhostState memory self) internal view returns (PortfolioPool memory) {
+        return IPortfolioStruct(self.subject).pools(self.poolId);
     }
 
-    function position(GhostState memory self, address owner) internal view returns (HyperPosition memory) {
-        return IHyperStruct(self.subject).positions(owner, self.poolId);
+    function position(GhostState memory self, address owner) internal view returns (PortfolioPosition memory) {
+        return IPortfolioStruct(self.subject).positions(owner, self.poolId);
     }
 
-    function pairOf(GhostState memory self, uint24 pairId) internal view returns (HyperPair memory) {
-        return IHyperStruct(self.subject).pairs(pairId);
+    function pairOf(GhostState memory self, uint24 pairId) internal view returns (PortfolioPair memory) {
+        return IPortfolioStruct(self.subject).pairs(pairId);
     }
 
-    function poolOf(GhostState memory self, uint64 poolId) internal view returns (HyperPool memory) {
-        return IHyperStruct(self.subject).pools(poolId);
+    function poolOf(GhostState memory self, uint64 poolId) internal view returns (PortfolioPool memory) {
+        return IPortfolioStruct(self.subject).pools(poolId);
     }
 
     function file(GhostState storage self, bytes32 what, bytes memory data) internal {
@@ -59,11 +59,11 @@ library Ghost {
     }
 
     function net(GhostState memory self, address token) internal view returns (int) {
-        return IHyperGetters(self.subject).getNetBalance(token);
+        return IPortfolioGetters(self.subject).getNetBalance(token);
     }
 
     function balance(GhostState memory self, address account, address token) internal view returns (uint) {
-        return IHyperGetters(self.subject).getBalance(account, token);
+        return IPortfolioGetters(self.subject).getBalance(account, token);
     }
 
     function physicalBalance(GhostState memory self, address token) internal view returns (uint) {
@@ -71,10 +71,10 @@ library Ghost {
     }
 
     function reserve(GhostState memory self, address token) internal view returns (uint) {
-        return IHyperGetters(self.subject).getReserve(token);
+        return IPortfolioGetters(self.subject).getReserve(token);
     }
 
-    function config(GhostState memory self) internal view returns (HyperCurve memory) {
+    function config(GhostState memory self) internal view returns (PortfolioCurve memory) {
         return self.pool().params;
     }
 
@@ -87,10 +87,10 @@ library Ghost {
     }
 }
 
-interface IHyperStruct {
-    function pairs(uint24 pairId) external view returns (HyperPair memory);
+interface IPortfolioStruct {
+    function pairs(uint24 pairId) external view returns (PortfolioPair memory);
 
-    function positions(address owner, uint64 positionId) external view returns (HyperPosition memory);
+    function positions(address owner, uint64 positionId) external view returns (PortfolioPosition memory);
 
-    function pools(uint64 poolId) external view returns (HyperPool memory);
+    function pools(uint64 poolId) external view returns (PortfolioPool memory);
 }

@@ -1,4 +1,4 @@
-# Primitive Hyper Testing
+# Primitive Portfolio Testing
 
 Primitive follows [test driven development](https://en.wikipedia.org/wiki/Test-driven_development).
 
@@ -86,11 +86,11 @@ At this point, you should be setup to interact with the test suites.
 
 System invariants are tested using Foundry's invariant testing. There is no documentation for Foundry's invariant testing at the moment, so use the dapptools docs as a reference: [Invariant Testing](https://github.com/dapphub/dapptools/blob/master/src/dapp/README.md#invariant-testing).
 
-### Hyper.sol
+### Portfolio.sol
 
 #### Global
 
-- Token balances of Hyper should be greater than or equal to the `reserves` of all tokens.
+- Token balances of Portfolio should be greater than or equal to the `reserves` of all tokens.
 - For every pool, `reserves` of the pool's tokens should always be greater than the `getAmounts` output for the pool's entire liquidity.
 - The sum of liquidity in all pools must be equal to the sum of liquidity of every position.
 - The `lock` variable must always return `1` outside of execution.
@@ -106,15 +106,15 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The `msg.value` amount of ether sent to the contract is deposited into the weth contract via `deposit() payable`.
 - Postconditions:
   - Caller's `balances` value of `weth` increased by `msg.value`.
-  - Hyper's `address(this).balance` is equal to the balance prior to calling the function.
-  - Hyper's `reserves` value for `weth` increased by `msg.value`.
-  - Hyper's `balanceOf` `weth` increased by `msg.value`.
+  - Portfolio's `address(this).balance` is equal to the balance prior to calling the function.
+  - Portfolio's `reserves` value for `weth` increased by `msg.value`.
+  - Portfolio's `balanceOf` `weth` increased by `msg.value`.
   - The `Deposit` event was emitted.
 
 #### Fund
 
 - Preconditions:
-  - Caller must approve hyper to spend `amount` of tokens.
+  - Caller must approve Portfolio to spend `amount` of tokens.
   - Caller must have a balance greater than equal to `amount` of tokens.
 - During Execution:
   - The `token` must be added to the `__account__.warm` address array.
@@ -122,8 +122,8 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - Postconditions:
   - The Caller's `balances` value for the `token` increased by `amount`.
   - The `IncreaseUserBalance` event was emitted.
-  - Hyper's `reserves` value for the `token` increased by `amount`.
-  - The `balanceOf` Hyper for `token` increased by `amount`.
+  - Portfolio's `reserves` value for the `token` increased by `amount`.
+  - The `balanceOf` Portfolio for `token` increased by `amount`.
   - Calling `draw` with the same `amount` always suceeds.
 
 #### Draw
@@ -135,9 +135,9 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - Postcondition:
   - The Caller's `balances` value for `token` decreased by `amount`.
   - The `DecreaseUserBalance` event was emitted.
-  - Hyper's `reserves` value for the `token` decreased by `amount`.
+  - Portfolio's `reserves` value for the `token` decreased by `amount`.
   - The `to` address received `amount` of token or `amount` of Ether, if `token === weth`.
-  - Hyper's `balanceOf` value for `token` decreased by `amount`.
+  - Portfolio's `balanceOf` value for `token` decreased by `amount`.
 
 #### Claim
 
@@ -164,8 +164,8 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The Caller's `positions` `freeLiquidity` for `poolId` always increased by `deltaLiquidity`.
   - Calling `unallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
-  - Hyper's `reserves` value for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
-  - The `balanceOf` Hyper for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
+  - Portfolio's `reserves` value for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
+  - The `balanceOf` Portfolio for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
   - The `ChangePosition` event is emitted.
   - The `Allocate` event is emitted.
   - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
@@ -183,8 +183,8 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The Caller's `positions` `freeLiquidity` for `poolId` always decreases by `deltaLiquidity`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - The Caller's `balances` value for the pool's tokens increases by respective amounts computed with `getAmounts`.
-  - Hyper's `reserves` value for the pool's tokens stays the same.
-  - The `balanceOf` Hyper for the pool's tokens stays the same.
+  - Portfolio's `reserves` value for the pool's tokens stays the same.
+  - The `balanceOf` Portfolio for the pool's tokens stays the same.
   - The `DecreasePosition` event is emitted.
   - The `Unallocate` event is emitted.
   - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
@@ -193,7 +193,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 
 - Preconditions:
   - For swaps with the argument `direction = 0` then the input token for `poolId` is the pair's `pair.tokenAsset`, else or swaps with the argument `direction = 1` then the input token for `poolId` is the pair's `pair.tokenQuote`
-    - Caller must have approved token to be spent by Hyper and have `input` of tokens, or Caller must have `input` of tokens in their `balances`.
+    - Caller must have approved token to be spent by Portfolio and have `input` of tokens, or Caller must have `input` of tokens in their `balances`.
   - The `pools` `poolId` value must return a `lastTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
   - The `input` amount must be greater than zero.
   - The `poolId`'s `curve.maturity` value must be less than `block.timestamp`.
@@ -203,10 +203,10 @@ System invariants are tested using Foundry's invariant testing. There is no docu
     - Greater than `limit` price if `direction == 0`.
     - Less than `limit` price if `direction == 1`.
 - Postconditions:
-  - Hyper's `reserves` changed:
+  - Portfolio's `reserves` changed:
     - For `input` amount, changed by zero if Caller used their internal balance.
     - For `input` amount, changed by `input` if Caller paid with external tokens.
     - For `output` amount, changed by zero.
-  - Hyper's `balanceOf` respective tokens changed equal to changes in `reserves`.
+  - Portfolio's `balanceOf` respective tokens changed equal to changes in `reserves`.
   - The `Swap` event was emitted.
   - The `PoolUpdate` event was emitted.

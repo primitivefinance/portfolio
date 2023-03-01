@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperUnallocate is Setup {
+contract TestPortfolioUnallocate is Setup {
     function test_unallocate_max() public noJit defaultConfig useActor usePairTokens(10 ether) isArmed {
         uint128 amt = 1 ether;
         subject().multiprocess(EnigmaLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.13;
 
-import "./HyperLib.sol";
-import "./interfaces/IHyper.sol";
+import "./PortfolioLib.sol";
+import "./interfaces/IPortfolio.sol";
 import "./interfaces/IERC20.sol";
 
 /**
  * @notice Virtual interface to implement the logic for a "Portfolio".
  */
-abstract contract Objective is IHyper {
+abstract contract Objective is IPortfolio {
     // ===== Internal Effects ===== //
     /**
      * @dev Used to apply changes to `_state`.
@@ -65,7 +65,7 @@ abstract contract Objective is IHyper {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn
-    ) public view virtual override(IHyperGetters) returns (uint256 output);
+    ) public view virtual override(IPortfolioGetters) returns (uint256 output);
 
     /**
      * @dev Estimates the `price` of a pool with `poolId` given the pool's reserves.
