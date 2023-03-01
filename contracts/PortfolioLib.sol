@@ -51,6 +51,7 @@ error InvalidFee(uint16 fee);
 error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
 error InvalidJit(uint16);
+error InvalidPair();
 error InvalidReentrancy();
 error InvalidReward();
 error InvalidSettlement();
