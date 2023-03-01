@@ -227,7 +227,7 @@ function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint6
 /**
  * @dev Encodes a swap operation
  *      +-------------------------------------------------------------------------------+
- *      | Description | SWAP | poolId | power0 | amount0 | power1 | amount1 | direction |
+ *      | Description | SWAP | poolId | power0 | amount0 | power1 | amount1 | sellAsset |
  *      +-------------+------+--------+--------+---------+--------+---------+-----------+
  *      | Size (byte) |   1  |    8   |    1   |    16   |    1   |    16   |      1    |
  *      +-------------+------+--------+--------+---------+--------+---------+-----------+
@@ -241,7 +241,7 @@ function encodeSwap(
     uint128 amount0,
     uint8 power1,
     uint128 amount1,
-    uint8 direction
+    uint8 sellAsset
 ) pure returns (bytes memory data) {
     data = abi.encodePacked(
         AssemblyLib.pack(bytes1(useMax), SWAP),
@@ -250,16 +250,16 @@ function encodeSwap(
         amount0,
         power1,
         amount1,
-        direction
+        sellAsset
     );
 }
 
 function decodeSwap(
     bytes calldata data
-) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 direction) {
+) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset) {
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
     input = AssemblyLib.toAmount(data[9:26]);
     output = AssemblyLib.toAmount(data[26:43]);
-    direction = uint8(data[data.length - 1]);
+    sellAsset = uint8(data[data.length - 1]);
 }

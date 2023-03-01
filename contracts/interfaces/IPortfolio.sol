@@ -38,16 +38,16 @@ interface IPortfolioEvents {
     event DecreaseReserveBalance(address indexed token, uint256 amount);
 
     /**
-     * @dev Assigns `input` amount of `tokenIn` to Portfolio's reserves.
+     * @dev Assigns `input` amount of `sellAsset` to Portfolio's reserves.
      * Unassigns `output` amount of `tokenOut` from Portfolio's reserves.
      * @param price Post-swap approximated marginal price in wad units.
-     * @param feeAmountDec Amount of `tokenIn` tokens paid as a fee.
+     * @param feeAmountDec Amount of `sellAsset` tokens paid as a fee.
      * @param invariantWad Post-swap invariant in wad units.
      */
     event Swap(
         uint64 indexed poolId,
         uint256 price,
-        address indexed tokenIn,
+        address indexed sellAsset,
         uint256 input,
         address indexed tokenOut,
         uint256 output,

@@ -48,7 +48,7 @@ abstract contract Objective is IPortfolio {
      */
     function computeMaxInput(
         uint64 poolId,
-        bool direction,
+        bool sellAsset,
         uint reserveIn,
         uint liquidity
     ) public view virtual returns (uint);

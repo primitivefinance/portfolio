@@ -192,7 +192,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 #### Swap
 
 - Preconditions:
-  - For swaps with the argument `direction = 0` then the input token for `poolId` is the pair's `pair.tokenAsset`, else or swaps with the argument `direction = 1` then the input token for `poolId` is the pair's `pair.tokenQuote`
+  - For swaps with the argument `sellAsset = 0` then the input token for `poolId` is the pair's `pair.tokenAsset`, else or swaps with the argument `sellAsset = 1` then the input token for `poolId` is the pair's `pair.tokenQuote`
     - Caller must have approved token to be spent by Portfolio and have `input` of tokens, or Caller must have `input` of tokens in their `balances`.
   - The `pools` `poolId` value must return a `lastTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
   - The `input` amount must be greater than zero.
@@ -200,8 +200,8 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - During Execution:
   - If `useMax` === 1, the `remainder` value in memory must be initialized with the Caller's entire `balances` value of the input token.
   - The memory `_swap.price` value must not be:
-    - Greater than `limit` price if `direction == 0`.
-    - Less than `limit` price if `direction == 1`.
+    - Greater than `limit` price if `sellAsset == 0`.
+    - Less than `limit` price if `sellAsset == 1`.
 - Postconditions:
   - Portfolio's `reserves` changed:
     - For `input` amount, changed by zero if Caller used their internal balance.

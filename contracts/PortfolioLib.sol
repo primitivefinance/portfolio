@@ -138,7 +138,7 @@ struct Order {
     uint128 input;
     // For swapExactIn or swapExactOut, output is the limit price.
     uint128 output;
-    uint8 direction;
+    uint8 sellAsset;
 }
 
 struct Iteration {
@@ -154,7 +154,7 @@ struct Iteration {
 
 struct SwapState {
     bool sell;
-    address tokenInput;
+    address sellAssetput;
     address tokenOutput;
     uint256 fee;
     uint256 feeGrowthGlobal;

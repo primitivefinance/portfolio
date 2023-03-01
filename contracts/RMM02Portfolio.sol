@@ -72,12 +72,12 @@ contract RMM02Portfolio is PortfolioVirtual {
     /// @inheritdoc Objective
     function computeMaxInput(
         uint64 poolId,
-        bool direction,
+        bool sellAsset,
         uint256 reserveIn,
         uint256 liquidity
     ) public view override returns (uint256) {
         uint256 maxInput;
-        if (direction) {
+        if (sellAsset) {
             maxInput = 10000 ether; // There can be maximum 1:1 ratio between assets and liqudiity.
         } else {
             maxInput = 10000 ether; // There can be maximum strike:1 liquidity ratio between quote and liquidity.

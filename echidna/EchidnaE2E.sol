@@ -254,7 +254,7 @@ contract EchidnaE2E is GlobalInvariants {
         } else {
             try
                 _portfolio.multiprocess(
-                    EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                    EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
                 )
             {
                 // PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
@@ -283,7 +283,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         try
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 1 : 0))
             )
         {
             emit AssertionFailed(message);
@@ -319,7 +319,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 prePoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
         _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
         );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
 
@@ -399,7 +399,7 @@ contract EchidnaE2E is GlobalInvariants {
         {
             PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             );
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
             t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
@@ -467,7 +467,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
         _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
         );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
         t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
@@ -532,7 +532,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
         _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
         );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
         t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);

@@ -308,7 +308,7 @@ abstract contract PortfolioVirtual is Objective {
         }
     }
 
-    /** @dev Swaps in direction (0 or 1) input of tokens (0 = asset, 1 = quote) for output of tokens (0 = quote, 1 = asset). */
+    /** @dev Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote) for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset). */
     function _swap(
         Order memory args
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
@@ -317,10 +317,10 @@ abstract contract PortfolioVirtual is Objective {
         PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
-        _state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
+        _state.sell = args.sellAsset == 1; // 1: true, 0: false
         _state.fee = msg.sender == pool.controller ? pool.params.priorityFee : uint256(pool.params.fee);
         _state.feeGrowthGlobal = _state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
-        _state.tokenInput = _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote;
+        _state.sellAssetput = _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote;
         _state.tokenOutput = _state.sell ? pool.pair.tokenQuote : pool.pair.tokenAsset;
 
         Iteration memory iteration;
@@ -441,7 +441,7 @@ abstract contract PortfolioVirtual is Objective {
             _state.invariantGrowthGlobal
         );
 
-        _increaseReserves(_state.tokenInput, iteration.input);
+        _increaseReserves(_state.sellAssetput, iteration.input);
         _decreaseReserves(_state.tokenOutput, iteration.output);
 
         {
@@ -450,7 +450,7 @@ abstract contract PortfolioVirtual is Objective {
             emit Swap(
                 id,
                 price,
-                _state.tokenInput,
+                _state.sellAssetput,
                 iteration.input,
                 _state.tokenOutput,
                 iteration.output,
@@ -632,7 +632,7 @@ abstract contract PortfolioVirtual is Objective {
             _deallocate(useMax == 1, poolId, deltaLiquidity);
         } else if (instruction == Enigma.SWAP) {
             Order memory args;
-            (args.useMax, args.poolId, args.input, args.output, args.direction) = Enigma.decodeSwap(data);
+            (args.useMax, args.poolId, args.input, args.output, args.sellAsset) = Enigma.decodeSwap(data);
             _swap(args);
         } else if (instruction == Enigma.CREATE_POOL) {
             (

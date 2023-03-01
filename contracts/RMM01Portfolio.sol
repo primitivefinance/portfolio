@@ -104,12 +104,12 @@ contract RMM01Portfolio is PortfolioVirtual {
     /// @inheritdoc Objective
     function computeMaxInput(
         uint64 poolId,
-        bool direction,
+        bool sellAsset,
         uint256 reserveIn,
         uint256 liquidity
     ) public view override returns (uint256) {
         uint256 maxInput;
-        if (direction) {
+        if (sellAsset) {
             maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio
             // between assets and liqudiity.
         } else {

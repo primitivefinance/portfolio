@@ -247,10 +247,10 @@ contract Setup is Test {
         _;
     }
 
-    modifier swapSome(uint128 amt, bool direction) {
-        uint128 amtOut = subject().getAmountOut(ghost().poolId, direction, amt).safeCastTo128();
+    modifier swapSome(uint128 amt, bool sellAsset) {
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt).safeCastTo128();
         subject().multiprocess(
-            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(direction ? 0 : 1))
+            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(sellAsset ? 1 : 0))
         );
         _;
     }
@@ -258,15 +258,15 @@ contract Setup is Test {
     modifier swapSomeGetOut(
         uint128 amt,
         int amtOutDelta,
-        bool direction
+        bool sellAsset
     ) {
-        uint128 amtOut = subject().getAmountOut(ghost().poolId, direction, amt).safeCastTo128();
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt).safeCastTo128();
         amtOut = amtOutDelta > 0
             ? amtOut + uint(amtOutDelta).safeCastTo128()
             : amtOut - uint(-amtOutDelta).safeCastTo128();
 
         subject().multiprocess(
-            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(direction ? 0 : 1))
+            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(sellAsset ? 1 : 0))
         );
         _;
     }
