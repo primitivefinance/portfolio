@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import {RMM01Portfolio as Portfolio} from "../../contracts/RMM01Portfolio.sol";
+import "solmate/test/utils/mocks/MockERC20.sol";
+
 import "contracts/PortfolioLib.sol";
-import "contracts/test/TestERC20.sol";
+import {RMM01Portfolio as Portfolio} from "contracts/RMM01Portfolio.sol";
 
 contract RevertCatcher {
     Portfolio public portfolio;
 
-    constructor(address Portfolio_) {
-        portfolio = Portfolio(payable(Portfolio_));
+    constructor(address portfolio_) {
+        portfolio = Portfolio(payable(portfolio_));
     }
 
     receive() external payable {}
 
     function approve(address token, address spender) external {
-        TestERC20(token).approve(spender, type(uint256).max);
+        MockERC20(token).approve(spender, type(uint256).max);
     }
 
     /** @dev Assumes portfolio calls this, for testing only. Uses try catch to bubble up errors. */
