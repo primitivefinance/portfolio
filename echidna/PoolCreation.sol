@@ -41,7 +41,7 @@ contract PoolCreation is EchidnaStateHandling {
             assert(!pool.isMutable());
             PortfolioCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
-            assert(_Portfolio.getLatestEstimatedPrice(poolId) == price);
+            assert(_portfolio.getLatestEstimatedPrice(poolId) == price);
             assert(curve.createdAt == block.timestamp);
             assert(pool.controller == address(0));
             assert(curve.priorityFee == 0);
@@ -137,7 +137,7 @@ contract PoolCreation is EchidnaStateHandling {
             maxPrice,
             price
         );
-        (bool success, ) = address(_Portfolio).call(createPoolData);
+        (bool success, ) = address(_portfolio).call(createPoolData);
         assert(!success);
     }
 
@@ -146,17 +146,17 @@ contract PoolCreation is EchidnaStateHandling {
         bytes memory createPoolData,
         bool hasController
     ) private returns (PortfolioPool memory pool, uint64 poolId) {
-        uint256 preCreationPoolNonce = _Portfolio.getPoolNonce();
-        (bool success, ) = address(_Portfolio).call(createPoolData);
+        uint256 preCreationPoolNonce = _portfolio.getPoolNonce();
+        (bool success, ) = address(_portfolio).call(createPoolData);
         assert(success);
 
         // pool nonce should increase by 1 each time a pool is created
-        uint256 poolNonce = _Portfolio.getPoolNonce();
+        uint256 poolNonce = _portfolio.getPoolNonce();
         assert(poolNonce == preCreationPoolNonce + 1);
 
         // pool should be created and exist
         poolId = ProcessingLib.encodePoolId(pairId, hasController, uint32(poolNonce));
-        pool = getPool(address(_Portfolio), poolId);
+        pool = getPool(address(_portfolio), poolId);
         if (!pool.exists()) {
             emit AssertionFailed("BUG: Pool should return true on exists after being created.");
         }

@@ -14,7 +14,7 @@ contract StatelessSwaps is Helper, Test {
     // contract Test is DSTest, StdAssertions, StdChains, StdCheats, StdUtils, TestBase
 
     WETH weth;
-    Portfolio Portfolio;
+    Portfolio portfolio;
     MockERC20 usdc;
     MockERC20 asset;
     MockERC20 quote;
@@ -29,7 +29,7 @@ contract StatelessSwaps is Helper, Test {
         usdc = new MockERC20("USD Coin", "USDC", 6);
         quote = new MockERC20("Quote", "QUOTE", 18);
         asset = new MockERC20("Asset", "ASSET", 18);
-        Portfolio = new Portfolio(address(weth));
+        portfolio = new Portfolio(address(weth));
 
         // vm.label(address(weth), "WETH");
         // vm.label(address(usdc), "USDC");
@@ -44,9 +44,9 @@ contract StatelessSwaps is Helper, Test {
         // usdc.mint(self, INITIAL_BALANCE);
         // quote.mint(self, INITIAL_BALANCE);
         // asset.mint(self, INITIAL_BALANCE);
-        // usdc.approve(address(Portfolio), type(uint256).max);
-        // quote.approve(address(Portfolio), type(uint256).max);
-        // asset.approve(address(Portfolio), type(uint256).max);
+        // usdc.approve(address(portfolio), type(uint256).max);
+        // quote.approve(address(portfolio), type(uint256).max);
+        // asset.approve(address(portfolio), type(uint256).max);
 
         // vm.startPrank(alice);
 
@@ -55,9 +55,9 @@ contract StatelessSwaps is Helper, Test {
         vm.prank(alice);
         asset.mint(alice, INITIAL_BALANCE);
         vm.prank(alice);
-        quote.approve(address(Portfolio), type(uint256).max);
+        quote.approve(address(portfolio), type(uint256).max);
         vm.prank(alice);
-        asset.approve(address(Portfolio), type(uint256).max);
+        asset.approve(address(portfolio), type(uint256).max);
 
         // vm.stopPrank();
     }
@@ -93,7 +93,7 @@ contract StatelessSwaps is Helper, Test {
             vm.prank(alice);
             createPool(vol, tau, uint128(stk), uint128(price));
             // Allocate liquidity.
-            (uint256 amountAsset, uint256 amountQuote) = Portfolio.getReserves(poolId);
+            (uint256 amountAsset, uint256 amountQuote) = portfolio.getReserves(poolId);
 
             // Need to bound liquidity accordingly,
             // so that the required tokens (= amount * liquidity) don't overflow.
@@ -108,13 +108,13 @@ contract StatelessSwaps is Helper, Test {
             emit LogUint256("Allocating liquidity:", liquidity);
 
             vm.prank(alice);
-            Portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity)));
+            portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity)));
         }
 
-        // Update stk to what Portfolio stores, otherwise calculations will be inexcat.
+        // Update stk to what portfolio stores, otherwise calculations will be inexcat.
         emit LogUint256("stk", stk);
         {
-            PortfolioPool memory pool = IPortfolioStruct(address(Portfolio)).pools(poolId);
+            PortfolioPool memory pool = IPortfolioStruct(address(portfolio)).pools(poolId);
 
             // Compute reserves to determine max input and output.
             (uint256 R_y, uint256 R_x) = RMM01Lib.computeReservesWithPrice(pool, price, 0);
@@ -161,10 +161,10 @@ contract StatelessSwaps is Helper, Test {
             // (uint256 R_y, uint256 R_x) = RMM01Lib.computeReserves(rmm, price);
             // console.log("R_x", R_x);
             // console.log("R_y", R_y);
-            // console.log("bal asset", Portfolio.getBalance(self, address(asset)));
-            // console.log("bal quote", Portfolio.getBalance(self, address(quote)));
-            Portfolio.draw(address(asset), Portfolio.getBalance(self, address(asset)), self);
-            Portfolio.draw(address(quote), Portfolio.getBalance(self, address(quote)), self);
+            // console.log("bal asset", portfolio.getBalance(self, address(asset)));
+            // console.log("bal quote", portfolio.getBalance(self, address(quote)));
+            portfolio.draw(address(asset), portfolio.getBalance(self, address(asset)), self);
+            portfolio.draw(address(quote), portfolio.getBalance(self, address(quote)), self);
 
             emit LogUint256("asset gain", asset.balanceOf(self) - INITIAL_BALANCE);
             emit LogUint256("quote gain", quote.balanceOf(self) - INITIAL_BALANCE);
@@ -200,7 +200,7 @@ contract StatelessSwaps is Helper, Test {
             instructions[0] = EnigmaLib.encodeCreatePair(token0, token1);
             data = EnigmaLib.encodeJumpInstruction(instructions);
 
-            (success, returndata) = address(Portfolio).call(data);
+            (success, returndata) = address(portfolio).call(data);
             if (!success) {
                 assembly {
                     revert(add(32, returndata), mload(returndata))
@@ -232,14 +232,14 @@ contract StatelessSwaps is Helper, Test {
 
         data = EnigmaLib.encodeJumpInstruction(instructions);
 
-        (success, returndata) = address(Portfolio).call(data);
+        (success, returndata) = address(portfolio).call(data);
         if (!success) {
             assembly {
                 revert(add(32, returndata), mload(returndata))
             }
         }
 
-        poolId = Enigma.encodePoolId(Portfolio.getPairNonce(), true, Portfolio.getPoolNonce());
+        poolId = Enigma.encodePoolId(portfolio.getPairNonce(), true, portfolio.getPoolNonce());
 
         console.log("PoolId", poolId);
 
@@ -280,7 +280,7 @@ contract StatelessSwaps is Helper, Test {
 
         bytes memory data = EnigmaLib.encodeJumpInstruction(instructions);
 
-        (success, returndata) = address(Portfolio).call(data);
+        (success, returndata) = address(portfolio).call(data);
     }
 }
 

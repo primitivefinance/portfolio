@@ -12,7 +12,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(_Portfolio.getLatestEstimatedPrice(poolId) != 0);
+        require(_portfolio.getLatestEstimatedPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero
@@ -24,7 +24,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         }
 
         int128 deltaLiquidityInt = convertToInt128(uint128(deltaLiquidity));
-        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
@@ -33,8 +33,8 @@ contract AllocateUnallocate is EchidnaStateHandling {
         execute_allocate_call(poolId, _asset, _quote, deltaAsset, deltaQuote, deltaLiquidity);
 
         if (!hasFunded) {
-            _asset.burn(address(_Portfolio), 20);
-            _quote.burn(address(_Portfolio), 20);
+            _asset.burn(address(_portfolio), 20);
+            _quote.burn(address(_portfolio), 20);
             hasFunded = true;
         }
     }
@@ -54,14 +54,14 @@ contract AllocateUnallocate is EchidnaStateHandling {
         address[] memory owners = new address[](1);
 
         // Save pre allocation state
-        PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
+        PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
 
-        (uint256 allocateAsset, uint256 allocateQuote) = _Portfolio.getLiquidityDeltas(deltaLiquidity);
-        _Portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity));
+        (uint256 allocateAsset, uint256 allocateQuote) = _portfolio.getLiquidityDeltas(deltaLiquidity);
+        _portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity));
         emit LogUint256("allocate asset return", allocateAsset);
         emit LogUint256("allocate quote return", allocateQuote);
 
-        PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
+        PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
         {
             // Reserves in both tokens should increase
             if (preState.reserveAsset + deltaAsset != postState.reserveAsset) {
@@ -109,7 +109,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         }
 
         int128 deltaLiquidityInt = convertToInt128(uint128(deltaLiquidity));
-        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
@@ -119,7 +119,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        try _Portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
+        try _portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
             emit AssertionFailed("BUG: allocate with non existent pool should fail");
         } catch {}
     }
@@ -133,13 +133,13 @@ contract AllocateUnallocate is EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(_Portfolio.getLatestEstimatedPrice(poolId) != 0);
+        require(_portfolio.getLatestEstimatedPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         uint128 deltaLiquidity = 0;
 
         int128 deltaLiquidityInt = convertToInt128(uint128(deltaLiquidity));
-        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getLiquidityDeltas(poolId, deltaLiquidityInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
@@ -149,7 +149,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         mint_and_approve(_asset, deltaAsset);
         mint_and_approve(_quote, deltaQuote);
 
-        try _Portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
+        try _portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)) {
             emit AssertionFailed("BUG: allocate with deltaLiquidity=0 should fail");
         } catch {}
     }
@@ -169,18 +169,18 @@ contract AllocateUnallocate is EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
-        PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
+        PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
         uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
         uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
-        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getReserves(poolId);
+        (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getReserves(poolId);
 
-        _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
-        PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
+        PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
         {
             uint256 postUnallocateAssetBalance = _asset.balanceOf(address(this));
             uint256 postUnallocateQuoteBalance = _quote.balanceOf(address(this));
@@ -216,7 +216,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
     // Caller position last timestamp <= block.timestamp, with JIT policy
     // A user should not be able to unallocate more than they own
     function unallocate_should_fail(uint64 poolId, uint256 amount, string memory failureMsg) private {
-        try _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount)) {
+        try _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount)) {
             emit AssertionFailed(failureMsg);
         } catch {}
     }
@@ -231,7 +231,7 @@ contract AllocateUnallocate is EchidnaStateHandling {
         ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        require(_Portfolio.getLatestEstimatedPrice(poolId) != 0);
+        require(_portfolio.getLatestEstimatedPrice(poolId) != 0);
         require(pool.lastTimestamp != 0);
 
         // ensures deltaLiquidity is never zero
@@ -243,13 +243,13 @@ contract AllocateUnallocate is EchidnaStateHandling {
         }
 
         int128 amountInt = convertToInt128(uint128(amount));
-        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, amountInt);
+        (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getLiquidityDeltas(poolId, amountInt);
 
         emit LogUint256("delta asset:", deltaAsset);
         emit LogUint256("delta quote:", deltaQuote);
         emit LogUint256("amount", amount);
 
         execute_allocate_call(poolId, _asset, _quote, deltaAsset, deltaQuote, amount);
-        _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
     }
 }

@@ -18,13 +18,13 @@ contract EchidnaE2E is GlobalInvariants {
     // ******************** Check Proper System Deployment ********************
     function check_proper_deployment() public view {
         assert(address(_weth) != address(0));
-        assert(address(_Portfolio) != address(0));
+        assert(address(_portfolio) != address(0));
 
         // Note: This invariant may break with tokens on hooks.
-        assert(_Portfolio.locked() == 1);
+        assert(_portfolio.locked() == 1);
 
         // Retrieve the AccountLib.__account__
-        bool settled = _Portfolio.__account__();
+        bool settled = _portfolio.__account__();
         assert(settled);
     }
 
@@ -33,7 +33,7 @@ contract EchidnaE2E is GlobalInvariants {
     function check_Portfolio_curve_assumptions() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
             assert(curve.fee != 0);
@@ -48,17 +48,17 @@ contract EchidnaE2E is GlobalInvariants {
     function check_Portfolio_pool_assumptions() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioPair memory pair = pool.pair;
 
             // The `getReserves` method always returns values less than Portfolio’s respective `getReserve` function for each token of the pool’s pair.
 
             // `getReserves method`
-            (uint128 deltaAsset, uint128 deltaQuote) = _Portfolio.getReserves(poolId);
+            (uint128 deltaAsset, uint128 deltaQuote) = _portfolio.getReserves(poolId);
 
             // Portfolio's `getReserve` function for each of the pool's pair
-            uint256 assetReserves = _Portfolio.getReserve(pair.tokenAsset);
-            uint256 quoteReserves = _Portfolio.getReserve(pair.tokenQuote);
+            uint256 assetReserves = _portfolio.getReserve(pair.tokenAsset);
+            uint256 quoteReserves = _portfolio.getReserve(pair.tokenQuote);
 
             if (deltaAsset > assetReserves) {
                 emit LogUint256("deltaAsset", deltaAsset);
@@ -106,7 +106,7 @@ contract EchidnaE2E is GlobalInvariants {
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
-        _Portfolio.changeParameters(poolId, priorityFee, fee, jit);
+        _portfolio.changeParameters(poolId, priorityFee, fee, jit);
         {
             (PortfolioPool memory postChangeState, , , ) = retrieve_random_pool_and_tokens(id);
             PortfolioCurve memory preChangeCurve = preChangeState.params;
@@ -152,7 +152,7 @@ contract EchidnaE2E is GlobalInvariants {
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
-        try _Portfolio.changeParameters(poolId, priorityFee, fee, jit) {
+        try _portfolio.changeParameters(poolId, priorityFee, fee, jit) {
             emit AssertionFailed("BUG: Changing pool parameters of a nonmutable pool should not be possible");
         } catch {}
     }
@@ -168,10 +168,10 @@ contract EchidnaE2E is GlobalInvariants {
         (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        PortfolioPosition memory preClaimPosition = getPosition(address(_Portfolio), address(this), poolId);
+        PortfolioPosition memory preClaimPosition = getPosition(address(_portfolio), address(this), poolId);
         require(preClaimPosition.lastTimestamp != 0);
 
-        try _Portfolio.multiprocess(EnigmaLib.encodeClaim(poolId, deltaAsset, deltaQuote)) {
+        try _portfolio.multiprocess(EnigmaLib.encodeClaim(poolId, deltaAsset, deltaQuote)) {
             // if tokens were owned, decrement from position
             // if tokens were owed, getBalance of tokens increased for the caller
         } catch {
@@ -198,18 +198,18 @@ contract EchidnaE2E is GlobalInvariants {
         ) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
-        PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
+        PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
         uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
         uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
-        (uint256 deltaAsset, uint256 deltaQuote) = _Portfolio.getReserves(poolId);
+        (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getReserves(poolId);
 
-        _Portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
-        PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
+        PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
         {
             uint256 postUnallocateAssetBalance = _asset.balanceOf(address(this));
             uint256 postUnallocateQuoteBalance = _quote.balanceOf(address(this));
@@ -245,7 +245,7 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        // PortfolioState memory preState = getState(address(_Portfolio), poolId, address(this), owners);
+        // PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
 
         if (curve.maturity() <= block.timestamp) {
             emit LogUint256("Maturity timestamp", curve.maturity());
@@ -253,11 +253,11 @@ contract EchidnaE2E is GlobalInvariants {
             swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
             try
-                _Portfolio.multiprocess(
+                _portfolio.multiprocess(
                     EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
                 )
             {
-                // PortfolioState memory postState = getState(address(_Portfolio), poolId, address(this), owners);
+                // PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
             } catch {}
         }
     }
@@ -282,7 +282,7 @@ contract EchidnaE2E is GlobalInvariants {
         limit;
 
         try
-            _Portfolio.multiprocess(
+            _portfolio.multiprocess(
                 EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 0 : 1))
             )
         {
@@ -313,20 +313,20 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        uint256 prevReserveSell = getReserve(address(_Portfolio), address(_asset));
-        uint256 prevReserveBuy = getReserve(address(_Portfolio), address(_quote));
+        uint256 prevReserveSell = getReserve(address(_portfolio), address(_asset));
+        uint256 prevReserveBuy = getReserve(address(_portfolio), address(_quote));
 
-        uint256 prePoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
-        PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
-        _Portfolio.multiprocess(
+        uint256 prePoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
+        PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
+        _portfolio.multiprocess(
             EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
         );
-        PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
+        PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
 
-        uint256 postReserveSell = getReserve(address(_Portfolio), address(_asset));
-        uint256 postReserveBuy = getReserve(address(_Portfolio), address(_quote));
+        uint256 postReserveSell = getReserve(address(_portfolio), address(_asset));
+        uint256 postReserveBuy = getReserve(address(_portfolio), address(_quote));
 
-        uint256 postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
+        uint256 postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
         if (postPoolLastPrice == 0) {
             emit LogUint256("lastPrice", postPoolLastPrice);
@@ -388,21 +388,21 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("limit:", limit);
 
         _T_ memory t = _T_({
-            prevReserveSell: getReserve(address(_Portfolio), address(_quote)),
-            prevReserveBuy: getReserve(address(_Portfolio), address(_asset)),
-            prePoolLastPrice: _Portfolio.getLatestEstimatedPrice(poolId),
+            prevReserveSell: getReserve(address(_portfolio), address(_quote)),
+            prevReserveBuy: getReserve(address(_portfolio), address(_asset)),
+            prePoolLastPrice: _portfolio.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
         {
-            PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
-            _Portfolio.multiprocess(
+            PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
+            _portfolio.multiprocess(
                 EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
             );
-            PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
-            t.postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
+            PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
+            t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
             if (t.postPoolLastPrice < t.prePoolLastPrice) {
                 emit LogUint256("price before swap", t.prePoolLastPrice);
@@ -412,8 +412,8 @@ contract EchidnaE2E is GlobalInvariants {
                 );
             }
 
-            t.postReserveSell = getReserve(address(_Portfolio), address(_quote));
-            t.postReserveBuy = getReserve(address(_Portfolio), address(_asset));
+            t.postReserveSell = getReserve(address(_portfolio), address(_quote));
+            t.postReserveBuy = getReserve(address(_portfolio), address(_asset));
 
             // feeGrowthSell = quote
             check_external_swap_invariants(
@@ -457,23 +457,23 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("limit:", limit);
 
         _T_ memory t = _T_({
-            prevReserveSell: getReserve(address(_Portfolio), address(_quote)),
-            prevReserveBuy: getReserve(address(_Portfolio), address(_asset)),
-            prePoolLastPrice: _Portfolio.getLatestEstimatedPrice(poolId),
+            prevReserveSell: getReserve(address(_portfolio), address(_quote)),
+            prevReserveBuy: getReserve(address(_portfolio), address(_asset)),
+            prePoolLastPrice: _portfolio.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
-        PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
-        _Portfolio.multiprocess(
+        PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
+        _portfolio.multiprocess(
             EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
         );
-        PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
-        t.postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
+        PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
+        t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
-        t.postReserveSell = getReserve(address(_Portfolio), address(_asset));
-        t.postReserveBuy = getReserve(address(_Portfolio), address(_quote));
+        t.postReserveSell = getReserve(address(_portfolio), address(_asset));
+        t.postReserveBuy = getReserve(address(_portfolio), address(_quote));
 
         if (t.postReserveSell < t.prevReserveSell) {
             emit LogUint256("asset reserve before swap", t.prevReserveSell);
@@ -522,23 +522,23 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("limit:", limit);
 
         _T_ memory t = _T_({
-            prevReserveSell: getReserve(address(_Portfolio), address(_quote)),
-            prevReserveBuy: getReserve(address(_Portfolio), address(_asset)),
-            prePoolLastPrice: _Portfolio.getLatestEstimatedPrice(poolId),
+            prevReserveSell: getReserve(address(_portfolio), address(_quote)),
+            prevReserveBuy: getReserve(address(_portfolio), address(_asset)),
+            prePoolLastPrice: _portfolio.getLatestEstimatedPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
-        PortfolioPool memory prePool = getPool(address(_Portfolio), poolId);
-        _Portfolio.multiprocess(
+        PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
+        _portfolio.multiprocess(
             EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
         );
-        PortfolioPool memory postPool = getPool(address(_Portfolio), poolId);
-        t.postPoolLastPrice = _Portfolio.getLatestEstimatedPrice(poolId);
+        PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
+        t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
-        t.postReserveSell = getReserve(address(_Portfolio), address(_quote));
-        t.postReserveBuy = getReserve(address(_Portfolio), address(_asset));
+        t.postReserveSell = getReserve(address(_portfolio), address(_quote));
+        t.postReserveBuy = getReserve(address(_portfolio), address(_asset));
 
         if (t.prevReserveSell < t.prevReserveSell) {
             emit LogUint256("quote reserve before swap", t.prevReserveSell);

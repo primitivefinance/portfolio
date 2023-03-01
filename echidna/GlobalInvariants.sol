@@ -27,10 +27,10 @@ contract GlobalInvariants is
             EchidnaERC20 token = EchidnaStateHandling.get_token_at_index(i);
 
             // retrieve reserves of the token and add to tracked reserve balance
-            reserveBalance = getReserve(address(_Portfolio), address(token));
+            reserveBalance = getReserve(address(_portfolio), address(token));
 
             // get token balance and add to tracked token balance
-            tokenBalance = token.balanceOf(address(_Portfolio));
+            tokenBalance = token.balanceOf(address(_portfolio));
 
             assert(tokenBalance >= reserveBalance);
         }
@@ -40,17 +40,17 @@ contract GlobalInvariants is
         uint256 tokenBalance = 0;
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioPair memory pair = pool.pair;
 
             // retrieve reserves of the token and add to tracked reserve balance
-            uint256 assetReserveBalance = getReserve(address(_Portfolio), pair.tokenAsset);
-            uint256 quoteReserveBalance = getReserve(address(_Portfolio), pair.tokenQuote);
+            uint256 assetReserveBalance = getReserve(address(_portfolio), pair.tokenAsset);
+            uint256 quoteReserveBalance = getReserve(address(_portfolio), pair.tokenQuote);
 
             // reserve/poolLiquidity
             // compare after
 
-            (uint256 assetAmount, uint256 quoteAmount) = _Portfolio.getReserves(poolId);
+            (uint256 assetAmount, uint256 quoteAmount) = _portfolio.getReserves(poolId);
 
             assert(assetReserveBalance >= assetAmount);
             assert(quoteReserveBalance >= quoteAmount);
@@ -61,14 +61,14 @@ contract GlobalInvariants is
     function pair_asset_never_equal_to_quote(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
-        PortfolioPair memory pair = getPair(address(_Portfolio), pairId);
+        PortfolioPair memory pair = getPair(address(_portfolio), pairId);
         assert(pair.tokenAsset != pair.tokenQuote);
     }
 
     function pair_decimals_never_exceed_bounds(uint256 id) public view {
         uint24 pairId = retrieve_created_pair(id);
 
-        PortfolioPair memory pair = getPair(address(_Portfolio), pairId);
+        PortfolioPair memory pair = getPair(address(_portfolio), pairId);
         assert(pair.decimalsAsset == EchidnaERC20(pair.tokenAsset).decimals());
         assert(pair.decimalsAsset >= 6);
         assert(pair.decimalsAsset <= 18);
@@ -95,13 +95,13 @@ contract GlobalInvariants is
     function pool_last_price_not_greater_than_strike() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _Portfolio.getLatestEstimatedPrice(poolId));
+            emit LogUint256("pool's last price", _portfolio.getLatestEstimatedPrice(poolId));
             emit LogUint256("strike price", curve.maxPrice);
 
-            assert(_Portfolio.getLatestEstimatedPrice(poolId) <= curve.maxPrice);
+            assert(_portfolio.getLatestEstimatedPrice(poolId) <= curve.maxPrice);
         }
     }
 
@@ -110,10 +110,10 @@ contract GlobalInvariants is
     function pool_strike_price_non_zero() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _Portfolio.getLatestEstimatedPrice(poolId));
+            emit LogUint256("pool's last price", _portfolio.getLatestEstimatedPrice(poolId));
             emit LogUint256("strike price", curve.maxPrice);
 
             if (curve.maxPrice == 0) {
@@ -125,7 +125,7 @@ contract GlobalInvariants is
     function pool_maturity_never_less_last_timestamp() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
             emit LogUint256("Portfolio pool last timestamp: ", pool.lastTimestamp);
@@ -141,11 +141,11 @@ contract GlobalInvariants is
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
 
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             emit LogUint256("last timestamp", uint256(pool.lastTimestamp));
 
-            if (_Portfolio.getLatestEstimatedPrice(poolId) != 0) {
-                emit LogUint256("pool's last price", _Portfolio.getLatestEstimatedPrice(poolId));
+            if (_portfolio.getLatestEstimatedPrice(poolId) != 0) {
+                emit LogUint256("pool's last price", _portfolio.getLatestEstimatedPrice(poolId));
                 if (pool.liquidity == 0) {
                     emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
                 }
@@ -163,7 +163,7 @@ contract GlobalInvariants is
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
-        (uint128 deltaAsset, uint128 deltaQuote) = _Portfolio.getLiquidityDeltas(poolId, deltaLiquidity);
+        (uint128 deltaAsset, uint128 deltaQuote) = _portfolio.getLiquidityDeltas(poolId, deltaLiquidity);
         emit LogUint256("deltaAsset", deltaAsset);
         if (deltaAsset == 0) {
             emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaAsset");
@@ -177,7 +177,7 @@ contract GlobalInvariants is
     function pool_Portfolio_curve_assumptions() public view {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
             assert(curve.fee != 0);
@@ -191,17 +191,17 @@ contract GlobalInvariants is
     function Portfolio_pool_assumptions() public {
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioPair memory pair = pool.pair;
 
             // The `getVirtualReserves` method always returns values less than Portfolio’s respective `getReserve` function for each token of the pool’s pair.
 
             // `getVirtualReserves method`
-            (uint128 deltaAsset, uint128 deltaQuote) = _Portfolio.getReserves(poolId);
+            (uint128 deltaAsset, uint128 deltaQuote) = _portfolio.getReserves(poolId);
 
             // Portfolio's `getReserve` function for each of the pool's pair
-            uint256 assetReserves = _Portfolio.getReserve(pair.tokenAsset);
-            uint256 quoteReserves = _Portfolio.getReserve(pair.tokenQuote);
+            uint256 assetReserves = _portfolio.getReserve(pair.tokenAsset);
+            uint256 quoteReserves = _portfolio.getReserve(pair.tokenQuote);
 
             if (deltaAsset > assetReserves) {
                 emit LogUint256("deltaAsset", deltaAsset);
@@ -221,7 +221,7 @@ contract GlobalInvariants is
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
             (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
@@ -243,7 +243,7 @@ contract GlobalInvariants is
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = getPool(address(_Portfolio), poolId);
+            PortfolioPool memory pool = getPool(address(_portfolio), poolId);
 
             (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getPoolAmounts();
 

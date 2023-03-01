@@ -8,12 +8,12 @@ import "contracts/libraries/EnigmaLib.sol" as ProcessingLib;
 
 contract EchidnaStateHandling is Helper, HelperPortfolioView {
     bool hasFunded;
-    Portfolio public immutable _Portfolio;
+    Portfolio public immutable _portfolio;
     WETH public immutable _weth;
 
     constructor() {
         _weth = new WETH();
-        _Portfolio = new Portfolio(address(_weth));
+        _portfolio = new Portfolio(address(_weth));
     }
 
     // Portfolio Tokens
@@ -89,7 +89,7 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
         uint256 random = between(id, 0, poolIds.length - 1);
         if (poolIds.length == 1) random = 0;
 
-        pool = getPool(address(_Portfolio), poolIds[random]);
+        pool = getPool(address(_portfolio), poolIds[random]);
         poolId = poolIds[random];
         PortfolioPair memory pair = pool.pair;
         quote = EchidnaERC20(pair.tokenQuote);
@@ -104,7 +104,7 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
         for (uint8 i = 0; i < poolIds.length; i++) {
             // will auto skew to the first pool that is not expired, however this should be okay.
             // this gives us a higher chance to return a pool that is not expired through iterating
-            pool = getPool(address(_Portfolio), poolIds[i]);
+            pool = getPool(address(_portfolio), poolIds[i]);
             PortfolioCurve memory curve = pool.params;
             if (curve.maturity() > block.timestamp) {
                 PortfolioPair memory pair = pool.pair;
@@ -115,6 +115,6 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
 
     function mint_and_approve(EchidnaERC20 token, uint256 amount) internal {
         token.mint(address(this), amount);
-        token.approve(address(_Portfolio), type(uint256).max);
+        token.approve(address(_portfolio), type(uint256).max);
     }
 }

@@ -18,7 +18,7 @@ contract ChangeParameters is EchidnaStateHandling {
             jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
         }
 
-        _Portfolio.changeParameters(poolId, priorityFee, fee, jit);
+        _portfolio.changeParameters(poolId, priorityFee, fee, jit);
         {
             (PortfolioPool memory postChangeState, , , ) = retrieve_random_pool_and_tokens(id);
             PortfolioCurve memory preChangeCurve = preChangeState.params;
@@ -51,7 +51,7 @@ contract ChangeParameters is EchidnaStateHandling {
             jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
         }
 
-        try _Portfolio.changeParameters(poolId, priorityFee, fee, jit) {
+        try _portfolio.changeParameters(poolId, priorityFee, fee, jit) {
             emit AssertionFailed("BUG: Changing pool parameters of a nonmutable pool should not be possible");
         } catch {}
     }
