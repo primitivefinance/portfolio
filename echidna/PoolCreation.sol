@@ -1,4 +1,5 @@
 pragma solidity ^0.8.4;
+
 import "./EchidnaStateHandling.sol";
 
 contract PoolCreation is EchidnaStateHandling {
@@ -15,15 +16,8 @@ contract PoolCreation is EchidnaStateHandling {
     ) public {
         uint24 pairId = retrieve_created_pair(uint256(id));
         {
-            (, fee, maxPrice, volatility, duration, , price) = clam_safe_create_bounds(
-                0,
-                fee,
-                maxPrice,
-                volatility,
-                duration,
-                0,
-                price
-            );
+            (, fee, maxPrice, volatility, duration,, price) =
+                clam_safe_create_bounds(0, fee, maxPrice, volatility, duration, 0, price);
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
             pairId,
@@ -66,15 +60,8 @@ contract PoolCreation is EchidnaStateHandling {
     ) public {
         uint24 pairId = retrieve_created_pair(id);
         {
-            (, fee, maxPrice, volatility, duration, , price) = clam_safe_create_bounds(
-                0,
-                fee,
-                maxPrice,
-                volatility,
-                duration,
-                0,
-                price
-            );
+            (, fee, maxPrice, volatility, duration,, price) =
+                clam_safe_create_bounds(0, fee, maxPrice, volatility, duration, 0, price);
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
             pairId,
@@ -88,7 +75,7 @@ contract PoolCreation is EchidnaStateHandling {
             price
         );
         {
-            (PortfolioPool memory pool, ) = execute_create_pool(pairId, createPoolData, true);
+            (PortfolioPool memory pool,) = execute_create_pool(pairId, createPoolData, true);
             assert(pool.isMutable());
             PortfolioCurve memory curve = pool.params;
             assert(pool.lastTimestamp == block.timestamp);
@@ -116,15 +103,8 @@ contract PoolCreation is EchidnaStateHandling {
         uint24 pairId = retrieve_created_pair(id);
         uint16 priorityFee = 0;
         {
-            (, fee, maxPrice, volatility, duration, , price) = clam_safe_create_bounds(
-                0,
-                fee,
-                maxPrice,
-                volatility,
-                duration,
-                0,
-                price
-            );
+            (, fee, maxPrice, volatility, duration,, price) =
+                clam_safe_create_bounds(0, fee, maxPrice, volatility, duration, 0, price);
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
             pairId,
@@ -137,7 +117,7 @@ contract PoolCreation is EchidnaStateHandling {
             maxPrice,
             price
         );
-        (bool success, ) = address(_portfolio).call(createPoolData);
+        (bool success,) = address(_portfolio).call(createPoolData);
         assert(!success);
     }
 
@@ -147,7 +127,7 @@ contract PoolCreation is EchidnaStateHandling {
         bool hasController
     ) private returns (PortfolioPool memory pool, uint64 poolId) {
         uint256 preCreationPoolNonce = _portfolio.getPoolNonce();
-        (bool success, ) = address(_portfolio).call(createPoolData);
+        (bool success,) = address(_portfolio).call(createPoolData);
         assert(success);
 
         // pool nonce should increase by 1 each time a pool is created
@@ -168,15 +148,8 @@ contract PoolCreation is EchidnaStateHandling {
     /// @dev Create Special Pool is used to test swaps where quote token has 15 decimals.
     function create_special_pool(uint24 pairId, PoolParams memory pp) internal returns (uint64 poolId) {
         PoolParams memory _pp;
-        (
-            _pp.priorityFee,
-            _pp.fee,
-            _pp.maxPrice,
-            _pp.volatility,
-            _pp.duration,
-            _pp.jit,
-            _pp.price
-        ) = clam_safe_create_bounds(pp.priorityFee, pp.fee, pp.maxPrice, pp.volatility, pp.duration, pp.jit, pp.price);
+        (_pp.priorityFee, _pp.fee, _pp.maxPrice, _pp.volatility, _pp.duration, _pp.jit, _pp.price) =
+            clam_safe_create_bounds(pp.priorityFee, pp.fee, pp.maxPrice, pp.volatility, pp.duration, pp.jit, pp.price);
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
             pairId,
             address(this),

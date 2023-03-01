@@ -42,7 +42,7 @@ bracket_spacing = false
 int_types = 'long'
 multiline_func_header = 'params_first'
 quote_style = 'double'
-wrap_comments = true
+wrap_comments = false
 
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config

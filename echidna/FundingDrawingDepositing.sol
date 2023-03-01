@@ -1,4 +1,5 @@
 pragma solidity ^0.8.4;
+
 import "./EchidnaStateHandling.sol";
 
 contract FundingDrawingDepositing is EchidnaStateHandling {
@@ -79,7 +80,8 @@ contract FundingDrawingDepositing is EchidnaStateHandling {
         uint256 reservePreFund = getReserve(address(_portfolio), address(token));
         uint256 PortfolioBalancePreFund = EchidnaERC20(token).balanceOf(address(_portfolio));
 
-        try _portfolio.fund(address(token), amount) {} catch (bytes memory error) {
+        try _portfolio.fund(address(token), amount) {}
+        catch (bytes memory error) {
             emit LogBytes("error", error);
             assert(false);
         }
@@ -181,7 +183,7 @@ contract FundingDrawingDepositing is EchidnaStateHandling {
     }
 
     function draw_to_zero_should_fail(uint256 assetAmount, uint256 quoteAmount) public {
-        (EchidnaERC20 _asset, ) = get_Portfolio_tokens(assetAmount, quoteAmount);
+        (EchidnaERC20 _asset,) = get_Portfolio_tokens(assetAmount, quoteAmount);
 
         // make sure a user has funded already
         uint256 virtualBalancePreFund = getBalance(address(_portfolio), address(this), address(_asset));

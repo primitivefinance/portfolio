@@ -38,14 +38,13 @@ library RMM01Lib {
         uint256 R_y,
         uint256 timeRemainingSec
     ) internal pure returns (int256 invariantWad) {
-        return
-            Invariant.invariant({
-                R_y: R_y,
-                R_x: R_x,
-                stk: self.params.maxPrice,
-                vol: convertPercentageToWad(self.params.volatility),
-                tau: timeRemainingSec
-            });
+        return Invariant.invariant({
+            R_y: R_y,
+            R_x: R_x,
+            stk: self.params.maxPrice,
+            vol: convertPercentageToWad(self.params.volatility),
+            tau: timeRemainingSec
+        });
     }
 
     /**
@@ -121,7 +120,7 @@ library RMM01Lib {
         nextInd = prevInd + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
-        if (sellAsset)
+        if (sellAsset) {
             nextDep = Invariant.getY({
                 R_x: nextInd,
                 stk: self.params.maxPrice,
@@ -129,7 +128,7 @@ library RMM01Lib {
                 tau: tau,
                 inv: data.prevInvariant
             });
-        else
+        } else {
             nextDep = Invariant.getX({
                 R_y: nextInd,
                 stk: self.params.maxPrice,
@@ -137,6 +136,7 @@ library RMM01Lib {
                 tau: tau,
                 inv: data.prevInvariant
             });
+        }
     }
 
     /**

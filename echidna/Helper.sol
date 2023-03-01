@@ -51,9 +51,7 @@ contract Helper {
 
     function convertToInt128(uint128 a) internal pure returns (int128 b) {
         assembly {
-            if gt(a, 0x7fffffffffffffffffffffffffffffff) {
-                revert(0, 0)
-            }
+            if gt(a, 0x7fffffffffffffffffffffffffffffff) { revert(0, 0) }
 
             b := a
         }

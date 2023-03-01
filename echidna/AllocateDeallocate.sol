@@ -1,15 +1,12 @@
 pragma solidity ^0.8.4;
+
 import "./EchidnaStateHandling.sol";
 
 contract AllocateDeallocate is EchidnaStateHandling {
     // ******************** Allocate ********************
     function allocate_should_succeed_with_correct_preconditions(uint256 id, uint128 deltaLiquidity) public {
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         require(_portfolio.getLatestEstimatedPrice(poolId) != 0);
@@ -125,12 +122,8 @@ contract AllocateDeallocate is EchidnaStateHandling {
     }
 
     function allocate_with_zero_delta_liquidity_should_fail(uint256 id) public {
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         require(_portfolio.getLatestEstimatedPrice(poolId) != 0);
@@ -161,12 +154,8 @@ contract AllocateDeallocate is EchidnaStateHandling {
     // A user attempting to deallocate on any pool should succeed with correct preconditions
     function deallocate_with_correct_preconditions_should_succeed(uint256 id, uint128 amount) public {
         address[] memory owners = new address[](1);
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
         PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
@@ -198,7 +187,7 @@ contract AllocateDeallocate is EchidnaStateHandling {
 
     // A user without a position should not be able to deallocate funds
     function deallocate_without_position_should_fail(uint256 id, uint256 amount) public {
-        (PortfolioPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
@@ -223,12 +212,8 @@ contract AllocateDeallocate is EchidnaStateHandling {
 
     // A user calling allocate then deallocate should succeed
     function allocate_then_deallocate_should_succeed(uint256 id, uint128 amount) public {
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         require(_portfolio.getLatestEstimatedPrice(poolId) != 0);

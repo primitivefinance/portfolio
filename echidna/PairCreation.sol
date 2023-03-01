@@ -1,4 +1,5 @@
 pragma solidity ^0.8.4;
+
 import "./EchidnaStateHandling.sol";
 
 contract PairCreation is EchidnaStateHandling {
@@ -82,7 +83,7 @@ contract PairCreation is EchidnaStateHandling {
     function create_same_pair_should_fail() public {
         EchidnaERC20 quote = create_token("Create same pair asset fail", "CSPF", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(quote), address(quote));
-        (bool success, ) = address(_portfolio).call(createPairData);
+        (bool success,) = address(_portfolio).call(createPairData);
         assert(!success);
     }
 
@@ -91,7 +92,7 @@ contract PairCreation is EchidnaStateHandling {
         EchidnaERC20 testToken = create_token("create less min decimals asset fail", "CLMDF", uint8(decimals));
         EchidnaERC20 quote = create_token("create less min decimals quote", "CLMDQ", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(testToken), address(quote));
-        (bool success, ) = address(_portfolio).call(createPairData);
+        (bool success,) = address(_portfolio).call(createPairData);
         assert(!success);
     }
 
@@ -100,7 +101,7 @@ contract PairCreation is EchidnaStateHandling {
         EchidnaERC20 testToken = create_token("Create more than max decimals fail", "CMTMF", uint8(decimals));
         EchidnaERC20 quote = create_token("Create more than max decimals fail quote", "CMTMF2", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(testToken), address(quote));
-        (bool success, ) = address(_portfolio).call(createPairData);
+        (bool success,) = address(_portfolio).call(createPairData);
         assert(!success);
     }
 
@@ -108,7 +109,7 @@ contract PairCreation is EchidnaStateHandling {
         EchidnaERC20 _quote = create_token("Quote Token 15 Decimals", "QDEC15", 15);
         EchidnaERC20 _asset = create_token("Asset Token 18 Decimals", "ADEC18", 18);
         bytes memory createPairData = ProcessingLib.encodeCreatePair(address(_asset), address(_quote));
-        (bool success, ) = address(_portfolio).call(createPairData);
+        (bool success,) = address(_portfolio).call(createPairData);
         assert(!success);
         pairId = _portfolio.getPairId(address(_asset), address(_quote));
     }

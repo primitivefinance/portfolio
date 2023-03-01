@@ -2,35 +2,33 @@
 pragma solidity 0.8.13;
 
 /**
-
-  -------------
-
-  This is called the Enigma, it's an alternative ABI.
-  Originally, it was designed to compress calldata and therefore
-  save gas on optimistic rollup networks.
-
-  There are levels to the optimizations that can be made for it,
-  but this one focuses on the alternative multicall: jump process.
-
-  Multicalls will pad all calls to a full bytes32.
-  This means two calls are at least 64 bytes.
-  This alternative multicall can process over 10 calls in the same 64 bytes.
-  The smallest bytes provided by a call is for allocate and deallocate, at 11 bytes.
-
-  Multicalls also process transactions sequentially.
-  State cannot be carried over transiently between transactions.
-  With Enigma, we can transiently set state (only specific state),
-  and use it across "instructions".
-
-  Without jump instruction, this alternative encoding is overkill.
-
-  Be aware of function selector hash collisions.
-  Data is delivered via the `multiprocess` function in Portfolio.
-
-  -------------
-
-  Primitive™
-
+ * -------------
+ *
+ *   This is called the Enigma, it's an alternative ABI.
+ *   Originally, it was designed to compress calldata and therefore
+ *   save gas on optimistic rollup networks.
+ *
+ *   There are levels to the optimizations that can be made for it,
+ *   but this one focuses on the alternative multicall: jump process.
+ *
+ *   Multicalls will pad all calls to a full bytes32.
+ *   This means two calls are at least 64 bytes.
+ *   This alternative multicall can process over 10 calls in the same 64 bytes.
+ *   The smallest bytes provided by a call is for allocate and deallocate, at 11 bytes.
+ *
+ *   Multicalls also process transactions sequentially.
+ *   State cannot be carried over transiently between transactions.
+ *   With Enigma, we can transiently set state (only specific state),
+ *   and use it across "instructions".
+ *
+ *   Without jump instruction, this alternative encoding is overkill.
+ *
+ *   Be aware of function selector hash collisions.
+ *   Data is delivered via the `multiprocess` function in Portfolio.
+ *
+ *   -------------
+ *
+ *   Primitive™
  */
 
 import "./AssemblyLib.sol";
@@ -54,7 +52,9 @@ bytes1 constant INSTRUCTION_JUMP = 0xAA;
 error InvalidJump(uint256 pointer); // 0x80f63bd1
 error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
 
-/** @dev  [jump instruction, instructions.length, pointer, ...instruction, pointer, ...etc] */
+/**
+ * @dev  [jump instruction, instructions.length, pointer, ...instruction, pointer, ...etc]
+ */
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
     uint8 length = uint8(data[1]);
     uint8 pointer = JUMP_PROCESS_START_POINTER;
@@ -116,9 +116,10 @@ function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure retu
     return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
 }
 
-function decodePoolId(
-    bytes calldata data
-) pure returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) {
+function decodePoolId(bytes calldata data)
+    pure
+    returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
+{
     if (data.length != 8) revert InvalidBytesLength(8, data.length);
     poolId = uint64(bytes8(data));
     pairId = uint16(bytes2(data[:3]));
@@ -173,9 +174,7 @@ function encodeCreatePool(
     data = abi.encodePacked(CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
 }
 
-function decodeCreatePool(
-    bytes calldata data
-)
+function decodeCreatePool(bytes calldata data)
     pure
     returns (
         uint24 pairId,
@@ -207,7 +206,7 @@ function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
-    (bytes1 maxFlag, ) = AssemblyLib.separate(data[0]);
+    (bytes1 maxFlag,) = AssemblyLib.separate(data[0]);
     useMax = uint8(maxFlag);
     poolId = uint64(bytes8(data[1:9]));
     deltaLiquidity = AssemblyLib.toAmount(data[9:]);
@@ -243,20 +242,13 @@ function encodeSwap(
     uint128 amount1,
     uint8 sellAsset
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), SWAP),
-        poolId,
-        power0,
-        amount0,
-        power1,
-        amount1,
-        sellAsset
-    );
+    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), SWAP), poolId, power0, amount0, power1, amount1, sellAsset);
 }
 
-function decodeSwap(
-    bytes calldata data
-) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset) {
+function decodeSwap(bytes calldata data)
+    pure
+    returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
+{
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
     input = AssemblyLib.toAmount(data[9:26]);

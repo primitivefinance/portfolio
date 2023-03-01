@@ -153,7 +153,7 @@ contract StatelessSwaps is Helper, Test {
         uint256 maxErr = 100 * 1e18;
 
         // Swapping back and forth should not succeed if `output > input` under normal circumstances.
-        (bool success, ) = swapBackAndForthCall(sell, uint128(input), uint128(output), uint128(input + maxErr));
+        (bool success,) = swapBackAndForthCall(sell, uint128(input), uint128(output), uint128(input + maxErr));
 
         //
         if (success) {

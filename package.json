@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "lcov": "FOUNDRY_PROFILE=test forge coverage --report lcov",
-    "lint": "forge fmt",
+    "lint": "forge fmt ./contracts",
     "prepare": "husky install"
   },
   "repository": {
@@ -27,7 +27,7 @@
     "test": "test"
   },
   "lint-staged": {
-    "**.sol": "forge fmt"
+    "**.sol": "forge fmt ./contracts"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.4.2",

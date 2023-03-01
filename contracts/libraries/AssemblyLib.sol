@@ -49,9 +49,7 @@ library AssemblyLib {
         assembly {
             output := add(input, delta)
             // Reverts on overflow.
-            if gt(output, 0xffffffffffffffffffffffffffffffff) {
-                revert(add(32, revertData), mload(revertData)) // 0x1fff9681
-            }
+            if gt(output, 0xffffffffffffffffffffffffffffffff) { revert(add(32, revertData), mload(revertData)) } // 0x1fff9681
         }
     }
 
@@ -104,9 +102,7 @@ library AssemblyLib {
         assembly {
             amountSeconds := mul(amountDays, SECONDS_PER_DAY)
             // Reverts on overflow.
-            if gt(amountSeconds, 0xffffffffffffffffffffffffffffffff) {
-                revert(add(32, revertData), mload(revertData))
-            }
+            if gt(amountSeconds, 0xffffffffffffffffffffffffffffffff) { revert(add(32, revertData), mload(revertData)) }
         }
     }
 
@@ -129,9 +125,7 @@ library AssemblyLib {
     function toInt128(uint128 a) internal pure returns (int128 b) {
         assembly {
             // Reverts on overflow.
-            if gt(a, 0x7fffffffffffffffffffffffffffffff) {
-                revert(0, 0)
-            }
+            if gt(a, 0x7fffffffffffffffffffffffffffffff) { revert(0, 0) }
 
             b := a
         }

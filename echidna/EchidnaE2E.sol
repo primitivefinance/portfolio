@@ -90,7 +90,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint16 jit,
         uint128 price
     ) public {
-        (PortfolioPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(preChangeState.isMutable());
@@ -108,7 +108,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         _portfolio.changeParameters(poolId, priorityFee, fee, jit);
         {
-            (PortfolioPool memory postChangeState, , , ) = retrieve_random_pool_and_tokens(id);
+            (PortfolioPool memory postChangeState,,,) = retrieve_random_pool_and_tokens(id);
             PortfolioCurve memory preChangeCurve = preChangeState.params;
             PortfolioCurve memory postChangeCurve = postChangeState.params;
             assert(postChangeState.lastTimestamp == preChangeState.lastTimestamp);
@@ -136,7 +136,7 @@ contract EchidnaE2E is GlobalInvariants {
     ) public {
         maxPrice;
 
-        (PortfolioPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(!preChangeState.isMutable());
@@ -165,7 +165,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint128 deltaAsset,
         uint128 deltaQuote
     ) public {
-        (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
         PortfolioPosition memory preClaimPosition = getPosition(address(_portfolio), address(this), poolId);
@@ -190,12 +190,8 @@ contract EchidnaE2E is GlobalInvariants {
     // ******************** Deallocate ********************
     function deallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
         PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
@@ -229,12 +225,8 @@ contract EchidnaE2E is GlobalInvariants {
     function swap_should_succeed(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -252,11 +244,9 @@ contract EchidnaE2E is GlobalInvariants {
             emit LogUint256("block.timestamp", block.timestamp);
             swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
-            try
-                _portfolio.multiprocess(
-                    EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-                )
-            {
+            try _portfolio.multiprocess(
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+            ) {
                 // PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
             } catch {}
         }
@@ -264,7 +254,7 @@ contract EchidnaE2E is GlobalInvariants {
 
     function swap_on_zero_amount_should_fail(uint256 id) public {
         // Will always return a pool that exists
-        (PortfolioPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         uint256 amount = 0;
 
         swap_should_fail(pool.params, poolId, true, amount, id, "BUG: Swap with zero amount should fail.");
@@ -281,11 +271,9 @@ contract EchidnaE2E is GlobalInvariants {
         curve;
         limit;
 
-        try
-            _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 1 : 0))
-            )
-        {
+        try _portfolio.multiprocess(
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 1 : 0))
+        ) {
             emit AssertionFailed(message);
         } catch {}
     }
@@ -295,12 +283,8 @@ contract EchidnaE2E is GlobalInvariants {
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
@@ -369,12 +353,8 @@ contract EchidnaE2E is GlobalInvariants {
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
@@ -407,9 +387,7 @@ contract EchidnaE2E is GlobalInvariants {
             if (t.postPoolLastPrice < t.prePoolLastPrice) {
                 emit LogUint256("price before swap", t.prePoolLastPrice);
                 emit LogUint256("price after swap", t.postPoolLastPrice);
-                emit AssertionFailed(
-                    "BUG: pool.lastPrice decreased after swapping quote in, it should have increased."
-                );
+                emit AssertionFailed("BUG: pool.lastPrice decreased after swapping quote in, it should have increased.");
             }
 
             t.postReserveSell = getReserve(address(_portfolio), address(_quote));
@@ -438,12 +416,8 @@ contract EchidnaE2E is GlobalInvariants {
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
@@ -503,12 +477,8 @@ contract EchidnaE2E is GlobalInvariants {
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 

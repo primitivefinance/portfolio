@@ -6,7 +6,7 @@ import {RMM01Portfolio as Portfolio} from "contracts/RMM01Portfolio.sol";
 contract ChangeParameters is EchidnaStateHandling {
     // ******************** Change Pool Parameters ********************
     function change_parameters(uint256 id, uint16 priorityFee, uint16 fee, uint16 jit) public {
-        (PortfolioPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(preChangeState.isMutable());
@@ -20,7 +20,7 @@ contract ChangeParameters is EchidnaStateHandling {
 
         _portfolio.changeParameters(poolId, priorityFee, fee, jit);
         {
-            (PortfolioPool memory postChangeState, , , ) = retrieve_random_pool_and_tokens(id);
+            (PortfolioPool memory postChangeState,,,) = retrieve_random_pool_and_tokens(id);
             PortfolioCurve memory preChangeCurve = preChangeState.params;
             PortfolioCurve memory postChangeCurve = postChangeState.params;
             assert(postChangeState.lastTimestamp == preChangeState.lastTimestamp);
@@ -39,7 +39,7 @@ contract ChangeParameters is EchidnaStateHandling {
         uint16 fee,
         uint16 jit
     ) public {
-        (PortfolioPool memory preChangeState, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(!preChangeState.isMutable());
