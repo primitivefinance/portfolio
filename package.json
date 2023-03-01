@@ -1,8 +1,8 @@
 {
-  "name": "@primitivefi/hyper",
+  "name": "@primitivefi/portfolio",
   "license": "AGPL-3.0-only",
-  "version": "beta-v0.1.0",
-  "description": "Gas optimized replicating market maker.",
+  "version": "v1.0.0-beta",
+  "description": "Onchain portfolio protocol for risk and liquidity management.",
   "files": [
     "contracts/**/*.sol"
   ],
@@ -17,7 +17,7 @@
   },
   "keywords": [
     "rmm",
-    "hyper",
+    "portfolio",
     "primitive",
     "forge"
   ],

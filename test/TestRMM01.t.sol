@@ -32,4 +32,8 @@ contract TestRMM01 is
         // address new_subject = address(new CCPortfolio(address(subjects().weth)));
         // subjects().change_subject(new_subject);
     }
+
+    function test_version() public {
+        assertEq(subject().VERSION(), "v1.0.0-beta", "version-not-equal");
+    }
 }
