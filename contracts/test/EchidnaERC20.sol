@@ -13,18 +13,13 @@ contract EchidnaERC20 is IERC20 {
     string public name;
     string public symbol;
     uint8 public override decimals;
-    address public hyper;
+    address public Portfolio;
 
-    constructor(
-        string memory name_,
-        string memory symbol_,
-        uint8 decimals_,
-        address _hyper
-    ) {
+    constructor(string memory name_, string memory symbol_, uint8 decimals_, address _Portfolio) {
         name = name_;
         symbol = symbol_;
         decimals = decimals_;
-        hyper = _hyper;
+        Portfolio = _Portfolio;
     }
 
     /// @notice Used for testing pairs with decimals that are not 18
@@ -41,7 +36,7 @@ contract EchidnaERC20 is IERC20 {
     }
 
     function mint(address to, uint256 wad) public {
-        if (to == address(hyper)) return;
+        if (to == address(Portfolio)) return;
         _mint(to, wad);
     }
 
@@ -63,11 +58,7 @@ contract EchidnaERC20 is IERC20 {
         return true;
     }
 
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public virtual override returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(sender, recipient, amount);
 
         uint256 currentAllowance = _allowances[sender][msg.sender];
@@ -94,11 +85,7 @@ contract EchidnaERC20 is IERC20 {
         return true;
     }
 
-    function _transfer(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) internal virtual {
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
@@ -139,11 +126,7 @@ contract EchidnaERC20 is IERC20 {
         emit Transfer(account, address(0), amount);
     }
 
-    function _approve(
-        address owner,
-        address spender,
-        uint256 amount
-    ) internal virtual {
+    function _approve(address owner, address spender, uint256 amount) internal virtual {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
@@ -151,9 +134,5 @@ contract EchidnaERC20 is IERC20 {
         emit Approval(owner, spender, amount);
     }
 
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 amount
-    ) internal virtual {}
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual {}
 }
