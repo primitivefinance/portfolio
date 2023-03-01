@@ -12,24 +12,28 @@ interface IPortfolioEvents {
     /**
      * @notice Assigns `amount` of `token` to `account`.
      * @dev Emitted on `unallocate`, `swap`, or `fund`.
+     * @param amount Quantity of token in token's native decimal units.
      */
     event IncreaseUserBalance(address indexed account, address indexed token, uint256 amount);
 
     /**
      * @notice Unassigns `amount` of `token` from `account`.
      * @dev Emitted on `allocate`, `swap`, or `draw`.
+     * @param amount Quantity of token in token's native decimal units.
      */
     event DecreaseUserBalance(address indexed account, address indexed token, uint256 amount);
 
     /**
      * @notice Assigns an additional `amount` of `token` to Portfolio's internally tracked balance.
-     * @dev Emitted on `swap`, `allocate`, and when a user is gifted surplus tokens.
+     * @dev Emitted on `swap`, `allocate`, and when a user is gifted surplus tokens that were sent to the contract.
+     * @param amount Quantity of token in token's native decimal units.
      */
     event IncreaseReserveBalance(address indexed token, uint256 amount);
 
     /**
      * @notice Unassigns `amount` of `token` from Portfolio's internally tracked balance.
      * @dev Emitted on `swap`, `unallocate`, and when paying with an internal balance.
+     * @param amount Quantity of token in token's native decimal units.
      */
     event DecreaseReserveBalance(address indexed token, uint256 amount);
 
@@ -53,6 +57,7 @@ interface IPortfolioEvents {
 
     /**
      * @dev Assigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId.
+     * Units are in the respective tokens' native decimals. Units for `deltaLiquidity` are WAD.
      */
     event Allocate(
         uint64 indexed poolId,
@@ -65,6 +70,7 @@ interface IPortfolioEvents {
 
     /**
      * @dev Unassigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId.
+     * Units are in the respective tokens' native decimals. Units for `deltaLiquidity` are WAD.
      */
     event Unallocate(
         uint64 indexed poolId,
@@ -89,6 +95,10 @@ interface IPortfolioEvents {
         uint256 feeQuoteDec,
         address indexed quote
     );
+
+    /**
+     * @notice Emitted on pair creation.
+     */
     event CreatePair(
         uint24 indexed pairId,
         address indexed asset,
@@ -96,6 +106,10 @@ interface IPortfolioEvents {
         uint8 decimalsAsset,
         uint8 decimalsQuote
     );
+
+    /**
+     * @param price Estimated price of the initialized pool in WAD units.
+     */
     event CreatePool(
         uint64 indexed poolId,
         bool isMutable,
@@ -107,22 +121,60 @@ interface IPortfolioEvents {
 
 interface IPortfolioGetters {
     // ===== Account Getters ===== //
+    /**
+     * @dev Internally owned balance of `token` of `owner`.
+     * @return Balance held, in native `token` decimal units.
+     */
     function getBalance(address owner, address token) external view returns (uint256);
 
+    /**
+     * @dev Internally tracked global balance of all `token`s assigned to an address or a pool.
+     * @return Global balance held, in native `token` decimal units.
+     */
     function getReserve(address token) external view returns (uint256);
 
+    /**
+     * @notice Difference of `token.balanceOf(this)` and internally tracked reserve balance.
+     * @dev Critical system invariant. Must always return greater than or equal to zero.
+     * @custom:example
+     * ```
+     * uint256 previousReserve = getReserve(token);
+     * uint256 previousBalance = token.balanceOf(portfolio);
+     * assertEq(previousReserve, 1);
+     * assertEq(previousBalance, 1);
+     * token.transfer(portfolio, 10);
+     * uint256 netBalance = getNetBalance(token);
+     * assertEq(netBalance, 10);
+     * ```
+     */
     function getNetBalance(address token) external view returns (int256);
 
     // ===== State Getters ===== //
 
+    /**
+     * @dev Current semantic version of the Portfolio.
+     */
     function VERSION() external pure returns (string memory);
 
+    /**
+     * @dev Wrapped Ether address initialized on creating the Portfolio.
+     */
     function WETH() external view returns (address);
 
+    /**
+     * @dev Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
+     */
     function getPairNonce() external view returns (uint24);
 
+    /**
+     * @dev Incremented when a pool is created.
+     */
     function getPoolNonce() external view returns (uint32);
 
+    /**
+     * @dev Reverse lookup to find the `pairId` of a given `asset` and `quote`.
+     * Order matters! There can be two pairs for every two tokens.
+     */
     function getPairId(address asset, address quote) external view returns (uint24 pairId);
 
     function pairs(
@@ -169,11 +221,22 @@ interface IPortfolioGetters {
 
     // ===== Portfolio View ===== //
 
+    /**
+     * @dev Computes amount of `deltaAsset` and `deltaQuote` that must be paid for to
+     * mint `deltaLiquidity`.
+     */
     function getLiquidityDeltas(
         uint64 poolId,
         int128 deltaLiquidity
     ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
 
+    /**
+     * @dev Computes the optimal and max amount of `deltaLiquidity` given two
+     * amounts of `deltaAsset` and `deltaQuote`.
+     * @param deltaAsset Quantity of `asset` tokens in native decimal units.
+     * @param deltaQuote Quantity of `quote` tokens in native decimal units.
+     * @return deltaLiquidity Quantity of liquidity minted in wad units.
+     */
     function getMaxLiquidity(
         uint64 poolId,
         uint256 deltaAsset,
@@ -181,12 +244,16 @@ interface IPortfolioGetters {
     ) external view returns (uint128 deltaLiquidity);
 
     /**
-     * @dev Amount of tokens received if all pool liquidity was removed.
+     * @dev Amount of tokens received if all `pool.liquidity` is removed.
+     * @return deltaAsset Quantity of `asset` tokens in native decimal units.
+     * @return deltaQuote Quantity of `quote` tokens in native decimal units.
      */
     function getReserves(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
      * @dev Amount of tokens scaled to WAD units per WAD liquidity.
+     * @return deltaAsset Quantity of `asset` tokens in wad units.
+     * @return deltaQuote Quantity of `quote` tokens in wad units.
      */
     function getVirtualReservesPerLiquidity(
         uint64 poolId
@@ -194,16 +261,41 @@ interface IPortfolioGetters {
 
     // ===== Objective View ===== //
 
-    // todo: ... missing some which use structs as args
-
+    /**
+     * @dev Computes an amount out of tokens given an `amountIn`.
+     * @param sellAsset If true, swap `asset` for `quote` tokens.
+     * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
+     * @return amountOut of tokens in native token decimal units.
+     */
     function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) external view returns (uint256);
 
+    /**
+     * @dev Computes an estimated on-chain price of the `poolId`.
+     * @custom:mev Vulnerable to manipulation, do not rely on this function on-chain.
+     * @return price Estimated price in wad units of `quote` tokens per `asset` token.
+     */
     function getLatestEstimatedPrice(uint64 poolId) external view returns (uint256 price);
 }
 
 interface IPortfolioActions {
     /**
-     * @dev Entrypoint to manipulate balances in Portfolio.
+     * @notice Entrypoint to allocate, unallocate, or swap in Portfolio.
+     * @dev Multiprocess expects custom encoded data that can be built off-chain
+     * or on-chain using the `EnigmaLib` library. This function is similar to
+     * multicall, which sends calldata to a target by looping over an array of
+     * calldatas and targets.
+     *
+     * The difference is that the transactions in a multicall
+     * must setttle token amounts in each call.
+     * In multiprocess, token amounts are settled after all calls
+     * have been processed.
+     *
+     * This means that token deficits can be carried over between calls
+     * and paid by future ones (within the same multiprocess transaction)!
+     *
+     * todo: Investigate the amount of operations that can be processed, since it uses a loop.
+     * todo: Update multiprocess to return data, or information that can help debugging.
+     * todo: Update the custom encoded `data` to use regular abi-encoded data to match multicall.
      */
     function multiprocess(bytes calldata data) external payable;
 
@@ -220,8 +312,8 @@ interface IPortfolioActions {
     function draw(address token, uint256 amount, address to) external;
 
     /**
-     * @notice Deposits ETH into the user internal balance.
-     * @dev Amount of ETH must be sent as `msg.value`, the ETH will be wrapped.
+     * @notice Deposits ether into the `WETH` contract and credits `msg.sender` the received WETH.
+     * @dev Amount of ether must be sent as `msg.value`, the ether will be wrapped.
      */
     function deposit() external payable;
 

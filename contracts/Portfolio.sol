@@ -35,8 +35,11 @@ abstract contract PortfolioVirtual is Objective {
 
     Account.AccountSystem public __account__;
 
+    /// @inheritdoc IPortfolioGetters
     address public immutable WETH;
+    /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
+    /// @inheritdoc IPortfolioGetters
     uint32 public getPoolNonce;
 
     mapping(uint24 => PortfolioPair) public pairs;
@@ -51,21 +54,15 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev
-     * Used on external functions to handle settlement of outstanding token balances.
-     *
-     * @notice
-     * Tokens sent to this contract are lost.
+     * Protects against re-entrancy and getting to invalid settlement states.
+     * Used on all external non-view functions.
      *
      * @custom:guide
      * Step 1. Enter `locked` re-entrancy guard.
-     * Step 2. Validate Portfolio's account system has not already been entered.
      * Step 3. Wrap the entire ether balance of this contract and credit the wrapped ether to the msg.sender account.
-     * Step 4. Enter the re-entrancy guard of Portfolio's account system.
      * Step 5. Execute the function logic.
-     * Step 6. Exit the re-entrancy guard of Portfolio's account system.
      * Step 7. Enter the settlement function, requesting token payments or sending them out to msg.sender.
      * Step 8. Validate Portfolio's account system was settled.
-     * Step 9. Exit interactions modifier.
      * Step 10. Exit `locked` re-entrancy guard.
      */
     modifier lock() {
@@ -97,17 +94,17 @@ abstract contract PortfolioVirtual is Objective {
 
     // ===== Account Getters ===== //
 
-    /** @dev balanceOf(token) - getReserve(token). If negative, you win. */
+    /// @inheritdoc IPortfolioGetters
     function getNetBalance(address token) public view returns (int256) {
         return __account__.getNetBalance(token, address(this));
     }
 
-    /** @dev Virtual balance of `token`. */
+    /// @inheritdoc IPortfolioGetters
     function getReserve(address token) public view returns (uint256) {
         return __account__.reserves[token];
     }
 
-    /** @dev Internal balance of `owner` of `token`. */
+    /// @inheritdoc IPortfolioGetters
     function getBalance(address owner, address token) public view returns (uint256) {
         return __account__.balances[owner][token];
     }
@@ -143,7 +140,7 @@ abstract contract PortfolioVirtual is Objective {
         if (amount == type(uint256).max) amount = balance;
         if (amount > balance) revert DrawBalance();
 
-        // Touches token, updates __account__.settled = false.
+        // Touches token, sets __account__.settled = false.
         _applyDebit(token, amount);
         _decreaseReserves(token, amount);
 
@@ -151,20 +148,21 @@ abstract contract PortfolioVirtual is Objective {
         else Account.SafeTransferLib.safeTransfer(Account.ERC20(token), to, amount);
 
         // Interactions
-        _settlement(); // Updates __account__.settled = true.
+        _settlement(); // Sets __account__.settled = true.
     }
 
     /// @inheritdoc IPortfolioActions
     function fund(address token, uint256 amount) external override lock {
         if (amount == type(uint256).max) amount = Account.__balanceOf__(token, msg.sender);
 
-        // Touches token, updates __account__.settled = false.
+        // Touches token, sets __account__.settled = false.
         __account__.dangerousFund(token, address(this), amount); // warning: external call to msg.sender.
 
         // Interactions
-        _settlement(); // Updates __account__.settled = true.
+        _settlement(); // Sets __account__.settled = true.
     }
 
+    /// @inheritdoc IPortfolioActions
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external lock {
         PortfolioPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
@@ -209,7 +207,7 @@ abstract contract PortfolioVirtual is Objective {
         emit Collect(poolId, msg.sender, claimedAssets, asset, claimedQuotes, quote);
     }
 
-    /** @dev Increases virtal reserves and liquidity. Debits `msg.sender`. */
+    /** @dev Increases virtual reserves and liquidity. Debits `msg.sender`. */
     function _allocate(
         bool useMax,
         uint64 poolId,
@@ -563,9 +561,15 @@ abstract contract PortfolioVirtual is Objective {
 
     // ===== Accounting System ===== //
 
+    /**
+     * @dev Wraps address(this).balance of ether but does not credit to `msg.sender`.
+     * Received WETH will remain in the contract as a surplus, i.e. `getNetBalance(WETH)` will be positive.
+     * The `settlement` function handles how to apply the surplus,
+     * by either using it to pay a debit or by gifting the `msg.sender`.
+     */
     function _deposit() internal {
         if (msg.value > 0) {
-            __account__.__wrapEther__(WETH); // Deposits msg.value ether, this contract receives WETH.
+            __account__.__wrapEther__(WETH);
             emit Deposit(msg.sender, msg.value);
         }
     }
@@ -616,8 +620,8 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
-     * @dev Alternative entrypoint to execute functions.
-     * @param data Encoded Enigma data. First byte must be an Enigma instruction.
+     * @dev Use `multiprocess` to enter this function to process instructions.
+     * @param data Custom encoded Enigma data. First byte must be an Enigma instruction.
      */
     function _process(bytes calldata data) internal {
         (, bytes1 instruction) = Assembly.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
@@ -661,7 +665,7 @@ abstract contract PortfolioVirtual is Objective {
         Be aware of these settlement invariants:
 
         Invariant 1. Every token that is interacted with is cached and exists.
-        Invariant 2. Tokens are removed from cache, and cache is empty by end of settlement.
+        Invariant 2. Tokens are removed from cache and cache is empty by end of settlement.
         Invariant 3. Cached tokens cannot be carried over from previous transactions.
         Invariant 4. Execution does not exit during the loops prematurely.
         Invariant 5. Account `settled` bool is set to true at end of `settlement`.
@@ -669,13 +673,11 @@ abstract contract PortfolioVirtual is Objective {
 
      */
     function _settlement() internal {
-        //if (__account__.settled) revert Account.AlreadySettled();
-
         address[] memory tokens = __account__.warm;
         uint256 loops = tokens.length;
         if (loops == 0) return __account__.reset(); // exit early.
 
-        uint256 x;
+        // Compute all the payments that must be paid to this contract.
         uint256 i = loops;
         do {
             // Loop backwards to pop tokens off.
@@ -694,26 +696,25 @@ abstract contract PortfolioVirtual is Objective {
             }
             // Outstanding amount must be transferred in.
             if (remainder > 0) _payments.push(Payment({token: token, amount: remainder}));
-            // Token accounted for.
+            // Token considered fully accounted for.
             __account__.warm.pop();
             unchecked {
-                --i;
-                ++x;
+                --i; // Cannot underflow because loop exists at 0!
             }
         } while (i != 0);
 
+        // Use `token.transferFrom(msg.sender, amount)` to pay for the outstanding debits.
         Payment[] memory payments = _payments;
-
         uint256 px = payments.length;
         while (px != 0) {
             uint256 index = px - 1;
             Account.__dangerousTransferFrom__(payments[index].token, address(this), payments[index].amount);
             unchecked {
-                --px;
+                --px; // Cannot underflow because loop exists at 0!
             }
         }
 
-        __account__.reset();
+        __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;
     }
 
@@ -725,6 +726,7 @@ abstract contract PortfolioVirtual is Objective {
 
     // ===== Public View ===== //
 
+    /// @inheritdoc IPortfolioGetters
     function getLiquidityDeltas(
         uint64 poolId,
         int128 deltaLiquidity
@@ -732,6 +734,7 @@ abstract contract PortfolioVirtual is Objective {
         return pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
     }
 
+    /// @inheritdoc IPortfolioGetters
     function getMaxLiquidity(
         uint64 poolId,
         uint256 amount0,
@@ -740,10 +743,12 @@ abstract contract PortfolioVirtual is Objective {
         return pools[poolId].getPoolMaxLiquidity(amount0, amount1);
     }
 
+    /// @inheritdoc IPortfolioGetters
     function getReserves(uint64 poolId) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
         return pools[poolId].getPoolAmounts();
     }
 
+    /// @inheritdoc IPortfolioGetters
     function getVirtualReservesPerLiquidity(
         uint64 poolId
     ) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
