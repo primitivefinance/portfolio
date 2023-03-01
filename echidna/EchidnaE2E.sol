@@ -187,8 +187,8 @@ contract EchidnaE2E is GlobalInvariants {
 
     // A user should not be able to allocate more than they own
 
-    // ******************** Unallocate ********************
-    function unallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
+    // ******************** Deallocate ********************
+    function deallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
         address[] memory owners = new address[](1);
         (
             PortfolioPool memory pool,
@@ -199,22 +199,22 @@ contract EchidnaE2E is GlobalInvariants {
 
         // Save pre unallocation state
         PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
-        uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
-        uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
+        uint256 preDeallocateAssetBalance = _asset.balanceOf(address(this));
+        uint256 preDeallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
         (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getReserves(poolId);
 
-        _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(EnigmaLib.encodeDeallocate(uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
         PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
         {
-            uint256 postUnallocateAssetBalance = _asset.balanceOf(address(this));
-            uint256 postUnallocateQuoteBalance = _quote.balanceOf(address(this));
-            assert(preUnallocateAssetBalance + deltaAsset == postUnallocateAssetBalance);
-            assert(preUnallocateQuoteBalance + deltaQuote == postUnallocateQuoteBalance);
+            uint256 postDeallocateAssetBalance = _asset.balanceOf(address(this));
+            uint256 postDeallocateQuoteBalance = _quote.balanceOf(address(this));
+            assert(preDeallocateAssetBalance + deltaAsset == postDeallocateAssetBalance);
+            assert(preDeallocateQuoteBalance + deltaQuote == postDeallocateQuoteBalance);
         }
 
         assert(preState.totalPoolLiquidity - amount == postState.totalPoolLiquidity);
@@ -254,7 +254,7 @@ contract EchidnaE2E is GlobalInvariants {
         } else {
             try
                 _portfolio.multiprocess(
-                    EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                    EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
                 )
             {
                 // PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
@@ -283,7 +283,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         try
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 1 : 0))
             )
         {
             emit AssertionFailed(message);
@@ -319,7 +319,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 prePoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
         _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
         );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
 
@@ -399,7 +399,7 @@ contract EchidnaE2E is GlobalInvariants {
         {
             PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             );
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
             t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
@@ -467,7 +467,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
         _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
         );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
         t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
@@ -532,7 +532,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
         _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
         );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
         t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);

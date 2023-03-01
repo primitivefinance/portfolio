@@ -2,14 +2,15 @@
 pragma solidity 0.8.13;
 
 import "./PortfolioLib.sol";
-import "./interfaces/IPortfolio.sol";
 import "./interfaces/IERC20.sol";
+import "./interfaces/IPortfolio.sol";
 
 /**
- * @notice Virtual interface to implement the logic for a "Portfolio".
+ * @title   Objective
+ * @author  Primitive™
+ * @notice  Implements objective specific logic for a Portfolio.
  */
 abstract contract Objective is IPortfolio {
-    // ===== Internal Effects ===== //
     /**
      * @dev Used to apply changes to `_state`.
      */
@@ -21,7 +22,9 @@ abstract contract Objective is IPortfolio {
     function _beforeSwapEffects(uint64 poolId) internal virtual returns (bool success, int256 invariant);
 
     /**
-     * @dev Conditional check made before changing `pool.liquidity` and `position.freeLiquidity`..
+     * @dev Conditional check made before changing `pool.liquidity` and `position.freeLiquidity`.
+     * @param delta Signed quantity of liquidity in WAD units to change liquidity by.
+     * @return True if position liquidity can be changed by `delta` amount.
      */
     function checkPosition(uint64 poolId, address owner, int256 delta) public view virtual returns (bool);
 
@@ -31,13 +34,13 @@ abstract contract Objective is IPortfolio {
     function checkPool(uint64 poolId) public view virtual returns (bool);
 
     /**
-     * @dev Computes the invariant given `reserve0` and `reserve1` and returns the invariant condition status.
+     * @dev Computes the invariant given `reserveX` and `reserveY` and returns the invariant condition status.
      */
     function checkInvariant(
         uint64 poolId,
         int256 invariant,
-        uint reserve0,
-        uint reserve1
+        uint reserveX,
+        uint reserveY
     ) public view virtual returns (bool success, int nextInvariant);
 
     /**
@@ -45,7 +48,7 @@ abstract contract Objective is IPortfolio {
      */
     function computeMaxInput(
         uint64 poolId,
-        bool direction,
+        bool sellAsset,
         uint reserveIn,
         uint liquidity
     ) public view virtual returns (uint);
@@ -56,10 +59,10 @@ abstract contract Objective is IPortfolio {
     function computeReservesFromPrice(
         uint64 poolId,
         uint price
-    ) public view virtual returns (uint reserve0, uint reserve1);
+    ) public view virtual returns (uint reserveX, uint reserveY);
 
     /**
-     * @dev Computes an amount of tokens out in units of the token's decimals given an amount in.
+     * @dev Computes an amount of tokens out given an amount in, units are in the token's decimals.
      */
     function getAmountOut(
         uint64 poolId,

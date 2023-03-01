@@ -26,7 +26,7 @@ contract TestPortfolioClaim is Setup {
     {
         PortfolioPosition memory pos = ghost().position(actor());
         PortfolioPool memory pool = ghost().pool();
-        uint128 tokensOwed = Assembly
+        uint128 tokensOwed = AssemblyLib
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity)
             .safeCastTo128();
@@ -53,7 +53,7 @@ contract TestPortfolioClaim is Setup {
     {
         PortfolioPosition memory pos = ghost().position(actor());
         PortfolioPool memory pool = ghost().pool();
-        uint128 tokensOwed = Assembly
+        uint128 tokensOwed = AssemblyLib
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity)
             .safeCastTo128();
@@ -76,7 +76,7 @@ contract TestPortfolioClaim is Setup {
 
         PortfolioPosition memory pos = ghost().position(actor());
         PortfolioPool memory pool = ghost().pool();
-        uint128 tokensOwed = Assembly
+        uint128 tokensOwed = AssemblyLib
             .computeCheckpointDistance(pool.feeGrowthGlobalQuote, pos.feeGrowthQuoteLast)
             .mulWadDown(pool.liquidity)
             .safeCastTo128();
@@ -94,7 +94,7 @@ contract TestPortfolioClaim is Setup {
         usePairTokens(10 ether) // mint and approve tokens to default actor()
         allocateSome(1 ether) // allocate some liquidity from actor()
         swapSomeGetOut(0.1 ether, -int(10), true) // Swapping a little less than optimal amount to trigger positive invariant growth!
-        unallocateSome(1 ether) // remove all liquidity from actor
+        deallocateSome(1 ether) // remove all liquidity from actor
         isArmed
     {
         // Draw all the tokens from our account.
@@ -157,7 +157,7 @@ contract TestPortfolioClaim is Setup {
         // eve waits for some swaps to happen. basicSwap will sell assets and increment asset fee growth.
         uint128 amountIn = 1500;
         uint128 amountOut = (subject().getAmountOut(ghost().poolId, true, amountIn) - 10).safeCastTo128(); // Subtract small amount to get positive invariant growth (not an optimal trade).
-        subject().multiprocess(EnigmaLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(0))); // trade in 1500 * 1% fee = 15 / 12_000 = 0.00125 fee growth per liquidity
+        subject().multiprocess(EnigmaLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(1))); // trade in 1500 * 1% fee = 15 / 12_000 = 0.00125 fee growth per liquidity
 
         // save the total fee growth for the asset per liquidity.
         PortfolioPool memory pool = ghost().pool();
@@ -184,10 +184,10 @@ contract TestPortfolioClaim is Setup {
         // swap a small amount so we generate fees
         uint128 amountIn = 10_000 wei; // 1% fees will generate 100 wei of asset fee growth
         uint128 amountOut = (subject().getAmountOut(ghost().poolId, true, amountIn) - 10).safeCastTo128(); // Subtract small amount to get positive invariant growth (not an optimal trade).
-        subject().multiprocess(EnigmaLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(0)));
+        subject().multiprocess(EnigmaLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(1)));
 
         // withdraw all the liquidity after the swap, to sync fees.
-        subject().multiprocess(EnigmaLib.encodeUnallocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
+        subject().multiprocess(EnigmaLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
 
         // withdraw all internal balances
         uint256 bal0 = ghost().balance(actor(), ghost().asset().to_addr());

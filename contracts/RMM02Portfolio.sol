@@ -4,27 +4,24 @@ pragma solidity 0.8.13;
 import "./Portfolio.sol";
 import "./libraries/RMM02Lib.sol";
 
+/**
+ * @title   RMM-02 Portfolio
+ * @author  Primitive™
+ */
 contract RMM02Portfolio is PortfolioVirtual {
     using RMM02Lib for PortfolioPool;
+    using AssemblyLib for uint256;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
-    using {Assembly.isBetween} for uint8;
-    using {Assembly.scaleFromWadDownSigned} for int256;
-    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
 
-    /**
-     * @dev
-     * Failing to pass a valid WETH contract that implements the `deposit()` function,
-     * will cause all transactions with Portfolio to fail once address(this).balance > 0.
-     *
-     * @notice
-     * Tokens sent to this contract are lost.
-     */
     constructor(address weth) PortfolioVirtual(weth) {}
+
+    uint256 public weight = 0.5 ether;
 
     // Implemented
 
+    /// @inheritdoc Objective
     function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
         PortfolioPool storage pool = pools[poolId];
 
@@ -33,17 +30,19 @@ contract RMM02Portfolio is PortfolioVirtual {
         return true;
     }
 
-    uint public weight = 0.5 ether;
-
+    /// @inheritdoc Objective
     function _beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
         PortfolioPool storage pool = pools[poolId];
-        int256 invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
         pool.syncPoolTimestamp(block.timestamp);
 
-        return (true, invariant);
+        bool valid = true;
+        int256 invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
+        return (valid, invariant);
     }
 
+    /// @inheritdoc Objective
     function checkPosition(uint64 poolId, address owner, int delta) public view override returns (bool) {
+        // Just in time liquidity protection.
         if (delta < 0) {
             uint256 distance = positions[owner][poolId].getTimeSinceChanged(block.timestamp);
             return (pools[poolId].params.jit <= distance);
@@ -52,28 +51,33 @@ contract RMM02Portfolio is PortfolioVirtual {
         return true;
     }
 
+    /// @inheritdoc Objective
     function checkPool(uint64 poolId) public view override returns (bool) {
         return pools[poolId].exists();
     }
 
+    /// @inheritdoc Objective
     function checkInvariant(
         uint64 poolId,
         int invariant,
-        uint reserve0,
-        uint reserve1
+        uint256 reserveX,
+        uint256 reserveY
     ) public view override returns (bool, int256 nextInvariant) {
-        int256 nextInvariant = pools[poolId].invariantOf({r1: reserve0, r2: reserve1, weight: weight}); // fix this is inverted?
-        return (nextInvariant >= invariant, nextInvariant);
+        nextInvariant = pools[poolId].invariantOf({R_x: reserveX, R_y: reserveY, weight: weight}); // fix this is inverted?
+
+        bool valid = nextInvariant >= invariant;
+        return (valid, nextInvariant);
     }
 
+    /// @inheritdoc Objective
     function computeMaxInput(
         uint64 poolId,
-        bool direction,
-        uint reserveIn,
-        uint liquidity
-    ) public view override returns (uint) {
-        uint maxInput;
-        if (direction) {
+        bool sellAsset,
+        uint256 reserveIn,
+        uint256 liquidity
+    ) public view override returns (uint256) {
+        uint256 maxInput;
+        if (sellAsset) {
             maxInput = 10000 ether; // There can be maximum 1:1 ratio between assets and liqudiity.
         } else {
             maxInput = 10000 ether; // There can be maximum strike:1 liquidity ratio between quote and liquidity.
@@ -82,23 +86,26 @@ contract RMM02Portfolio is PortfolioVirtual {
         return maxInput;
     }
 
+    /// @inheritdoc Objective
     function computeReservesFromPrice(
         uint64 poolId,
-        uint price
-    ) public view override returns (uint reserve0, uint reserve1) {
-        uint balance = 1 ether;
-        (reserve0, reserve1) = pools[poolId].computeReservesWithPrice(price, weight, balance);
+        uint256 price
+    ) public view override returns (uint256 reserveX, uint256 reserveY) {
+        uint256 balance = 1 ether;
+        (reserveX, reserveY) = pools[poolId].computeReservesWithPrice(price, weight, balance);
     }
 
-    function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint price) {
+    /// @inheritdoc Objective
+    function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint256 price) {
         price = pools[poolId].computePrice(weight);
     }
 
+    /// @inheritdoc Objective
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn
     ) public view override(Objective) returns (uint256 output) {
-        output = pools[poolId].getAmountOut({weight: weight, xIn: sellAsset, amountIn: amountIn, feeBps: 0});
+        output = pools[poolId].getAmountOut({sellAsset: sellAsset, amountIn: amountIn, weightIn: weight});
     }
 }

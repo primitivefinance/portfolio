@@ -1,7 +1,7 @@
 pragma solidity ^0.8.4;
 import "./EchidnaStateHandling.sol";
 
-contract AllocateUnallocate is EchidnaStateHandling {
+contract AllocateDeallocate is EchidnaStateHandling {
     // ******************** Allocate ********************
     function allocate_should_succeed_with_correct_preconditions(uint256 id, uint128 deltaLiquidity) public {
         (
@@ -156,10 +156,10 @@ contract AllocateUnallocate is EchidnaStateHandling {
 
     // A user should not be able to allocate more than they own
 
-    // ******************** Unallocate ********************
-    // A user attempting to unallocate an expired pool should be successful
-    // A user attempting to unallocate on any pool should succeed with correct preconditions
-    function unallocate_with_correct_preconditions_should_succeed(uint256 id, uint128 amount) public {
+    // ******************** Deallocate ********************
+    // A user attempting to deallocate an expired pool should be successful
+    // A user attempting to deallocate on any pool should succeed with correct preconditions
+    function deallocate_with_correct_preconditions_should_succeed(uint256 id, uint128 amount) public {
         address[] memory owners = new address[](1);
         (
             PortfolioPool memory pool,
@@ -170,22 +170,22 @@ contract AllocateUnallocate is EchidnaStateHandling {
 
         // Save pre unallocation state
         PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
-        uint256 preUnallocateAssetBalance = _asset.balanceOf(address(this));
-        uint256 preUnallocateQuoteBalance = _quote.balanceOf(address(this));
+        uint256 preDeallocateAssetBalance = _asset.balanceOf(address(this));
+        uint256 preDeallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
         (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getReserves(poolId);
 
-        _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(EnigmaLib.encodeDeallocate(uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
         PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
         {
-            uint256 postUnallocateAssetBalance = _asset.balanceOf(address(this));
-            uint256 postUnallocateQuoteBalance = _quote.balanceOf(address(this));
-            assert(preUnallocateAssetBalance + deltaAsset == postUnallocateAssetBalance);
-            assert(preUnallocateQuoteBalance + deltaQuote == postUnallocateQuoteBalance);
+            uint256 postDeallocateAssetBalance = _asset.balanceOf(address(this));
+            uint256 postDeallocateQuoteBalance = _quote.balanceOf(address(this));
+            assert(preDeallocateAssetBalance + deltaAsset == postDeallocateAssetBalance);
+            assert(preDeallocateQuoteBalance + deltaQuote == postDeallocateQuoteBalance);
         }
 
         assert(preState.totalPoolLiquidity - amount == postState.totalPoolLiquidity);
@@ -196,33 +196,33 @@ contract AllocateUnallocate is EchidnaStateHandling {
         assert(preState.physicalBalanceQuote == postState.physicalBalanceQuote);
     }
 
-    // A user without a position should not be able to unallocate funds
-    function unallocate_without_position_should_fail(uint256 id, uint256 amount) public {
+    // A user without a position should not be able to deallocate funds
+    function deallocate_without_position_should_fail(uint256 id, uint256 amount) public {
         (PortfolioPool memory pool, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
         require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
 
-        unallocate_should_fail(poolId, amount, "BUG: Unallocate without a position should fail.");
+        deallocate_should_fail(poolId, amount, "BUG: Deallocate without a position should fail.");
     }
 
-    // A user attempting to unallocate a nonexistent pool should fail
-    function unallocate_with_non_existent_pool_should_fail(uint64 id, uint128 amount) public {
+    // A user attempting to deallocate a nonexistent pool should fail
+    function deallocate_with_non_existent_pool_should_fail(uint64 id, uint128 amount) public {
         require(!is_created_pool(id));
         amount = between(amount, 1, type(uint256).max);
-        unallocate_should_fail(id, amount, "BUG: Unallocate to a non-existent pool should fail.");
+        deallocate_should_fail(id, amount, "BUG: Deallocate to a non-existent pool should fail.");
     }
 
     // Caller position last timestamp <= block.timestamp, with JIT policy
-    // A user should not be able to unallocate more than they own
-    function unallocate_should_fail(uint64 poolId, uint256 amount, string memory failureMsg) private {
-        try _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount)) {
+    // A user should not be able to deallocate more than they own
+    function deallocate_should_fail(uint64 poolId, uint256 amount, string memory failureMsg) private {
+        try _portfolio.multiprocess(EnigmaLib.encodeDeallocate(uint8(0), poolId, 0x0, amount)) {
             emit AssertionFailed(failureMsg);
         } catch {}
     }
 
-    // A user calling allocate then unallocate should succeed
-    function allocate_then_unallocate_should_succeed(uint256 id, uint128 amount) public {
+    // A user calling allocate then deallocate should succeed
+    function allocate_then_deallocate_should_succeed(uint256 id, uint128 amount) public {
         (
             PortfolioPool memory pool,
             uint64 poolId,
@@ -250,6 +250,6 @@ contract AllocateUnallocate is EchidnaStateHandling {
         emit LogUint256("amount", amount);
 
         execute_allocate_call(poolId, _asset, _quote, deltaAsset, deltaQuote, amount);
-        _portfolio.multiprocess(EnigmaLib.encodeUnallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(EnigmaLib.encodeDeallocate(uint8(0), poolId, 0x0, amount));
     }
 }

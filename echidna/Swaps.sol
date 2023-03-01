@@ -173,7 +173,7 @@ contract Swaps is EchidnaStateHandling {
     ) private {
         try
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             )
         {
             emit AssertionFailed(failureMsg);
@@ -217,7 +217,7 @@ contract Swaps is EchidnaStateHandling {
 
         try
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             )
         {
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
@@ -352,7 +352,7 @@ contract Swaps is EchidnaStateHandling {
 
         try
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             )
         {
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
@@ -412,7 +412,7 @@ contract Swaps is EchidnaStateHandling {
 
         try
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 0 : 1))
+                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             )
         {
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
@@ -462,7 +462,7 @@ contract Swaps is EchidnaStateHandling {
         // price always changes in a swap
         assert(postPrice != prevPrice);
 
-        // liquidity only changes in allocate and unallocate
+        // liquidity only changes in allocate and deallocate
         assert(prevLiquidity == postLiquidity);
 
         // fee growth checkpoints are always changing
@@ -503,7 +503,7 @@ contract Swaps is EchidnaStateHandling {
 
             assert(postPoolLastPrice != prePoolLastPrice);
 
-            // liquidity only changes in allocate and unallocate
+            // liquidity only changes in allocate and deallocate
             assert(prePool.liquidity == postPool.liquidity);
 
             // fee growth checkpoints are always changing

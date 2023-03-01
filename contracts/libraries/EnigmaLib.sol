@@ -15,7 +15,7 @@ pragma solidity 0.8.13;
   Multicalls will pad all calls to a full bytes32.
   This means two calls are at least 64 bytes.
   This alternative multicall can process over 10 calls in the same 64 bytes.
-  The smallest bytes provided by a call is for allocate and unallocate, at 11 bytes.
+  The smallest bytes provided by a call is for allocate and deallocate, at 11 bytes.
 
   Multicalls also process transactions sequentially.
   State cannot be carried over transiently between transactions.
@@ -25,7 +25,7 @@ pragma solidity 0.8.13;
   Without jump instruction, this alternative encoding is overkill.
 
   Be aware of function selector hash collisions.
-  Data is delivered via the `fallback` function.
+  Data is delivered via the `multiprocess` function in Portfolio.
 
   -------------
 
@@ -33,13 +33,13 @@ pragma solidity 0.8.13;
 
  */
 
-import "./AssemblyLib.sol" as Assembly;
+import "./AssemblyLib.sol";
 
 uint8 constant JUMP_PROCESS_START_POINTER = 2;
 bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
-bytes1 constant UNALLOCATE = 0x03;
+bytes1 constant DEALLOCATE = 0x03;
 bytes1 constant CLAIM = 0x04;
 bytes1 constant SWAP = 0x05;
 bytes1 constant UNSET06 = 0x06;
@@ -147,16 +147,16 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
  *      +--------------------------------------------------------------------+
  */
 function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (bytes memory data) {
-    (uint8 powerFee0, uint128 baseFee0) = Assembly.fromAmount(fee0);
-    (uint8 powerFee1, uint128 baseFee1) = Assembly.fromAmount(fee1);
+    (uint8 powerFee0, uint128 baseFee0) = AssemblyLib.fromAmount(fee0);
+    (uint8 powerFee1, uint128 baseFee1) = AssemblyLib.fromAmount(fee1);
 
     return abi.encodePacked(CLAIM, poolId, powerFee0, baseFee0, powerFee1, baseFee1);
 }
 
 function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
     poolId = uint64(bytes8(data[1:9]));
-    fee0 = Assembly.toAmount(data[9:26]);
-    fee1 = Assembly.toAmount(data[26:43]);
+    fee0 = AssemblyLib.toAmount(data[9:26]);
+    fee1 = AssemblyLib.toAmount(data[26:43]);
 }
 
 function encodeCreatePool(
@@ -202,32 +202,32 @@ function decodeCreatePool(
 }
 
 function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(Assembly.pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
+    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
 }
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
-    (bytes1 maxFlag, ) = Assembly.separate(data[0]);
+    (bytes1 maxFlag, ) = AssemblyLib.separate(data[0]);
     useMax = uint8(maxFlag);
     poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = Assembly.toAmount(data[9:]);
+    deltaLiquidity = AssemblyLib.toAmount(data[9:]);
 }
 
-function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(Assembly.pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
+function encodeDeallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
+    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, amount);
 }
 
-function decodeUnallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = uint128(Assembly.toAmount(data[9:]));
+    deltaLiquidity = uint128(AssemblyLib.toAmount(data[9:]));
 }
 
 /**
  * @dev Encodes a swap operation
  *      +-------------------------------------------------------------------------------+
- *      | Description | SWAP | poolId | power0 | amount0 | power1 | amount1 | direction |
+ *      | Description | SWAP | poolId | power0 | amount0 | power1 | amount1 | sellAsset |
  *      +-------------+------+--------+--------+---------+--------+---------+-----------+
  *      | Size (byte) |   1  |    8   |    1   |    16   |    1   |    16   |      1    |
  *      +-------------+------+--------+--------+---------+--------+---------+-----------+
@@ -241,17 +241,25 @@ function encodeSwap(
     uint128 amount0,
     uint8 power1,
     uint128 amount1,
-    uint8 direction
+    uint8 sellAsset
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(Assembly.pack(bytes1(useMax), SWAP), poolId, power0, amount0, power1, amount1, direction);
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), SWAP),
+        poolId,
+        power0,
+        amount0,
+        power1,
+        amount1,
+        sellAsset
+    );
 }
 
 function decodeSwap(
     bytes calldata data
-) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 direction) {
+) pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset) {
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
-    input = Assembly.toAmount(data[9:26]);
-    output = Assembly.toAmount(data[26:43]);
-    direction = uint8(data[data.length - 1]);
+    input = AssemblyLib.toAmount(data[9:26]);
+    output = AssemblyLib.toAmount(data[26:43]);
+    sellAsset = uint8(data[data.length - 1]);
 }

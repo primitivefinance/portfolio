@@ -4,7 +4,7 @@ import "./PairCreation.sol";
 import "./PoolCreation.sol";
 import "./ChangeParameters.sol";
 import "./FundingDrawingDepositing.sol";
-import "./AllocateUnallocate.sol";
+import "./AllocateDeallocate.sol";
 import "./Swaps.sol";
 
 contract GlobalInvariants is
@@ -12,7 +12,7 @@ contract GlobalInvariants is
     PoolCreation,
     ChangeParameters,
     FundingDrawingDepositing,
-    AllocateUnallocate,
+    AllocateDeallocate,
     Swaps
 {
     // ******************** System wide Invariants ********************

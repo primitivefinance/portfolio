@@ -11,7 +11,7 @@ import "./TestPortfolioDeposit.t.sol";
 import "./TestPortfolioDraw.t.sol";
 import "./TestPortfolioFund.t.sol";
 import "./TestPortfolioSwap.t.sol";
-import "./TestPortfolioUnallocate.t.sol";
+import "./TestPortfolioDeallocate.t.sol";
 
 contract TestRMM01 is
     TestPortfolioAllocate,
@@ -23,7 +23,7 @@ contract TestRMM01 is
     TestPortfolioDraw,
     TestPortfolioFund,
     TestPortfolioSwap,
-    TestPortfolioUnallocate
+    TestPortfolioDeallocate
 {
     function setUp() public override {
         super.setUp();

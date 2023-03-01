@@ -162,7 +162,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The `pools` `liquidity` for `poolId` always increases by `deltaLiquidity`.
   - The `pools` `liquidity` for `poolId` never decreases.
   - The Caller's `positions` `freeLiquidity` for `poolId` always increased by `deltaLiquidity`.
-  - Calling `unallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
+  - Calling `deallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - Portfolio's `reserves` value for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
   - The `balanceOf` Portfolio for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
@@ -170,7 +170,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The `Allocate` event is emitted.
   - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
-#### Unallocate
+#### Deallocate
 
 - Preconditions:
   - The Caller's `positions` `freeLiquidity` for `poolId` is greater than zero.
@@ -186,13 +186,13 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - Portfolio's `reserves` value for the pool's tokens stays the same.
   - The `balanceOf` Portfolio for the pool's tokens stays the same.
   - The `DecreasePosition` event is emitted.
-  - The `Unallocate` event is emitted.
+  - The `Deallocate` event is emitted.
   - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
 #### Swap
 
 - Preconditions:
-  - For swaps with the argument `direction = 0` then the input token for `poolId` is the pair's `pair.tokenAsset`, else or swaps with the argument `direction = 1` then the input token for `poolId` is the pair's `pair.tokenQuote`
+  - For swaps with the argument `sellAsset = 0` then the input token for `poolId` is the pair's `pair.tokenAsset`, else or swaps with the argument `sellAsset = 1` then the input token for `poolId` is the pair's `pair.tokenQuote`
     - Caller must have approved token to be spent by Portfolio and have `input` of tokens, or Caller must have `input` of tokens in their `balances`.
   - The `pools` `poolId` value must return a `lastTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
   - The `input` amount must be greater than zero.
@@ -200,8 +200,8 @@ System invariants are tested using Foundry's invariant testing. There is no docu
 - During Execution:
   - If `useMax` === 1, the `remainder` value in memory must be initialized with the Caller's entire `balances` value of the input token.
   - The memory `_swap.price` value must not be:
-    - Greater than `limit` price if `direction == 0`.
-    - Less than `limit` price if `direction == 1`.
+    - Greater than `limit` price if `sellAsset == 0`.
+    - Less than `limit` price if `sellAsset == 1`.
 - Postconditions:
   - Portfolio's `reserves` changed:
     - For `input` amount, changed by zero if Caller used their internal balance.
