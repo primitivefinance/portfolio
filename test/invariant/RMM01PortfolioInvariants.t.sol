@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "../Setup.sol";
 import "./HelperInvariantLib.sol";
 
-import {HandlerHyper} from "./HandlerHyper.sol";
+import {HandlerPortfolio} from "./HandlerPortfolio.sol";
 import {HandlerExternal} from "./HandlerExternal.sol";
 
 bytes32 constant SLOT_LOCKED = bytes32(uint256(10));
@@ -14,13 +14,13 @@ interface AccountLike {
 }
 
 /**
- * @dev Most important test suite, verifies the critical invariants of Hyper.
+ * @dev Most important test suite, verifies the critical invariants of Portfolio.
  *
  * Invariant 1. balanceOf >= getReserve for all tokens.
  * Invariant 2. AccountSystem.settled == true.
  * Invariant 3. AccountSystem.prepared == false.
- * Invariant 4. (balanceOf(asset), balanceOf(quote)) >= hyper.getVirtualReserves, for all pools.
- * Invariant 5. ∑ hyper.positions(owner, poolId).freeLiquidity == hyper.pools(poolId).liquidity, for all pools.
+ * Invariant 4. (balanceOf(asset), balanceOf(quote)) >= Portfolio.getVirtualReserves, for all pools.
+ * Invariant 5. ∑ Portfolio.positions(owner, poolId).freeLiquidity == Portfolio.pools(poolId).liquidity, for all pools.
  */
 contract RMM01PortfolioInvariants is Setup {
     /**
@@ -28,24 +28,24 @@ contract RMM01PortfolioInvariants is Setup {
      */
     InvariantGhostState private _ghostInvariant;
 
-    HandlerHyper internal _hyper;
+    HandlerPortfolio internal _Portfolio;
     HandlerExternal internal _external;
 
     function setUp() public override {
         super.setUp();
 
-        _hyper = new HandlerHyper();
+        _Portfolio = new HandlerPortfolio();
 
         {
             bytes4[] memory selectors = new bytes4[](6);
-            selectors[0] = HandlerHyper.deposit.selector;
-            selectors[1] = HandlerHyper.fund_asset.selector;
-            selectors[2] = HandlerHyper.fund_quote.selector;
-            selectors[3] = HandlerHyper.create_pool.selector;
-            selectors[4] = HandlerHyper.allocate.selector;
-            selectors[5] = HandlerHyper.unallocate.selector;
-            targetSelector(FuzzSelector({addr: address(_hyper), selectors: selectors}));
-            targetContract(address(_hyper));
+            selectors[0] = HandlerPortfolio.deposit.selector;
+            selectors[1] = HandlerPortfolio.fund_asset.selector;
+            selectors[2] = HandlerPortfolio.fund_quote.selector;
+            selectors[3] = HandlerPortfolio.create_pool.selector;
+            selectors[4] = HandlerPortfolio.allocate.selector;
+            selectors[5] = HandlerPortfolio.unallocate.selector;
+            targetSelector(FuzzSelector({addr: address(_Portfolio), selectors: selectors}));
+            targetContract(address(_Portfolio));
         }
 
         // Create default pool, used in handlers via `usePool(uint)` modifier.
@@ -85,7 +85,7 @@ contract RMM01PortfolioInvariants is Setup {
     }
 
     function invariant_virtual_pool_asset_reserves() public {
-        HyperPool memory pool = ghost().pool();
+        PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
             (uint256 dAsset, ) = subject().getReserves(ghost().poolId);
@@ -95,7 +95,7 @@ contract RMM01PortfolioInvariants is Setup {
     }
 
     function invariant_virtual_pool_quote_reserves() public {
-        HyperPool memory pool = ghost().pool();
+        PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
             (, uint256 dQuote) = subject().getReserves(ghost().poolId);
@@ -105,11 +105,11 @@ contract RMM01PortfolioInvariants is Setup {
     }
 
     function invariant_liquidity_sum() public {
-        HyperPool memory pool = ghost().pool();
+        PortfolioPool memory pool = ghost().pool();
 
         uint256 sum;
         for (uint256 i; i != actors().active.length; ++i) {
-            HyperPosition memory pos = ghost().position(actors().active[i]);
+            PortfolioPosition memory pos = ghost().position(actors().active[i]);
             sum += pos.freeLiquidity;
         }
 
@@ -127,7 +127,7 @@ contract RMM01PortfolioInvariants is Setup {
     function invariant_callSummary() public view {
         console.log("Call summary:");
         console.log("-------------------");
-        _hyper.callSummary();
+        _Portfolio.callSummary();
         console.log("pools created", getPoolIds().length);
     }
 

@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperFund is Setup {
+contract TestPortfolioFund is Setup {
     struct FundGhostVariables {
         uint userAddressBalance;
         uint userSubjectBalance;

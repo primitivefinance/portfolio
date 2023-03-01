@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.13;
 
-import "./Hyper.sol";
+import "./Portfolio.sol";
 import "./libraries/RMM02Lib.sol";
 
-contract RMM02Portfolio is HyperVirtual {
-    using RMM02Lib for HyperPool;
+contract RMM02Portfolio is PortfolioVirtual {
+    using RMM02Lib for PortfolioPool;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -16,17 +16,17 @@ contract RMM02Portfolio is HyperVirtual {
     /**
      * @dev
      * Failing to pass a valid WETH contract that implements the `deposit()` function,
-     * will cause all transactions with Hyper to fail once address(this).balance > 0.
+     * will cause all transactions with Portfolio to fail once address(this).balance > 0.
      *
      * @notice
      * Tokens sent to this contract are lost.
      */
-    constructor(address weth) HyperVirtual(weth) {}
+    constructor(address weth) PortfolioVirtual(weth) {}
 
     // Implemented
 
     function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
-        HyperPool storage pool = pools[poolId];
+        PortfolioPool storage pool = pools[poolId];
 
         int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
 
@@ -36,7 +36,7 @@ contract RMM02Portfolio is HyperVirtual {
     uint public weight = 0.5 ether;
 
     function _beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
-        HyperPool storage pool = pools[poolId];
+        PortfolioPool storage pool = pools[poolId];
         int256 invariant = pool.invariantOf(pool.virtualX, pool.virtualY, weight);
         pool.syncPoolTimestamp(block.timestamp);
 

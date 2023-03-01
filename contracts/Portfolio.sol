@@ -5,7 +5,7 @@ pragma solidity 0.8.13;
 
   ------------------------------------
 
-  Hyper is a replicating market maker.
+  Portfolio is a replicating market maker.
 
   ------------------------------------
 
@@ -16,9 +16,9 @@ pragma solidity 0.8.13;
 import "./Objective.sol";
 
 /**
- * @notice Hyper is the core logic to manage capital using trading functions.
+ * @notice Portfolio is the core logic to manage capital using trading functions.
  */
-abstract contract HyperVirtual is Objective {
+abstract contract PortfolioVirtual is Objective {
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -50,10 +50,10 @@ abstract contract HyperVirtual is Objective {
     uint24 public getPairNonce;
     uint32 public getPoolNonce;
 
-    mapping(uint24 => HyperPair) public pairs;
-    mapping(uint64 => HyperPool) public pools;
+    mapping(uint24 => PortfolioPair) public pairs;
+    mapping(uint64 => PortfolioPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
-    mapping(address => mapping(uint64 => HyperPosition)) public positions;
+    mapping(address => mapping(uint64 => PortfolioPosition)) public positions;
 
     uint256 public locked = 1;
     uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
@@ -69,13 +69,13 @@ abstract contract HyperVirtual is Objective {
      *
      * @custom:guide
      * Step 1. Enter `locked` re-entrancy guard.
-     * Step 2. Validate Hyper's account system has not already been entered.
+     * Step 2. Validate Portfolio's account system has not already been entered.
      * Step 3. Wrap the entire ether balance of this contract and credit the wrapped ether to the msg.sender account.
-     * Step 4. Enter the re-entrancy guard of Hyper's account system.
+     * Step 4. Enter the re-entrancy guard of Portfolio's account system.
      * Step 5. Execute the function logic.
-     * Step 6. Exit the re-entrancy guard of Hyper's account system.
+     * Step 6. Exit the re-entrancy guard of Portfolio's account system.
      * Step 7. Enter the settlement function, requesting token payments or sending them out to msg.sender.
-     * Step 8. Validate Hyper's account system was settled.
+     * Step 8. Validate Portfolio's account system was settled.
      * Step 9. Exit interactions modifier.
      * Step 10. Exit `locked` re-entrancy guard.
      */
@@ -92,7 +92,7 @@ abstract contract HyperVirtual is Objective {
     /**
      * @dev
      * Failing to pass a valid WETH contract that implements the `deposit()` function,
-     * will cause all transactions with Hyper to fail once address(this).balance > 0.
+     * will cause all transactions with Portfolio to fail once address(this).balance > 0.
      *
      * @notice
      * Tokens sent to this contract are lost.
@@ -125,7 +125,7 @@ abstract contract HyperVirtual is Objective {
 
     // ===== External Actions ===== //
 
-    /// @inheritdoc IHyperActions
+    /// @inheritdoc IPortfolioActions
     function deposit() external payable override lock {
         if (msg.value == 0) revert ZeroValue();
         _deposit();
@@ -134,7 +134,7 @@ abstract contract HyperVirtual is Objective {
         _settlement();
     }
 
-    /// @inheritdoc IHyperActions
+    /// @inheritdoc IPortfolioActions
     function multiprocess(bytes calldata data) external payable lock {
         _deposit();
 
@@ -146,7 +146,7 @@ abstract contract HyperVirtual is Objective {
         _settlement();
     }
 
-    /// @inheritdoc IHyperActions
+    /// @inheritdoc IPortfolioActions
     function draw(address token, uint256 amount, address to) external override lock {
         if (to == address(this)) revert InvalidTransfer(); // todo: Investigate attack vectors if this was not here.
 
@@ -165,7 +165,7 @@ abstract contract HyperVirtual is Objective {
         _settlement(); // Updates __account__.settled = true.
     }
 
-    /// @inheritdoc IHyperActions
+    /// @inheritdoc IPortfolioActions
     function fund(address token, uint256 amount) external override lock {
         if (amount == type(uint256).max) amount = Account.__balanceOf__(token, msg.sender);
 
@@ -177,10 +177,10 @@ abstract contract HyperVirtual is Objective {
     }
 
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external lock {
-        HyperPool storage pool = pools[poolId];
+        PortfolioPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
-        HyperCurve memory modified = pool.params;
+        PortfolioCurve memory modified = pool.params;
         if (jit != 0) modified.jit = jit;
         if (fee != 0) modified.fee = fee;
         if (priorityFee != 0) modified.priorityFee = priorityFee;
@@ -193,10 +193,10 @@ abstract contract HyperVirtual is Objective {
     // ===== Internal ===== //
 
     function _claim(uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) internal {
-        HyperPosition storage pos = positions[msg.sender][poolId];
+        PortfolioPosition storage pos = positions[msg.sender][poolId];
         if (pos.lastTimestamp == 0) revert NonExistentPosition(msg.sender, poolId);
 
-        HyperPool memory pool = pools[poolId];
+        PortfolioPool memory pool = pools[poolId];
         (uint growthAsset, uint growthQuote, uint growthInvariant, address asset, address quote) = (
             pool.feeGrowthGlobalAsset,
             pool.feeGrowthGlobalQuote,
@@ -293,7 +293,7 @@ abstract contract HyperVirtual is Objective {
     function _changeLiquidity(
         ChangeLiquidityParams memory args
     ) internal returns (uint256 feeAsset, uint256 feeQuote, uint256 invariantGrowth) {
-        (HyperPool storage pool, HyperPosition storage position) = (
+        (PortfolioPool storage pool, PortfolioPosition storage position) = (
             pools[args.poolId],
             positions[args.owner][args.poolId]
         );
@@ -327,7 +327,7 @@ abstract contract HyperVirtual is Objective {
     ) internal returns (uint64 poolId, uint256 remainder, uint256 input, uint256 output) {
         if (args.input == 0) revert ZeroInput();
 
-        HyperPool storage pool = pools[args.poolId];
+        PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
         _state.sell = args.direction == 0; // 0: asset -> quote, 1: quote -> asset
@@ -488,7 +488,7 @@ abstract contract HyperVirtual is Objective {
         uint256 feeGrowthGlobalQuote,
         uint256 invariantGrowthGlobal
     ) internal returns (uint256 timeDelta) {
-        HyperPool storage pool = pools[poolId];
+        PortfolioPool storage pool = pools[poolId];
 
         timeDelta = _getTimePassed(pool);
 
@@ -517,7 +517,7 @@ abstract contract HyperVirtual is Objective {
         pairId = ++getPairNonce;
 
         getPairId[asset][quote] = pairId; // note: order of tokens matters!
-        pairs[pairId] = HyperPair({
+        pairs[pairId] = PortfolioPair({
             tokenAsset: asset,
             decimalsAsset: decimalsAsset,
             tokenQuote: quote,
@@ -546,7 +546,7 @@ abstract contract HyperVirtual is Objective {
         uint32 poolNonce = ++getPoolNonce;
         poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
 
-        HyperPool storage pool = pools[poolId];
+        PortfolioPool storage pool = pools[poolId];
         pool.controller = controller;
         if (hasController && priorityFee == 0) revert InvalidFee(priorityFee); // Cannot set priority to 0.
 
@@ -554,7 +554,7 @@ abstract contract HyperVirtual is Objective {
         pool.lastTimestamp = timestamp;
         pool.pair = pairs[pairNonce];
 
-        HyperCurve memory params = HyperCurve({
+        PortfolioCurve memory params = PortfolioCurve({
             maxPrice: maxPrice,
             jit: hasController ? jit : uint8(_liquidityPolicy),
             fee: fee,
@@ -730,7 +730,7 @@ abstract contract HyperVirtual is Objective {
 
     // ===== Internal View ===== //
 
-    function _getTimePassed(HyperPool memory pool) internal view returns (uint256) {
+    function _getTimePassed(PortfolioPool memory pool) internal view returns (uint256) {
         return block.timestamp - pool.lastTimestamp;
     }
 

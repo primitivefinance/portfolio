@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperCreatePair is Setup {
+contract TestPortfolioCreatePair is Setup {
     function test_createPair_success() public {
         address token0 = address(new MockERC20("tkn", "tkn", 18));
         address token1 = address(new MockERC20("tkn", "tkn", 18));
@@ -84,7 +84,7 @@ contract TestHyperCreatePair is Setup {
         bytes memory data = Enigma.encodeCreatePair(address(token0), address(token1));
         subject().multiprocess(data);
         uint24 pairId = subject().getPairId(token0, token1);
-        HyperPair memory pair = ghost().pairOf(pairId);
+        PortfolioPair memory pair = ghost().pairOf(pairId);
         assertEq(pair.tokenAsset, token0);
         assertEq(pair.tokenQuote, token1);
         assertEq(pair.decimalsAsset, 18);

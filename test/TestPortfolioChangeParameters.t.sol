@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperChangeParameters is Setup {
+contract TestPortfolioChangeParameters is Setup {
     function testFuzz_changeParameters(
         uint16 priorityFee,
         uint16 fee,
@@ -15,7 +15,7 @@ contract TestHyperChangeParameters is Setup {
         jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
 
         subject().changeParameters(poolId, priorityFee, fee, jit);
-        HyperCurve memory actual = ghost().pool().params;
+        PortfolioCurve memory actual = ghost().pool().params;
         assertEq(actual.priorityFee, priorityFee, "priorityFee");
         assertEq(actual.fee, fee, "fee");
         assertEq(actual.jit, jit, "jit");
@@ -45,7 +45,7 @@ contract TestHyperChangeParameters is Setup {
 
     function test_revert_changeParameters_priority_fee_above_max() public defaultControlledConfig isArmed {
         uint64 poolId = ghost().poolId;
-        HyperCurve memory curve = HyperCurve({
+        PortfolioCurve memory curve = PortfolioCurve({
             maxPrice: DEFAULT_STRIKE,
             jit: DEFAULT_JIT,
             fee: 55,

@@ -5,7 +5,7 @@ pragma solidity 0.8.13;
 
   ------------------------------------
 
-  Hyper is a replicating market maker.
+  Portfolio is a replicating market maker.
 
   ------------------------------------
 
@@ -13,11 +13,11 @@ pragma solidity 0.8.13;
 
  */
 
-import "./Hyper.sol";
+import "./Portfolio.sol";
 import "./libraries/RMM01Lib.sol";
 
-contract RMM01Portfolio is HyperVirtual {
-    using RMM01Lib for HyperPool;
+contract RMM01Portfolio is PortfolioVirtual {
+    using RMM01Lib for PortfolioPool;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -28,12 +28,12 @@ contract RMM01Portfolio is HyperVirtual {
     /**
      * @dev
      * Failing to pass a valid WETH contract that implements the `deposit()` function,
-     * will cause all transactions with Hyper to fail once address(this).balance > 0.
+     * will cause all transactions with Portfolio to fail once address(this).balance > 0.
      *
      * @notice
      * Tokens sent to this contract are lost.
      */
-    constructor(address weth) HyperVirtual(weth) {}
+    constructor(address weth) PortfolioVirtual(weth) {}
 
     // Implemented
 
@@ -121,7 +121,7 @@ contract RMM01Portfolio is HyperVirtual {
     function _computeSyncedPrice(
         uint64 poolId
     ) internal view returns (uint256 price, int256 invariant, uint256 updatedTau) {
-        HyperPool memory pool = pools[poolId];
+        PortfolioPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
         uint timeSinceUpdate = _getTimePassed(pool);
         (invariant, updatedTau) = RMM01Lib.getNextInvariant({self: pool, timeSinceUpdate: timeSinceUpdate});
@@ -138,7 +138,7 @@ contract RMM01Portfolio is HyperVirtual {
         bool sellAsset,
         uint256 amountIn
     ) public view override(Objective) returns (uint256 output) {
-        HyperPool memory pool = pools[poolId];
+        PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             direction: sellAsset,
             amountIn: amountIn,

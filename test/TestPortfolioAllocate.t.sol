@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperAllocate is Setup {
+contract TestPortfolioAllocate is Setup {
     function test_allocate_modifies_liquidity() public defaultConfig useActor usePairTokens(10 ether) isArmed {
         // Arguments for test.
         uint128 amount = 0.1 ether;

@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperDraw is Setup {
+contract TestPortfolioDraw is Setup {
     modifier fund(uint amt) {
         ghost().asset().prepare(address(this), address(subject()), amt);
         subject().fund(ghost().asset().to_addr(), amt);

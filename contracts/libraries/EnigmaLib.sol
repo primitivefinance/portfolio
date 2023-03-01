@@ -105,7 +105,7 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24) {
  * @dev Returns the pool id given some pool parameters
  * @param pairId Id of the pair of asset / quote tokens
  * @param isMutable True if the pool is mutable
- * @param poolNonce Current pool nonce of the Hyper contract
+ * @param poolNonce Current pool nonce of the Portfolio contract
  * @return Corresponding encoded pool id
  * @custom:example
  * ```
@@ -146,22 +146,11 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
  *      | Index       |   0   |  1 - 9 |    9   | 10 - 26 |   26   | 27 - 43 |
  *      +--------------------------------------------------------------------+
  */
-function encodeClaim(
-    uint64 poolId,
-    uint128 fee0,
-    uint128 fee1
-) pure returns (bytes memory data) {
+function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (bytes memory data) {
     (uint8 powerFee0, uint128 baseFee0) = Assembly.fromAmount(fee0);
     (uint8 powerFee1, uint128 baseFee1) = Assembly.fromAmount(fee1);
 
-    return abi.encodePacked(
-        CLAIM,
-        poolId,
-        powerFee0,
-        baseFee0,
-        powerFee1,
-        baseFee1
-    );
+    return abi.encodePacked(CLAIM, poolId, powerFee0, baseFee0, powerFee1, baseFee1);
 }
 
 function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
@@ -254,15 +243,7 @@ function encodeSwap(
     uint128 amount1,
     uint8 direction
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(
-        Assembly.pack(bytes1(useMax), SWAP),
-        poolId,
-        power0,
-        amount0,
-        power1,
-        amount1,
-        direction
-    );
+    data = abi.encodePacked(Assembly.pack(bytes1(useMax), SWAP), poolId, power0, amount0, power1, amount1, direction);
 }
 
 function decodeSwap(

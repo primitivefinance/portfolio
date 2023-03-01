@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperDeposit is Setup {
+contract TestPortfolioDeposit is Setup {
     function test_deposit_increases_user_weth_balance() public {
         uint amount = 10 ether;
         uint prev = ghost().balance(address(this), subject().WETH());

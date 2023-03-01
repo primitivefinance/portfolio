@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import {RMM01Portfolio as Hyper} from "../../contracts/RMM01Portfolio.sol";
-import "contracts/HyperLib.sol";
+import {RMM01Portfolio as Portfolio} from "../../contracts/RMM01Portfolio.sol";
+import "contracts/PortfolioLib.sol";
 import "contracts/test/TestERC20.sol";
 
 contract RevertCatcher {
-    Hyper public hyper;
+    Portfolio public portfolio;
 
-    constructor(address hyper_) {
-        hyper = Hyper(payable(hyper_));
+    constructor(address Portfolio_) {
+        portfolio = Portfolio(payable(Portfolio_));
     }
 
     receive() external payable {}
@@ -18,9 +18,9 @@ contract RevertCatcher {
         TestERC20(token).approve(spender, type(uint256).max);
     }
 
-    /** @dev Assumes Hyper calls this, for testing only. Uses try catch to bubble up errors. */
+    /** @dev Assumes portfolio calls this, for testing only. Uses try catch to bubble up errors. */
     function process(bytes calldata data) external payable returns (bool) {
-        try hyper.multiprocess{value: msg.value}(data) {} catch (bytes memory reason) {
+        try portfolio.multiprocess{value: msg.value}(data) {} catch (bytes memory reason) {
             assembly {
                 revert(add(32, reason), mload(reason))
             }
@@ -28,9 +28,9 @@ contract RevertCatcher {
         return true;
     }
 
-    /** @dev Assumes Hyper calls this, for testing only. Uses try catch to bubble up errors. */
+    /** @dev Assumes Portfolio calls this, for testing only. Uses try catch to bubble up errors. */
     function jumpProcess(bytes calldata data) external payable returns (bool) {
-        try hyper.multiprocess{value: msg.value}(data) {} catch (bytes memory reason) {
+        try portfolio.multiprocess{value: msg.value}(data) {} catch (bytes memory reason) {
             assembly {
                 revert(add(32, reason), mload(reason))
             }

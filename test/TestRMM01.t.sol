@@ -2,28 +2,28 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
-import "./TestHyperAllocate.t.sol";
-import "./TestHyperChangeParameters.t.sol";
-import "./TestHyperClaim.t.sol";
-import "./TestHyperCreatePair.t.sol";
-import "./TestHyperCreatePool.t.sol";
-import "./TestHyperDeposit.t.sol";
-import "./TestHyperDraw.t.sol";
-import "./TestHyperFund.t.sol";
-import "./TestHyperSwap.t.sol";
-import "./TestHyperUnallocate.t.sol";
+import "./TestPortfolioAllocate.t.sol";
+import "./TestPortfolioChangeParameters.t.sol";
+import "./TestPortfolioClaim.t.sol";
+import "./TestPortfolioCreatePair.t.sol";
+import "./TestPortfolioCreatePool.t.sol";
+import "./TestPortfolioDeposit.t.sol";
+import "./TestPortfolioDraw.t.sol";
+import "./TestPortfolioFund.t.sol";
+import "./TestPortfolioSwap.t.sol";
+import "./TestPortfolioUnallocate.t.sol";
 
 contract TestRMM01 is
-    TestHyperAllocate,
-    TestHyperChangeParameters,
-    TestHyperClaim,
-    TestHyperCreatePair,
-    TestHyperCreatePool,
-    TestHyperDeposit,
-    TestHyperDraw,
-    TestHyperFund,
-    TestHyperSwap,
-    TestHyperUnallocate
+    TestPortfolioAllocate,
+    TestPortfolioChangeParameters,
+    TestPortfolioClaim,
+    TestPortfolioCreatePair,
+    TestPortfolioCreatePool,
+    TestPortfolioDeposit,
+    TestPortfolioDraw,
+    TestPortfolioFund,
+    TestPortfolioSwap,
+    TestPortfolioUnallocate
 {
     function setUp() public override {
         super.setUp();

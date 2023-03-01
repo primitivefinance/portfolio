@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "solmate/utils/SafeCastLib.sol";
-import "contracts/interfaces/IHyper.sol";
+import "contracts/interfaces/IPortfolio.sol";
 import "contracts/libraries/EnigmaLib.sol" as EnigmaLib;
 
 using Configs for ConfigState global;
@@ -42,7 +42,7 @@ function safeCastTo16(uint256 x) pure returns (uint16 y) {
  * - Make a fresh config with defaults using `Configs.fresh()`.
  * - Use `edit` to make modifications to the config.
  * - Must `edit` the `asset` and `quote` parameters of the config.
- * - Call `generate()` on a config to create the pool in the test subject (a Hyper contract).
+ * - Call `generate()` on a config to create the pool in the test subject (a Portfolio contract).
  */
 library Configs {
     using SafeCastLib for uint;
@@ -52,10 +52,10 @@ library Configs {
      * @dev Creates a new config with defaults.
      * @custom:example
      * ```
-     * // Get the hyper contract that is the subject of the test.
-     * address hyper = address(subject());
+     * // Get the Portfolio contract that is the subject of the test.
+     * address Portfolio = address(subject());
      * // Creates the pool with the fresh config.
-     * Configs.fresh().{edit asset}.{edit quote}.generate(hyper);
+     * Configs.fresh().{edit asset}.{edit quote}.generate(Portfolio);
      * // note: Must edit the `asset` and `quote`, or `generate` will revert.
      * ```
      */
@@ -81,7 +81,7 @@ library Configs {
      * ```
      * // Expects abi encoded arguments as the `data`. Types must match expected types.
      * // Creates a new pool with `asset_address`.
-     * Configs.fresh().edit("asset", abi.encode(asset_address)).generate(hyper);
+     * Configs.fresh().edit("asset", abi.encode(asset_address)).generate(Portfolio);
      * ```
      */
     function edit(ConfigState memory self, bytes32 what, bytes memory data) internal pure returns (ConfigState memory) {
@@ -106,7 +106,7 @@ library Configs {
     }
 
     /**
-     * @notice Uses a config and `hyper` address to create the pool in the contract.
+     * @notice Uses a config and `Portfolio` address to create the pool in the contract.
      * @dev Will create a pair if the `asset` and `quote` are not an existing pair.
      * @custom:example
      * ```
@@ -117,10 +117,10 @@ library Configs {
      *      .generate(address(subject()));
      * ```
      */
-    function generate(ConfigState memory self, address hyper) internal returns (uint64 poolId) {
+    function generate(ConfigState memory self, address Portfolio) internal returns (uint64 poolId) {
         require(self.asset != address(0), "did you set asset in config?");
         require(self.quote != address(0), "did you set quote in config?");
-        uint24 pairId = IHyperGetters(hyper).getPairId(self.asset, self.quote);
+        uint24 pairId = IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
         if (pairId == 0) {
             bytes[] memory data = new bytes[](2);
             data[0] = (EnigmaLib.encodeCreatePair(self.asset, self.quote));
@@ -140,13 +140,13 @@ library Configs {
 
             bytes memory payload = EnigmaLib.encodeJumpInstruction(data);
 
-            IHyper(hyper).multiprocess(payload);
+            IPortfolio(Portfolio).multiprocess(payload);
 
             bool controlled = self.controller != address(0);
             poolId = EnigmaLib.encodePoolId(
-                IHyperGetters(hyper).getPairNonce(),
+                IPortfolioGetters(Portfolio).getPairNonce(),
                 controlled,
-                IHyperGetters(hyper).getPoolNonce()
+                IPortfolioGetters(Portfolio).getPoolNonce()
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {
@@ -161,7 +161,7 @@ library Configs {
                 maxPrice: self.terminalPriceWad,
                 price: self.reportedPriceWad
             });
-            IHyper(hyper).multiprocess(payload);
+            IPortfolio(Portfolio).multiprocess(payload);
         }
     }
 }

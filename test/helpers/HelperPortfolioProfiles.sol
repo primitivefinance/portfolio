@@ -20,4 +20,4 @@ uint16 constant DEFAULT_VOLATILITY = 10_000;
 uint16 constant DEFAULT_DURATION = 365;
 int24 constant DEFAULT_MAX_TICK = int24(23027);
 
-contract HelperHyperProfiles {}
+contract HelperPortfolioProfiles {}

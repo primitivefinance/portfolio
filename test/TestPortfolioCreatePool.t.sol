@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "./Setup.sol";
 
-contract TestHyperCreatePool is Setup {
+contract TestPortfolioCreatePool is Setup {
     function testFuzz_createPool(
         uint16 priorityFee,
         uint16 fee,
@@ -39,8 +39,8 @@ contract TestHyperCreatePool is Setup {
         uint64 poolId = Enigma.encodePoolId(pairId, true, subject().getPoolNonce());
         setGhostPoolId(poolId);
 
-        HyperPool memory pool = ghost().pool();
-        HyperCurve memory actual = pool.params;
+        PortfolioPool memory pool = ghost().pool();
+        PortfolioCurve memory actual = pool.params;
 
         assertEq(pool.controller, address(this), "controller");
         assertEq(actual.priorityFee, priorityFee, "priorityFee");

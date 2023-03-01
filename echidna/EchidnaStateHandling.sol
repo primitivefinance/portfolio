@@ -2,22 +2,22 @@ pragma solidity ^0.8.4;
 import "solmate/tokens/WETH.sol";
 import "contracts/test/EchidnaERC20.sol";
 import "./Helper.sol";
-import {RMM01Portfolio as Hyper, Account as AccountLib, SafeCastLib, Enigma as EnigmaLib} from "contracts/RMM01Portfolio.sol";
-import "../helpers/HelperHyperView.sol";
+import {RMM01Portfolio as Portfolio, Account as AccountLib, SafeCastLib, Enigma as EnigmaLib} from "contracts/RMM01Portfolio.sol";
+import "../helpers/HelperPortfolioView.sol";
 import "contracts/libraries/EnigmaLib.sol" as ProcessingLib;
 
-contract EchidnaStateHandling is Helper, HelperHyperView {
+contract EchidnaStateHandling is Helper, HelperPortfolioView {
     bool hasFunded;
-    Hyper public immutable _hyper;
+    Portfolio public immutable _portfolio;
     WETH public immutable _weth;
 
     constructor() {
         _weth = new WETH();
-        _hyper = new Hyper(address(_weth));
+        _portfolio = new Portfolio(address(_weth));
     }
 
-    // Hyper Tokens
-    EchidnaERC20[] public hyperTokens;
+    // Portfolio Tokens
+    EchidnaERC20[] public PortfolioTokens;
     uint64 internal specialPoolId;
     bool internal specialPoolCreated;
 
@@ -31,25 +31,28 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
         uint128 price;
     }
 
-    function add_created_hyper_token(EchidnaERC20 token) internal {
-        hyperTokens.push(token);
+    function add_created_Portfolio_token(EchidnaERC20 token) internal {
+        PortfolioTokens.push(token);
     }
 
-    function get_hyper_tokens(uint256 id1, uint256 id2) internal view returns (EchidnaERC20 asset, EchidnaERC20 quote) {
-        // This assumes that hyperTokens.length is always >2
+    function get_Portfolio_tokens(
+        uint256 id1,
+        uint256 id2
+    ) internal view returns (EchidnaERC20 asset, EchidnaERC20 quote) {
+        // This assumes that PortfolioTokens.length is always >2
         if (poolIds.length == 2) {
             id1 = 0;
             id2 = 1;
         } else {
-            id1 = between(id1, 0, hyperTokens.length - 1);
-            id2 = between(id2, 0, hyperTokens.length - 1);
+            id1 = between(id1, 0, PortfolioTokens.length - 1);
+            id2 = between(id2, 0, PortfolioTokens.length - 1);
         }
         require(id1 != id2);
-        return (hyperTokens[id1], hyperTokens[id2]);
+        return (PortfolioTokens[id1], PortfolioTokens[id2]);
     }
 
     function get_token_at_index(uint256 index) internal view returns (EchidnaERC20 token) {
-        return hyperTokens[index];
+        return PortfolioTokens[index];
     }
 
     // Pairs
@@ -81,14 +84,14 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
 
     function retrieve_random_pool_and_tokens(
         uint256 id
-    ) internal view returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
+    ) internal view returns (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
         // assumes that at least one pool exists because it's been created in the constructor
         uint256 random = between(id, 0, poolIds.length - 1);
         if (poolIds.length == 1) random = 0;
 
-        pool = getPool(address(_hyper), poolIds[random]);
+        pool = getPool(address(_portfolio), poolIds[random]);
         poolId = poolIds[random];
-        HyperPair memory pair = pool.pair;
+        PortfolioPair memory pair = pool.pair;
         quote = EchidnaERC20(pair.tokenQuote);
         asset = EchidnaERC20(pair.tokenAsset);
     }
@@ -96,15 +99,15 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
     function retrieve_non_expired_pool_and_tokens()
         internal
         view
-        returns (HyperPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote)
+        returns (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote)
     {
         for (uint8 i = 0; i < poolIds.length; i++) {
             // will auto skew to the first pool that is not expired, however this should be okay.
             // this gives us a higher chance to return a pool that is not expired through iterating
-            pool = getPool(address(_hyper), poolIds[i]);
-            HyperCurve memory curve = pool.params;
+            pool = getPool(address(_portfolio), poolIds[i]);
+            PortfolioCurve memory curve = pool.params;
             if (curve.maturity() > block.timestamp) {
-                HyperPair memory pair = pool.pair;
+                PortfolioPair memory pair = pool.pair;
                 return (pool, poolIds[i], EchidnaERC20(pair.tokenQuote), EchidnaERC20(pair.tokenAsset));
             }
         }
@@ -112,6 +115,6 @@ contract EchidnaStateHandling is Helper, HelperHyperView {
 
     function mint_and_approve(EchidnaERC20 token, uint256 amount) internal {
         token.mint(address(this), amount);
-        token.approve(address(_hyper), type(uint256).max);
+        token.approve(address(_portfolio), type(uint256).max);
     }
 }

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import {HyperCurve, HyperPair} from "../HyperLib.sol";
+import {PortfolioCurve, PortfolioPair} from "../PortfolioLib.sol";
 
-interface IHyperEvents {
+interface IPortfolioEvents {
     /**
-     * @dev Ether transfers into Hyper via payable `deposit` function.
+     * @dev Ether transfers into Portfolio via payable `deposit` function.
      */
     event Deposit(address indexed account, uint256 amount);
 
@@ -22,20 +22,20 @@ interface IHyperEvents {
     event DecreaseUserBalance(address indexed account, address indexed token, uint256 amount);
 
     /**
-     * @notice Assigns an additional `amount` of `token` to Hyper's internally tracked balance.
+     * @notice Assigns an additional `amount` of `token` to Portfolio's internally tracked balance.
      * @dev Emitted on `swap`, `allocate`, and when a user is gifted surplus tokens.
      */
     event IncreaseReserveBalance(address indexed token, uint256 amount);
 
     /**
-     * @notice Unassigns `amount` of `token` from Hyper's internally tracked balance.
+     * @notice Unassigns `amount` of `token` from Portfolio's internally tracked balance.
      * @dev Emitted on `swap`, `unallocate`, and when paying with an internal balance.
      */
     event DecreaseReserveBalance(address indexed token, uint256 amount);
 
     /**
-     * @dev Assigns `input` amount of `tokenIn` to Hyper's reserves.
-     * Unassigns `output` amount of `tokenOut` from Hyper's reserves.
+     * @dev Assigns `input` amount of `tokenIn` to Portfolio's reserves.
+     * Unassigns `output` amount of `tokenOut` from Portfolio's reserves.
      * @param price Post-swap approximated marginal price in wad units.
      * @param feeAmountDec Amount of `tokenIn` tokens paid as a fee.
      * @param invariantWad Post-swap invariant in wad units.
@@ -105,7 +105,7 @@ interface IHyperEvents {
     );
 }
 
-interface IHyperGetters {
+interface IPortfolioGetters {
     // ===== Account Getters ===== //
     function getBalance(address owner, address token) external view returns (uint256);
 
@@ -146,8 +146,8 @@ interface IHyperGetters {
             uint256 invariantGrowthGlobal,
             uint256 feeGrowthGlobalAsset,
             uint256 feeGrowthGlobalQuote,
-            HyperCurve memory,
-            HyperPair memory
+            PortfolioCurve memory,
+            PortfolioPair memory
         );
 
     function positions(
@@ -167,7 +167,7 @@ interface IHyperGetters {
             uint128 invariantOwed
         );
 
-    // ===== Hyper View ===== //
+    // ===== Portfolio View ===== //
 
     function getLiquidityDeltas(
         uint64 poolId,
@@ -201,9 +201,9 @@ interface IHyperGetters {
     function getLatestEstimatedPrice(uint64 poolId) external view returns (uint256 price);
 }
 
-interface IHyperActions {
+interface IPortfolioActions {
     /**
-     * @dev Entrypoint to manipulate balances in Hyper.
+     * @dev Entrypoint to manipulate balances in Portfolio.
      */
     function multiprocess(bytes calldata data) external payable;
 
@@ -236,4 +236,4 @@ interface IHyperActions {
     function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
 }
 
-interface IHyper is IHyperActions, IHyperEvents, IHyperGetters {}
+interface IPortfolio is IPortfolioActions, IPortfolioEvents, IPortfolioGetters {}
