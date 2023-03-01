@@ -11,15 +11,15 @@ library RMM02Lib {
     using FixedPointMathLib for int;
 
     /**
-     * @custom:math k = 1 - (R1 / w)^(w) (R2/(1-w))^(1-w)
+     * @custom:math k = 1 - (R_x / w)^(w) (R_y/(1-w))^(1-w)
      */
-    function invariantOf(PortfolioPool memory pool, uint r1, uint r2, uint weight) internal pure returns (int) {
-        //(uint r1, uint r2) = (pool.virtualX, pool.virtualY);
+    function invariantOf(PortfolioPool memory pool, uint R_x, uint R_y, uint weight) internal pure returns (int) {
+        //(uint R_x, uint R_y) = (pool.virtualX, pool.virtualY);
         uint w1 = weight;
         uint w2 = 1 ether - weight;
 
-        int part0 = int(r1.divWadDown(w1)).powWad(int(w1));
-        int part1 = int(r2.divWadDown(w2)).powWad(int(w2));
+        int part0 = int(R_x.divWadDown(w1)).powWad(int(w1));
+        int part1 = int(R_y.divWadDown(w2)).powWad(int(w2));
 
         int result = (part0 * part1) / int(1 ether);
         return result;
@@ -53,13 +53,13 @@ library RMM02Lib {
         uint price,
         uint weight,
         uint balance
-    ) internal pure returns (uint r1, uint r2) {
+    ) internal pure returns (uint R_x, uint R_y) {
         pool;
         uint wi = weight;
         uint wo = 1 ether - weight;
 
-        r1 = balance;
-        r2 = r1.divWadDown(price.mulWadDown(wi.divWadDown(1 ether - wo)));
+        R_x = balance;
+        R_y = R_x.divWadDown(price.mulWadDown(wi.divWadDown(1 ether - wo)));
     }
 
     function computePrice(PortfolioPool memory pool, uint weight) internal pure returns (uint price) {

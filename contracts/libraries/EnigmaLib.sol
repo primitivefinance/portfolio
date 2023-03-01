@@ -25,7 +25,7 @@ pragma solidity 0.8.13;
   Without jump instruction, this alternative encoding is overkill.
 
   Be aware of function selector hash collisions.
-  Data is delivered via the `fallback` function.
+  Data is delivered via the `multiprocess` function in Portfolio.
 
   -------------
 

@@ -66,7 +66,7 @@ contract RMM02Portfolio is PortfolioVirtual {
         uint reserve0,
         uint reserve1
     ) public view override returns (bool, int256 nextInvariant) {
-        int256 nextInvariant = pools[poolId].invariantOf({r1: reserve0, r2: reserve1, weight: weight}); // fix this is inverted?
+        int256 nextInvariant = pools[poolId].invariantOf({R_x: reserve0, R_y: reserve1, weight: weight}); // fix this is inverted?
         return (nextInvariant >= invariant, nextInvariant);
     }
 

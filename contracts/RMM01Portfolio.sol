@@ -71,7 +71,12 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint256 reserve1
     ) public view override returns (bool, int256 nextInvariant) {
         uint256 tau = pools[poolId].lastTau();
-        nextInvariant = RMM01Lib.invariantOf({self: pools[poolId], r1: reserve0, r2: reserve1, timeRemainingSec: tau}); // fix
+        nextInvariant = RMM01Lib.invariantOf({
+            self: pools[poolId],
+            R_x: reserve0,
+            R_y: reserve1,
+            timeRemainingSec: tau
+        }); // fix
         // this is inverted?
 
         int256 liveInvariantWad = invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote); // invariant is
@@ -102,7 +107,11 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         uint256 price
     ) public view override returns (uint256 reserve0, uint256 reserve1) {
-        (reserve1, reserve0) = RMM01Lib.computeReservesWithPrice({self: pools[poolId], priceWad: price, inv: 0});
+        (reserve1, reserve0) = RMM01Lib.computeReservesWithPrice({
+            self: pools[poolId],
+            priceWad: price,
+            invariantWad: 0
+        });
     }
 
     function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint256 price) {
