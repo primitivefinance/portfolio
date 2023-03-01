@@ -57,23 +57,23 @@ library RMM01Lib {
      */
     function getAmountOut(
         PortfolioPool memory self,
-        bool direction,
+        bool sellAsset,
         uint256 amountIn,
         uint256 secondsPassed
     ) internal pure returns (uint256 amountOut) {
         // Sets data.invariant, data.liquidity, and data.remainder.
-        (Iteration memory data, uint256 tau) = getSwapData(self, direction, amountIn, secondsPassed); // Declare and assign variables individual to save on gas spent on initializing 0 values.
+        (Iteration memory data, uint256 tau) = getSwapData(self, sellAsset, amountIn, secondsPassed); // Declare and assign variables individual to save on gas spent on initializing 0 values.
 
         // Uses data.invariant, data.liquidity, and data.remainder to compute next input reserve.
         // Uses next input reserve to compute output reserve.
-        (uint256 prevDep, uint256 nextDep) = computeSwapStep(self, data, direction, tau);
+        (uint256 prevDep, uint256 nextDep) = computeSwapStep(self, data, sellAsset, tau);
 
         // Checks to make sure next reserve decreases and computes the difference in WAD.
         if (nextDep > prevDep) revert SwapInputTooSmall();
         data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
 
         // Scale down amounts from WAD.
-        uint256 outputDec = direction ? self.pair.decimalsQuote : self.pair.decimalsAsset;
+        uint256 outputDec = sellAsset ? self.pair.decimalsQuote : self.pair.decimalsAsset;
         amountOut = data.output.scaleFromWadDown(outputDec);
     }
 
@@ -82,7 +82,7 @@ library RMM01Lib {
      */
     function getSwapData(
         PortfolioPool memory self,
-        bool direction,
+        bool sellAsset,
         uint256 amountIn,
         uint256 secondsPassed
     ) internal pure returns (Iteration memory, uint256 tau) {
@@ -91,7 +91,7 @@ library RMM01Lib {
         Iteration memory data;
         (data.invariant, tau) = getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
         (data.virtualX, data.virtualY) = self.getAmountsWad();
-        data.remainder = amountIn.scaleToWad(direction ? self.pair.decimalsAsset : self.pair.decimalsQuote);
+        data.remainder = amountIn.scaleToWad(sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote);
         data.liquidity = self.liquidity;
         data.feeAmount = (data.remainder * fee) / PERCENTAGE;
 
@@ -105,7 +105,7 @@ library RMM01Lib {
     function computeSwapStep(
         PortfolioPool memory self,
         Iteration memory data,
-        bool direction,
+        bool sellAsset,
         uint256 tau
     ) internal pure returns (uint256 prevDep, uint256 nextDep) {
         uint256 prevInd;
@@ -113,7 +113,7 @@ library RMM01Lib {
         uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
 
         // if sellAsset, ind = x && dep = y, else ind = y && dep = x
-        if (direction) {
+        if (sellAsset) {
             (prevInd, prevDep) = (data.virtualX, data.virtualY);
         } else {
             (prevDep, prevInd) = (data.virtualX, data.virtualY);
@@ -122,7 +122,7 @@ library RMM01Lib {
         nextInd = prevInd + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
-        if (direction)
+        if (sellAsset)
             nextDep = Invariant.getY({
                 R_x: nextInd,
                 stk: self.params.maxPrice,
