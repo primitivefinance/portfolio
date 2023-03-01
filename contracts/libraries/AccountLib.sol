@@ -5,7 +5,7 @@ pragma solidity 0.8.13;
 
   -------------
 
-  This is a custom account system to support Enigma's
+  This is a custom accounting system to support Enigma's
   jump processing. Without jump processing, the benefits
   are marginal at best. Combining the two reduces the
   marginal cost of aditional operations to only ~20% of a single operation.
@@ -30,8 +30,8 @@ pragma solidity 0.8.13;
  */
 
 import "solmate/utils/SafeTransferLib.sol";
-import "../interfaces/IWETH.sol";
 import "../interfaces/IERC20.sol";
+import "../interfaces/IWETH.sol";
 import "./AssemblyLib.sol" as Assembly;
 
 using {

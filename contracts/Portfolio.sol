@@ -1,22 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.13;
 
-/**
-
-  ------------------------------------
-
-  Portfolio is a replicating market maker.
-
-  ------------------------------------
-
-  Primitive™
-
- */
-
 import "./Objective.sol";
 
 /**
- * @notice Portfolio is the core logic to manage capital using trading functions.
+ * @title   Portfolio
+ * @author  Primitive™
  */
 abstract contract PortfolioVirtual is Objective {
     using SafeCastLib for uint256;

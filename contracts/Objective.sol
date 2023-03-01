@@ -2,14 +2,15 @@
 pragma solidity 0.8.13;
 
 import "./PortfolioLib.sol";
-import "./interfaces/IPortfolio.sol";
 import "./interfaces/IERC20.sol";
+import "./interfaces/IPortfolio.sol";
 
 /**
- * @notice Virtual interface to implement the logic for a "Portfolio".
+ * @title   Objective
+ * @author  Primitive™
+ * @notice  Implements objective specific logic for a Portfolio.
  */
 abstract contract Objective is IPortfolio {
-    // ===== Internal Effects ===== //
     /**
      * @dev Used to apply changes to `_state`.
      */
@@ -59,7 +60,7 @@ abstract contract Objective is IPortfolio {
     ) public view virtual returns (uint reserve0, uint reserve1);
 
     /**
-     * @dev Computes an amount of tokens out in units of the token's decimals given an amount in.
+     * @dev Computes an amount of tokens out given an amount in, units are in the token's decimals.
      */
     function getAmountOut(
         uint64 poolId,

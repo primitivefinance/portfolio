@@ -4,6 +4,10 @@ pragma solidity 0.8.13;
 import "./Portfolio.sol";
 import "./libraries/RMM02Lib.sol";
 
+/**
+ * @title   Replicating Market Maker 01 Portfolio
+ * @author  Primitive™
+ */
 contract RMM02Portfolio is PortfolioVirtual {
     using RMM02Lib for PortfolioPool;
     using SafeCastLib for uint256;

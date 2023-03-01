@@ -1,19 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.13;
 
-/**
-
-  -------------
-
-  Comprehensive library with all structs, errors,
-  constants, and utils for Portfolio.
-
-  -------------
-
-  Primitive™
-
- */
-
 import "solmate/utils/SafeCastLib.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "./libraries/AssemblyLib.sol" as Assembly;

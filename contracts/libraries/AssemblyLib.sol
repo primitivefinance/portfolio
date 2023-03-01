@@ -5,10 +5,8 @@ pragma solidity 0.8.13;
 
   -------------
 
-  Using yul to handle low-level conversions
-  can easily be a foot shotgun.
-
-  We like the gas reductions.
+  Yul usage here is to optimize the 
+  most called functions in the codebase.
 
   -------------
 
@@ -17,17 +15,18 @@ pragma solidity 0.8.13;
  */
 
 error InvalidLiquidity();
+error InvalidDays();
 
 uint256 constant SECONDS_PER_DAY = 86_400 seconds;
 uint8 constant MIN_DECIMALS = 6;
 uint8 constant MAX_DECIMALS = 18;
 
 /**
- * @dev Returns true if `value` is between a range defined by `lower` and `upper` bounds
- * @param value Value to compare
- * @param lower Lower bound of the range
- * @param upper Upper bound of the range
- * @return valid True if the value is between the range
+ * @dev Returns true if `value` is between a range defined by `lower` and `upper` bounds.
+ * @param value Value to compare.
+ * @param lower Inclusive lower bound of the range.
+ * @param upper Inclusive upper bound of the range.
+ * @return valid True if the value is between the range.
  * @custom:example
  * ```
  * bool valid = isBetween(50, 0, 100);
@@ -41,52 +40,85 @@ function isBetween(uint256 value, uint256 lower, uint256 upper) pure returns (bo
 }
 
 /**
-
-    @dev Reference:
-
-    if (delta < 0) {
-        output = input - uint128(-delta);
-        if (output >= input) revert InvalidLiquidity();
-    } else {
-        output = input + uint128(delta);
-        if (output < input) revert InvalidLiquidity();
-    }
-*/
+ * @dev Adds a signed `delta` to an unsigned `input` by using the sign-agnostic 256-bit type used in yul.
+ * Checks for overflow manually and reverts with `InvalidLiquidity()`, because this function is used to
+ * change liquidity in a position or pool.
+ * @custom:example
+ * ```
+ * uint128 output = addSignedDelta(uint128(15), -int128(5));
+ * assertEq(output, uint128(10));
+ * ```
+ */
 function addSignedDelta(uint128 input, int128 delta) pure returns (uint128 output) {
     bytes memory revertData = abi.encodeWithSelector(InvalidLiquidity.selector);
     assembly {
         output := add(input, delta)
-
+        // Reverts on overflow.
         if gt(output, 0xffffffffffffffffffffffffffffffff) {
             revert(add(32, revertData), mload(revertData)) // 0x1fff9681
         }
     }
 }
 
+/**
+ * @dev Adds a `delta` to a cumulative value and returns the result. Each result is used as a
+ * fee `checkpoint`. Positions compute fees earned using checkpoints by measuring the difference between
+ * when positions were entered and when they were exited. Since these are cumulative values,
+ * computing the difference with a checkpoint that overflows is no different from computing the difference
+ * between checkpoints that have not overflowed.
+ * @custom:example
+ * ```
+ * uint256 checkpoint = computeCheckpoint(100, 22);
+ * assertEq(checkpoint, 122);
+ * ```
+ */
 function computeCheckpoint(uint256 present, uint256 delta) pure returns (uint256 checkpoint) {
     checkpoint = present;
 
     if (delta != 0) {
-        // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+        // Overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
         assembly {
             checkpoint := add(present, delta)
         }
     }
 }
 
+/**
+ * @notice Computes the difference between two checkpoints.
+ * @dev Underflows.
+ * @custom:example
+ * ```
+ * uint256 distance = computeCheckpointDistance(50, 25);
+ * assertEq(distance, 25);
+ * ```
+ */
 function computeCheckpointDistance(uint256 present, uint256 past) pure returns (uint256 distance) {
-    // overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+    // Underflow by design, as these are checkpoints which can measure the distance even if underflowed.
     assembly {
         distance := sub(present, past)
     }
 }
 
+/**
+ * @notice Days units are used in Portfolio because they fit into an unsigned 16-bit integer and they
+ * are human readable.
+ * @dev Reverts on overflow.
+ */
 function convertDaysToSeconds(uint256 amountDays) pure returns (uint256 amountSeconds) {
+    bytes memory revertData = abi.encodeWithSelector(InvalidDays.selector);
     assembly {
         amountSeconds := mul(amountDays, SECONDS_PER_DAY)
+        // Reverts on overflow.
+        if gt(amountSeconds, 0xffffffffffffffffffffffffffffffff) {
+            revert(add(32, revertData), mload(revertData))
+        }
     }
 }
 
+/**
+ * @dev There's no explict casting from dynamic to fixed sized bytes, this function
+ * handles it for us.
+ */
 function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     assembly {
         data := mload(add(raw, 32))
@@ -95,8 +127,13 @@ function toBytes16(bytes memory raw) pure returns (bytes16 data) {
     }
 }
 
+/**
+ * @dev Safely casts an unsigned 128-bit integer into a signed 128-bit integer.
+ * Reverts on overflow.
+ */
 function toInt128(uint128 a) pure returns (int128 b) {
     assembly {
+        // Reverts on overflow.
         if gt(a, 0x7fffffffffffffffffffffffffffffff) {
             revert(0, 0)
         }
@@ -106,10 +143,10 @@ function toInt128(uint128 a) pure returns (int128 b) {
 }
 
 /**
- * @dev Separates the upper and lower bits of a byte
- * @param data Byte to separate
- * @return upper Upper bit of the byte
- * @return lower Lower bit of the byte
+ * @dev Separates the upper and lower bits of a byte.
+ * @param data Byte to separate.
+ * @return upper Upper bit of the byte.
+ * @return lower Lower bit of the byte.
  * @custom:example
  * ```
  * (bytes1 upper, bytes1 lower) = separate(0x12);
@@ -120,15 +157,25 @@ function separate(bytes1 data) pure returns (bytes1 upper, bytes1 lower) {
     lower = data & 0x0f;
 }
 
+/**
+ * @dev Packs the upper and lower bits of a byte.
+ * @param upper Upper bit of the byte.
+ * @param lower Lower bit of the byte.
+ * @return data Packed byte.
+ * @custom:example
+ * ```
+ * bytes1 0x21 = pack(0x20, 0x01);
+ * ```
+ */
 function pack(bytes1 upper, bytes1 lower) pure returns (bytes1 data) {
     data = (upper << 4) | lower;
 }
 
 /**
- * @dev             Converts an array of bytes into an uint128, the array must adhere
- *                  to the the following format:
- *                  - First byte: Amount of trailing zeros.
- *                  - Rest of the array: A hexadecimal number.
+ * @dev Converts an array of bytes into an uint128, the array must adhere
+ * to the the following format:
+ * - First byte: Amount of trailing zeros.
+ * - Rest of the array: A hexadecimal number.
  */
 function toAmount(bytes calldata raw) pure returns (uint128 amount) {
     uint8 power = uint8(raw[0]);
@@ -146,6 +193,10 @@ function fromAmount(uint128 amount) pure returns (uint8 power, uint128 base) {
     }
 }
 
+/**
+ * @dev Scalars are used to convert token amounts between the token's decimal units
+ * and WAD (10^18) units.
+ */
 function computeScalar(uint256 decimals) pure returns (uint256 scalar) {
     return 10 ** (MAX_DECIMALS - decimals); // can revert on underflow
 }
