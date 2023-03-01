@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "contracts/RMM01Portfolio.sol";
 import "solmate/tokens/WETH.sol";
@@ -44,7 +44,7 @@ library Subjects {
      * @dev Modifies the subject of the tests. Use this to change the target portfolio being tested.
      * @custom:example
      * ```
-     * pragma solidity ^0.8.0;
+     * pragma solidity ^0.8.4;
      *
      * import "./Setup.sol";
      *

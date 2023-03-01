@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 // Test subjects
 import "contracts/RMM01Portfolio.sol";
@@ -63,14 +63,24 @@ contract Setup is Test {
         _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
     }
 
-    function _set_pool_id(uint64 poolId) internal virtual {
+    function setGhostPoolId(uint64 poolId) public virtual {
+        require(poolId != 0, "invalid-poolId");
         _ghost.file("poolId", abi.encode(poolId));
+    }
+
+    function setGhostActor(address actor) public virtual {
+        require(actor != address(0), "invalid-actor");
+        _ghost.file("actor", abi.encode(actor));
+    }
+
+    function addGhostActor(address actor) public virtual {
+        actors().add(actor);
     }
 
     /**
      * @dev Fetches the ghost state to get information or manipulate it.
      */
-    function ghost() internal virtual returns (GhostState memory) {
+    function ghost() public view virtual returns (GhostState memory) {
         return _ghost;
     }
 
@@ -89,11 +99,15 @@ contract Setup is Test {
         return _subjects;
     }
 
+    function getTokens() public view virtual returns (MockERC20[] memory) {
+        return _subjects.tokens;
+    }
+
     /**
      * @notice Contract that is being tested.
      * @dev Target subject is a ghost variable because it changes in the environment.
      */
-    function subject() internal virtual returns (IHyper) {
+    function subject() public view virtual returns (IHyper) {
         return IHyper(_ghost.subject);
     }
 
@@ -103,8 +117,17 @@ contract Setup is Test {
      * It uses the `_ghost.actor` instead of `_actor.last` because it can
      * change in the environment.
      */
-    function actor() internal virtual returns (address) {
+    function actor() public view virtual returns (address) {
         return _ghost.actor;
+    }
+
+    function getActors() public view virtual returns (address[] memory) {
+        address[] memory actors = _actors.active;
+        return actors;
+    }
+
+    function getRandomActor(uint index) public view virtual returns (address) {
+        return _actors.rand(index);
     }
 
     // === Modifiers for Tests === //
@@ -143,7 +166,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -155,7 +178,7 @@ contract Setup is Test {
             .edit("controller", abi.encode(address(this)))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -166,7 +189,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[2])))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -177,7 +200,7 @@ contract Setup is Test {
             .edit("quote", abi.encode(address(subjects().tokens[1])))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -189,7 +212,7 @@ contract Setup is Test {
             .edit("duration", abi.encode(duration))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -201,7 +224,7 @@ contract Setup is Test {
             .edit("volatility", abi.encode(volatility))
             .generate(address(subject()));
 
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
         _;
     }
 
@@ -249,7 +272,7 @@ contract Setup is Test {
     }
 
     modifier setActor(address actor) {
-        _ghost.actor = actor;
+        _ghost.file("actor", abi.encode(actor));
         _;
     }
 

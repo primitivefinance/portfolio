@@ -37,7 +37,7 @@ contract TestHyperCreatePool is Setup {
         subject().multiprocess(data);
 
         uint64 poolId = Enigma.encodePoolId(pairId, true, subject().getPoolNonce());
-        _set_pool_id(poolId);
+        setGhostPoolId(poolId);
 
         HyperPool memory pool = ghost().pool();
         HyperCurve memory actual = pool.params;
