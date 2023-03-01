@@ -74,7 +74,7 @@ contract Setup is Test {
     }
 
     function addGhostActor(address actor) public virtual {
-        _actors.add(actor);
+        actors().add(actor);
     }
 
     /**
@@ -97,6 +97,10 @@ contract Setup is Test {
      */
     function subjects() internal virtual returns (SubjectsState storage) {
         return _subjects;
+    }
+
+    function getTokens() public view virtual returns (MockERC20[] memory) {
+        return _subjects.tokens;
     }
 
     /**

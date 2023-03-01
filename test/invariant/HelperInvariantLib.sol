@@ -15,6 +15,7 @@ struct InvariantGhostState {
 library InvariantGhost {
     function add(InvariantGhostState storage self, uint64 poolId) internal {
         if (!self.exists[poolId]) {
+            self.exists[poolId] = true;
             self.poolIds.push(poolId);
             self.last = poolId;
         }

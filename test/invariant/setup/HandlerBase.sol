@@ -10,9 +10,9 @@ import {StdAssertions} from "forge-std/StdAssertions.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 
 import "contracts/interfaces/IHyper.sol";
-import {HyperPool, HyperPosition, HyperPair, HyperCurve} from "contracts/HyperLib.sol";
 import {GhostState} from "../../HelperGhostLib.sol";
 import {ActorsState} from "../../HelperActorsLib.sol";
+import {HyperPool, HyperPosition, HyperPair, HyperCurve, Enigma, Assembly, MIN_VOLATILITY, MAX_VOLATILITY, MIN_FEE, MAX_FEE, MIN_DURATION, MAX_DURATION} from "contracts/HyperLib.sol";
 
 interface Context {
     // Manipulate ghost environment
@@ -30,6 +30,8 @@ interface Context {
     function actor() external view returns (address);
 
     function ghost() external view returns (GhostState memory);
+
+    function getTokens() external view returns (MockERC20[] memory);
 
     function getActors() external view returns (address[] memory);
 
