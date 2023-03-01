@@ -16,8 +16,8 @@ uint256 constant YEAR = 31556953 seconds;
  */
 library RMM01Lib {
     using AssemblyLib for uint256;
-    using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+    using FixedPointMathLib for uint256;
 
     error UndefinedPrice();
     error OverflowWad(int256 wad);
@@ -100,7 +100,6 @@ library RMM01Lib {
 
     /**
      * @dev Simulates a swap and computes the output tokens given an amount of tokens in.
-     * Applies fee.
      */
     function computeSwapStep(
         PortfolioPool memory self,
@@ -249,11 +248,10 @@ library RMM01Lib {
         PortfolioPool memory self,
         uint256 timeSinceUpdate
     ) internal pure returns (int128 invariant, uint256 tau) {
-        tau = self.lastTau();
+        tau = self.lastTau(); // Compute block.timestamp - self.lastTimestamp.
+        tau -= timeSinceUpdate; // Time remaining less time passed since `self.lastTimestamp` was updated.
 
-        tau -= timeSinceUpdate; // update to next curve at new time.
-        (uint256 x, uint256 y) = self.getAmountsWad();
-
-        invariant = int128(invariantOf({self: self, R_x: x, R_y: y, timeRemainingSec: tau})); // todo: fix casting
+        (uint256 x, uint256 y) = self.getAmountsWad(); // Quantities of each reserve per WAD units of liquidity.
+        invariant = int128(invariantOf({self: self, R_x: x, R_y: y, timeRemainingSec: tau}));
     }
 }

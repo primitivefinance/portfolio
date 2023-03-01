@@ -140,7 +140,7 @@ contract RMM01Portfolio is PortfolioVirtual {
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
-            direction: sellAsset,
+            sellAsset: sellAsset,
             amountIn: amountIn,
             secondsPassed: block.timestamp - pool.lastTimestamp
         });

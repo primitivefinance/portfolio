@@ -9,8 +9,8 @@ import {PortfolioPool} from "../PortfolioLib.sol";
  * @dev    Geometric mean portfolio for two tokens.
  */
 library RMM02Lib {
-    using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
+    using FixedPointMathLib for uint256;
 
     /**
      * @dev Computes the invariant of the RMM-02 trading function.
@@ -28,13 +28,13 @@ library RMM02Lib {
         uint256 weight
     ) internal pure returns (int256 invariantWad) {
         self; // todo: Keeps same api as RMM01Lib, but can be changed.
-        uint256 w1 = weight;
-        uint256 w2 = FixedPointMathLib.WAD - weight;
+        uint256 w_x = weight;
+        uint256 w_y = FixedPointMathLib.WAD - weight;
 
-        int256 part0 = int256(R_x.divWadDown(w1)).powWad(int256(w1)); // (R_x / w) ^ w
-        int256 part1 = int256(R_y.divWadDown(w2)).powWad(int256(w2)); // (R_y / (1 - w)) ^ (1 - w)
+        int256 p_x = int256(R_x.divWadDown(w_x)).powWad(int256(w_x)); // (R_x / w_x) ^ w_x
+        int256 p_y = int256(R_y.divWadDown(w_y)).powWad(int256(w_y)); // (R_y / (1 - w_x)) ^ (1 - w_x)
 
-        invariantWad = (part0 * part1) / int256(FixedPointMathLib.WAD); // Rounds down.
+        invariantWad = (p_x * p_y) / int256(FixedPointMathLib.WAD); // Rounds down.
     }
 
     /**
