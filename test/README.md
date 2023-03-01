@@ -269,7 +269,7 @@ function test_allocate_modifies_liquidity()
         // Fetch the variable we are changing (pool.liquidity).
         uint prev = ghost().pool().liquidity;
         // Trigger the function being tested.
-        subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
+        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
         // Fetch the variable changed.
         uint post = ghost().pool().liquidity;
         // Ghost assertions comparing the actual and expected deltas.

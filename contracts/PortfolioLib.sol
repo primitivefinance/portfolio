@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "solmate/utils/SafeCastLib.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "./libraries/AssemblyLib.sol";
-import "./libraries/EnigmaLib.sol" as Enigma;
+import "./libraries/FVMLib.sol" as FVM;
 import "./libraries/AccountLib.sol" as Account;
 
 using AssemblyLib for uint256;

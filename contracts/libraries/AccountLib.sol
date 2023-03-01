@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 /**
  * -------------
  *
- *   This is a custom accounting system to support Enigma's
+ *   This is a custom accounting system to support FVM's
  *   jump processing. Without jump processing, the benefits
  *   are marginal at best. Combining the two reduces the
  *   marginal cost of aditional operations to only ~20% of a single operation.

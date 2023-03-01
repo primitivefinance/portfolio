@@ -126,8 +126,8 @@ abstract contract PortfolioVirtual is Objective {
         _deposit();
 
         // Effects
-        if (data[0] != Enigma.INSTRUCTION_JUMP) _process(data);
-        else Enigma._jumpProcess(data, _process);
+        if (data[0] != FVM.INSTRUCTION_JUMP) _process(data);
+        else FVM._jumpProcess(data, _process);
 
         // Interactions
         _settlement();
@@ -540,7 +540,7 @@ abstract contract PortfolioVirtual is Objective {
 
         bool hasController = controller != address(0);
         uint32 poolNonce = ++getPoolNonce;
-        poolId = Enigma.encodePoolId(pairNonce, hasController, poolNonce);
+        poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
 
         PortfolioPool storage pool = pools[poolId];
         pool.controller = controller;
@@ -630,22 +630,22 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Use `multiprocess` to enter this function to process instructions.
-     * @param data Custom encoded Enigma data. First byte must be an Enigma instruction.
+     * @param data Custom encoded FVM data. First byte must be an FVM instruction.
      */
     function _process(bytes calldata data) internal {
         (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
-        if (instruction == Enigma.ALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeAllocate(data);
+        if (instruction == FVM.ALLOCATE) {
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = FVM.decodeAllocate(data);
             _allocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (instruction == Enigma.DEALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeDeallocate(data);
+        } else if (instruction == FVM.DEALLOCATE) {
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = FVM.decodeDeallocate(data);
             _deallocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (instruction == Enigma.SWAP) {
+        } else if (instruction == FVM.SWAP) {
             Order memory args;
-            (args.useMax, args.poolId, args.input, args.output, args.sellAsset) = Enigma.decodeSwap(data);
+            (args.useMax, args.poolId, args.input, args.output, args.sellAsset) = FVM.decodeSwap(data);
             _swap(args);
-        } else if (instruction == Enigma.CREATE_POOL) {
+        } else if (instruction == FVM.CREATE_POOL) {
             (
                 uint24 pairId,
                 address controller,
@@ -656,13 +656,13 @@ abstract contract PortfolioVirtual is Objective {
                 uint16 jit,
                 uint128 maxPrice,
                 uint128 price
-            ) = Enigma.decodeCreatePool(data);
+            ) = FVM.decodeCreatePool(data);
             _createPool(pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
-        } else if (instruction == Enigma.CREATE_PAIR) {
-            (address asset, address quote) = Enigma.decodeCreatePair(data);
+        } else if (instruction == FVM.CREATE_PAIR) {
+            (address asset, address quote) = FVM.decodeCreatePair(data);
             _createPair(asset, quote);
-        } else if (instruction == Enigma.CLAIM) {
-            (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) = Enigma.decodeClaim(data);
+        } else if (instruction == FVM.CLAIM) {
+            (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) = FVM.decodeClaim(data);
             _claim(poolId, deltaAsset, deltaQuote);
         } else {
             revert InvalidInstruction();

@@ -275,7 +275,7 @@ interface IPortfolioActions {
     /**
      * @notice Entrypoint to allocate, deallocate, or swap in Portfolio.
      * @dev Multiprocess expects custom encoded data that can be built off-chain
-     * or on-chain using the `EnigmaLib` library. This function is similar to
+     * or on-chain using the `FVMLib` library. This function is similar to
      * multicall, which sends calldata to a target by looping over an array of
      * calldatas and targets.
      *

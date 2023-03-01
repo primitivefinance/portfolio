@@ -7,10 +7,10 @@ import {
     RMM01Portfolio as Portfolio,
     Account as AccountLib,
     SafeCastLib,
-    Enigma as EnigmaLib
+    FVM as FVMLib
 } from "contracts/RMM01Portfolio.sol";
 import "../helpers/HelperPortfolioView.sol";
-import "contracts/libraries/EnigmaLib.sol" as ProcessingLib;
+import "contracts/libraries/FVMLib.sol" as ProcessingLib;
 
 contract EchidnaStateHandling is Helper, HelperPortfolioView {
     bool hasFunded;

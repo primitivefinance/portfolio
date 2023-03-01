@@ -171,7 +171,7 @@ contract EchidnaE2E is GlobalInvariants {
         PortfolioPosition memory preClaimPosition = getPosition(address(_portfolio), address(this), poolId);
         require(preClaimPosition.lastTimestamp != 0);
 
-        try _portfolio.multiprocess(EnigmaLib.encodeClaim(poolId, deltaAsset, deltaQuote)) {
+        try _portfolio.multiprocess(FVMLib.encodeClaim(poolId, deltaAsset, deltaQuote)) {
             // if tokens were owned, decrement from position
             // if tokens were owed, getBalance of tokens increased for the caller
         } catch {
@@ -202,7 +202,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getReserves(poolId);
 
-        _portfolio.multiprocess(EnigmaLib.encodeDeallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(FVMLib.encodeDeallocate(uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
         PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
@@ -245,7 +245,7 @@ contract EchidnaE2E is GlobalInvariants {
             swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
         } else {
             try _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+                FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             ) {
                 // PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
             } catch {}
@@ -272,7 +272,7 @@ contract EchidnaE2E is GlobalInvariants {
         limit;
 
         try _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 1 : 0))
+            FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 1 : 0))
         ) {
             emit AssertionFailed(message);
         } catch {}
@@ -302,9 +302,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         uint256 prePoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
-        _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-        );
+        _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0)));
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
 
         uint256 postReserveSell = getReserve(address(_portfolio), address(_asset));
@@ -379,7 +377,7 @@ contract EchidnaE2E is GlobalInvariants {
         {
             PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
             _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+                FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
             );
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
             t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
@@ -440,9 +438,7 @@ contract EchidnaE2E is GlobalInvariants {
         });
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
-        _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-        );
+        _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0)));
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
         t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
@@ -501,9 +497,7 @@ contract EchidnaE2E is GlobalInvariants {
         });
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
-        _portfolio.multiprocess(
-            EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-        );
+        _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0)));
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
         t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 

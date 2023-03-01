@@ -17,7 +17,7 @@ import {
     PortfolioPosition,
     PortfolioPair,
     PortfolioCurve,
-    Enigma,
+    FVM,
     AssemblyLib,
     MIN_VOLATILITY,
     MAX_VOLATILITY,

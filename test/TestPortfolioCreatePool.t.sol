@@ -23,11 +23,11 @@ contract TestPortfolioCreatePool is Setup {
         vm.assume(maxPrice > 0);
 
         bytes memory data =
-            Enigma.encodeCreatePool(pairId, address(this), priorityFee, fee, volatility, duration, jit, maxPrice, price);
+            FVM.encodeCreatePool(pairId, address(this), priorityFee, fee, volatility, duration, jit, maxPrice, price);
 
         subject().multiprocess(data);
 
-        uint64 poolId = Enigma.encodePoolId(pairId, true, subject().getPoolNonce());
+        uint64 poolId = FVM.encodePoolId(pairId, true, subject().getPoolNonce());
         setGhostPoolId(poolId);
 
         PortfolioPool memory pool = ghost().pool();
@@ -43,20 +43,20 @@ contract TestPortfolioCreatePool is Setup {
     }
 
     function test_createPool_non_controlled_default_jit() public {
-        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
+        bytes memory data = FVM.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
         subject().multiprocess(data);
-        uint64 poolId = Enigma.encodePoolId(uint24(1), false, uint32(subject().getPoolNonce()));
+        uint64 poolId = FVM.encodePoolId(uint24(1), false, uint32(subject().getPoolNonce()));
         assertEq(ghost().poolOf(poolId).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY);
     }
 
     function test_revert_createPool_zero_price() public {
-        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(this), 1, 1, 1, 1, 1, 1, 0);
+        bytes memory data = FVM.encodeCreatePool(uint24(1), address(this), 1, 1, 1, 1, 1, 1, 0);
         vm.expectRevert(ZeroPrice.selector);
         subject().multiprocess(data);
     }
 
     function test_revert_createPool_priority_fee_invalid_fee() public {
-        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(this), 0, 1, 1, 1, 1, 1, 1);
+        bytes memory data = FVM.encodeCreatePool(uint24(1), address(this), 0, 1, 1, 1, 1, 1, 1);
         vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, 0));
         subject().multiprocess(data);
     }
@@ -71,7 +71,7 @@ contract TestPortfolioCreatePool is Setup {
 
         address token = address(new MockERC20("t", "t", 18));
 
-        bytes memory data = Enigma.encodeCreatePair(ghost().asset().to_addr(), token);
+        bytes memory data = FVM.encodeCreatePair(ghost().asset().to_addr(), token);
         vm.expectRevert(arithmeticError);
         subject().multiprocess(data);
     }
@@ -81,7 +81,7 @@ contract TestPortfolioCreatePool is Setup {
         vm.store(address(subject()), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
         assertEq(subject().getPoolNonce(), type(uint32).max, "not set to max value");
 
-        bytes memory data = Enigma.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
+        bytes memory data = FVM.encodeCreatePool(uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100);
 
         vm.expectRevert(arithmeticError);
         subject().multiprocess(data);

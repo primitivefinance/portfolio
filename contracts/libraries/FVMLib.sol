@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 /**
  * -------------
  *
- *   This is called the Enigma, it's an alternative ABI.
+ *   This is called the FVM, it's an alternative ABI.
  *   Originally, it was designed to compress calldata and therefore
  *   save gas on optimistic rollup networks.
  *
@@ -18,12 +18,11 @@ pragma solidity 0.8.13;
  *
  *   Multicalls also process transactions sequentially.
  *   State cannot be carried over transiently between transactions.
- *   With Enigma, we can transiently set state (only specific state),
+ *   With FVM, we can transiently set state (only specific state),
  *   and use it across "instructions".
  *
  *   Without jump instruction, this alternative encoding is overkill.
  *
- *   Be aware of function selector hash collisions.
  *   Data is delivered via the `multiprocess` function in Portfolio.
  *
  *   -------------

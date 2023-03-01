@@ -3,9 +3,9 @@ pragma solidity ^0.8.4;
 
 import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
-import "contracts/libraries/EnigmaLib.sol";
+import "contracts/libraries/FVMLib.sol";
 
-contract EnigmaLibTarget is Test {
+contract FVMLibTarget is Test {
     function doEncodeSwap(
         uint8 useMax,
         uint64 poolId,
@@ -35,8 +35,8 @@ contract EnigmaLibTarget is Test {
     }
 }
 
-contract TestEnigmaLib is Test {
-    EnigmaLibTarget public target = new EnigmaLibTarget();
+contract TestFVMLib is Test {
+    FVMLibTarget public target = new FVMLibTarget();
 
     function testFuzz_encodeSwap(
         bool useMax,

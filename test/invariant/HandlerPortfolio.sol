@@ -153,11 +153,11 @@ contract HandlerPortfolio is HandlerBase {
         uint24 pairId = ctx.subject().getPairId(args.token0, args.token1);
         {
             // PortfolioPair not created? Push a create pair call to the stack.
-            if (pairId == 0) instructions.push(Enigma.encodeCreatePair(args.token0, args.token1));
+            if (pairId == 0) instructions.push(FVM.encodeCreatePair(args.token0, args.token1));
 
             // Push create pool to stack
             instructions.push(
-                Enigma.encodeCreatePool(
+                FVM.encodeCreatePool(
                     pairId,
                     address(0),
                     args.priorityFee, // priorityFee
@@ -170,7 +170,7 @@ contract HandlerPortfolio is HandlerBase {
                 )
             ); // temp
         }
-        bytes memory payload = Enigma.encodeJumpInstruction(instructions);
+        bytes memory payload = FVM.encodeJumpInstruction(instructions);
 
         try ctx.subject().multiprocess(payload) {
             console.log("Successfully created a pool.");
@@ -183,7 +183,7 @@ contract HandlerPortfolio is HandlerBase {
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = Enigma.encodePoolId(pairId, isMutable, uint32(ctx.subject().getPoolNonce()));
+        uint64 poolId = FVM.encodePoolId(pairId, isMutable, uint32(ctx.subject().getPoolNonce()));
         // Add the created pool to the list of pools.
         // todo: fix assertTrue(getPool(address(subject()), poolId).lastPrice != 0, "pool-price-zero");
         ctx.addGhostPoolId(poolId);
@@ -360,7 +360,7 @@ contract HandlerPortfolio is HandlerBase {
             prev = fetchAccountingState();
 
             ctx.subject().multiprocess(
-                Enigma.encodeDeallocate(uint8(0), ctx.ghost().poolId, 0x0, deltaLiquidity.safeCastTo128())
+                FVM.encodeDeallocate(uint8(0), ctx.ghost().poolId, 0x0, deltaLiquidity.safeCastTo128())
             );
 
             AccountingState memory end = fetchAccountingState();
