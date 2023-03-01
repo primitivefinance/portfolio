@@ -15,12 +15,9 @@ remappings = [
 via_ir = true
 optimizer_runs = 0
 out = 'optimized-out'
-fuzz_runs = 256
-fuzz_max_local_rejects = 65536
-fuzz_max_global_rejects = 1024
 
 [profile.test] # does not use optimizer
-src = 'test/'       # not default
+src = 'test/'  # not default
 gas_reports = ["*"]
 ffi = true
 
@@ -31,8 +28,8 @@ test = 'test/echidna' # not default
 
 
 [rpc_endpoints]
-primitive = "http://${PRIMITIVE_RPC}:8545"
-ganache = "http://127.0.0.1:8546"
+primitive = "${PRIMITIVE_RPC}"
+anvil = "http://127.0.0.1:8545"
 prod = "${MAINNET_URL}"
 
 [fmt]
