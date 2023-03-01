@@ -1,4 +1,5 @@
 pragma solidity ^0.8.4;
+
 import "./EchidnaStateHandling.sol";
 
 contract Swaps is EchidnaStateHandling {
@@ -7,7 +8,7 @@ contract Swaps is EchidnaStateHandling {
     function mint_and_allocate(PortfolioPair memory pair, uint128 amount, uint64 poolId) internal {
         mint_and_approve(EchidnaERC20(pair.tokenAsset), amount);
         mint_and_approve(EchidnaERC20(pair.tokenQuote), amount);
-        _portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(FVMLib.encodeAllocate(uint8(0), poolId, 0x0, amount));
     }
 
     function clamp_liquidity(uint256 id, uint64 poolId) internal returns (uint256 liquidity) {
@@ -26,10 +27,10 @@ contract Swaps is EchidnaStateHandling {
         uint256 liquidity,
         PortfolioPool memory pool
     ) internal returns (uint256 input, uint256 output) {
-        uint maxInput;
-        uint maxOutput;
+        uint256 maxInput;
+        uint256 maxOutput;
         PortfolioCurve memory curve = pool.params;
-        uint stk = curve.maxPrice;
+        uint256 stk = curve.maxPrice;
 
         // Compute reserves to determine max input and output.
         (uint256 R_y, uint256 R_x) = RMM01Lib.computeReservesWithPrice(pool, stk, 0);
@@ -59,15 +60,11 @@ contract Swaps is EchidnaStateHandling {
     }
 
     // Swaps
-    function swap_should_succeed(uint id, bool sellAsset) public {
+    function swap_should_succeed(uint256 id, bool sellAsset) public {
         address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
 
         uint256 liquidity = clamp_liquidity(id, poolId);
@@ -83,7 +80,7 @@ contract Swaps is EchidnaStateHandling {
             uint256 stk = curve.maxPrice;
             emit LogUint256("stk", stk);
 
-            (uint input, uint output) = clam_safe_input_output_value(sellAsset, liquidity, pool);
+            (uint256 input, uint256 output) = clam_safe_input_output_value(sellAsset, liquidity, pool);
             if (input == 0 && output == 0) return;
             check_swap_error(pool, poolId, sellAsset, input, output);
         }
@@ -103,13 +100,8 @@ contract Swaps is EchidnaStateHandling {
         uint256 maxErr = 100 * 1e18;
         {
             // Swapping back and forth should not succeed if `output > input` under normal circumstances.
-            (bool success, ) = swapBackAndForthCall(
-                poolId,
-                sellAsset,
-                uint128(input),
-                uint128(output),
-                uint128(input + maxErr)
-            );
+            (bool success,) =
+                swapBackAndForthCall(poolId, sellAsset, uint128(input), uint128(output), uint128(input + maxErr));
 
             if (success) {
                 _portfolio.draw(pair.tokenAsset, _portfolio.getBalance(address(this), pair.tokenAsset), address(this));
@@ -150,7 +142,7 @@ contract Swaps is EchidnaStateHandling {
 
     function swap_on_zero_amount_should_fail() public {
         // Will always return a pool that exists
-        (, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
+        (, uint64 poolId,,) = retrieve_non_expired_pool_and_tokens();
         uint256 amount = 0;
 
         swap_should_fail(poolId, true, amount, poolId + 1, "BUG: Swap with zero swap amount should fail.");
@@ -158,7 +150,7 @@ contract Swaps is EchidnaStateHandling {
 
     function swap_on_limit_amount_of_zero_should_fail() public {
         // Will always return a pool that exists
-        (, uint64 poolId, , ) = retrieve_non_expired_pool_and_tokens();
+        (, uint64 poolId,,) = retrieve_non_expired_pool_and_tokens();
         uint256 amount = between(poolId, 1, type(uint256).max);
 
         swap_should_fail(poolId, true, amount, 0, "BUG: Swap with zero limit amount should fail.");
@@ -171,11 +163,9 @@ contract Swaps is EchidnaStateHandling {
         uint256 limit,
         string memory failureMsg
     ) private {
-        try
-            _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-            )
-        {
+        try _portfolio.multiprocess(
+            FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+        ) {
             emit AssertionFailed(failureMsg);
         } catch {}
     }
@@ -184,12 +174,8 @@ contract Swaps is EchidnaStateHandling {
         bool sellAsset = true;
 
         // Will always return a pool that exists
-        (
-            PortfolioPool memory pool,
-            uint64 poolId,
-            EchidnaERC20 _asset,
-            EchidnaERC20 _quote
-        ) = retrieve_non_expired_pool_and_tokens();
+        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
+            retrieve_non_expired_pool_and_tokens();
         PortfolioCurve memory curve = pool.params;
         emit LogUint256("curve maturity", uint256(curve.maturity()));
         emit LogUint256("block timestamp", block.timestamp);
@@ -215,11 +201,9 @@ contract Swaps is EchidnaStateHandling {
             postReserveBuy: 0
         });
 
-        try
-            _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-            )
-        {
+        try _portfolio.multiprocess(
+            FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+        ) {
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
             c.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
@@ -235,7 +219,7 @@ contract Swaps is EchidnaStateHandling {
                 emit LogUint256("price after swap", c.postPoolLastPrice);
                 emit AssertionFailed(
                     "BUG: pool.lastPrice increased after swapping assets in, it should have decreased."
-                );
+                    );
             }
 
             // feeGrowthSell = asset
@@ -283,7 +267,7 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveSell = getReserve(address(_portfolio), address(_quote));
         uint256 prevReserveBuy = getReserve(address(_portfolio), address(_asset));
 
-        try _portfolio.multiprocess(EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, sellAsset)) {
+        try _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, sellAsset)) {
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
             c.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
@@ -293,9 +277,7 @@ contract Swaps is EchidnaStateHandling {
             if (c.postPoolLastPrice < c.prePoolLastPrice) {
                 emit LogUint256("price before swap", c.prePoolLastPrice);
                 emit LogUint256("price after swap", c.postPoolLastPrice);
-                emit AssertionFailed(
-                    "BUG: pool.lastPrice decreased after swapping quote in, it should have increased."
-                );
+                emit AssertionFailed("BUG: pool.lastPrice decreased after swapping quote in, it should have increased.");
             }
 
             // feeGrowthSell = quote
@@ -350,11 +332,9 @@ contract Swaps is EchidnaStateHandling {
             postReserveBuy: 0
         });
 
-        try
-            _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-            )
-        {
+        try _portfolio.multiprocess(
+            FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+        ) {
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
             c.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
@@ -410,11 +390,9 @@ contract Swaps is EchidnaStateHandling {
             postReserveBuy: 0
         });
 
-        try
-            _portfolio.multiprocess(
-                EnigmaLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
-            )
-        {
+        try _portfolio.multiprocess(
+            FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+        ) {
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
             c.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
 
@@ -446,18 +424,18 @@ contract Swaps is EchidnaStateHandling {
     }
 
     function check_external_swap_invariants(
-        uint prevPrice,
-        uint postPrice,
-        uint prevLiquidity,
-        uint postLiquidity,
-        uint prevReserveSell,
-        uint postReserveSell,
-        uint prevReserveBuy,
-        uint postReserveBuy,
-        uint prevFeeGrowthSell,
-        uint postFeeGrowthSell,
-        uint prevFeeGrowthBuy,
-        uint postFeeGrowthBuy
+        uint256 prevPrice,
+        uint256 postPrice,
+        uint256 prevLiquidity,
+        uint256 postLiquidity,
+        uint256 prevReserveSell,
+        uint256 postReserveSell,
+        uint256 prevReserveBuy,
+        uint256 postReserveBuy,
+        uint256 prevFeeGrowthSell,
+        uint256 postFeeGrowthSell,
+        uint256 prevFeeGrowthBuy,
+        uint256 postFeeGrowthBuy
     ) internal pure {
         // price always changes in a swap
         assert(postPrice != prevPrice);
@@ -491,9 +469,7 @@ contract Swaps is EchidnaStateHandling {
         uint256 prevReserveSell = getReserve(address(_portfolio), prePool.pair.tokenQuote);
         uint256 prevReserveBuy = getReserve(address(_portfolio), prePool.pair.tokenAsset);
 
-        try
-            _portfolio.multiprocess(EnigmaLib.encodeSwap(uint8(0), specialPoolId, 0x0, _amount, 0x0, _limit, uint8(1)))
-        {
+        try _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), specialPoolId, 0x0, _amount, 0x0, _limit, uint8(1))) {
             // sellAsset = false
             PortfolioPool memory postPool = getPool(address(_portfolio), specialPoolId);
             uint256 postPoolLastPrice = _portfolio.getLatestEstimatedPrice(specialPoolId);

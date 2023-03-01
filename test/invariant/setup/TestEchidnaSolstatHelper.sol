@@ -43,7 +43,12 @@ contract TestEchidnaSolstatHelper is Test {
         assertEqCall(addr, calldata1, addr, calldata2, eqRevertData);
     }
 
-    function assertEqCall(address address1, bytes memory calldata1, address address2, bytes memory calldata2) internal {
+    function assertEqCall(
+        address address1,
+        bytes memory calldata1,
+        address address2,
+        bytes memory calldata2
+    ) internal {
         assertEqCall(address1, calldata1, address2, calldata2, true);
     }
 

@@ -1,6 +1,12 @@
+> Beta: Not production ready. Pending on-going audits.
+
 # Primitive Portfolio
 
-Portfolio is a replicating market maker.
+On-chain portfolio management. Optimized for managing risk and liquidity.
+
+## Documentation
+
+[Documentation](https://docs.primitive.xyz)
 
 ## System Invariants
 
@@ -19,8 +25,6 @@ For more invariants, [read this](./test/README.md).
 Required:
 
 - Foundry
-- Ganache
-- Node >=v16.x
 - Python (if running echidna)
 
 ### 1. Install foundry. [source](https://github.com/foundry-rs/foundry)
@@ -41,9 +45,19 @@ Required:
 
 ## Resources
 
+- [Documentation](https://docs.primitive.xyz)
+- [Portfolio Yellow Paper](https://yellow.primitive.xyz)
 - [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
 - [Original codebase](https://github.com/primitivefinance/rmm-core)
 - [solstat](https://github.com/primitivefinance/solstat)
 - [Replicating Market Makers](https://github.com/angeris/angeris.github.io/blob/master/papers/rmms.pdf)
 - [RMM whitepaper](https://primitive.xyz/whitepaper)
 - [High precision calculator](https://keisan.casio.com/calculator)
+
+## Audits
+
+| Security Firm | Review Time |
+| ------------- | ----------- |
+| ChainSecurity | 8-weeks     |
+| Trail of Bits | 8-weeks     |
+| Spearbit      | 5-weeks     |

@@ -2,17 +2,17 @@
 pragma solidity 0.8.13;
 
 /**
-    @dev Marginal price to trade y (∆) for x (∆′).
-
-    Variable | Name         | Value
-    ---------|--------------|-----------
-    γ        | Gamma        | 1 - fee, Percentage
-    K        | Strike       | K > 0, Wad
-    k        | Invariant    | 2^128 > k > -2^128, Signed integer
-    y        | Quote        | K >= y >= 0, Wad
-    x        | Asset        | 1 >= x >= 0, Wad
-
-    @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
+ * @dev Marginal price to trade y (∆) for x (∆′).
+ *
+ *     Variable | Name         | Value
+ *     ---------|--------------|-----------
+ *     γ        | Gamma        | 1 - fee, Percentage
+ *     K        | Strike       | K > 0, Wad
+ *     k        | Invariant    | 2^128 > k > -2^128, Signed integer
+ *     y        | Quote        | K >= y >= 0, Wad
+ *     x        | Asset        | 1 >= x >= 0, Wad
+ *
+ *     @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
  */
 
 import "solmate/utils/FixedPointMathLib.sol";
@@ -23,7 +23,7 @@ using FixedPointMathLib for uint256;
 uint256 constant HALF_SCALAR = 1e9;
 
 /**
- @custom:math 1 / φ( Φ^(−1) (x) )
+ * @custom:math 1 / φ( Φ^(−1) (x) )
  */
 function d_ppf(int256 input) pure returns (int256) {
     int256 numerator;
@@ -51,10 +51,11 @@ struct Parameters {
 }
 
 /**
-    todo: currently broken, marginal price goes lower after a swap in, should go higher!
-    @dev Marginal price to trade y (∆) for x (∆′).
-    @custom:math ( d∆′ / d∆ ) (∆) = (K / γ) φ( Φ^(−1)( ( y + γ∆ − k) / K ) + σ√τ) × (Φ−1)′ ( (y + γ∆ − k) / K )
-    @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
+ * todo: currently broken, marginal price goes lower after a swap in, should go higher!
+ *     @dev Marginal price to trade y (∆) for x (∆′).
+ *     @custom:math ( d∆′ / d∆ ) (∆) = (K / γ) φ( Φ^(−1)( ( y + γ∆ − k) / K ) + σ√τ) ×
+ * (Φ−1)′ ( (y + γ∆ − k) / K )
+ *     @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
  */
 function computeMarginalPriceQuoteIn(
     uint256 d_y,
@@ -91,7 +92,8 @@ function computeMarginalPriceQuoteIn(
     }
 
     uint256 part4 = (params.stk).divWadDown(gamma); // K / γ
-    uint256 part5 = part4.mulWadDown(uint256(Gaussian.pdf(int256(part3)))); // (K / γ) φ( Φ^(−1)( ( y + γ∆ − k) / K ) + σ√τ)
+    uint256 part5 = part4.mulWadDown(uint256(Gaussian.pdf(int256(part3)))); // (K / γ) φ( Φ^(−1)( ( y + γ∆ −
+        // k) / K ) + σ√τ)
 
     int256 part6 = d_ppf(int256(part1)); // (Φ−1)′ ( (y + γ∆ − k) / K )
 
@@ -105,9 +107,10 @@ function computeMarginalPriceQuoteIn(
 }
 
 /**
-    @dev Marginal price to trade x (∆) for y (∆′).
-    @custom:math (d∆′ / d∆) (∆) = γKφ(Φ−1(1 − x − γ∆) − σ√τ ) × (Φ−1)′(1 − x − γ∆)
-    @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
+ * @dev Marginal price to trade x (∆) for y (∆′).
+ *     @custom:math (d∆′ / d∆) (∆) = γKφ(Φ−1(1 − x − γ∆) − σ√τ ) × (Φ−1)′(1 − x −
+ * γ∆)
+ *     @custom:source https://primitive.xyz/whitepaper-rmm-01.pdf
  */
 function computeMarginalPriceAssetIn(
     uint256 d_x,

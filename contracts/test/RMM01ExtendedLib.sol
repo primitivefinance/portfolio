@@ -9,9 +9,9 @@ library RMM01ExtendedLib {
     using FixedPointMathLib for int256;
 
     struct RMM {
-        uint strike;
-        uint sigma;
-        uint tau;
+        uint256 strike;
+        uint256 sigma;
+        uint256 tau;
     }
 
     /**

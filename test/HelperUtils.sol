@@ -24,8 +24,8 @@ using {prepare, to_token, to_addr} for Coin global;
  * assertEq(ghost().asset().balanceOf(owner), amount);
  * ```
  */
-function prepare(Coin token, address owner, address spender, uint amount) {
-    token.to_token().approve(spender, type(uint).max);
+function prepare(Coin token, address owner, address spender, uint256 amount) {
+    token.to_token().approve(spender, type(uint256).max);
     token.to_token().mint(owner, amount);
 }
 

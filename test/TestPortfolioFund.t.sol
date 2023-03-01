@@ -5,29 +5,29 @@ import "./Setup.sol";
 
 contract TestPortfolioFund is Setup {
     struct FundGhostVariables {
-        uint userAddressBalance;
-        uint userSubjectBalance;
-        uint subjectReserveBalance;
-        uint subjectActualBalance;
+        uint256 userAddressBalance;
+        uint256 userSubjectBalance;
+        uint256 subjectReserveBalance;
+        uint256 subjectActualBalance;
     }
 
     function test_fund_increases_user_balance() public defaultConfig isArmed {
-        uint amt = 1 ether;
+        uint256 amt = 1 ether;
         address tkn = ghost().asset().to_addr();
         ghost().asset().prepare(address(this), address(subject()), amt);
-        uint prev = ghost().balance(address(this), tkn);
+        uint256 prev = ghost().balance(address(this), tkn);
         subject().fund(tkn, amt);
-        uint post = ghost().balance(address(this), tkn);
+        uint256 post = ghost().balance(address(this), tkn);
         assertEq(post, prev + amt, "did-not-increase-balance");
     }
 
     function test_fund_max_balance() public defaultConfig isArmed {
-        uint amt = 10 ether;
+        uint256 amt = 10 ether;
         address tkn = ghost().asset().to_addr();
         ghost().asset().prepare(address(this), address(subject()), amt);
-        uint prev = ghost().balance(address(this), tkn);
+        uint256 prev = ghost().balance(address(this), tkn);
         subject().fund(tkn, amt);
-        uint post = ghost().balance(address(this), tkn);
+        uint256 post = ghost().balance(address(this), tkn);
         assertEq(post, prev + amt, "did-not-increase-balance");
     }
 
@@ -58,14 +58,10 @@ contract TestPortfolioFund is Setup {
 
         // Check to make sure balances increased.
         assertEq(
-            ghost_state_post.userAddressBalance,
-            ghost_state_prev.userAddressBalance - amt,
-            "user-addr-balance-post"
+            ghost_state_post.userAddressBalance, ghost_state_prev.userAddressBalance - amt, "user-addr-balance-post"
         );
         assertEq(
-            ghost_state_post.userSubjectBalance,
-            ghost_state_prev.userSubjectBalance + amt,
-            "user-subj-balance-post"
+            ghost_state_post.userSubjectBalance, ghost_state_prev.userSubjectBalance + amt, "user-subj-balance-post"
         );
         assertEq(
             ghost_state_post.subjectReserveBalance,
@@ -79,7 +75,7 @@ contract TestPortfolioFund is Setup {
         );
 
         // Max draw tokens.
-        subject().draw(ghost().asset().to_addr(), type(uint).max, address(this));
+        subject().draw(ghost().asset().to_addr(), type(uint256).max, address(this));
 
         // Get final variables.
         FundGhostVariables memory ghost_state_final = FundGhostVariables({
@@ -98,9 +94,7 @@ contract TestPortfolioFund is Setup {
             "subj-reserve-balance-final"
         );
         assertEq(
-            ghost_state_final.subjectActualBalance,
-            ghost_state_prev.subjectActualBalance,
-            "subj-actual-balance-final"
+            ghost_state_final.subjectActualBalance, ghost_state_prev.subjectActualBalance, "subj-actual-balance-final"
         );
     }
 }

@@ -81,7 +81,7 @@ contract GlobalInvariants is
     // ---------- Pool Properties -------
 
     function pool_non_zero_priority_fee_if_controlled(uint64 id) public {
-        (PortfolioPool memory pool, , , ) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool,,,) = retrieve_random_pool_and_tokens(id);
         // if the pool has a controller, the priority fee should never be zero
         emit LogBool("is mutable", pool.isMutable());
         if (pool.controller != address(0)) {
@@ -159,7 +159,7 @@ contract GlobalInvariants is
 
     function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
         require(deltaLiquidity != 0);
-        (, uint64 poolId, , ) = retrieve_random_pool_and_tokens(id);
+        (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 

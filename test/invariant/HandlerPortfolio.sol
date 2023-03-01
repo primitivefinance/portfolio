@@ -5,7 +5,7 @@ import "./setup/HandlerBase.sol";
 import "solmate/utils/SafeCastLib.sol";
 
 contract HandlerPortfolio is HandlerBase {
-    using SafeCastLib for uint;
+    using SafeCastLib for uint256;
 
     function callSummary() external view {
         console.log("deposit", calls["deposit"]);
@@ -16,7 +16,10 @@ contract HandlerPortfolio is HandlerBase {
         console.log("deallocate", calls["deallocate"]);
     }
 
-    function deposit(uint amount, uint seed) external countCall("deposit") createActor useActor(seed) usePool(seed) {
+    function deposit(
+        uint256 amount,
+        uint256 seed
+    ) external countCall("deposit") createActor useActor(seed) usePool(seed) {
         amount = bound(amount, 1, 1e36);
 
         vm.deal(ctx.actor(), amount);
@@ -105,7 +108,7 @@ contract HandlerPortfolio is HandlerBase {
         {
             MockERC20[] memory mock_tokens = ctx.getTokens();
             address[] memory tokens = new address[](mock_tokens.length);
-            for (uint i; i != mock_tokens.length; ++i) {
+            for (uint256 i; i != mock_tokens.length; ++i) {
                 tokens[i] = address(mock_tokens[i]);
             }
 
@@ -114,17 +117,8 @@ contract HandlerPortfolio is HandlerBase {
             address token1 = tokens[1];
             assertTrue(token0 != token1, "same-token");
 
-            CreateArgs memory args = CreateArgs(
-                ctx.actor(),
-                token0,
-                token1,
-                price,
-                terminalPrice,
-                volatility,
-                duration,
-                fee,
-                priorityFee
-            );
+            CreateArgs memory args =
+                CreateArgs(ctx.actor(), token0, token1, price, terminalPrice, volatility, duration, fee, priorityFee);
             _assertCreatePool(args);
         }
     }
@@ -159,11 +153,11 @@ contract HandlerPortfolio is HandlerBase {
         uint24 pairId = ctx.subject().getPairId(args.token0, args.token1);
         {
             // PortfolioPair not created? Push a create pair call to the stack.
-            if (pairId == 0) instructions.push(Enigma.encodeCreatePair(args.token0, args.token1));
+            if (pairId == 0) instructions.push(FVM.encodeCreatePair(args.token0, args.token1));
 
             // Push create pool to stack
             instructions.push(
-                Enigma.encodeCreatePool(
+                FVM.encodeCreatePool(
                     pairId,
                     address(0),
                     args.priorityFee, // priorityFee
@@ -176,7 +170,7 @@ contract HandlerPortfolio is HandlerBase {
                 )
             ); // temp
         }
-        bytes memory payload = Enigma.encodeJumpInstruction(instructions);
+        bytes memory payload = FVM.encodeJumpInstruction(instructions);
 
         try ctx.subject().multiprocess(payload) {
             console.log("Successfully created a pool.");
@@ -189,7 +183,7 @@ contract HandlerPortfolio is HandlerBase {
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = Enigma.encodePoolId(pairId, isMutable, uint32(ctx.subject().getPoolNonce()));
+        uint64 poolId = FVM.encodePoolId(pairId, isMutable, uint32(ctx.subject().getPoolNonce()));
         // Add the created pool to the list of pools.
         // todo: fix assertTrue(getPool(address(subject()), poolId).lastPrice != 0, "pool-price-zero");
         ctx.addGhostPoolId(poolId);
@@ -257,19 +251,16 @@ contract HandlerPortfolio is HandlerBase {
 
         // Preconditions
         PortfolioPool memory pool = ctx.ghost().pool();
-        uint256 lowerDecimals = pool.pair.decimalsAsset > pool.pair.decimalsQuote
-            ? pool.pair.decimalsQuote
-            : pool.pair.decimalsAsset;
+        uint256 lowerDecimals =
+            pool.pair.decimalsAsset > pool.pair.decimalsQuote ? pool.pair.decimalsQuote : pool.pair.decimalsAsset;
         uint256 minLiquidity = 10 ** (18 - lowerDecimals);
         vm.assume(deltaLiquidity > minLiquidity);
         assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
         // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
         // Amounts of tokens that will be allocated to pool.
-        (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject().getLiquidityDeltas(
-            ctx.ghost().poolId,
-            int128(uint128(deltaLiquidity))
-        );
+        (expectedDeltaAsset, expectedDeltaQuote) =
+            ctx.subject().getLiquidityDeltas(ctx.ghost().poolId, int128(uint128(deltaLiquidity)));
 
         // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
         // They will be credited to the msg.sender of the next call.
@@ -286,19 +277,13 @@ contract HandlerPortfolio is HandlerBase {
 
         // If there is a net balance, user can use it to pay their cost.
         // Total payment the user must make.
-        physicalAssetPayment = uint256(assetCredit) > expectedDeltaAsset
-            ? 0
-            : expectedDeltaAsset - uint256(assetCredit);
-        physicalQuotePayment = uint256(quoteCredit) > expectedDeltaQuote
-            ? 0
-            : expectedDeltaQuote - uint256(quoteCredit);
+        physicalAssetPayment = uint256(assetCredit) > expectedDeltaAsset ? 0 : expectedDeltaAsset - uint256(assetCredit);
+        physicalQuotePayment = uint256(quoteCredit) > expectedDeltaQuote ? 0 : expectedDeltaQuote - uint256(quoteCredit);
 
-        physicalAssetPayment = uint256(userAssetBalance) > physicalAssetPayment
-            ? 0
-            : physicalAssetPayment - uint256(userAssetBalance);
-        physicalQuotePayment = uint256(userQuoteBalance) > physicalQuotePayment
-            ? 0
-            : physicalQuotePayment - uint256(userQuoteBalance);
+        physicalAssetPayment =
+            uint256(userAssetBalance) > physicalAssetPayment ? 0 : physicalAssetPayment - uint256(userAssetBalance);
+        physicalQuotePayment =
+            uint256(userQuoteBalance) > physicalQuotePayment ? 0 : physicalQuotePayment - uint256(userQuoteBalance);
 
         // If user can pay for the allocate using their internal balance of tokens, don't need to transfer tokens in.
         // Won't need to transfer in tokens if user payment is zero.
@@ -321,9 +306,7 @@ contract HandlerPortfolio is HandlerBase {
         assertEq(post.totalPoolLiquidity, prev.totalPoolLiquidity + deltaLiquidity, "pool-total-liquidity");
         assertTrue(post.totalPoolLiquidity > prev.totalPoolLiquidity, "pool-liquidity-increases");
         assertEq(
-            post.callerPositionLiquidity,
-            prev.callerPositionLiquidity + deltaLiquidity,
-            "position-liquidity-increases"
+            post.callerPositionLiquidity, prev.callerPositionLiquidity + deltaLiquidity, "position-liquidity-increases"
         );
 
         assertEq(post.reserveAsset, prev.reserveAsset + physicalAssetPayment + uint256(assetCredit), "reserve-asset");
@@ -372,14 +355,12 @@ contract HandlerPortfolio is HandlerBase {
             uint256 timestamp = block.timestamp + 4; // todo: fix default jit policy
             vm.warp(timestamp);
 
-            (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject().getLiquidityDeltas(
-                ctx.ghost().poolId,
-                -int128(uint128(deltaLiquidity))
-            );
+            (expectedDeltaAsset, expectedDeltaQuote) =
+                ctx.subject().getLiquidityDeltas(ctx.ghost().poolId, -int128(uint128(deltaLiquidity)));
             prev = fetchAccountingState();
 
             ctx.subject().multiprocess(
-                Enigma.encodeDeallocate(uint8(0), ctx.ghost().poolId, 0x0, deltaLiquidity.safeCastTo128())
+                FVM.encodeDeallocate(uint8(0), ctx.ghost().poolId, 0x0, deltaLiquidity.safeCastTo128())
             );
 
             AccountingState memory end = fetchAccountingState();
@@ -390,14 +371,10 @@ contract HandlerPortfolio is HandlerBase {
             assertTrue(prev.totalPositionLiquidity >= deltaLiquidity, "total-pos-liq-underflow");
             assertTrue(prev.callerPositionLiquidity >= deltaLiquidity, "caller-pos-liq-underflow");
             assertEq(
-                end.totalPositionLiquidity,
-                prev.totalPositionLiquidity - deltaLiquidity,
-                "total-position-liquidity"
+                end.totalPositionLiquidity, prev.totalPositionLiquidity - deltaLiquidity, "total-position-liquidity"
             );
             assertEq(
-                end.callerPositionLiquidity,
-                prev.callerPositionLiquidity - deltaLiquidity,
-                "caller-position-liquidity"
+                end.callerPositionLiquidity, prev.callerPositionLiquidity - deltaLiquidity, "caller-position-liquidity"
             );
         }
         emit FinishedCall("Deallocate");

@@ -20,7 +20,8 @@ interface AccountLike {
  * Invariant 2. AccountSystem.settled == true.
  * Invariant 3. AccountSystem.prepared == false.
  * Invariant 4. (balanceOf(asset), balanceOf(quote)) >= Portfolio.getVirtualReserves, for all pools.
- * Invariant 5. ∑ Portfolio.positions(owner, poolId).freeLiquidity == Portfolio.pools(poolId).liquidity, for all pools.
+ * Invariant 5. ∑ Portfolio.positions(owner, poolId).freeLiquidity == Portfolio.pools(poolId).liquidity, for all
+ * pools.
  */
 contract RMM01PortfolioInvariants is Setup {
     /**
@@ -49,11 +50,9 @@ contract RMM01PortfolioInvariants is Setup {
         }
 
         // Create default pool, used in handlers via `usePool(uint)` modifier.
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(subjects().tokens[0])))
-            .edit("quote", abi.encode(address(subjects().tokens[1])))
-            .generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
+            "quote", abi.encode(address(subjects().tokens[1]))
+        ).generate(address(subject()));
 
         setGhostPoolId(poolId);
     }
@@ -70,12 +69,12 @@ contract RMM01PortfolioInvariants is Setup {
     // ===== Invariants ===== //
 
     function invariant_asset_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical, ) = getBalances(ghost().asset().to_addr());
+        (uint256 reserve, uint256 physical,) = getBalances(ghost().asset().to_addr());
         assertTrue(physical >= reserve, "invariant-asset-physical-balance");
     }
 
     function invariant_quote_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical, ) = getBalances(ghost().quote().to_addr());
+        (uint256 reserve, uint256 physical,) = getBalances(ghost().quote().to_addr());
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
     }
 
@@ -88,7 +87,7 @@ contract RMM01PortfolioInvariants is Setup {
         PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
-            (uint256 dAsset, ) = subject().getReserves(ghost().poolId);
+            (uint256 dAsset,) = subject().getReserves(ghost().poolId);
             uint256 bAsset = ghost().physicalBalance(ghost().asset().to_addr());
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }
@@ -145,7 +144,7 @@ contract RMM01PortfolioInvariants is Setup {
         return _ghostInvariant.poolIds;
     }
 
-    function getRandomPoolId(uint index) public view virtual returns (uint64) {
+    function getRandomPoolId(uint256 index) public view virtual returns (uint64) {
         return _ghostInvariant.rand(index);
     }
 
@@ -157,7 +156,7 @@ contract RMM01PortfolioInvariants is Setup {
         }
     }
 
-    function getBalanceSum(address token) public view virtual returns (uint) {
+    function getBalanceSum(address token) public view virtual returns (uint256) {
         address[] memory actors = getActors();
         uint256 sum;
         for (uint256 x; x != actors.length; ++x) {

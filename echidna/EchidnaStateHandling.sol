@@ -1,10 +1,16 @@
 pragma solidity ^0.8.4;
+
 import "solmate/tokens/WETH.sol";
 import "contracts/test/EchidnaERC20.sol";
 import "./Helper.sol";
-import {RMM01Portfolio as Portfolio, Account as AccountLib, SafeCastLib, Enigma as EnigmaLib} from "contracts/RMM01Portfolio.sol";
+import {
+    RMM01Portfolio as Portfolio,
+    Account as AccountLib,
+    SafeCastLib,
+    FVM as FVMLib
+} from "contracts/RMM01Portfolio.sol";
 import "../helpers/HelperPortfolioView.sol";
-import "contracts/libraries/EnigmaLib.sol" as ProcessingLib;
+import "contracts/libraries/FVMLib.sol" as ProcessingLib;
 
 contract EchidnaStateHandling is Helper, HelperPortfolioView {
     bool hasFunded;
@@ -82,9 +88,11 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
         return false;
     }
 
-    function retrieve_random_pool_and_tokens(
-        uint256 id
-    ) internal view returns (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote) {
+    function retrieve_random_pool_and_tokens(uint256 id)
+        internal
+        view
+        returns (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote)
+    {
         // assumes that at least one pool exists because it's been created in the constructor
         uint256 random = between(id, 0, poolIds.length - 1);
         if (poolIds.length == 1) random = 0;

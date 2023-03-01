@@ -18,7 +18,7 @@ struct ActorsState {
  * - Use `add` to add an actor the list.
  */
 library Actors {
-    function rand(ActorsState storage self, uint seed) internal view returns (address) {
+    function rand(ActorsState storage self, uint256 seed) internal view returns (address) {
         if (self.active.length == 0) return address(0xc0ffee); // thanks horsefacts
         return self.active[seed % self.active.length];
     }

@@ -14,7 +14,8 @@ import "./HelperSubjectsLib.sol";
 import "./HelperUtils.sol" as Utils;
 
 /**
- * @dev Portfolio's test environment is setup to easily extend the tests with new configurations, actors, or environment states.
+ * @dev Portfolio's test environment is setup to easily extend the tests with new configurations, actors, or environment
+ * states.
  *
  * For every test:
  * Do you have the `useActor` modifier?
@@ -22,18 +23,24 @@ import "./HelperUtils.sol" as Utils;
  * Do you check if the test is ready with the `isArmed` modifier?
  *
  * | Problem                                                 | Solution                                                                  |
- * | ------------------------------------------------------- | ------------------------------------------------------------------------- |
- * | Different contracts with same interface                 | Internal virtual function in test setup that returns test subject.        |
+ * | ------------------------------------------------------- |
+ * ------------------------------------------------------------------------- |
+ * | Different contracts with same interface                 | Internal virtual function in test setup that returns test
+ * subject.        |
  * | Pools with different configurations                     | Virtual function in setup that overrides config.                          |
- * | Redundant inputs per test, e.g. poolId, tokens, actors. | Ghost variable state accessed via a virtual internal function.            |
- * | Multiple tokens and actors                              | Managed via a registry lib with easy ways to fetch, add, and remove them. |
- * | Time based test scenarios                               | Cheatcodes, and maybe a library to manage the time with more granularity. |
+ * | Redundant inputs per test, e.g. poolId, tokens, actors. | Ghost variable state accessed via a virtual internal
+ * function.            |
+ * | Multiple tokens and actors                              | Managed via a registry lib with easy ways to fetch, add,
+ * and remove them. |
+ * | Time based test scenarios                               | Cheatcodes, and maybe a library to manage the time with
+ * more granularity. |
  */
 contract Setup is Test {
-    using SafeCastLib for uint;
+    using SafeCastLib for uint256;
     /**
      * @dev Manages the addresses calling the subjects in the environment.
      */
+
     ActorsState private _actors;
     /**
      * @dev Manages the contextual state in the environment. Includes subjects/actors.
@@ -51,14 +58,10 @@ contract Setup is Test {
      * @dev Initializes the actor, subject, and poolId ghost state.
      */
     function setUp() public virtual {
-        _subjects
-            .startDeploy(vm)
-            .wrapper()
-            .subject()
-            .token("token", abi.encode("Asset-Std", "A-STD-18", uint8(18)))
-            .token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18)))
-            .token("token", abi.encode("USDC", "USDC-6", uint8(6)))
-            .stopDeploy();
+        _subjects.startDeploy(vm).wrapper().subject().token("token", abi.encode("Asset-Std", "A-STD-18", uint8(18)))
+            .token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
+            "token", abi.encode("USDC", "USDC-6", uint8(6))
+        ).stopDeploy();
 
         _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
     }
@@ -126,7 +129,7 @@ contract Setup is Test {
         return actors;
     }
 
-    function getRandomActor(uint index) public view virtual returns (address) {
+    function getRandomActor(uint256 index) public view virtual returns (address) {
         return _actors.rand(index);
     }
 
@@ -145,7 +148,7 @@ contract Setup is Test {
         vm.stopPrank();
     }
 
-    modifier usePairTokens(uint amount) {
+    modifier usePairTokens(uint256 amount) {
         // Approve and mint tokens for actor.
         ghost().asset().prepare({owner: actor(), spender: address(subject()), amount: amount});
         ghost().quote().prepare({owner: actor(), spender: address(subject()), amount: amount});
@@ -160,69 +163,54 @@ contract Setup is Test {
      * ```
      */
     modifier defaultConfig() {
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(subjects().tokens[0])))
-            .edit("quote", abi.encode(address(subjects().tokens[1])))
-            .generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
+            "quote", abi.encode(address(subjects().tokens[1]))
+        ).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier defaultControlledConfig() {
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(subjects().tokens[0])))
-            .edit("quote", abi.encode(address(subjects().tokens[1])))
-            .edit("controller", abi.encode(address(this)))
-            .generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
+            "quote", abi.encode(address(subjects().tokens[1]))
+        ).edit("controller", abi.encode(address(this))).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier sixDecimalQuoteConfig() {
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(subjects().tokens[0])))
-            .edit("quote", abi.encode(address(subjects().tokens[2])))
-            .generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
+            "quote", abi.encode(address(subjects().tokens[2]))
+        ).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier wethConfig() {
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(subjects().weth)))
-            .edit("quote", abi.encode(address(subjects().tokens[1])))
-            .generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().weth))).edit(
+            "quote", abi.encode(address(subjects().tokens[1]))
+        ).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier durationConfig(uint16 duration) {
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(subjects().tokens[0])))
-            .edit("quote", abi.encode(address(subjects().tokens[1])))
-            .edit("duration", abi.encode(duration))
-            .generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
+            "quote", abi.encode(address(subjects().tokens[1]))
+        ).edit("duration", abi.encode(duration)).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier volatilityConfig(uint16 volatility) {
-        uint64 poolId = Configs
-            .fresh()
-            .edit("asset", abi.encode(address(subjects().tokens[0])))
-            .edit("quote", abi.encode(address(subjects().tokens[1])))
-            .edit("volatility", abi.encode(volatility))
-            .generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
+            "quote", abi.encode(address(subjects().tokens[1]))
+        ).edit("volatility", abi.encode(volatility)).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
@@ -232,41 +220,37 @@ contract Setup is Test {
      * @dev Sets internal default jit protection seconds value to 0.
      */
     modifier noJit() {
-        uint LIQUIDITY_POLICY_STORAGE_SLOT = 11;
+        uint256 LIQUIDITY_POLICY_STORAGE_SLOT = 11;
         vm.store(address(subject()), bytes32(LIQUIDITY_POLICY_STORAGE_SLOT), bytes32(0));
         _;
     }
 
     modifier allocateSome(uint128 amt) {
-        subject().multiprocess(EnigmaLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));
+        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));
         _;
     }
 
     modifier deallocateSome(uint128 amt) {
-        subject().multiprocess(EnigmaLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, amt));
+        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, amt));
         _;
     }
 
     modifier swapSome(uint128 amt, bool sellAsset) {
         uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt).safeCastTo128();
         subject().multiprocess(
-            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(sellAsset ? 1 : 0))
+            FVM.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(sellAsset ? 1 : 0))
         );
         _;
     }
 
-    modifier swapSomeGetOut(
-        uint128 amt,
-        int amtOutDelta,
-        bool sellAsset
-    ) {
+    modifier swapSomeGetOut(uint128 amt, int256 amtOutDelta, bool sellAsset) {
         uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt).safeCastTo128();
         amtOut = amtOutDelta > 0
-            ? amtOut + uint(amtOutDelta).safeCastTo128()
-            : amtOut - uint(-amtOutDelta).safeCastTo128();
+            ? amtOut + uint256(amtOutDelta).safeCastTo128()
+            : amtOut - uint256(-amtOutDelta).safeCastTo128();
 
         subject().multiprocess(
-            Enigma.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(sellAsset ? 1 : 0))
+            FVM.encodeSwap(uint8(0), ghost().poolId, 0x0, amt, 0x0, amtOut, uint8(sellAsset ? 1 : 0))
         );
         _;
     }

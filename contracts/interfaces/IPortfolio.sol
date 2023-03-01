@@ -81,7 +81,9 @@ interface IPortfolioEvents {
         uint256 deltaLiquidity
     );
 
-    /** @dev Emits a `0` for unchanged parameters. */
+    /**
+     * @dev Emits a `0` for unchanged parameters.
+     */
     event ChangeParameters(uint64 indexed poolId, uint16 indexed priorityFee, uint16 indexed fee, uint16 jit);
 
     /**
@@ -100,22 +102,14 @@ interface IPortfolioEvents {
      * @notice Emitted on pair creation.
      */
     event CreatePair(
-        uint24 indexed pairId,
-        address indexed asset,
-        address indexed quote,
-        uint8 decimalsAsset,
-        uint8 decimalsQuote
+        uint24 indexed pairId, address indexed asset, address indexed quote, uint8 decimalsAsset, uint8 decimalsQuote
     );
 
     /**
      * @param price Estimated price of the initialized pool in WAD units.
      */
     event CreatePool(
-        uint64 indexed poolId,
-        bool isMutable,
-        address indexed asset,
-        address indexed quote,
-        uint256 price
+        uint64 indexed poolId, bool isMutable, address indexed asset, address indexed quote, uint256 price
     );
 }
 
@@ -177,16 +171,15 @@ interface IPortfolioGetters {
      */
     function getPairId(address asset, address quote) external view returns (uint24 pairId);
 
-    function pairs(
-        uint24 pairId
-    ) external view returns (address tokenAsset, uint8 decimalsAsset, address tokenQuote, uint8 decimalsQuote);
+    function pairs(uint24 pairId)
+        external
+        view
+        returns (address tokenAsset, uint8 decimalsAsset, address tokenQuote, uint8 decimalsQuote);
 
     /**
      * @dev Structs in memory are returned as tuples, e.g. (foo, bar...).
      */
-    function pools(
-        uint64 poolId
-    )
+    function pools(uint64 poolId)
         external
         view
         returns (
@@ -255,9 +248,10 @@ interface IPortfolioGetters {
      * @return deltaAsset Quantity of `asset` tokens in wad units.
      * @return deltaQuote Quantity of `quote` tokens in wad units.
      */
-    function getVirtualReservesPerLiquidity(
-        uint64 poolId
-    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
+    function getVirtualReservesPerLiquidity(uint64 poolId)
+        external
+        view
+        returns (uint128 deltaAsset, uint128 deltaQuote);
 
     // ===== Objective View ===== //
 
@@ -281,7 +275,7 @@ interface IPortfolioActions {
     /**
      * @notice Entrypoint to allocate, deallocate, or swap in Portfolio.
      * @dev Multiprocess expects custom encoded data that can be built off-chain
-     * or on-chain using the `EnigmaLib` library. This function is similar to
+     * or on-chain using the `FVMLib` library. This function is similar to
      * multicall, which sends calldata to a target by looping over an array of
      * calldatas and targets.
      *

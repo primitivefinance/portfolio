@@ -12,7 +12,20 @@ import "solmate/test/utils/mocks/MockERC20.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import {GhostState} from "../../HelperGhostLib.sol";
 import {ActorsState} from "../../HelperActorsLib.sol";
-import {PortfolioPool, PortfolioPosition, PortfolioPair, PortfolioCurve, Enigma, AssemblyLib, MIN_VOLATILITY, MAX_VOLATILITY, MIN_FEE, MAX_FEE, MIN_DURATION, MAX_DURATION} from "contracts/PortfolioLib.sol";
+import {
+    PortfolioPool,
+    PortfolioPosition,
+    PortfolioPair,
+    PortfolioCurve,
+    FVM,
+    AssemblyLib,
+    MIN_VOLATILITY,
+    MAX_VOLATILITY,
+    MIN_FEE,
+    MAX_FEE,
+    MIN_DURATION,
+    MAX_DURATION
+} from "contracts/PortfolioLib.sol";
 
 interface Context {
     // Manipulate ghost environment
@@ -35,21 +48,24 @@ interface Context {
 
     function getActors() external view returns (address[] memory);
 
-    function getRandomActor(uint index) external view returns (address);
+    function getRandomActor(uint256 index) external view returns (address);
 
     // Ghost Invariant environment getters
 
     function getPoolIds() external view returns (uint64[] memory);
 
-    function getRandomPoolId(uint index) external view returns (uint64);
+    function getRandomPoolId(uint256 index) external view returns (uint64);
 
     // Subject Specific Getters
-    function getBalanceSum(address) external view returns (uint);
+    function getBalanceSum(address) external view returns (uint256);
 
-    function getPositionsLiquiditySum() external view returns (uint);
+    function getPositionsLiquiditySum() external view returns (uint256);
 }
 
-/** @dev Target contract must inherit. Read: https://github.com/dapphub/dapptools/blob/master/src/dapp/README.md#invariant-testing */
+/**
+ * @dev Target contract must inherit. Read:
+ * https://github.com/dapphub/dapptools/blob/master/src/dapp/README.md#invariant-testing
+ */
 abstract contract HandlerBase is CommonBase, StdCheats, StdUtils, StdAssertions {
     Context ctx;
     mapping(bytes32 => uint256) public calls;
@@ -69,14 +85,14 @@ abstract contract HandlerBase is CommonBase, StdCheats, StdUtils, StdAssertions 
         _;
     }
 
-    modifier useActor(uint seed) {
+    modifier useActor(uint256 seed) {
         ctx.setGhostActor(ctx.getRandomActor(seed));
         vm.startPrank(ctx.actor());
         _;
         vm.stopPrank();
     }
 
-    modifier usePool(uint seed) {
+    modifier usePool(uint256 seed) {
         ctx.setGhostPoolId(ctx.getRandomPoolId(seed));
         _;
     }

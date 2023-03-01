@@ -19,9 +19,12 @@ contract RevertCatcher {
         MockERC20(token).approve(spender, type(uint256).max);
     }
 
-    /** @dev Assumes portfolio calls this, for testing only. Uses try catch to bubble up errors. */
+    /**
+     * @dev Assumes portfolio calls this, for testing only. Uses try catch to bubble up errors.
+     */
     function process(bytes calldata data) external payable returns (bool) {
-        try portfolio.multiprocess{value: msg.value}(data) {} catch (bytes memory reason) {
+        try portfolio.multiprocess{value: msg.value}(data) {}
+        catch (bytes memory reason) {
             assembly {
                 revert(add(32, reason), mload(reason))
             }
@@ -29,9 +32,12 @@ contract RevertCatcher {
         return true;
     }
 
-    /** @dev Assumes Portfolio calls this, for testing only. Uses try catch to bubble up errors. */
+    /**
+     * @dev Assumes Portfolio calls this, for testing only. Uses try catch to bubble up errors.
+     */
     function jumpProcess(bytes calldata data) external payable returns (bool) {
-        try portfolio.multiprocess{value: msg.value}(data) {} catch (bytes memory reason) {
+        try portfolio.multiprocess{value: msg.value}(data) {}
+        catch (bytes memory reason) {
             assembly {
                 revert(add(32, reason), mload(reason))
             }

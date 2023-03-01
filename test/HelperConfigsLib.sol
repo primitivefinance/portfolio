@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "solmate/utils/SafeCastLib.sol";
 import "contracts/interfaces/IPortfolio.sol";
-import "contracts/libraries/EnigmaLib.sol" as EnigmaLib;
+import "contracts/libraries/FVMLib.sol" as FVMLib;
 
 using Configs for ConfigState global;
 
@@ -45,8 +45,8 @@ function safeCastTo16(uint256 x) pure returns (uint16 y) {
  * - Call `generate()` on a config to create the pool in the test subject (a Portfolio contract).
  */
 library Configs {
-    using SafeCastLib for uint;
-    using {safeCastTo16} for uint;
+    using SafeCastLib for uint256;
+    using {safeCastTo16} for uint256;
 
     /**
      * @dev Creates a new config with defaults.
@@ -84,7 +84,11 @@ library Configs {
      * Configs.fresh().edit("asset", abi.encode(asset_address)).generate(Portfolio);
      * ```
      */
-    function edit(ConfigState memory self, bytes32 what, bytes memory data) internal pure returns (ConfigState memory) {
+    function edit(
+        ConfigState memory self,
+        bytes32 what,
+        bytes memory data
+    ) internal pure returns (ConfigState memory) {
         if (what == "asset") {
             self.asset = abi.decode(data, (address));
         } else if (what == "quote") {
@@ -123,9 +127,9 @@ library Configs {
         uint24 pairId = IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
         if (pairId == 0) {
             bytes[] memory data = new bytes[](2);
-            data[0] = (EnigmaLib.encodeCreatePair(self.asset, self.quote));
+            data[0] = (FVMLib.encodeCreatePair(self.asset, self.quote));
             data[1] = (
-                EnigmaLib.encodeCreatePool({
+                FVMLib.encodeCreatePool({
                     pairId: pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
                     controller: self.controller,
                     priorityFee: self.priorityFeeBps,
@@ -138,19 +142,17 @@ library Configs {
                 })
             );
 
-            bytes memory payload = EnigmaLib.encodeJumpInstruction(data);
+            bytes memory payload = FVMLib.encodeJumpInstruction(data);
 
             IPortfolio(Portfolio).multiprocess(payload);
 
             bool controlled = self.controller != address(0);
-            poolId = EnigmaLib.encodePoolId(
-                IPortfolioGetters(Portfolio).getPairNonce(),
-                controlled,
-                IPortfolioGetters(Portfolio).getPoolNonce()
+            poolId = FVMLib.encodePoolId(
+                IPortfolioGetters(Portfolio).getPairNonce(), controlled, IPortfolioGetters(Portfolio).getPoolNonce()
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {
-            bytes memory payload = EnigmaLib.encodeCreatePool({
+            bytes memory payload = FVMLib.encodeCreatePool({
                 pairId: pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
                 controller: self.controller,
                 priorityFee: self.priorityFeeBps,

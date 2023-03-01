@@ -108,7 +108,7 @@ contract StatelessSwaps is Helper, Test {
             emit LogUint256("Allocating liquidity:", liquidity);
 
             vm.prank(alice);
-            portfolio.multiprocess(EnigmaLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity)));
+            portfolio.multiprocess(FVMLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity)));
         }
 
         // Update stk to what portfolio stores, otherwise calculations will be inexcat.
@@ -153,7 +153,7 @@ contract StatelessSwaps is Helper, Test {
         uint256 maxErr = 100 * 1e18;
 
         // Swapping back and forth should not succeed if `output > input` under normal circumstances.
-        (bool success, ) = swapBackAndForthCall(sell, uint128(input), uint128(output), uint128(input + maxErr));
+        (bool success,) = swapBackAndForthCall(sell, uint128(input), uint128(output), uint128(input + maxErr));
 
         //
         if (success) {
@@ -197,8 +197,8 @@ contract StatelessSwaps is Helper, Test {
         bytes memory returndata;
 
         if (poolId == 0) {
-            instructions[0] = EnigmaLib.encodeCreatePair(token0, token1);
-            data = EnigmaLib.encodeJumpInstruction(instructions);
+            instructions[0] = FVMLib.encodeCreatePair(token0, token1);
+            data = FVMLib.encodeJumpInstruction(instructions);
 
             (success, returndata) = address(portfolio).call(data);
             if (!success) {
@@ -208,7 +208,7 @@ contract StatelessSwaps is Helper, Test {
             }
         }
 
-        instructions[0] = EnigmaLib.encodeCreatePool(
+        instructions[0] = FVMLib.encodeCreatePool(
             0x000000, // magic variable
             controller,
             uint16(priorityFee),
@@ -230,7 +230,7 @@ contract StatelessSwaps is Helper, Test {
         // console.log("stk", stk);
         // console.log("price %s\n", price);
 
-        data = EnigmaLib.encodeJumpInstruction(instructions);
+        data = FVMLib.encodeJumpInstruction(instructions);
 
         (success, returndata) = address(portfolio).call(data);
         if (!success) {
@@ -239,7 +239,7 @@ contract StatelessSwaps is Helper, Test {
             }
         }
 
-        poolId = Enigma.encodePoolId(portfolio.getPairNonce(), true, portfolio.getPoolNonce());
+        poolId = FVM.encodePoolId(portfolio.getPairNonce(), true, portfolio.getPoolNonce());
 
         console.log("PoolId", poolId);
 
@@ -275,10 +275,10 @@ contract StatelessSwaps is Helper, Test {
         //     output2
         // );
 
-        instructions[0] = EnigmaLib.encodeSwap(0, poolId, 0, input, 0, output1, sell ? 0 : 1);
-        instructions[1] = EnigmaLib.encodeSwap(0, poolId, 0, output1, 0, output2, sell ? 1 : 0);
+        instructions[0] = FVMLib.encodeSwap(0, poolId, 0, input, 0, output1, sell ? 0 : 1);
+        instructions[1] = FVMLib.encodeSwap(0, poolId, 0, output1, 0, output2, sell ? 1 : 0);
 
-        bytes memory data = EnigmaLib.encodeJumpInstruction(instructions);
+        bytes memory data = FVMLib.encodeJumpInstruction(instructions);
 
         (success, returndata) = address(portfolio).call(data);
     }

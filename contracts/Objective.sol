@@ -39,9 +39,9 @@ abstract contract Objective is IPortfolio {
     function checkInvariant(
         uint64 poolId,
         int256 invariant,
-        uint reserveX,
-        uint reserveY
-    ) public view virtual returns (bool success, int nextInvariant);
+        uint256 reserveX,
+        uint256 reserveY
+    ) public view virtual returns (bool success, int256 nextInvariant);
 
     /**
      * @dev Computes the max amount of tokens that can be swapped into the pool.
@@ -49,17 +49,17 @@ abstract contract Objective is IPortfolio {
     function computeMaxInput(
         uint64 poolId,
         bool sellAsset,
-        uint reserveIn,
-        uint liquidity
-    ) public view virtual returns (uint);
+        uint256 reserveIn,
+        uint256 liquidity
+    ) public view virtual returns (uint256);
 
     /**
      * @dev Computes the reserves in WAD units using a `price`.
      */
     function computeReservesFromPrice(
         uint64 poolId,
-        uint price
-    ) public view virtual returns (uint reserveX, uint reserveY);
+        uint256 price
+    ) public view virtual returns (uint256 reserveX, uint256 reserveY);
 
     /**
      * @dev Computes an amount of tokens out given an amount in, units are in the token's decimals.
@@ -73,5 +73,5 @@ abstract contract Objective is IPortfolio {
     /**
      * @dev Estimates the `price` of a pool with `poolId` given the pool's reserves.
      */
-    function getLatestEstimatedPrice(uint64 poolId) public view virtual returns (uint price);
+    function getLatestEstimatedPrice(uint64 poolId) public view virtual returns (uint256 price);
 }

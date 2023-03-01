@@ -41,7 +41,7 @@ contract RMM02Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function checkPosition(uint64 poolId, address owner, int delta) public view override returns (bool) {
+    function checkPosition(uint64 poolId, address owner, int256 delta) public view override returns (bool) {
         // Just in time liquidity protection.
         if (delta < 0) {
             uint256 distance = positions[owner][poolId].getTimeSinceChanged(block.timestamp);
@@ -59,7 +59,7 @@ contract RMM02Portfolio is PortfolioVirtual {
     /// @inheritdoc Objective
     function checkInvariant(
         uint64 poolId,
-        int invariant,
+        int256 invariant,
         uint256 reserveX,
         uint256 reserveY
     ) public view override returns (bool, int256 nextInvariant) {

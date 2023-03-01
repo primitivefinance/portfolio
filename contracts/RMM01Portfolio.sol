@@ -25,9 +25,11 @@ contract RMM01Portfolio is PortfolioVirtual {
      * movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _computeSyncedPrice(
-        uint64 poolId
-    ) internal view returns (uint256 price, int256 invariant, uint256 updatedTau) {
+    function _computeSyncedPrice(uint64 poolId)
+        internal
+        view
+        returns (uint256 price, int256 invariant, uint256 updatedTau)
+    {
         PortfolioPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
         uint256 timeSinceUpdate = _getTimePassed(pool);
@@ -42,13 +44,12 @@ contract RMM01Portfolio is PortfolioVirtual {
 
     /// @inheritdoc Objective
     function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
-        int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
         // Apply priority invariant growth.
         if (msg.sender == pools[poolId].controller) {
-            int256 delta = iteration.invariant - liveInvariantWad;
+            int256 delta = iteration.nextInvariant - iteration.prevInvariant;
             uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-            if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity); // todo: don't
-            // like this setting internal _state...
+            // todo: I don't like this setting internal _state...
+            if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity);
         }
 
         return true;
@@ -56,7 +57,7 @@ contract RMM01Portfolio is PortfolioVirtual {
 
     /// @inheritdoc Objective
     function _beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
-        (, int256 invariant, ) = _computeSyncedPrice(poolId);
+        (, int256 invariant,) = _computeSyncedPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
         if (pools[poolId].lastTau() == 0) return (false, invariant);
@@ -88,12 +89,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint256 reserveY
     ) public view override returns (bool, int256 nextInvariant) {
         uint256 tau = pools[poolId].lastTau();
-        nextInvariant = RMM01Lib.invariantOf({
-            self: pools[poolId],
-            R_x: reserveX,
-            R_y: reserveY,
-            timeRemainingSec: tau
-        });
+        nextInvariant = RMM01Lib.invariantOf({self: pools[poolId], R_x: reserveX, R_y: reserveY, timeRemainingSec: tau});
 
         // Invariant for RMM01 is denominated in the `quote` token.
         int256 liveInvariantWad = invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
@@ -111,10 +107,10 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint256 maxInput;
         if (sellAsset) {
             maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio
-            // between assets and liqudiity.
+                // between assets and liqudiity.
         } else {
             maxInput = (pools[poolId].params.maxPrice - reserveIn).mulWadDown(liquidity); // There can be maximum
-            // strike:1 liquidity ratio between quote and liquidity.
+                // strike:1 liquidity ratio between quote and liquidity.
         }
 
         return maxInput;
@@ -125,11 +121,8 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         uint256 price
     ) public view override returns (uint256 reserveX, uint256 reserveY) {
-        (reserveY, reserveX) = RMM01Lib.computeReservesWithPrice({
-            self: pools[poolId],
-            priceWad: price,
-            invariantWad: 0
-        });
+        (reserveY, reserveX) =
+            RMM01Lib.computeReservesWithPrice({self: pools[poolId], priceWad: price, invariantWad: 0});
     }
 
     /// @inheritdoc Objective
@@ -148,6 +141,6 @@ contract RMM01Portfolio is PortfolioVirtual {
 
     /// @inheritdoc Objective
     function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint256 price) {
-        (price, , ) = _computeSyncedPrice(poolId);
+        (price,,) = _computeSyncedPrice(poolId);
     }
 }

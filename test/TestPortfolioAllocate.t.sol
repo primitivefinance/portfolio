@@ -10,11 +10,11 @@ contract TestPortfolioAllocate is Setup {
         // Fetch the ghost variables to interact with the target pool.
         uint64 xid = ghost().poolId;
         // Fetch the variable we are changing (pool.liquidity).
-        uint prev = ghost().pool().liquidity;
+        uint256 prev = ghost().pool().liquidity;
         // Trigger the function being tested.
-        subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
+        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
         // Fetch the variable changed.
-        uint post = ghost().pool().liquidity;
+        uint256 post = ghost().pool().liquidity;
         // Ghost assertions comparing the actual and expected deltas.
         assertEq(post, prev + amount, "pool.liquidity");
         // Direct assertions of pool state.
@@ -29,9 +29,9 @@ contract TestPortfolioAllocate is Setup {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        uint prev = ghost().pool().lastTimestamp;
-        subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
-        uint post = ghost().pool().lastTimestamp;
+        uint256 prev = ghost().pool().lastTimestamp;
+        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
+        uint256 post = ghost().pool().lastTimestamp;
 
         assertEq(post, prev, "pool.lastTimestamp");
     }
@@ -40,12 +40,12 @@ contract TestPortfolioAllocate is Setup {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        uint prev_asset = ghost().reserve(ghost().asset().to_addr());
-        uint prev_quote = ghost().reserve(ghost().quote().to_addr());
-        (uint delta0, uint delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
-        subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
-        uint post_asset = ghost().reserve(ghost().asset().to_addr());
-        uint post_quote = ghost().reserve(ghost().quote().to_addr());
+        uint256 prev_asset = ghost().reserve(ghost().asset().to_addr());
+        uint256 prev_quote = ghost().reserve(ghost().quote().to_addr());
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
+        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
+        uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
+        uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
 
         assertTrue(post_asset != 0, "pool.getReserve(asset) == 0");
         assertTrue(post_quote != 0, "pool.getReserve(quote) == 0");
@@ -66,12 +66,12 @@ contract TestPortfolioAllocate is Setup {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        uint prev_asset = ghost().reserve(ghost().asset().to_addr());
-        uint prev_quote = ghost().reserve(ghost().quote().to_addr());
-        (uint delta0, uint delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
-        subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
-        uint post_asset = ghost().reserve(ghost().asset().to_addr());
-        uint post_quote = ghost().reserve(ghost().quote().to_addr());
+        uint256 prev_asset = ghost().reserve(ghost().asset().to_addr());
+        uint256 prev_quote = ghost().reserve(ghost().quote().to_addr());
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
+        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
+        uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
+        uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
 
         assertTrue(post_asset != 0, "pool.getReserve(asset) == 0");
         assertTrue(post_quote != 0, "pool.getReserve(quote) == 0");
@@ -83,12 +83,12 @@ contract TestPortfolioAllocate is Setup {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        uint prev_asset = ghost().asset().to_token().balanceOf(address(subject()));
-        uint prev_quote = ghost().quote().to_token().balanceOf(address(subject()));
-        (uint delta0, uint delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
-        subject().multiprocess(EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
-        uint post_asset = ghost().asset().to_token().balanceOf(address(subject()));
-        uint post_quote = ghost().quote().to_token().balanceOf(address(subject()));
+        uint256 prev_asset = ghost().asset().to_token().balanceOf(address(subject()));
+        uint256 prev_quote = ghost().quote().to_token().balanceOf(address(subject()));
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
+        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
+        uint256 post_asset = ghost().asset().to_token().balanceOf(address(subject()));
+        uint256 post_quote = ghost().quote().to_token().balanceOf(address(subject()));
 
         assertTrue(post_asset != 0, "asset.balanceOf(subject) == 0");
         assertTrue(post_quote != 0, "quote.balanceOf(subject) == 0");
@@ -99,24 +99,22 @@ contract TestPortfolioAllocate is Setup {
     function test_allocate_non_existent_pool_reverts() public useActor {
         uint64 failureArg = 51;
         vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        subject().multiprocess(
-            EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: failureArg, power: 0, amount: 1 ether})
-        );
+        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: failureArg, power: 0, amount: 1 ether}));
     }
 
     function test_allocate_zero_liquidity_reverts() public defaultConfig useActor isArmed {
-        uint failureArg = 0;
+        uint256 failureArg = 0;
         vm.expectRevert(ZeroLiquidity.selector);
         subject().multiprocess(
-            EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: ghost().poolId, power: 0, amount: uint128(failureArg)})
+            FVMLib.encodeAllocate({useMax: uint8(0), poolId: ghost().poolId, power: 0, amount: uint128(failureArg)})
         );
     }
 
     function test_allocate_liquidity_overflow_reverts() public defaultConfig useActor isArmed {
-        uint failureArg = uint(type(uint128).max) + 1;
+        uint256 failureArg = uint256(type(uint128).max) + 1;
         vm.expectRevert(); // safeCastTo128 reverts with no message, so it's just an "Evm Error".
         subject().multiprocess(
-            EnigmaLib.encodeAllocate({useMax: uint8(0), poolId: ghost().poolId, power: 0, amount: uint128(failureArg)})
+            FVMLib.encodeAllocate({useMax: uint8(0), poolId: ghost().poolId, power: 0, amount: uint128(failureArg)})
         );
     }
 }

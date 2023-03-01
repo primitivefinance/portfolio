@@ -4,7 +4,7 @@ pragma solidity 0.8.13;
 import "solmate/utils/SafeCastLib.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "./libraries/AssemblyLib.sol";
-import "./libraries/EnigmaLib.sol" as Enigma;
+import "./libraries/FVMLib.sol" as FVM;
 import "./libraries/AccountLib.sol" as Account;
 
 using AssemblyLib for uint256;
@@ -51,6 +51,7 @@ error InvalidFee(uint16 fee);
 error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
 error InvalidJit(uint16);
+error InvalidPair();
 error InvalidReentrancy();
 error InvalidReward();
 error InvalidSettlement();
@@ -142,7 +143,8 @@ struct Order {
 }
 
 struct Iteration {
-    int256 invariant;
+    int256 prevInvariant;
+    int256 nextInvariant;
     uint256 virtualX;
     uint256 virtualY;
     uint256 remainder;
@@ -177,7 +179,7 @@ function syncPoolTimestamp(PortfolioPool storage self, uint256 timestamp) {
 }
 
 function changePoolParameters(PortfolioPool storage self, PortfolioCurve memory updated) {
-    (bool success, ) = updated.validateParameters();
+    (bool success,) = updated.validateParameters();
     self.params = updated;
     assert(success);
 }
@@ -328,20 +330,27 @@ function validateParameters(PortfolioCurve memory self) pure returns (bool, byte
     return (success, reason);
 }
 
-/** @dev Invalid parameters should revert. Bound checks are inclusive. */
+/**
+ * @dev Invalid parameters should revert. Bound checks are inclusive.
+ */
 function checkParameters(PortfolioCurve memory self) pure returns (bool, bytes memory) {
     if (self.jit > JUST_IN_TIME_MAX) return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
-    if (!AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
+    if (!AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY)) {
         return (false, abi.encodeWithSelector(InvalidVolatility.selector, self.volatility));
-    if (!AssemblyLib.isBetween(self.duration, MIN_DURATION, MAX_DURATION))
+    }
+    if (!AssemblyLib.isBetween(self.duration, MIN_DURATION, MAX_DURATION)) {
         return (false, abi.encodeWithSelector(InvalidDuration.selector, self.duration));
-    if (!AssemblyLib.isBetween(self.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE))
+    }
+    if (!AssemblyLib.isBetween(self.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE)) {
         return (false, abi.encodeWithSelector(InvalidStrike.selector, self.maxPrice));
-    if (!AssemblyLib.isBetween(self.fee, MIN_FEE, MAX_FEE))
+    }
+    if (!AssemblyLib.isBetween(self.fee, MIN_FEE, MAX_FEE)) {
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
+    }
     // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
-    if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee))
+    if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
         return (false, abi.encodeWithSelector(InvalidFee.selector, self.priorityFee));
+    }
 
     return (true, "");
 }
