@@ -18,9 +18,11 @@ contract EnigmaLibTarget is Test {
         return encodeSwap(useMax, poolId, power0, amount0, power1, amount1, sellAsset);
     }
 
-    function doDecodeSwap(
-        bytes calldata data
-    ) external pure returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset) {
+    function doDecodeSwap(bytes calldata data)
+        external
+        pure
+        returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
+    {
         return decodeSwap(data);
     }
 
@@ -49,13 +51,7 @@ contract TestEnigmaLib is Test {
         vm.assume(power1 <= 18);
 
         bytes memory data = target.doEncodeSwap(
-            useMax ? uint8(1) : uint8(0),
-            poolId,
-            power0,
-            amount0,
-            power1,
-            amount1,
-            sellAsset ? uint8(1) : uint8(0)
+            useMax ? uint8(1) : uint8(0), poolId, power0, amount0, power1, amount1, sellAsset ? uint8(1) : uint8(0)
         );
 
         (uint8 useMax_, uint64 poolId_, uint128 input_, uint128 output_, uint8 sellAsset_) = target.doDecodeSwap(data);

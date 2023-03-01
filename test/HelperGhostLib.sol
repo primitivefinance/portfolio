@@ -58,19 +58,19 @@ library Ghost {
         }
     }
 
-    function net(GhostState memory self, address token) internal view returns (int) {
+    function net(GhostState memory self, address token) internal view returns (int256) {
         return IPortfolioGetters(self.subject).getNetBalance(token);
     }
 
-    function balance(GhostState memory self, address account, address token) internal view returns (uint) {
+    function balance(GhostState memory self, address account, address token) internal view returns (uint256) {
         return IPortfolioGetters(self.subject).getBalance(account, token);
     }
 
-    function physicalBalance(GhostState memory self, address token) internal view returns (uint) {
+    function physicalBalance(GhostState memory self, address token) internal view returns (uint256) {
         return MockERC20(token).balanceOf(self.subject);
     }
 
-    function reserve(GhostState memory self, address token) internal view returns (uint) {
+    function reserve(GhostState memory self, address token) internal view returns (uint256) {
         return IPortfolioGetters(self.subject).getReserve(token);
     }
 

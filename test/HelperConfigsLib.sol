@@ -45,8 +45,8 @@ function safeCastTo16(uint256 x) pure returns (uint16 y) {
  * - Call `generate()` on a config to create the pool in the test subject (a Portfolio contract).
  */
 library Configs {
-    using SafeCastLib for uint;
-    using {safeCastTo16} for uint;
+    using SafeCastLib for uint256;
+    using {safeCastTo16} for uint256;
 
     /**
      * @dev Creates a new config with defaults.
@@ -84,7 +84,11 @@ library Configs {
      * Configs.fresh().edit("asset", abi.encode(asset_address)).generate(Portfolio);
      * ```
      */
-    function edit(ConfigState memory self, bytes32 what, bytes memory data) internal pure returns (ConfigState memory) {
+    function edit(
+        ConfigState memory self,
+        bytes32 what,
+        bytes memory data
+    ) internal pure returns (ConfigState memory) {
         if (what == "asset") {
             self.asset = abi.decode(data, (address));
         } else if (what == "quote") {
@@ -144,9 +148,7 @@ library Configs {
 
             bool controlled = self.controller != address(0);
             poolId = EnigmaLib.encodePoolId(
-                IPortfolioGetters(Portfolio).getPairNonce(),
-                controlled,
-                IPortfolioGetters(Portfolio).getPoolNonce()
+                IPortfolioGetters(Portfolio).getPairNonce(), controlled, IPortfolioGetters(Portfolio).getPoolNonce()
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {

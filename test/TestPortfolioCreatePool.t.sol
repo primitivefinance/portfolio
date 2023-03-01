@@ -22,17 +22,8 @@ contract TestPortfolioCreatePool is Setup {
         vm.assume(price > 0);
         vm.assume(maxPrice > 0);
 
-        bytes memory data = Enigma.encodeCreatePool(
-            pairId,
-            address(this),
-            priorityFee,
-            fee,
-            volatility,
-            duration,
-            jit,
-            maxPrice,
-            price
-        );
+        bytes memory data =
+            Enigma.encodeCreatePool(pairId, address(this), priorityFee, fee, volatility, duration, jit, maxPrice, price);
 
         subject().multiprocess(data);
 
@@ -70,7 +61,8 @@ contract TestPortfolioCreatePool is Setup {
         subject().multiprocess(data);
     }
 
-    bytes arithmeticError = abi.encodeWithSelector(0x4e487b71, 0x11); // 0x4e487b71 is Panic(uint256), and 0x11 is the panic code for arithmetic overflow.
+    bytes arithmeticError = abi.encodeWithSelector(0x4e487b71, 0x11); // 0x4e487b71 is Panic(uint256), and 0x11 is the
+        // panic code for arithmetic overflow.
 
     function test_revert_createPool_above_max_pairs() public defaultConfig {
         bytes32 slot = bytes32(uint256(5)); // slot is packed so has the pair + pool nonces.

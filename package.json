@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "lcov": "FOUNDRY_PROFILE=test forge coverage --report lcov",
-    "lint": "prettier --write **.sol",
+    "lint": "forge fmt",
     "prepare": "husky install"
   },
   "repository": {
@@ -27,13 +27,11 @@
     "test": "test"
   },
   "lint-staged": {
-    "**.sol": "prettier --write"
+    "**.sol": "forge fmt"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.4.2",
     "@commitlint/config-conventional": "^17.4.2",
-    "husky": ">=6",
-    "prettier": "2.6.2",
-    "prettier-plugin-solidity": "^1.0.0"
+    "husky": ">=6"
   }
 }

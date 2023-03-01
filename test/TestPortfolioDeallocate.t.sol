@@ -9,9 +9,9 @@ contract TestPortfolioDeallocate is Setup {
         subject().multiprocess(EnigmaLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));
 
         // Deallocating liquidity can round down.
-        uint prev = ghost().position(address(this)).freeLiquidity;
+        uint256 prev = ghost().position(address(this)).freeLiquidity;
         subject().multiprocess(EnigmaLib.encodeDeallocate(uint8(1), ghost().poolId, 0x0, amt));
-        uint post = ghost().position(address(this)).freeLiquidity;
+        uint256 post = ghost().position(address(this)).freeLiquidity;
 
         assertApproxEqAbs(post, prev - amt, 1, "liquidity-did-not-decrease");
     }
