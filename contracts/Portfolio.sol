@@ -11,9 +11,9 @@ abstract contract PortfolioVirtual is Objective {
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
-    using {Assembly.isBetween} for uint8;
-    using {Assembly.scaleFromWadDownSigned} for int256;
-    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
+    using AssemblyLib for uint8;
+    using AssemblyLib for int256;
+    using AssemblyLib for uint256;
 
     function VERSION() public pure returns (string memory) {
         assembly ("memory-safe") {
@@ -228,7 +228,7 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = getLiquidityDeltas(poolId, Assembly.toInt128(deltaLiquidity)); // note: rounds up.
+        (deltaAsset, deltaQuote) = getLiquidityDeltas(poolId, AssemblyLib.toInt128(deltaLiquidity)); // note: rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
@@ -239,7 +239,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaQuote: deltaQuote,
             tokenAsset: asset,
             tokenQuote: quote,
-            deltaLiquidity: Assembly.toInt128(deltaLiquidity)
+            deltaLiquidity: AssemblyLib.toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
@@ -259,7 +259,7 @@ abstract contract PortfolioVirtual is Objective {
         if (useMax) deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = getLiquidityDeltas(poolId, -Assembly.toInt128(deltaLiquidity)); // rounds down
+        (deltaAsset, deltaQuote) = getLiquidityDeltas(poolId, -AssemblyLib.toInt128(deltaLiquidity)); // rounds down
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -269,7 +269,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaQuote: deltaQuote,
             tokenAsset: asset,
             tokenQuote: quote,
-            deltaLiquidity: -Assembly.toInt128(deltaLiquidity)
+            deltaLiquidity: -AssemblyLib.toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
@@ -484,9 +484,9 @@ abstract contract PortfolioVirtual is Objective {
         if (pool.liquidity != liquidity) pool.liquidity = liquidity.safeCastTo128();
         if (pool.lastTimestamp != block.timestamp) pool.syncPoolTimestamp(block.timestamp);
 
-        pool.feeGrowthGlobalAsset = Assembly.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
-        pool.feeGrowthGlobalQuote = Assembly.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
-        pool.invariantGrowthGlobal = Assembly.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
+        pool.feeGrowthGlobalAsset = AssemblyLib.computeCheckpoint(pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset);
+        pool.feeGrowthGlobalQuote = AssemblyLib.computeCheckpoint(pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote);
+        pool.invariantGrowthGlobal = AssemblyLib.computeCheckpoint(pool.invariantGrowthGlobal, invariantGrowthGlobal);
     }
 
     function _createPair(address asset, address quote) internal returns (uint24 pairId) {
@@ -496,10 +496,8 @@ abstract contract PortfolioVirtual is Objective {
         if (pairId != 0) revert PairExists(pairId);
 
         (uint8 decimalsAsset, uint8 decimalsQuote) = (IERC20(asset).decimals(), IERC20(quote).decimals());
-        if (!decimalsAsset.isBetween(Assembly.MIN_DECIMALS, Assembly.MAX_DECIMALS))
-            revert InvalidDecimals(decimalsAsset);
-        if (!decimalsQuote.isBetween(Assembly.MIN_DECIMALS, Assembly.MAX_DECIMALS))
-            revert InvalidDecimals(decimalsQuote);
+        if (!decimalsAsset.isBetween(MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsAsset);
+        if (!decimalsQuote.isBetween(MIN_DECIMALS, MAX_DECIMALS)) revert InvalidDecimals(decimalsQuote);
 
         pairId = ++getPairNonce;
 
@@ -624,7 +622,7 @@ abstract contract PortfolioVirtual is Objective {
      * @param data Custom encoded Enigma data. First byte must be an Enigma instruction.
      */
     function _process(bytes calldata data) internal {
-        (, bytes1 instruction) = Assembly.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
+        (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == Enigma.ALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeAllocate(data);

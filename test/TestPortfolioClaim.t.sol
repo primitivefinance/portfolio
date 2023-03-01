@@ -26,7 +26,7 @@ contract TestPortfolioClaim is Setup {
     {
         PortfolioPosition memory pos = ghost().position(actor());
         PortfolioPool memory pool = ghost().pool();
-        uint128 tokensOwed = Assembly
+        uint128 tokensOwed = AssemblyLib
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity)
             .safeCastTo128();
@@ -53,7 +53,7 @@ contract TestPortfolioClaim is Setup {
     {
         PortfolioPosition memory pos = ghost().position(actor());
         PortfolioPool memory pool = ghost().pool();
-        uint128 tokensOwed = Assembly
+        uint128 tokensOwed = AssemblyLib
             .computeCheckpointDistance(pool.feeGrowthGlobalAsset, pos.feeGrowthAssetLast)
             .mulWadDown(pool.liquidity)
             .safeCastTo128();
@@ -76,7 +76,7 @@ contract TestPortfolioClaim is Setup {
 
         PortfolioPosition memory pos = ghost().position(actor());
         PortfolioPool memory pool = ghost().pool();
-        uint128 tokensOwed = Assembly
+        uint128 tokensOwed = AssemblyLib
             .computeCheckpointDistance(pool.feeGrowthGlobalQuote, pos.feeGrowthQuoteLast)
             .mulWadDown(pool.liquidity)
             .safeCastTo128();

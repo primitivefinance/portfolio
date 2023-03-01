@@ -10,12 +10,11 @@ import "./libraries/RMM01Lib.sol";
  */
 contract RMM01Portfolio is PortfolioVirtual {
     using RMM01Lib for PortfolioPool;
+    using AssemblyLib for int256;
+    using AssemblyLib for uint256;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
-    using {Assembly.isBetween} for uint8;
-    using {Assembly.scaleFromWadDownSigned} for int256;
-    using {Assembly.scaleFromWadDown, Assembly.scaleFromWadUp, Assembly.scaleToWad} for uint256;
 
     /**
      * @dev

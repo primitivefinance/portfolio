@@ -12,7 +12,7 @@ import "solmate/test/utils/mocks/MockERC20.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import {GhostState} from "../../HelperGhostLib.sol";
 import {ActorsState} from "../../HelperActorsLib.sol";
-import {PortfolioPool, PortfolioPosition, PortfolioPair, PortfolioCurve, Enigma, Assembly, MIN_VOLATILITY, MAX_VOLATILITY, MIN_FEE, MAX_FEE, MIN_DURATION, MAX_DURATION} from "contracts/PortfolioLib.sol";
+import {PortfolioPool, PortfolioPosition, PortfolioPair, PortfolioCurve, Enigma, AssemblyLib, MIN_VOLATILITY, MAX_VOLATILITY, MIN_FEE, MAX_FEE, MIN_DURATION, MAX_DURATION} from "contracts/PortfolioLib.sol";
 
 interface Context {
     // Manipulate ghost environment

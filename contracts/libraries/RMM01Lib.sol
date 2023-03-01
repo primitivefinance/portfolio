@@ -2,7 +2,7 @@
 pragma solidity 0.8.13;
 
 import "solstat/Invariant.sol";
-import {PortfolioPool, Iteration, SwapInputTooSmall, Assembly} from "../PortfolioLib.sol";
+import {PortfolioPool, Iteration, SwapInputTooSmall, AssemblyLib} from "../PortfolioLib.sol";
 
 uint256 constant PERCENTAGE = 10_000;
 uint256 constant SQRT_WAD = 1e9;
@@ -15,9 +15,9 @@ uint256 constant YEAR = 31556953 seconds;
  * @notice  Implements math for RMM-01 objective.
  */
 library RMM01Lib {
+    using AssemblyLib for uint256;
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
-    using {Assembly.scaleFromWadDown, Assembly.scaleToWad, Assembly.scaleFromWadUp} for uint256;
 
     error UndefinedPrice();
     error OverflowWad(int256 wad);
