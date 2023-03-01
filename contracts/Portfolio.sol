@@ -338,9 +338,10 @@ abstract contract PortfolioVirtual is Objective {
 
             // Keeps WAD values
             iteration = Iteration({
+                prevInvariant: invariant,
+                nextInvariant: 0,
                 virtualX: 0,
                 virtualY: 0,
-                invariant: invariant,
                 feeAmount: 0,
                 remainder: remainder,
                 liquidity: pool.liquidity,
@@ -400,13 +401,13 @@ abstract contract PortfolioVirtual is Objective {
 
             (validInvariant, nextInvariantWad) = checkInvariant(
                 args.poolId,
-                iteration.invariant,
+                iteration.prevInvariant,
                 iteration.virtualX,
                 iteration.virtualY
             );
 
-            if (!validInvariant) revert InvalidInvariant(iteration.invariant, nextInvariantWad);
-            iteration.invariant = int128(nextInvariantWad);
+            if (!validInvariant) revert InvalidInvariant(iteration.prevInvariant, nextInvariantWad);
+            iteration.nextInvariant = int128(nextInvariantWad);
         }
 
         {
@@ -420,7 +421,7 @@ abstract contract PortfolioVirtual is Objective {
                 outputDec = pool.pair.decimalsAsset;
             }
 
-            if (iteration.invariant > 0) {
+            if (iteration.nextInvariant > 0) {
                 _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(iteration.feeAmount, iteration.liquidity);
             }
 
@@ -455,7 +456,7 @@ abstract contract PortfolioVirtual is Objective {
                 _state.tokenOutput,
                 iteration.output,
                 iteration.feeAmount,
-                iteration.invariant
+                iteration.nextInvariant
             );
         }
 

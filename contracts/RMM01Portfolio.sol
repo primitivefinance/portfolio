@@ -42,13 +42,12 @@ contract RMM01Portfolio is PortfolioVirtual {
 
     /// @inheritdoc Objective
     function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
-        int256 liveInvariantWad = 0; // todo: add prev invariant to iteration?
         // Apply priority invariant growth.
         if (msg.sender == pools[poolId].controller) {
-            int256 delta = iteration.invariant - liveInvariantWad;
+            int256 delta = iteration.nextInvariant - iteration.prevInvariant;
             uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-            if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity); // todo: don't
-            // like this setting internal _state...
+            // todo: I don't like this setting internal _state...
+            if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity);
         }
 
         return true;

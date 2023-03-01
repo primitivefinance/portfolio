@@ -89,7 +89,7 @@ library RMM01Lib {
         uint256 fee = self.controller != address(0) ? self.params.priorityFee : self.params.fee;
 
         Iteration memory data;
-        (data.invariant, tau) = getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
+        (data.prevInvariant, tau) = getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
         (data.virtualX, data.virtualY) = self.getAmountsWad();
         data.remainder = amountIn.scaleToWad(sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote);
         data.liquidity = self.liquidity;
@@ -127,7 +127,7 @@ library RMM01Lib {
                 stk: self.params.maxPrice,
                 vol: volatilityWad,
                 tau: tau,
-                inv: data.invariant
+                inv: data.prevInvariant
             });
         else
             nextDep = Invariant.getX({
@@ -135,7 +135,7 @@ library RMM01Lib {
                 stk: self.params.maxPrice,
                 vol: volatilityWad,
                 tau: tau,
-                inv: data.invariant
+                inv: data.prevInvariant
             });
     }
 

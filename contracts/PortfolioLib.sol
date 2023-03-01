@@ -142,7 +142,8 @@ struct Order {
 }
 
 struct Iteration {
-    int256 invariant;
+    int256 prevInvariant;
+    int256 nextInvariant;
     uint256 virtualX;
     uint256 virtualY;
     uint256 remainder;
