@@ -4,11 +4,11 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioDeposit is Setup {
-    function test_deposit_increases_user_weth_balance() public {
+    function test_deposit_increases_user_weth_balance() public useActor {
         uint amount = 10 ether;
-        uint prev = ghost().balance(address(this), subject().WETH());
+        uint prev = ghost().balance(actor(), subject().WETH());
         subject().deposit{value: amount}();
-        uint post = ghost().balance(address(this), subject().WETH());
+        uint post = ghost().balance(actor(), subject().WETH());
         assertEq(post, prev + amount, "missing-weth-deposit");
     }
 
