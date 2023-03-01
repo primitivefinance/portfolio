@@ -37,11 +37,13 @@ contract RMM01PortfolioInvariants is Setup {
         _hyper = new HandlerHyper();
 
         {
-            bytes4[] memory selectors = new bytes4[](4);
+            bytes4[] memory selectors = new bytes4[](6);
             selectors[0] = HandlerHyper.deposit.selector;
             selectors[1] = HandlerHyper.fund_asset.selector;
             selectors[2] = HandlerHyper.fund_quote.selector;
             selectors[3] = HandlerHyper.create_pool.selector;
+            selectors[4] = HandlerHyper.allocate.selector;
+            selectors[5] = HandlerHyper.unallocate.selector;
             targetSelector(FuzzSelector({addr: address(_hyper), selectors: selectors}));
             targetContract(address(_hyper));
         }
