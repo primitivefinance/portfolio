@@ -15,7 +15,7 @@ pragma solidity 0.8.13;
   Multicalls will pad all calls to a full bytes32.
   This means two calls are at least 64 bytes.
   This alternative multicall can process over 10 calls in the same 64 bytes.
-  The smallest bytes provided by a call is for allocate and unallocate, at 11 bytes.
+  The smallest bytes provided by a call is for allocate and deallocate, at 11 bytes.
 
   Multicalls also process transactions sequentially.
   State cannot be carried over transiently between transactions.
@@ -39,7 +39,7 @@ uint8 constant JUMP_PROCESS_START_POINTER = 2;
 bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
-bytes1 constant UNALLOCATE = 0x03;
+bytes1 constant DEALLOCATE = 0x03;
 bytes1 constant CLAIM = 0x04;
 bytes1 constant SWAP = 0x05;
 bytes1 constant UNSET06 = 0x06;
@@ -213,11 +213,11 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 
     deltaLiquidity = Assembly.toAmount(data[9:]);
 }
 
-function encodeUnallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(Assembly.pack(bytes1(useMax), UNALLOCATE), poolId, power, amount);
+function encodeDeallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
+    data = abi.encodePacked(Assembly.pack(bytes1(useMax), DEALLOCATE), poolId, power, amount);
 }
 
-function decodeUnallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));

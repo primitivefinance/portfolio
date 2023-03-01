@@ -94,7 +94,7 @@ contract TestPortfolioClaim is Setup {
         usePairTokens(10 ether) // mint and approve tokens to default actor()
         allocateSome(1 ether) // allocate some liquidity from actor()
         swapSomeGetOut(0.1 ether, -int(10), true) // Swapping a little less than optimal amount to trigger positive invariant growth!
-        unallocateSome(1 ether) // remove all liquidity from actor
+        deallocateSome(1 ether) // remove all liquidity from actor
         isArmed
     {
         // Draw all the tokens from our account.
@@ -187,7 +187,7 @@ contract TestPortfolioClaim is Setup {
         subject().multiprocess(EnigmaLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(0)));
 
         // withdraw all the liquidity after the swap, to sync fees.
-        subject().multiprocess(EnigmaLib.encodeUnallocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
+        subject().multiprocess(EnigmaLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
 
         // withdraw all internal balances
         uint256 bal0 = ghost().balance(actor(), ghost().asset().to_addr());

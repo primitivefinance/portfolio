@@ -11,7 +11,7 @@ interface IPortfolioEvents {
 
     /**
      * @notice Assigns `amount` of `token` to `account`.
-     * @dev Emitted on `unallocate`, `swap`, or `fund`.
+     * @dev Emitted on `deallocate`, `swap`, or `fund`.
      * @param amount Quantity of token in token's native decimal units.
      */
     event IncreaseUserBalance(address indexed account, address indexed token, uint256 amount);
@@ -32,7 +32,7 @@ interface IPortfolioEvents {
 
     /**
      * @notice Unassigns `amount` of `token` from Portfolio's internally tracked balance.
-     * @dev Emitted on `swap`, `unallocate`, and when paying with an internal balance.
+     * @dev Emitted on `swap`, `deallocate`, and when paying with an internal balance.
      * @param amount Quantity of token in token's native decimal units.
      */
     event DecreaseReserveBalance(address indexed token, uint256 amount);
@@ -72,7 +72,7 @@ interface IPortfolioEvents {
      * @dev Unassigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId.
      * Units are in the respective tokens' native decimals. Units for `deltaLiquidity` are WAD.
      */
-    event Unallocate(
+    event Deallocate(
         uint64 indexed poolId,
         address indexed asset,
         address indexed quote,
@@ -279,7 +279,7 @@ interface IPortfolioGetters {
 
 interface IPortfolioActions {
     /**
-     * @notice Entrypoint to allocate, unallocate, or swap in Portfolio.
+     * @notice Entrypoint to allocate, deallocate, or swap in Portfolio.
      * @dev Multiprocess expects custom encoded data that can be built off-chain
      * or on-chain using the `EnigmaLib` library. This function is similar to
      * multicall, which sends calldata to a target by looping over an array of

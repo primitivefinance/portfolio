@@ -462,7 +462,7 @@ contract Swaps is EchidnaStateHandling {
         // price always changes in a swap
         assert(postPrice != prevPrice);
 
-        // liquidity only changes in allocate and unallocate
+        // liquidity only changes in allocate and deallocate
         assert(prevLiquidity == postLiquidity);
 
         // fee growth checkpoints are always changing
@@ -503,7 +503,7 @@ contract Swaps is EchidnaStateHandling {
 
             assert(postPoolLastPrice != prePoolLastPrice);
 
-            // liquidity only changes in allocate and unallocate
+            // liquidity only changes in allocate and deallocate
             assert(prePool.liquidity == postPool.liquidity);
 
             // fee growth checkpoints are always changing

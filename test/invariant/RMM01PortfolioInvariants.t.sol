@@ -43,7 +43,7 @@ contract RMM01PortfolioInvariants is Setup {
             selectors[2] = HandlerPortfolio.fund_quote.selector;
             selectors[3] = HandlerPortfolio.create_pool.selector;
             selectors[4] = HandlerPortfolio.allocate.selector;
-            selectors[5] = HandlerPortfolio.unallocate.selector;
+            selectors[5] = HandlerPortfolio.deallocate.selector;
             targetSelector(FuzzSelector({addr: address(_Portfolio), selectors: selectors}));
             targetContract(address(_Portfolio));
         }

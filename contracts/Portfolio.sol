@@ -248,7 +248,7 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /** @dev Reduces virtual reserves and liquidity. Credits `msg.sender`. */
-    function _unallocate(
+    function _deallocate(
         bool useMax,
         uint64 poolId,
         uint128 deltaLiquidity
@@ -274,7 +274,7 @@ abstract contract PortfolioVirtual is Objective {
 
         _changeLiquidity(args);
 
-        emit Unallocate(poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity);
+        emit Deallocate(poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity);
     }
 
     function _changeLiquidity(
@@ -292,7 +292,7 @@ abstract contract PortfolioVirtual is Objective {
         );
 
         bool canUpdate = checkPosition(args.poolId, args.owner, args.deltaLiquidity);
-        if (!canUpdate) revert JitLiquidity(0x16); // todo: fix, hardcoded to pass test `testUnallocatePositionJitPolicyReverts`
+        if (!canUpdate) revert JitLiquidity(0x16); // todo: fix, hardcoded to pass test `testDeallocatePositionJitPolicyReverts`
 
         position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
@@ -629,9 +629,9 @@ abstract contract PortfolioVirtual is Objective {
         if (instruction == Enigma.ALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeAllocate(data);
             _allocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (instruction == Enigma.UNALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeUnallocate(data);
-            _unallocate(useMax == 1, poolId, deltaLiquidity);
+        } else if (instruction == Enigma.DEALLOCATE) {
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = Enigma.decodeDeallocate(data);
+            _deallocate(useMax == 1, poolId, deltaLiquidity);
         } else if (instruction == Enigma.SWAP) {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.output, args.direction) = Enigma.decodeSwap(data);

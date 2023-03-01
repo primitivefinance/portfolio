@@ -162,7 +162,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The `pools` `liquidity` for `poolId` always increases by `deltaLiquidity`.
   - The `pools` `liquidity` for `poolId` never decreases.
   - The Caller's `positions` `freeLiquidity` for `poolId` always increased by `deltaLiquidity`.
-  - Calling `unallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
+  - Calling `deallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same Caller allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
   - Portfolio's `reserves` value for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
   - The `balanceOf` Portfolio for the pool's tokens increased by respective amounts computed with `getAmounts`, if the Caller did not have enough tokens in their `balances`.
@@ -170,7 +170,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - The `Allocate` event is emitted.
   - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
-#### Unallocate
+#### Deallocate
 
 - Preconditions:
   - The Caller's `positions` `freeLiquidity` for `poolId` is greater than zero.
@@ -186,7 +186,7 @@ System invariants are tested using Foundry's invariant testing. There is no docu
   - Portfolio's `reserves` value for the pool's tokens stays the same.
   - The `balanceOf` Portfolio for the pool's tokens stays the same.
   - The `DecreasePosition` event is emitted.
-  - The `Unallocate` event is emitted.
+  - The `Deallocate` event is emitted.
   - The `EarnFees` event was emitted if the `feeGrowth{}` values changed.
 
 #### Swap

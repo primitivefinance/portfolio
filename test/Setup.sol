@@ -242,8 +242,8 @@ contract Setup is Test {
         _;
     }
 
-    modifier unallocateSome(uint128 amt) {
-        subject().multiprocess(EnigmaLib.encodeUnallocate(uint8(0), ghost().poolId, 0x0, amt));
+    modifier deallocateSome(uint128 amt) {
+        subject().multiprocess(EnigmaLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, amt));
         _;
     }
 

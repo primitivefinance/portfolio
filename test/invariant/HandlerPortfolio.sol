@@ -13,7 +13,7 @@ contract HandlerPortfolio is HandlerBase {
         console.log("fund-quote", calls["fund-quote"]);
         console.log("create", calls["create"]);
         console.log("allocate", calls["allocate"]);
-        console.log("unallocate", calls["unallocate"]);
+        console.log("deallocate", calls["deallocate"]);
     }
 
     function deposit(uint amount, uint seed) external countCall("deposit") createActor useActor(seed) usePool(seed) {
@@ -346,16 +346,16 @@ contract HandlerPortfolio is HandlerBase {
 
     event FinishedCall(string);
 
-    function unallocate(
+    function deallocate(
         uint256 deltaLiquidity,
         uint256 seed
-    ) external countCall("unallocate") createActor useActor(seed) usePool(seed) {
+    ) external countCall("deallocate") createActor useActor(seed) usePool(seed) {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
-        _assertUnallocate(deltaLiquidity);
+        _assertDeallocate(deltaLiquidity);
     }
 
-    function _assertUnallocate(uint256 deltaLiquidity) internal {
+    function _assertDeallocate(uint256 deltaLiquidity) internal {
         // TODO: Add use max flag support.
 
         // Get some liquidity.
@@ -368,7 +368,7 @@ contract HandlerPortfolio is HandlerBase {
             assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
             // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
 
-            // Unallocate
+            // Deallocate
             uint256 timestamp = block.timestamp + 4; // todo: fix default jit policy
             vm.warp(timestamp);
 
@@ -379,7 +379,7 @@ contract HandlerPortfolio is HandlerBase {
             prev = fetchAccountingState();
 
             ctx.subject().multiprocess(
-                Enigma.encodeUnallocate(uint8(0), ctx.ghost().poolId, 0x0, deltaLiquidity.safeCastTo128())
+                Enigma.encodeDeallocate(uint8(0), ctx.ghost().poolId, 0x0, deltaLiquidity.safeCastTo128())
             );
 
             AccountingState memory end = fetchAccountingState();
@@ -400,7 +400,7 @@ contract HandlerPortfolio is HandlerBase {
                 "caller-position-liquidity"
             );
         }
-        emit FinishedCall("Unallocate");
+        emit FinishedCall("Deallocate");
 
         checkVirtualInvariant();
     }
