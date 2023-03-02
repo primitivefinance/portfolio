@@ -72,4 +72,13 @@ contract TestFVMLib is Test {
         assertEq(fee0, fee0_);
         assertEq(fee1, fee1_);
     }
+
+    function test_decodeClaim() public {
+        bytes memory data = hex"1004002a0806052b03147bd7";
+        (uint64 poolId, uint128 fee0, uint128 fee1) = target.doDecodeClaim(data);
+
+        assertEq(poolId, 42);
+        assertEq(fee0, 1323 * 10 ** 6);
+        assertEq(fee1, 1342423 * 10 ** 3);
+    }
 }
