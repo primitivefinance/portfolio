@@ -63,9 +63,6 @@ contract TestFVMLib is Test {
     }
 
     function test_decodeSwap() public {
-        // 0x15000000000000002a0600000000000000000000000000000008120000000000000000000000000000000401
-        // 0x0500042a0709081204
-
         bytes memory data = hex"0500042a0709081204";
 
         (
