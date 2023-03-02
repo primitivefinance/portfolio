@@ -57,8 +57,7 @@ forge test --match-contract TestRMM01
 
 ## Resources
 
-- [Documentation](https://docs.primitive.xyz)
-- [Portfolio Yellow Paper](https://yellow.primitive.xyz)
+- [Portfolio Yellow Paper](https://www.primitive.xyz/yellow)
 - [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
 - [Original codebase](https://github.com/primitivefinance/rmm-core)
 - [solstat](https://github.com/primitivefinance/solstat)
