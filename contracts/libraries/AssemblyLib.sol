@@ -118,6 +118,14 @@ library AssemblyLib {
         }
     }
 
+    function toBytes8(bytes memory raw) internal pure returns (bytes8 data) {
+        assembly {
+            data := mload(add(raw, 32))
+            let shift := mul(sub(8, mload(raw)), 8)
+            data := shr(shift, data)
+        }
+    }
+
     /**
      * @dev Safely casts an unsigned 128-bit integer into a signed 128-bit integer.
      * Reverts on overflow.
