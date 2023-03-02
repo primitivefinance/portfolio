@@ -235,24 +235,29 @@ function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint6
 
 /**
  * @dev Encodes a swap operation
- *      +-------------------------------------------------------------------------------+
- *      | Description | SWAP | poolId | power0 | amount0 | power1 | amount1 | sellAsset |
- *      +-------------+------+--------+--------+---------+--------+---------+-----------+
- *      | Size (byte) |   1  |    8   |    1   |    16   |    1   |    16   |      1    |
- *      +-------------+------+--------+--------+---------+--------+---------+-----------+
- *      | Index       |   0  |  1 - 9 |    9   | 10 - 26 |    26  | 27 - 43 |     43    |
- *      +-------------------------------------------------------------------------------+
+ *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
 function encodeSwap(
     uint8 useMax,
     uint64 poolId,
-    uint8 power0,
     uint128 amount0,
-    uint8 power1,
     uint128 amount1,
     uint8 sellAsset
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), SWAP), poolId, power0, amount0, power1, amount1, sellAsset);
+    (uint8 power0, uint128 base0) = AssemblyLib.fromAmount(amount0);
+    (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(amount1);
+
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), SWAP),
+        sellAsset,
+        uint8(11), // pointer to pointer1
+        poolId,
+        uint8(29),
+        power0,
+        base0,
+        power1,
+        base1
+    );
 }
 
 function decodeSwap(bytes calldata data)
@@ -260,8 +265,10 @@ function decodeSwap(bytes calldata data)
     returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
 {
     useMax = uint8(data[0] >> 4);
-    poolId = uint64(bytes8(data[1:9]));
-    input = AssemblyLib.toAmount(data[9:26]);
-    output = AssemblyLib.toAmount(data[26:43]);
-    sellAsset = uint8(data[data.length - 1]);
+    sellAsset = uint8(data[1]);
+    uint8 pointer0 = uint8(data[2]);
+    poolId = uint64(AssemblyLib.toBytes8(data[3:pointer0]));
+    uint8 pointer1 = uint8(data[pointer0]);
+    input = AssemblyLib.toAmount(data[pointer0 + 1:pointer1]);
+    output = AssemblyLib.toAmount(data[pointer1:data.length]);
 }
