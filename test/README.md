@@ -25,7 +25,7 @@ Portfolio has multiple layers of possible states the system can be in. There are
 
 ## Installation
 
-For an installation guide, check out the [README](./README.md)
+For an installation guide, check out the [README](../README.md) in the root directory.
 
 ---
 

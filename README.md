@@ -4,10 +4,6 @@
 
 On-chain portfolio management. Optimized for managing risk and liquidity.
 
-## Documentation
-
-[Documentation](https://docs.primitive.xyz)
-
 ## System Invariants
 
 The system is designed around a single invariant:
@@ -20,6 +16,14 @@ Exposed via: `Portfolio.getNetBalance(token)`
 
 For more invariants, [read this](./test/README.md).
 
+# Portfolio Manual
+
+## Clone
+
+```
+git clone https://github.com/primitivefinance/portfolio.git
+```
+
 ## Installation
 
 Required:
@@ -29,24 +33,31 @@ Required:
 
 ### 1. Install foundry. [source](https://github.com/foundry-rs/foundry)
 
-`curl -L https://foundry.paradigm.xyz | bash`
+```
+curl -L https://foundry.paradigm.xyz | bash
+```
 
 ### 2. Restart terminal or reload `PATH`, then run:
 
-`foundryup`
+```
+foundryup
+```
 
 ### 3. Install deps
 
-`forge install`
+```
+forge install
+```
 
 ### 4. Test
 
-`forge test`
+```
+forge test --match-contract TestRMM01
+```
 
 ## Resources
 
-- [Documentation](https://docs.primitive.xyz)
-- [Portfolio Yellow Paper](https://yellow.primitive.xyz)
+- [Portfolio Yellow Paper](https://www.primitive.xyz/yellow)
 - [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
 - [Original codebase](https://github.com/primitivefinance/rmm-core)
 - [solstat](https://github.com/primitivefinance/solstat)
