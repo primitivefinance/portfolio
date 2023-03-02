@@ -52,7 +52,7 @@ forge install
 ### 4. Test
 
 ```
-forge test
+forge test --match-contract TestRMM01
 ```
 
 ## Resources
