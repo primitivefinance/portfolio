@@ -155,7 +155,7 @@ contract TestPortfolioClaim is Setup {
         uint128 amountIn = 1500;
         uint128 amountOut = (subject().getAmountOut(ghost().poolId, true, amountIn) - 10).safeCastTo128(); // Subtract
             // small amount to get positive invariant growth (not an optimal trade).
-        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(1))); // trade
+        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, amountIn, amountOut, uint8(1))); // trade
             // in 1500 * 1% fee = 15 / 12_000 = 0.00125 fee growth per liquidity
 
         // save the total fee growth for the asset per liquidity.
@@ -185,7 +185,7 @@ contract TestPortfolioClaim is Setup {
         uint128 amountIn = 10_000 wei; // 1% fees will generate 100 wei of asset fee growth
         uint128 amountOut = (subject().getAmountOut(ghost().poolId, true, amountIn) - 10).safeCastTo128(); // Subtract
             // small amount to get positive invariant growth (not an optimal trade).
-        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(1)));
+        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, amountIn, amountOut, uint8(1)));
 
         // withdraw all the liquidity after the swap, to sync fees.
         subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
