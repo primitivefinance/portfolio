@@ -57,7 +57,7 @@ forge test --match-contract TestRMM01
 
 ## Resources
 
-- [Portfolio Yellow Paper](https://www.primitive.xyz/yellow)
+- [Portfolio Yellow Paper](https://www.primitive.xyz/papers/yellow.pdf)
 - [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
 - [Original codebase](https://github.com/primitivefinance/rmm-core)
 - [solstat](https://github.com/primitivefinance/solstat)
@@ -67,8 +67,8 @@ forge test --match-contract TestRMM01
 
 ## Audits
 
-| Security Firm | Review Time |
-| ------------- | ----------- |
-| ChainSecurity | 8-weeks     |
-| Trail of Bits | 8-weeks     |
-| Spearbit      | 5-weeks     |
+| Security Firm | Review Time | Status    |
+| ------------- | ----------- | --------- |
+| ChainSecurity | 8-weeks     | Completed |
+| Trail of Bits | 8-weeks     | Completed |
+| Spearbit      | 5-weeks     | Scheduled |
