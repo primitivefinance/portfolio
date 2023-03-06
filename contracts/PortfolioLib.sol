@@ -377,8 +377,9 @@ function computeTau(
     uint256 timestamp
 ) pure returns (uint256) {
     uint256 end = self.params.maturity();
-    if (timestamp > end) return 0;
-    return end - timestamp;
+    unchecked {
+        return AssemblyLib.max(timestamp, end) - timestamp;
+    } 
 }
 
 function maturity(

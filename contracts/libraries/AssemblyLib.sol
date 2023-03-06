@@ -45,6 +45,16 @@ library AssemblyLib {
     }
 
     /**
+     * @dev Returns the larger of two numbers.
+     */
+    function max(uint256 a, uint256 b) internal pure returns (uint256 result) {
+        // Equivalent to: `result = (a < b) ? b : a`
+        assembly {
+            result := sub(a, mul(sub(a, b), lt(a, b)))
+        }
+    }
+
+    /**
      * @dev Adds a signed `delta` to an unsigned `input` by using the sign-agnostic 256-bit type used in yul.
      * Checks for overflow manually and reverts with `InvalidLiquidity()`, because this function is used to
      * change liquidity in a position or pool.
