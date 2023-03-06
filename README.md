@@ -72,3 +72,19 @@ forge test --match-contract TestRMM01
 | ChainSecurity | 8-weeks     | Completed |
 | Trail of Bits | 8-weeks     | Completed |
 | Spearbit      | 5-weeks     | Scheduled |
+
+
+## Contributing
+
+When making a pull request:
+- All tests pass.
+- Code coverage does not change.
+- Code follows the style guide:
+    - Follows Primitive [styling](https://github.com/primitivefinance/pso-sol) rules.
+    - Run `forge fmt`.
+    - Code is thoroughly commented with natspec where relevant.
+- If making a change to the contracts:
+    - Gas snapshots are provided and demonstrate an improvement (or an acceptable deficit given other improvements).
+    - New tests for all new features or code paths.
+- If making a modification to third-party dependencies, yarn audit passes.
+- A descriptive summary of the PR has been provided.
