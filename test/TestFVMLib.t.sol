@@ -21,6 +21,10 @@ contract FVMLibTarget is Test {
     function decodePoolId_(bytes calldata data) external pure returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) {
         return decodePoolId(data);
     }
+
+    function decodeCreatePair_(bytes calldata data) external pure returns (address tokenAsset, address tokenQuote) {
+        return decodeCreatePair(data);
+    }
 }
 
 contract TestFVMLib is Test {
@@ -89,5 +93,10 @@ contract TestFVMLib is Test {
         assertEq(fee1, 4 * 10 ** 18);
     }
 
-
+    function testFuzz_decodeCreatePair(address token0, address token1) public {
+        bytes memory data = encodeCreatePair(token0, token1);
+        (address token0_, address token1_) = target.decodeCreatePair_(data);
+        assertEq(token0, token0_);
+        assertEq(token1, token1_);
+    }
 }
