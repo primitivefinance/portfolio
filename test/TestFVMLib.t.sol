@@ -5,6 +5,18 @@ import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
 import "contracts/libraries/FVMLib.sol";
 
+struct DecodedCreatePool {
+    uint24 pairId;
+    address controller;
+    uint16 priorityFee;
+    uint16 fee;
+    uint16 vol;
+    uint16 dur;
+    uint16 jit;
+    uint128 maxPrice;
+    uint128 price;
+}
+
 contract FVMLibTarget is Test {
     function decodeSwap_(bytes calldata data)
         external
@@ -24,6 +36,30 @@ contract FVMLibTarget is Test {
 
     function decodeCreatePair_(bytes calldata data) external pure returns (address tokenAsset, address tokenQuote) {
         return decodeCreatePair(data);
+    }
+
+    function decodeCreatePool_(bytes calldata data) external pure returns (DecodedCreatePool memory pool) {
+        (
+            uint24 pairId,
+            address controller,
+            uint16 priorityFee,
+            uint16 fee,
+            uint16 vol,
+            uint16 dur,
+            uint16 jit,
+            uint128 maxPrice,
+            uint128 price
+        ) = decodeCreatePool(data);
+
+        pool.pairId = pairId;
+        pool.controller = controller;
+        pool.priorityFee = priorityFee;
+        pool.fee = fee;
+        pool.vol = vol;
+        pool.dur = dur;
+        pool.jit = jit;
+        pool.maxPrice = maxPrice;
+        pool.price = price;
     }
 }
 
@@ -104,5 +140,41 @@ contract TestFVMLib is Test {
         bytes memory data = hex"01";
         vm.expectRevert();
         target.decodeCreatePair_(data);
+    }
+
+    function testFuzz_encodeCreatePool(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 vol,
+        uint16 dur,
+        uint16 jit,
+        uint128 maxPrice,
+        uint128 price
+    ) public {
+        bytes memory data = encodeCreatePool(
+            pairId,
+            controller,
+            priorityFee,
+            fee,
+            vol,
+            dur,
+            jit,
+            maxPrice,
+            price
+        );
+
+        DecodedCreatePool memory pool = target.decodeCreatePool_(data);
+
+        assertEq(pairId, pool.pairId);
+        assertEq(controller, pool.controller);
+        assertEq(priorityFee, pool.priorityFee);
+        assertEq(fee, pool.fee);
+        assertEq(vol, pool.vol);
+        assertEq(dur, pool.dur);
+        assertEq(jit, pool.jit);
+        assertEq(maxPrice, pool.maxPrice);
+        assertEq(price, pool.price);
     }
 }
