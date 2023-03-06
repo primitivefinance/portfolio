@@ -129,6 +129,7 @@ function debit(
     paid = AssemblyLib.min(balance, owed);
     
     unchecked {
+        // Cannot underflow as `paid` is enforced to be the smaller of `balance` or `paid` 
         self.balances[owner][token] -= paid;
         remainder = owed - paid;
     }

@@ -377,6 +377,7 @@ function computeTau(
 ) pure returns (uint256) {
     uint256 end = self.params.maturity();
     unchecked {
+        // Cannot underflow as LHS is either equal to `timestamp` or greater. 
         return AssemblyLib.max(timestamp, end) - timestamp;
     }
 }
