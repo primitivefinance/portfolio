@@ -99,4 +99,10 @@ contract TestFVMLib is Test {
         assertEq(token0, token0_);
         assertEq(token1, token1_);
     }
+
+    function test_decodeCreatePair_RevertIfBadLength() public {
+        bytes memory data = hex"01";
+        vm.expectRevert();
+        target.decodeCreatePair_(data);
+    }
 }
