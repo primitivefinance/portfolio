@@ -6,17 +6,7 @@ import "forge-std/Vm.sol";
 import "contracts/libraries/FVMLib.sol";
 
 contract FVMLibTarget is Test {
-    function doEncodeSwap(
-        uint8 useMax,
-        uint64 poolId,
-        uint128 amount0,
-        uint128 amount1,
-        uint8 sellAsset
-    ) external pure returns (bytes memory) {
-        return encodeSwap(useMax, poolId, amount0, amount1, sellAsset);
-    }
-
-    function doDecodeSwap(bytes calldata data)
+    function decodeSwap_(bytes calldata data)
         external
         pure
         returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
@@ -24,12 +14,12 @@ contract FVMLibTarget is Test {
         return decodeSwap(data);
     }
 
-    function doEncodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) external pure returns (bytes memory data) {
-        return encodeClaim(poolId, fee0, fee1);
+    function decodeClaim_(bytes calldata data) external pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
+        return decodeClaim(data);
     }
 
-    function doDecodeClaim(bytes calldata data) external pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
-        return decodeClaim(data);
+    function decodePoolId_(bytes calldata data) external pure returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce) {
+        return decodePoolId(data);
     }
 }
 
@@ -43,7 +33,7 @@ contract TestFVMLib is Test {
         uint128 amount1,
         bool sellAsset
     ) public {
-        bytes memory data = target.doEncodeSwap(
+        bytes memory data = encodeSwap(
             useMax ? uint8(1) : uint8(0),
             poolId,
             amount0,
@@ -53,7 +43,7 @@ contract TestFVMLib is Test {
 
         console.logBytes(data);
 
-        (uint8 useMax_, uint64 poolId_, uint128 input_, uint128 output_, uint8 sellAsset_) = target.doDecodeSwap(data);
+        (uint8 useMax_, uint64 poolId_, uint128 input_, uint128 output_, uint8 sellAsset_) = target.decodeSwap_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_, "Wrong use max");
         assertEq(poolId, poolId_);
@@ -71,7 +61,7 @@ contract TestFVMLib is Test {
             uint128 input,
             uint128 output,
             uint8 sellAsset
-        ) = target.doDecodeSwap(data);
+        ) = target.decodeSwap_(data);
 
         assertEq(useMax, 0);
         assertEq(poolId, 42);
@@ -81,9 +71,9 @@ contract TestFVMLib is Test {
     }
 
     function testFuzz_encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) public {
-        bytes memory data = target.doEncodeClaim(poolId, fee0, fee1);
+        bytes memory data = encodeClaim(poolId, fee0, fee1);
 
-        (uint64 poolId_, uint128 fee0_, uint128 fee1_) = target.doDecodeClaim(data);
+        (uint64 poolId_, uint128 fee0_, uint128 fee1_) = target.decodeClaim_(data);
 
         assertEq(poolId, poolId_);
         assertEq(fee0, fee0_);
@@ -92,10 +82,12 @@ contract TestFVMLib is Test {
 
     function test_decodeClaim() public {
         bytes memory data = hex"10032a0609081204";
-        (uint64 poolId, uint128 fee0, uint128 fee1) = target.doDecodeClaim(data);
+        (uint64 poolId, uint128 fee0, uint128 fee1) = target.decodeClaim_(data);
 
         assertEq(poolId, 42);
         assertEq(fee0, 8000 * 10 ** 6);
         assertEq(fee1, 4 * 10 ** 18);
     }
+
+
 }
