@@ -170,6 +170,10 @@ function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 f
     fee1 = AssemblyLib.toAmount(data[pointer1:data.length]);
 }
 
+/**
+ * @dev Encodes a create pool operation.
+ *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ */
 function encodeCreatePool(
     uint24 pairId,
     address controller,
@@ -228,8 +232,19 @@ function decodeCreatePool(bytes calldata data)
     price = AssemblyLib.toAmount(data[pointer0:]);
 }
 
-function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
+/**
+ * @dev Encodes a allocate operation.
+ *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ */
+function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
+
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), ALLOCATE),
+        poolId,
+        power,
+        base
+    );
 }
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
