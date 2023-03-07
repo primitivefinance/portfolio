@@ -6,7 +6,7 @@ import "./Setup.sol";
 contract TestPortfolioDeallocate is Setup {
     function test_deallocate_max() public noJit defaultConfig useActor usePairTokens(10 ether) isArmed {
         uint128 amt = 1 ether;
-        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, amt));
+        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, amt));
 
         // Deallocating liquidity can round down.
         uint256 prev = ghost().position(address(this)).freeLiquidity;

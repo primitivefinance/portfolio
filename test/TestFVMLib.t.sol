@@ -61,6 +61,10 @@ contract FVMLibTarget is Test {
         pool.maxPrice = maxPrice;
         pool.price = price;
     }
+
+    function decodeAllocate_(bytes calldata data) external pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+        return decodeAllocate(data);
+    }
 }
 
 contract TestFVMLib is Test {
@@ -176,5 +180,23 @@ contract TestFVMLib is Test {
         assertEq(jit, pool.jit);
         assertEq(maxPrice, pool.maxPrice);
         assertEq(price, pool.price);
+    }
+
+    function testFuzz_encodeAllocate(
+        bool useMax,
+        uint64 poolId,
+        uint128 deltaLiquidity
+    ) public {
+        bytes memory data = encodeAllocate(
+            useMax ? uint8(1) : uint8(0),
+            poolId,
+            deltaLiquidity
+        );
+
+        (uint8 useMax_, uint64 poolId_, uint128 deltaLiquidity_) = target.decodeAllocate_(data);
+
+        assertEq(useMax ? uint8(1) : uint8(0), useMax_);
+        assertEq(poolId, poolId_);
+        assertEq(deltaLiquidity, deltaLiquidity_);
     }
 }
