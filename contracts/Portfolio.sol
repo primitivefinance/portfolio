@@ -330,24 +330,9 @@ abstract contract PortfolioVirtual is Objective {
         _state.sell = args.sellAsset == 1; // 1: true, 0: false
         _state.fee = msg.sender == pool.controller ? pool.params.priorityFee : uint256(pool.params.fee);
 
-        /*
         _state.feeGrowthGlobal = _state.sell ? pool.feeGrowthGlobalAsset : pool.feeGrowthGlobalQuote;
         _state.sellAssetput = _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote;
         _state.tokenOutput = _state.sell ? pool.pair.tokenQuote : pool.pair.tokenAsset;
-        */
-
-// | RMM01Portfolio        | 31.106    | -6.53       |
-// | RMM02Portfolio        | 27.096    | -2.52       |
-
-        if (_state.sell) {
-            _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
-            _state.sellAssetput = pool.pair.tokenAsset;
-            _state.tokenOutput = pool.pair.tokenQuote;
-        } else {
-            _state.feeGrowthGlobal = pool.feeGrowthGlobalQuote;
-            _state.sellAssetput = pool.pair.tokenQuote;
-            _state.tokenOutput = pool.pair.tokenAsset;
-        }
 
         Iteration memory iteration;
         {
