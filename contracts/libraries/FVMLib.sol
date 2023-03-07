@@ -238,13 +238,7 @@ function decodeCreatePool(bytes calldata data)
  */
 function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
-
-    data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), ALLOCATE),
-        poolId,
-        power,
-        base
-    );
+    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base);
 }
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
@@ -255,15 +249,17 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 
     deltaLiquidity = AssemblyLib.toAmount(data[9:]);
 }
 
-function encodeDeallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, amount);
+
+function encodeDeallocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
+    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base);
 }
 
 function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = uint128(AssemblyLib.toAmount(data[9:]));
+    deltaLiquidity = AssemblyLib.toAmount(data[9:]);
 }
 
 /**
