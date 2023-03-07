@@ -24,4 +24,11 @@ contract TestAssemblyLib is Test {
             assertFalse(valid);
         }
     }
+
+    function testFuzz_addSignedDelta(uint128 input, int128 delta) public {
+        assertEq(
+            AssemblyLib.addSignedDelta(input, delta),
+            delta < 0 ? uint128(-delta) : uint128(delta)
+        );
+    }
 }
