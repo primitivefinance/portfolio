@@ -31,4 +31,13 @@ contract TestAssemblyLib is Test {
             delta < 0 ? uint128(-delta) : uint128(delta)
         );
     }
+
+    function testFuzz_separate(bytes1 a, bytes1 b) public {
+        vm.assume(a <= bytes1(uint8(15)));
+        vm.assume(b <= bytes1(uint8(15)));
+        bytes1 data = AssemblyLib.pack(a, b);
+        (bytes1 a_, bytes1 b_) = AssemblyLib.separate(data);
+        assertEq(a, a_);
+        assertEq(b, b_);
+    }
 }
