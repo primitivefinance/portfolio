@@ -65,6 +65,10 @@ contract FVMLibTarget is Test {
     function decodeAllocate_(bytes calldata data) external pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
         return decodeAllocate(data);
     }
+
+    function decodeDeallocate_(bytes calldata data) external pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+        return decodeDeallocate(data);
+    }
 }
 
 contract TestFVMLib is Test {
@@ -194,6 +198,24 @@ contract TestFVMLib is Test {
         );
 
         (uint8 useMax_, uint64 poolId_, uint128 deltaLiquidity_) = target.decodeAllocate_(data);
+
+        assertEq(useMax ? uint8(1) : uint8(0), useMax_);
+        assertEq(poolId, poolId_);
+        assertEq(deltaLiquidity, deltaLiquidity_);
+    }
+
+    function testFuzz_encodeDeallocate(
+        bool useMax,
+        uint64 poolId,
+        uint128 deltaLiquidity
+    ) public {
+        bytes memory data = encodeDeallocate(
+            useMax ? uint8(1) : uint8(0),
+            poolId,
+            deltaLiquidity
+        );
+
+        (uint8 useMax_, uint64 poolId_, uint128 deltaLiquidity_) = target.decodeDeallocate_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_);
         assertEq(poolId, poolId_);
