@@ -137,28 +137,43 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
 }
 
 /**
- * @dev Encodes a claim operation
- *      +--------------------------------------------------------------------+
- *      | Description | CLAIM | poolId | power0 | amount0 | power1 | amount1 |
- *      +--------------------------------------------------------------------+
- *      | Size (byte) |   1   |    8   |    1   |    16   |    1   |    16   |
- *      +--------------------------------------------------------------------+
- *      | Index       |   0   |  1 - 9 |    9   | 10 - 26 |   26   | 27 - 43 |
- *      +--------------------------------------------------------------------+
+ * @dev Encodes a claim operation.
+ *
+ *      FIXME: This function is not optimized! Using `encodePacked` is not ideal
+ *      because it preserves all the trailing zeros for each type.
+ *      An improved version should be made to reduce the calldata size.
  */
 function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (bytes memory data) {
     (uint8 powerFee0, uint128 baseFee0) = AssemblyLib.fromAmount(fee0);
     (uint8 powerFee1, uint128 baseFee1) = AssemblyLib.fromAmount(fee1);
 
-    return abi.encodePacked(CLAIM, poolId, powerFee0, baseFee0, powerFee1, baseFee1);
+    return abi.encodePacked(
+        CLAIM,
+        uint8(10), // pointer to pointer1
+        poolId,
+        uint8(28), // pointer to fee1
+        powerFee0,
+        baseFee0,
+        powerFee1,
+        baseFee1
+    );
 }
 
+/**
+ * @dev Decodes a claim operation
+ */
 function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
-    poolId = uint64(bytes8(data[1:9]));
-    fee0 = AssemblyLib.toAmount(data[9:26]);
-    fee1 = AssemblyLib.toAmount(data[26:43]);
+    uint8 pointer0 = uint8(bytes1(data[1]));
+    poolId = uint64(AssemblyLib.toBytes8(data[2:pointer0]));
+    uint8 pointer1 = uint8(bytes1(data[pointer0]));
+    fee0 = AssemblyLib.toAmount(data[pointer0 + 1:pointer1]);
+    fee1 = AssemblyLib.toAmount(data[pointer1:data.length]);
 }
 
+/**
+ * @dev Encodes a create pool operation.
+ *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ */
 function encodeCreatePool(
     uint24 pairId,
     address controller,
@@ -170,7 +185,24 @@ function encodeCreatePool(
     uint128 maxPrice,
     uint128 price
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
+    (uint8 power0, uint128 base0) = AssemblyLib.fromAmount(maxPrice);
+    (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(price);
+
+    data = abi.encodePacked(
+        CREATE_POOL,
+        pairId,
+        controller,
+        priorityFee,
+        fee,
+        vol,
+        dur,
+        jit,
+        uint8(52),
+        power0,
+        base0,
+        power1,
+        base1
+    );
 }
 
 function decodeCreatePool(bytes calldata data)
@@ -187,7 +219,7 @@ function decodeCreatePool(bytes calldata data)
         uint128 price
     )
 {
-    if (data.length != 66) revert InvalidBytesLength(66, data.length);
+    // if (data.length != 66) revert InvalidBytesLength(66, data.length);
     pairId = uint24(bytes3(data[1:4]));
     controller = address(bytes20(data[4:24]));
     priorityFee = uint16(bytes2(data[24:26]));
@@ -195,12 +227,18 @@ function decodeCreatePool(bytes calldata data)
     vol = uint16(bytes2(data[28:30]));
     dur = uint16(bytes2(data[30:32]));
     jit = uint16(bytes2(data[32:34]));
-    maxPrice = uint128(bytes16(data[34:50]));
-    price = uint128(bytes16(data[50:]));
+    uint8 pointer0 = uint8(bytes1(data[34]));
+    maxPrice = AssemblyLib.toAmount(data[35:pointer0]);
+    price = AssemblyLib.toAmount(data[pointer0:]);
 }
 
-function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, amount);
+/**
+ * @dev Encodes a allocate operation.
+ *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ */
+function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
+    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base);
 }
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
@@ -211,46 +249,58 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 
     deltaLiquidity = AssemblyLib.toAmount(data[9:]);
 }
 
-function encodeDeallocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, amount);
+
+function encodeDeallocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
+    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base);
 }
 
 function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = uint128(AssemblyLib.toAmount(data[9:]));
+    deltaLiquidity = AssemblyLib.toAmount(data[9:]);
 }
 
 /**
  * @dev Encodes a swap operation
- *      +-------------------------------------------------------------------------------+
- *      | Description | SWAP | poolId | power0 | amount0 | power1 | amount1 | sellAsset |
- *      +-------------+------+--------+--------+---------+--------+---------+-----------+
- *      | Size (byte) |   1  |    8   |    1   |    16   |    1   |    16   |      1    |
- *      +-------------+------+--------+--------+---------+--------+---------+-----------+
- *      | Index       |   0  |  1 - 9 |    9   | 10 - 26 |    26  | 27 - 43 |     43    |
- *      +-------------------------------------------------------------------------------+
+ *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
 function encodeSwap(
     uint8 useMax,
     uint64 poolId,
-    uint8 power0,
     uint128 amount0,
-    uint8 power1,
     uint128 amount1,
     uint8 sellAsset
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), SWAP), poolId, power0, amount0, power1, amount1, sellAsset);
+    (uint8 power0, uint128 base0) = AssemblyLib.fromAmount(amount0);
+    (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(amount1);
+
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), SWAP),
+        sellAsset,
+        uint8(11), // pointer to pointer1
+        poolId,
+        uint8(29),
+        power0,
+        base0,
+        power1,
+        base1
+    );
 }
 
+/**
+ * @dev Decodes a swap operation.
+ */
 function decodeSwap(bytes calldata data)
     pure
     returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
 {
     useMax = uint8(data[0] >> 4);
-    poolId = uint64(bytes8(data[1:9]));
-    input = AssemblyLib.toAmount(data[9:26]);
-    output = AssemblyLib.toAmount(data[26:43]);
-    sellAsset = uint8(data[data.length - 1]);
+    sellAsset = uint8(data[1]);
+    uint8 pointer0 = uint8(data[2]);
+    poolId = uint64(AssemblyLib.toBytes8(data[3:pointer0]));
+    uint8 pointer1 = uint8(data[pointer0]);
+    input = AssemblyLib.toAmount(data[pointer0 + 1:pointer1]);
+    output = AssemblyLib.toAmount(data[pointer1:data.length]);
 }

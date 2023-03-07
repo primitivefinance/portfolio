@@ -148,14 +148,14 @@ contract TestPortfolioClaim is Setup {
         ghost().quote().to_token().approve(address(subject()), 100000);
 
         // eve provides minimal liquidity to the pool
-        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, uint128(startLiquidity / 5))); // 20%
+        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, uint128(startLiquidity / 5))); // 20%
             // of pool, eve = 2000, total = 2000 + 10000
 
         // eve waits for some swaps to happen. basicSwap will sell assets and increment asset fee growth.
         uint128 amountIn = 1500;
         uint128 amountOut = (subject().getAmountOut(ghost().poolId, true, amountIn) - 10).safeCastTo128(); // Subtract
             // small amount to get positive invariant growth (not an optimal trade).
-        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(1))); // trade
+        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, amountIn, amountOut, uint8(1))); // trade
             // in 1500 * 1% fee = 15 / 12_000 = 0.00125 fee growth per liquidity
 
         // save the total fee growth for the asset per liquidity.
@@ -179,16 +179,16 @@ contract TestPortfolioClaim is Setup {
     function test_claim_succeeds() public noJit defaultConfig usePairTokens(10 ether) useActor isArmed {
         // add a tiny amount of liquidity so we can test easier
         uint128 delLiquidity = 100_000 wei; // with the pool params, asset reserves will be about 300 wei.
-        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
+        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, delLiquidity));
 
         // swap a small amount so we generate fees
         uint128 amountIn = 10_000 wei; // 1% fees will generate 100 wei of asset fee growth
         uint128 amountOut = (subject().getAmountOut(ghost().poolId, true, amountIn) - 10).safeCastTo128(); // Subtract
             // small amount to get positive invariant growth (not an optimal trade).
-        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amountIn, 0x0, amountOut, uint8(1)));
+        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, amountIn, amountOut, uint8(1)));
 
         // withdraw all the liquidity after the swap, to sync fees.
-        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
+        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, delLiquidity));
 
         // withdraw all internal balances
         uint256 bal0 = ghost().balance(actor(), ghost().asset().to_addr());

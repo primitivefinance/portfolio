@@ -360,7 +360,7 @@ contract HandlerPortfolio is HandlerBase {
             prev = fetchAccountingState();
 
             ctx.subject().multiprocess(
-                FVM.encodeDeallocate(uint8(0), ctx.ghost().poolId, 0x0, deltaLiquidity.safeCastTo128())
+                FVM.encodeDeallocate(uint8(0), ctx.ghost().poolId, deltaLiquidity.safeCastTo128())
             );
 
             AccountingState memory end = fetchAccountingState();

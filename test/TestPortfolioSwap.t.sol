@@ -19,7 +19,7 @@ contract TestPortfolioSwap is Setup {
 
         uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
         subject().multiprocess(
-            FVMLib.encodeSwap(uint8(0), ghost().poolId, 0x0, amtIn, 0x0, amtOut, uint8(sellAsset ? 1 : 0))
+            FVMLib.encodeSwap(uint8(0), ghost().poolId, amtIn, amtOut, uint8(sellAsset ? 1 : 0))
         );
         uint256 post = ghost().balance(address(this), ghost().quote().to_addr());
 
