@@ -6,6 +6,7 @@ import "./Objective.sol";
 /**
  * @title   Portfolio
  * @author  Primitive™
+ * @custom:contributor TomAFrench
  */
 abstract contract PortfolioVirtual is Objective {
     using SafeCastLib for uint256;
@@ -411,6 +412,7 @@ abstract contract PortfolioVirtual is Objective {
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
             : uint256(pool.params.fee);
+            
         if (_state.sell) {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
             _state.sellAsset = pool.pair.tokenAsset;
