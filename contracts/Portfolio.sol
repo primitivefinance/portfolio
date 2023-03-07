@@ -412,7 +412,7 @@ abstract contract PortfolioVirtual is Objective {
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
             : uint256(pool.params.fee);
-            
+
         if (_state.sell) {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
             _state.sellAsset = pool.pair.tokenAsset;
@@ -922,7 +922,10 @@ abstract contract PortfolioVirtual is Objective {
     function _getTimePassed(
         PortfolioPool memory pool
     ) internal view returns (uint256) {
-        return block.timestamp - pool.lastTimestamp;
+        unchecked {
+            // `pool.lastTimestamp` is only ever synced to `block.timestamp` and so may never exceed it.
+            return block.timestamp - pool.lastTimestamp;
+        }
     }
 
     // ===== Public View ===== //
