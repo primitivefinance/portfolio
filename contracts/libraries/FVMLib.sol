@@ -181,7 +181,24 @@ function encodeCreatePool(
     uint128 maxPrice,
     uint128 price
 ) pure returns (bytes memory data) {
-    data = abi.encodePacked(CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price);
+    (uint8 power0, uint128 base0) = AssemblyLib.fromAmount(maxPrice);
+    (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(price);
+
+    data = abi.encodePacked(
+        CREATE_POOL,
+        pairId,
+        controller,
+        priorityFee,
+        fee,
+        vol,
+        dur,
+        jit,
+        uint8(52),
+        power0,
+        base0,
+        power1,
+        base1
+    );
 }
 
 function decodeCreatePool(bytes calldata data)
@@ -198,7 +215,7 @@ function decodeCreatePool(bytes calldata data)
         uint128 price
     )
 {
-    if (data.length != 66) revert InvalidBytesLength(66, data.length);
+    // if (data.length != 66) revert InvalidBytesLength(66, data.length);
     pairId = uint24(bytes3(data[1:4]));
     controller = address(bytes20(data[4:24]));
     priorityFee = uint16(bytes2(data[24:26]));
@@ -206,8 +223,9 @@ function decodeCreatePool(bytes calldata data)
     vol = uint16(bytes2(data[28:30]));
     dur = uint16(bytes2(data[30:32]));
     jit = uint16(bytes2(data[32:34]));
-    maxPrice = uint128(bytes16(data[34:50]));
-    price = uint128(bytes16(data[50:]));
+    uint8 pointer0 = uint8(bytes1(data[34]));
+    maxPrice = AssemblyLib.toAmount(data[35:pointer0]);
+    price = AssemblyLib.toAmount(data[pointer0:]);
 }
 
 function encodeAllocate(uint8 useMax, uint64 poolId, uint8 power, uint128 amount) pure returns (bytes memory data) {
