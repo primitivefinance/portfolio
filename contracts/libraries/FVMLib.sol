@@ -289,6 +289,9 @@ function encodeSwap(
     );
 }
 
+/**
+ * @dev Decodes a swap operation.
+ */
 function decodeSwap(bytes calldata data)
     pure
     returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
