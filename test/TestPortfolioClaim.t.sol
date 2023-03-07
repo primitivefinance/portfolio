@@ -188,7 +188,7 @@ contract TestPortfolioClaim is Setup {
         subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, amountIn, amountOut, uint8(1)));
 
         // withdraw all the liquidity after the swap, to sync fees.
-        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, delLiquidity));
+        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, delLiquidity));
 
         // withdraw all internal balances
         uint256 bal0 = ghost().balance(actor(), ghost().asset().to_addr());

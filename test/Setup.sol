@@ -231,7 +231,7 @@ contract Setup is Test {
     }
 
     modifier deallocateSome(uint128 amt) {
-        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, 0x0, amt));
+        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, amt));
         _;
     }
 
