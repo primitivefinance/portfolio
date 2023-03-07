@@ -118,6 +118,10 @@ library AssemblyLib {
         }
     }
 
+    /**
+     * @dev There's no explict casting from dynamic to fixed sized bytes, this function
+     * handles it for us.
+     */
     function toBytes8(bytes memory raw) internal pure returns (bytes8 data) {
         assembly {
             data := mload(add(raw, 32))
