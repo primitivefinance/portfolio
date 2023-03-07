@@ -162,7 +162,7 @@ struct SwapState {
     bool sell;
     address sellAsset;
     address tokenOutput;
-    uint256 fee;
+    uint16 fee;
     uint256 feeGrowthGlobal;
     uint256 invariantGrowthGlobal;
 }

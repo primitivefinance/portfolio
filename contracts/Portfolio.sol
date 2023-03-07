@@ -411,8 +411,8 @@ abstract contract PortfolioVirtual is Objective {
         _state.sell = args.sellAsset == 1; // 1: true, 0: false
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
-            : uint256(pool.params.fee);
-            
+            : pool.params.fee;
+
         if (_state.sell) {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
             _state.sellAsset = pool.pair.tokenAsset;
