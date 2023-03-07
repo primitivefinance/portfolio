@@ -18,9 +18,7 @@ contract TestPortfolioSwap is Setup {
         uint128 amtOut = uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn));
 
         uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
-        subject().multiprocess(
-            FVMLib.encodeSwap(uint8(0), ghost().poolId, amtIn, amtOut, uint8(sellAsset ? 1 : 0))
-        );
+        subject().multiprocess(FVMLib.encodeSwap(uint8(0), ghost().poolId, amtIn, amtOut, uint8(sellAsset ? 1 : 0)));
         uint256 post = ghost().balance(address(this), ghost().quote().to_addr());
 
         assertTrue(post > prev, "balance-did-not-increase");

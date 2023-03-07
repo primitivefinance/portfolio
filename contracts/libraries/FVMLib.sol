@@ -189,19 +189,7 @@ function encodeCreatePool(
     (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(price);
 
     data = abi.encodePacked(
-        CREATE_POOL,
-        pairId,
-        controller,
-        priorityFee,
-        fee,
-        vol,
-        dur,
-        jit,
-        uint8(52),
-        power0,
-        base0,
-        power1,
-        base1
+        CREATE_POOL, pairId, controller, priorityFee, fee, vol, dur, jit, uint8(52), power0, base0, power1, base1
     );
 }
 
@@ -248,7 +236,6 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 
     poolId = uint64(bytes8(data[1:9]));
     deltaLiquidity = AssemblyLib.toAmount(data[9:]);
 }
-
 
 function encodeDeallocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
