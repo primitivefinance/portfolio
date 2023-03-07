@@ -33,6 +33,7 @@ using {
     computeTau
 } for PortfolioPool global;
 
+uint256 constant PERCENTAGE = 10_000;
 uint256 constant MIN_MAX_PRICE = 1;
 uint256 constant MAX_MAX_PRICE = type(uint128).max;
 uint256 constant BUFFER = 300 seconds;

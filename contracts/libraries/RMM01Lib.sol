@@ -2,9 +2,8 @@
 pragma solidity 0.8.13;
 
 import "solstat/Invariant.sol";
-import {PortfolioPool, Iteration, SwapInputTooSmall, AssemblyLib} from "../PortfolioLib.sol";
+import {PortfolioPool, Iteration, SwapInputTooSmall, AssemblyLib, PERCENTAGE} from "../PortfolioLib.sol";
 
-uint256 constant PERCENTAGE = 10_000;
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant WAD = 1 ether;
 uint256 constant YEAR = 31556953 seconds;

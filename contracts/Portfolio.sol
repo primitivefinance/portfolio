@@ -412,7 +412,7 @@ abstract contract PortfolioVirtual is Objective {
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
             : uint256(pool.params.fee);
-            
+
         if (_state.sell) {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
             _state.sellAsset = pool.pair.tokenAsset;
@@ -491,7 +491,7 @@ abstract contract PortfolioVirtual is Objective {
                         ? maxInput
                         : iteration.remainder
                 ) * _state.fee) /
-                10_000;
+                PERCENTAGE;
 
             deltaInput = iteration.remainder > maxInput
                 ? maxInput
