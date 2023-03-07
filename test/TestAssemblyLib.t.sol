@@ -13,4 +13,15 @@ contract TestAssemblyLib is Test {
             assertEq(base, 5);
         }
     }
+
+    function testFuzz_isBetween(uint256 value, uint256 lower, uint256 upper) public {
+        vm.assume(lower <= upper);
+        bool valid = AssemblyLib.isBetween(value, lower, upper);
+
+        if (lower >= value && value <= upper) {
+            assertTrue(valid);
+        } else {
+            assertFalse(valid);
+        }
+    }
 }
