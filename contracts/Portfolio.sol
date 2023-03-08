@@ -412,7 +412,7 @@ abstract contract PortfolioVirtual is Objective {
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
             : uint256(pool.params.fee);
-            
+
         if (_state.sell) {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
             _state.sellAsset = pool.pair.tokenAsset;
@@ -485,17 +485,9 @@ abstract contract PortfolioVirtual is Objective {
                 liveIndependent,
                 iteration.liquidity
             );
-            iteration.feeAmount =
-                ((
-                    iteration.remainder > maxInput
-                        ? maxInput
-                        : iteration.remainder
-                ) * _state.fee) /
-                10_000;
+            deltaInput = AssemblyLib.min(iteration.remainder, maxInput); // swaps up to the maximum input
 
-            deltaInput = iteration.remainder > maxInput
-                ? maxInput
-                : iteration.remainder; // swaps up to the maximum input
+            iteration.feeAmount = (deltaInput * _state.fee) / 10_000;
             deltaInputLessFee = deltaInput - iteration.feeAmount;
             nextIndependent =
                 liveIndependent +
