@@ -114,10 +114,9 @@ struct PortfolioPool {
     PortfolioPair pair; // Token pair data.
 }
 
-// todo: optimize slot
 struct PortfolioPosition {
     uint128 freeLiquidity;
-    uint256 lastTimestamp;
+    uint32 lastTimestamp;
     uint256 invariantGrowthLast;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
@@ -199,7 +198,7 @@ function changePositionLiquidity(
     uint256 timestamp,
     int128 liquidityDelta
 ) {
-    self.lastTimestamp = timestamp;
+    self.lastTimestamp = uint32(timestamp);
     self.freeLiquidity = AssemblyLib.addSignedDelta(
         self.freeLiquidity,
         liquidityDelta
