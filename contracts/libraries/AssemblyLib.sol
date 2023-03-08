@@ -86,13 +86,9 @@ library AssemblyLib {
      * ```
      */
     function computeCheckpoint(uint256 present, uint256 delta) internal pure returns (uint256 checkpoint) {
-        checkpoint = present;
-
-        if (delta != 0) {
-            // Overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
-            assembly {
-                checkpoint := add(present, delta)
-            }
+        // Overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+        assembly {
+            checkpoint := add(present, delta)
         }
     }
 
