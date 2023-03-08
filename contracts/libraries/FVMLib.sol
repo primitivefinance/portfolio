@@ -138,10 +138,9 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
 
 /**
  * @dev Encodes a claim operation.
- *
- *      FIXME: This function is not optimized! Using `encodePacked` is not ideal
- *      because it preserves all the trailing zeros for each type.
- *      An improved version should be made to reduce the calldata size.
+ * FIXME: This function is not optimized! Using `encodePacked` is not ideal
+ * because it preserves all the trailing zeros for each type. An improved version
+ * should be made to reduce the calldata size by removing the extra zeros.
  */
 function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (bytes memory data) {
     (uint8 powerFee0, uint128 baseFee0) = AssemblyLib.fromAmount(fee0);
@@ -172,7 +171,7 @@ function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 f
 
 /**
  * @dev Encodes a create pool operation.
- *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
 function encodeCreatePool(
     uint24 pairId,
@@ -234,7 +233,7 @@ function decodeCreatePool(bytes calldata data)
 
 /**
  * @dev Encodes a allocate operation.
- *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
 function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
@@ -249,7 +248,10 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 
     deltaLiquidity = AssemblyLib.toAmount(data[9:]);
 }
 
-
+/**
+ * @dev Encodes a deallocate operation.
+ * FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ */
 function encodeDeallocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
     data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base);
@@ -264,7 +266,7 @@ function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint6
 
 /**
  * @dev Encodes a swap operation
- *      FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
 function encodeSwap(
     uint8 useMax,
