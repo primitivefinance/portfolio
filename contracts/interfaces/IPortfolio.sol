@@ -203,7 +203,7 @@ interface IPortfolioGetters {
         view
         returns (
             uint128 freeLiquidity,
-            uint256 lastTimestamp,
+            uint32 lastTimestamp,
             uint256 invariantGrowthLast,
             uint256 feeGrowthAssetLast,
             uint256 feeGrowthQuoteLast,

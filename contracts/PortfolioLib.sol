@@ -114,10 +114,9 @@ struct PortfolioPool {
     PortfolioPair pair; // Token pair data.
 }
 
-// todo: optimize slot
 struct PortfolioPosition {
     uint128 freeLiquidity;
-    uint256 lastTimestamp;
+    uint32 lastTimestamp;
     uint256 invariantGrowthLast;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
@@ -199,7 +198,7 @@ function changePositionLiquidity(
     uint256 timestamp,
     int128 liquidityDelta
 ) {
-    self.lastTimestamp = timestamp;
+    self.lastTimestamp = uint32(timestamp);
     self.freeLiquidity = AssemblyLib.addSignedDelta(
         self.freeLiquidity,
         liquidityDelta
@@ -285,8 +284,7 @@ function getPoolMaxLiquidity(
     (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
     uint256 liquidity0 = deltaAsset.divWadDown(amountAssetWad); // L_0 = X / (X / L)
     uint256 liquidity1 = deltaQuote.divWadDown(amountQuoteWad); // L_1 = Y / (Y / L)
-    deltaLiquidity = (liquidity0 < liquidity1 ? liquidity0 : liquidity1)
-        .safeCastTo128();
+    deltaLiquidity = AssemblyLib.min(liquidity0, liquidity1).safeCastTo128();
 }
 
 /**
@@ -377,8 +375,10 @@ function computeTau(
     uint256 timestamp
 ) pure returns (uint256) {
     uint256 end = self.params.maturity();
-    if (timestamp > end) return 0;
-    return end - timestamp;
+    unchecked {
+        // Cannot underflow as LHS is either equal to `timestamp` or greater. 
+        return AssemblyLib.max(timestamp, end) - timestamp;
+    }
 }
 
 function maturity(
