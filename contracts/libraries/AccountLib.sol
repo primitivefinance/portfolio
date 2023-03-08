@@ -30,7 +30,7 @@ pragma solidity 0.8.13;
 import "solmate/utils/SafeTransferLib.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IWETH.sol";
-import "./AssemblyLib.sol" as Assembly;
+import "./AssemblyLib.sol";
 
 using {
     __wrapEther__,
@@ -126,12 +126,10 @@ function debit(
 ) returns (uint256 paid, uint256 remainder) {
     self.touch(token);
     uint256 balance = self.balances[owner][token];
-    if (balance >= owed) {
-        paid = owed;
-        self.balances[owner][token] -= paid;
-        remainder = 0;
-    } else {
-        paid = balance;
+    paid = AssemblyLib.min(balance, owed);
+    
+    unchecked {
+        // Cannot underflow as `paid` is enforced to be the smaller of `balance` or `paid` 
         self.balances[owner][token] -= paid;
         remainder = owed - paid;
     }
