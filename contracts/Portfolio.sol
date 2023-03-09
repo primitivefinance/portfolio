@@ -485,9 +485,11 @@ abstract contract PortfolioVirtual is Objective {
                 liveIndependent,
                 iteration.liquidity
             );
+            
             deltaInput = AssemblyLib.min(iteration.remainder, maxInput); // swaps up to the maximum input
 
-            iteration.feeAmount = (deltaInput * _state.fee) / 10_000;
+            iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
+
             deltaInputLessFee = deltaInput - iteration.feeAmount;
             nextIndependent =
                 liveIndependent +
