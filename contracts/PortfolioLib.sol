@@ -189,9 +189,9 @@ function changePoolParameters(
     PortfolioPool storage self,
     PortfolioCurve memory updated
 ) {
-    (bool success, ) = updated.validateParameters();
+    // Reverts on invalid parameters.
+    updated.validateParameters();
     self.params = updated;
-    assert(success);
 }
 
 function changePositionLiquidity(
@@ -394,15 +394,13 @@ function maturity(
 
 function validateParameters(
     PortfolioCurve memory self
-) pure returns (bool, bytes memory) {
+) pure {
     (bool success, bytes memory reason) = self.checkParameters();
     if (!success) {
         assembly {
             revert(add(32, reason), mload(reason))
         }
     }
-
-    return (success, reason);
 }
 
 /**

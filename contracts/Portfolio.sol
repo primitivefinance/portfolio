@@ -712,8 +712,7 @@ abstract contract PortfolioVirtual is Objective {
             priorityFee: hasController ? priorityFee : 0,
             createdAt: timestamp
         });
-        params.validateParameters();
-        pool.params = params;
+        pool.changePoolParameters(params);
 
         (uint256 x, uint256 y) = computeReservesFromPrice(poolId, price);
         (pool.virtualY, pool.virtualX) = (y.safeCastTo128(), x.safeCastTo128());
