@@ -4,6 +4,8 @@
 
 On-chain portfolio management. Optimized for managing risk and liquidity.
 
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/primitivefinance/portfolio#contributing) [![](https://dcbadge.vercel.app/api/server/primitive?style=flat)](https://discord.gg/primitive) [![Twitter Badge](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/primitivefi)
+
 ## System Invariants
 
 The system is designed around a single invariant:

@@ -35,6 +35,26 @@ library AssemblyLib {
     }
 
     /**
+     * @dev Returns the smaller of two numbers.
+     */
+    function min(uint256 a, uint256 b) internal pure returns (uint256 result) {
+        // Equivalent to `result = (a < b) ? a : b`
+        assembly {
+            result := sub(a, mul(sub(a, b), gt(a, b)))
+        }
+    }
+
+    /**
+     * @dev Returns the larger of two numbers.
+     */
+    function max(uint256 a, uint256 b) internal pure returns (uint256 result) {
+        // Equivalent to: `result = (a < b) ? b : a`
+        assembly {
+            result := sub(a, mul(sub(a, b), lt(a, b)))
+        }
+    }
+
+    /**
      * @dev Adds a signed `delta` to an unsigned `input` by using the sign-agnostic 256-bit type used in yul.
      * Checks for overflow manually and reverts with `InvalidLiquidity()`, because this function is used to
      * change liquidity in a position or pool.
@@ -66,13 +86,9 @@ library AssemblyLib {
      * ```
      */
     function computeCheckpoint(uint256 present, uint256 delta) internal pure returns (uint256 checkpoint) {
-        checkpoint = present;
-
-        if (delta != 0) {
-            // Overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
-            assembly {
-                checkpoint := add(present, delta)
-            }
+        // Overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
+        assembly {
+            checkpoint := add(present, delta)
         }
     }
 

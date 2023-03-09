@@ -411,7 +411,7 @@ abstract contract PortfolioVirtual is Objective {
         _state.sell = args.sellAsset == 1; // 1: true, 0: false
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
-            : uint256(pool.params.fee);
+            : pool.params.fee;
 
         if (_state.sell) {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
@@ -485,17 +485,11 @@ abstract contract PortfolioVirtual is Objective {
                 liveIndependent,
                 iteration.liquidity
             );
-            iteration.feeAmount =
-                ((
-                    iteration.remainder > maxInput
-                        ? maxInput
-                        : iteration.remainder
-                ) * _state.fee) /
-                PERCENTAGE;
+            
+            deltaInput = AssemblyLib.min(iteration.remainder, maxInput); // swaps up to the maximum input
 
-            deltaInput = iteration.remainder > maxInput
-                ? maxInput
-                : iteration.remainder; // swaps up to the maximum input
+            iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
+
             deltaInputLessFee = deltaInput - iteration.feeAmount;
             nextIndependent =
                 liveIndependent +
@@ -877,20 +871,26 @@ abstract contract PortfolioVirtual is Objective {
             // Apply credits or debits to net balance.
             (uint256 credited, uint256 debited, uint256 remainder) = __account__
                 .settle(token, address(this));
-            // Reserves were increased, we paid a debit, therefore need to decrease reserves by `debited` amount.
-            if (debited > 0) {
-                emit DecreaseUserBalance(msg.sender, token, debited);
-                emit DecreaseReserveBalance(token, debited);
-            }
+
             // Reserves were not tracking some tokens, increase the reserves to account for them.
             if (credited > 0) {
                 emit IncreaseUserBalance(msg.sender, token, credited);
                 emit IncreaseReserveBalance(token, credited);
+            } else {
+                // Users are never simultaneously credited and debited so we must only check this when not credited.
+
+                // Reserves were increased, we paid a debit, therefore need to decrease reserves by `debited` amount.
+                if (debited > 0) {
+                    emit DecreaseUserBalance(msg.sender, token, debited);
+                    emit DecreaseReserveBalance(token, debited);
+                }
+
+                // Outstanding amount must be transferred in.
+                if (remainder > 0) {
+                    _payments.push(Payment({token: token, amount: remainder}));
+                }
             }
-            // Outstanding amount must be transferred in.
-            if (remainder > 0) {
-                _payments.push(Payment({token: token, amount: remainder}));
-            }
+
             // Token considered fully accounted for.
             __account__.warm.pop();
             unchecked {
@@ -922,7 +922,10 @@ abstract contract PortfolioVirtual is Objective {
     function _getTimePassed(
         PortfolioPool memory pool
     ) internal view returns (uint256) {
-        return block.timestamp - pool.lastTimestamp;
+        unchecked {
+            // `pool.lastTimestamp` is only ever synced to `block.timestamp` and so may never exceed it.
+            return block.timestamp - pool.lastTimestamp;
+        }
     }
 
     // ===== Public View ===== //

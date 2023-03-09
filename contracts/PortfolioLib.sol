@@ -115,10 +115,9 @@ struct PortfolioPool {
     PortfolioPair pair; // Token pair data.
 }
 
-// todo: optimize slot
 struct PortfolioPosition {
     uint128 freeLiquidity;
-    uint256 lastTimestamp;
+    uint32 lastTimestamp;
     uint256 invariantGrowthLast;
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
@@ -163,7 +162,7 @@ struct SwapState {
     bool sell;
     address sellAsset;
     address tokenOutput;
-    uint256 fee;
+    uint16 fee;
     uint256 feeGrowthGlobal;
     uint256 invariantGrowthGlobal;
 }
@@ -200,7 +199,7 @@ function changePositionLiquidity(
     uint256 timestamp,
     int128 liquidityDelta
 ) {
-    self.lastTimestamp = timestamp;
+    self.lastTimestamp = uint32(timestamp);
     self.freeLiquidity = AssemblyLib.addSignedDelta(
         self.freeLiquidity,
         liquidityDelta
@@ -286,8 +285,7 @@ function getPoolMaxLiquidity(
     (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
     uint256 liquidity0 = deltaAsset.divWadDown(amountAssetWad); // L_0 = X / (X / L)
     uint256 liquidity1 = deltaQuote.divWadDown(amountQuoteWad); // L_1 = Y / (Y / L)
-    deltaLiquidity = (liquidity0 < liquidity1 ? liquidity0 : liquidity1)
-        .safeCastTo128();
+    deltaLiquidity = AssemblyLib.min(liquidity0, liquidity1).safeCastTo128();
 }
 
 /**
@@ -378,16 +376,20 @@ function computeTau(
     uint256 timestamp
 ) pure returns (uint256) {
     uint256 end = self.params.maturity();
-    if (timestamp > end) return 0;
-    return end - timestamp;
+    unchecked {
+        // Cannot underflow as LHS is either equal to `timestamp` or greater. 
+        return AssemblyLib.max(timestamp, end) - timestamp;
+    }
 }
 
 function maturity(
     PortfolioCurve memory self
 ) pure returns (uint32 endTimestamp) {
-    return
-        (AssemblyLib.convertDaysToSeconds(self.duration) + self.createdAt)
-            .safeCastTo32();
+    unchecked {
+        // Portfolio duration is limited such that this addition will never overflow 256 bits.
+        endTimestamp = (AssemblyLib.convertDaysToSeconds(self.duration) +
+            self.createdAt).safeCastTo32();
+    }
 }
 
 function validateParameters(
