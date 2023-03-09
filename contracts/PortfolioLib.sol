@@ -384,9 +384,11 @@ function computeTau(
 function maturity(
     PortfolioCurve memory self
 ) pure returns (uint32 endTimestamp) {
-    return
-        (AssemblyLib.convertDaysToSeconds(self.duration) + self.createdAt)
-            .safeCastTo32();
+    unchecked {
+        // Portfolio duration is limited such that this addition will never overflow 256 bits.
+        endTimestamp = (AssemblyLib.convertDaysToSeconds(self.duration) +
+            self.createdAt).safeCastTo32();
+    }
 }
 
 function validateParameters(
