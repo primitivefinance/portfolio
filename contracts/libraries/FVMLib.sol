@@ -242,7 +242,7 @@ function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pur
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     // Looks like using Solidity or Assembly is the same in terms of gas cost.
-    if (data.length < 9) revert InvalidBytesLength(9, data.length);
+    if (data.length < 11) revert InvalidBytesLength(11, data.length);
 
     assembly {
         let value := calldataload(data.offset)
