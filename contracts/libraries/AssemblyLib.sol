@@ -252,4 +252,114 @@ library AssemblyLib {
             outputDec := sdiv(amountWad, factor)
         }
     }
+
+    // WIP functions
+
+    function trimBytes(uint128 input) public pure returns (bytes memory output) {
+        assembly {
+            let length := 0x20
+            let value := input
+
+            for { } 1 { } {
+                let s := byte(0, value)
+
+                switch iszero(s)
+                    case 0 { break }
+                    case 1 {
+                        value := shl(8, value)
+                        length := sub(length, 1)
+                    }
+            }
+
+            mstore(output, length)
+            mstore(add(0x20, output), value)
+        }
+    }
+
+    function trimBytes2(uint128 input) public pure returns (bytes memory output) {
+        assembly {
+            mstore(add(0x20, output), input)
+            mstore(output, 32)
+
+            if or(lt(mload(add(0x20, output)), 0xFF), eq(mload(add(0x20, output)), 0xFF)) {
+                mstore(add(0x20, output), shl(248, mload(add(0x20, output))))
+                mstore(output, 0x01)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFF), eq(mload(add(0x20, output)), 0xFFFF)) {
+                mstore(add(0x20, output), shl(240, mload(add(0x20, output))))
+                mstore(output, 0x02)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFF)) {
+                mstore(add(0x20, output), shl(232, mload(add(0x20, output))))
+                mstore(output, 0x03)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFF)) {
+                mstore(add(0x20, output), shl(224, mload(add(0x20, output))))
+                mstore(output, 0x04)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(216, mload(add(0x20, output))))
+                mstore(output, 0x05)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(208, mload(add(0x20, output))))
+                mstore(output, 0x06)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(200, mload(add(0x20, output))))
+                mstore(output, 0x07)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(192, mload(add(0x20, output))))
+                mstore(output, 0x08)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(184, mload(add(0x20, output))))
+                mstore(output, 0x09)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(176, mload(add(0x20, output))))
+                mstore(output, 0x0a)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(168, mload(add(0x20, output))))
+                mstore(output, 0x0b)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(160, mload(add(0x20, output))))
+                mstore(output, 0x0c)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(152, mload(add(0x20, output))))
+                mstore(output, 0x0d)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(144, mload(add(0x20, output))))
+                mstore(output, 0x0e)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(136, mload(add(0x20, output))))
+                mstore(output, 0x0f)
+            }
+
+            if or(lt(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF), eq(mload(add(0x20, output)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)) {
+                mstore(add(0x20, output), shl(128, mload(add(0x20, output))))
+                mstore(output, 0x10)
+            }
+        }
+    }
 }
