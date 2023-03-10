@@ -222,21 +222,17 @@ contract TestFVMLib is Test {
         assertEq(deltaLiquidity, deltaLiquidity_);
     }
 
-    /*
-    function testFuzz_encodePoolId(
-        uint24 pairId,
-        bool isMutable,
-        uint32 poolNonce
-    ) public {
-        uint64 poolId = encodePoolId(pairId, isMutable, poolNonce);
-        (uint64 poolId_, uint24 pairId_, uint8 isMutable_, uint32 poolNonce_) = target.decodePoolId_(abi.encode(poolId));
-
-        assertEq(poolId, poolId_);
-        assertEq(pairId, pairId_);
-        assertEq(isMutable ? uint8(1) : uint8(0), isMutable_);
-        assertEq(poolNonce, poolNonce_);
+    function test_decodeAllocate() public {
+        bytes memory data = hex"11aaffffffffffffbb0e016b";
+        (uint8 useMax, uint64 poolId, uint128 amount) = target.decodeAllocate_(data);
+        assertEq(useMax, 1);
+        assertEq(poolId, uint64(0xaaffffffffffffbb));
+        assertEq(amount, uint128(0.0363 ether));
     }
-    */
 
-
+    function test_decodeAllocate_RevertsBadLength() public {
+        bytes memory data = hex"11aaffffffffffffbb0e";
+        vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(11), uint256(10)));
+        (uint8 useMax, uint64 poolId, uint128 amount) = target.decodeAllocate_(data);
+    }
 }
