@@ -241,11 +241,17 @@ function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pur
 }
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+    // Looks like using Solidity or Assembly is the same in terms of gas cost.
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
-    (bytes1 maxFlag,) = AssemblyLib.separate(data[0]);
-    useMax = uint8(maxFlag);
-    poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = AssemblyLib.toAmount(data[9:]);
+
+    assembly {
+        let value := calldataload(data.offset)
+        useMax := shr(252, value)
+        poolId := shr(192, shl(8, value))
+        let power := shr(248, shl(72, value))
+        let base := shr(sub(256, mul(8, sub(data.length, 10))), shl(80, value))
+        deltaLiquidity := mul(base, exp(10, power))
+    }
 }
 
 /**
