@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/PortfolioLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
-import {Coin} from "./HelperUtils.sol";
+import { Coin } from "./HelperUtils.sol";
 
 using Ghost for GhostState global;
 
@@ -26,27 +26,48 @@ struct GhostState {
 library Ghost {
     error InvalidFileKey(bytes32 what);
 
-    function pair(GhostState memory self) internal view returns (PortfolioPair memory) {
+    function pair(GhostState memory self)
+        internal
+        view
+        returns (PortfolioPair memory)
+    {
         return self.pool().pair;
     }
 
-    function pool(GhostState memory self) internal view returns (PortfolioPool memory) {
+    function pool(GhostState memory self)
+        internal
+        view
+        returns (PortfolioPool memory)
+    {
         return IPortfolioStruct(self.subject).pools(self.poolId);
     }
 
-    function position(GhostState memory self, address owner) internal view returns (PortfolioPosition memory) {
+    function position(
+        GhostState memory self,
+        address owner
+    ) internal view returns (PortfolioPosition memory) {
         return IPortfolioStruct(self.subject).positions(owner, self.poolId);
     }
 
-    function pairOf(GhostState memory self, uint24 pairId) internal view returns (PortfolioPair memory) {
+    function pairOf(
+        GhostState memory self,
+        uint24 pairId
+    ) internal view returns (PortfolioPair memory) {
         return IPortfolioStruct(self.subject).pairs(pairId);
     }
 
-    function poolOf(GhostState memory self, uint64 poolId) internal view returns (PortfolioPool memory) {
+    function poolOf(
+        GhostState memory self,
+        uint64 poolId
+    ) internal view returns (PortfolioPool memory) {
         return IPortfolioStruct(self.subject).pools(poolId);
     }
 
-    function file(GhostState storage self, bytes32 what, bytes memory data) internal {
+    function file(
+        GhostState storage self,
+        bytes32 what,
+        bytes memory data
+    ) internal {
         if (what == "subject") {
             self.subject = abi.decode(data, (address));
         } else if (what == "poolId") {
@@ -58,23 +79,40 @@ library Ghost {
         }
     }
 
-    function net(GhostState memory self, address token) internal view returns (int256) {
+    function net(
+        GhostState memory self,
+        address token
+    ) internal view returns (int256) {
         return IPortfolioGetters(self.subject).getNetBalance(token);
     }
 
-    function balance(GhostState memory self, address account, address token) internal view returns (uint256) {
+    function balance(
+        GhostState memory self,
+        address account,
+        address token
+    ) internal view returns (uint256) {
         return IPortfolioGetters(self.subject).getBalance(account, token);
     }
 
-    function physicalBalance(GhostState memory self, address token) internal view returns (uint256) {
+    function physicalBalance(
+        GhostState memory self,
+        address token
+    ) internal view returns (uint256) {
         return MockERC20(token).balanceOf(self.subject);
     }
 
-    function reserve(GhostState memory self, address token) internal view returns (uint256) {
+    function reserve(
+        GhostState memory self,
+        address token
+    ) internal view returns (uint256) {
         return IPortfolioGetters(self.subject).getReserve(token);
     }
 
-    function config(GhostState memory self) internal view returns (PortfolioCurve memory) {
+    function config(GhostState memory self)
+        internal
+        view
+        returns (PortfolioCurve memory)
+    {
         return self.pool().params;
     }
 
@@ -88,9 +126,18 @@ library Ghost {
 }
 
 interface IPortfolioStruct {
-    function pairs(uint24 pairId) external view returns (PortfolioPair memory);
+    function pairs(uint24 pairId)
+        external
+        view
+        returns (PortfolioPair memory);
 
-    function positions(address owner, uint64 positionId) external view returns (PortfolioPosition memory);
+    function positions(
+        address owner,
+        uint64 positionId
+    ) external view returns (PortfolioPosition memory);
 
-    function pools(uint64 poolId) external view returns (PortfolioPool memory);
+    function pools(uint64 poolId)
+        external
+        view
+        returns (PortfolioPool memory);
 }

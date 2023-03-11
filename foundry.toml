@@ -33,9 +33,9 @@ anvil = "http://127.0.0.1:8545"
 prod = "${MAINNET_URL}"
 
 [fmt]
-line_length = 120
+line_length = 80
 tab_width = 4
-bracket_spacing = false
+bracket_spacing = true
 int_types = 'long'
 multiline_func_header = 'params_first'
 quote_style = 'double'

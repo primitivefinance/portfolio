@@ -10,7 +10,8 @@ contract TestRMM02 is TestPortfolioAllocate {
     function setUp() public override {
         super.setUp();
 
-        address new_subject = address(new RMM02Portfolio(address(subjects().weth)));
+        address new_subject =
+            address(new RMM02Portfolio(address(subjects().weth)));
 
         subjects().change_subject(new_subject);
     }

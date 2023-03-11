@@ -72,7 +72,10 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
     }
 }
 
-function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes memory) {
+function encodeJumpInstruction(bytes[] memory instructions)
+    pure
+    returns (bytes memory)
+{
     uint8 nextPointer;
     uint8 len = uint8(instructions.length);
     bytes memory payload = bytes.concat(INSTRUCTION_JUMP, bytes1(len));
@@ -111,8 +114,16 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24) {
  * uint64 poolId = encodePoolId(0, true, 1);
  * ```
  */
-function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64) {
-    return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
+function encodePoolId(
+    uint24 pairId,
+    bool isMutable,
+    uint32 poolNonce
+) pure returns (uint64) {
+    return uint64(
+        bytes8(
+            abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)
+        )
+    );
 }
 
 function decodePoolId(bytes calldata data)
@@ -126,11 +137,17 @@ function decodePoolId(bytes calldata data)
     poolNonce = uint32(bytes4(data[4:]));
 }
 
-function encodeCreatePair(address token0, address token1) pure returns (bytes memory data) {
+function encodeCreatePair(
+    address token0,
+    address token1
+) pure returns (bytes memory data) {
     data = abi.encodePacked(CREATE_PAIR, token0, token1);
 }
 
-function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
+function decodeCreatePair(bytes calldata data)
+    pure
+    returns (address tokenAsset, address tokenQuote)
+{
     if (data.length != 41) revert InvalidBytesLength(41, data.length);
     tokenAsset = address(bytes20(data[1:21]));
     tokenQuote = address(bytes20(data[21:]));
@@ -142,7 +159,11 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
  * because it preserves all the trailing zeros for each type. An improved version
  * should be made to reduce the calldata size by removing the extra zeros.
  */
-function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (bytes memory data) {
+function encodeClaim(
+    uint64 poolId,
+    uint128 fee0,
+    uint128 fee1
+) pure returns (bytes memory data) {
     (uint8 powerFee0, uint128 baseFee0) = AssemblyLib.fromAmount(fee0);
     (uint8 powerFee1, uint128 baseFee1) = AssemblyLib.fromAmount(fee1);
 
@@ -161,7 +182,10 @@ function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (by
 /**
  * @dev Decodes a claim operation
  */
-function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
+function decodeClaim(bytes calldata data)
+    pure
+    returns (uint64 poolId, uint128 fee0, uint128 fee1)
+{
     uint8 pointer0 = uint8(bytes1(data[1]));
     poolId = uint64(AssemblyLib.toBytes8(data[2:pointer0]));
     uint8 pointer1 = uint8(bytes1(data[pointer0]));
@@ -235,12 +259,21 @@ function decodeCreatePool(bytes calldata data)
  * @dev Encodes a allocate operation.
  * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
-function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+function encodeAllocate(
+    uint8 useMax,
+    uint64 poolId,
+    uint128 deltaLiquidity
+) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base);
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base
+    );
 }
 
-function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+function decodeAllocate(bytes calldata data)
+    pure
+    returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
+{
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
     (bytes1 maxFlag,) = AssemblyLib.separate(data[0]);
     useMax = uint8(maxFlag);
@@ -252,12 +285,21 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 
  * @dev Encodes a deallocate operation.
  * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
-function encodeDeallocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+function encodeDeallocate(
+    uint8 useMax,
+    uint64 poolId,
+    uint128 deltaLiquidity
+) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base);
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base
+    );
 }
 
-function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+function decodeDeallocate(bytes calldata data)
+    pure
+    returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
+{
     if (data.length < 9) revert InvalidBytesLength(9, data.length);
     useMax = uint8(data[0] >> 4);
     poolId = uint64(bytes8(data[1:9]));
@@ -296,7 +338,13 @@ function encodeSwap(
  */
 function decodeSwap(bytes calldata data)
     pure
-    returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
+    returns (
+        uint8 useMax,
+        uint64 poolId,
+        uint128 input,
+        uint128 output,
+        uint8 sellAsset
+    )
 {
     useMax = uint8(data[0] >> 4);
     sellAsset = uint8(data[1]);

@@ -21,29 +21,51 @@ contract TestPortfolioChangeParameters is Setup {
         assertEq(actual.jit, jit, "jit");
     }
 
-    function test_changeParameters_priority_fee_success() public defaultControlledConfig isArmed {
+    function test_changeParameters_priority_fee_success()
+        public
+        defaultControlledConfig
+        isArmed
+    {
         uint64 poolId = ghost().poolId;
         uint16 prev = ghost().pool().params.priorityFee;
-        subject().changeParameters(poolId, DEFAULT_PRIORITY_FEE + 10, DEFAULT_FEE + 20, 0);
+        subject().changeParameters(
+            poolId, DEFAULT_PRIORITY_FEE + 10, DEFAULT_FEE + 20, 0
+        );
         uint16 post = ghost().pool().params.priorityFee;
         assertEq(post, prev + 10, "priority-fee-change");
     }
 
-    function test_revert_changeParameters_not_controller() public defaultControlledConfig isArmed {
+    function test_revert_changeParameters_not_controller()
+        public
+        defaultControlledConfig
+        isArmed
+    {
         uint64 poolId = ghost().poolId;
         vm.expectRevert(NotController.selector);
         vm.prank(address(0x0006));
-        subject().changeParameters(poolId, DEFAULT_PRIORITY_FEE, DEFAULT_FEE, DEFAULT_JIT);
+        subject().changeParameters(
+            poolId, DEFAULT_PRIORITY_FEE, DEFAULT_FEE, DEFAULT_JIT
+        );
     }
 
-    function test_revert_changeParameters_invalid_jit() public defaultControlledConfig isArmed {
+    function test_revert_changeParameters_invalid_jit()
+        public
+        defaultControlledConfig
+        isArmed
+    {
         uint64 poolId = ghost().poolId;
         uint16 failureArg = 10000;
         vm.expectRevert(abi.encodeWithSelector(InvalidJit.selector, failureArg));
-        subject().changeParameters(poolId, DEFAULT_PRIORITY_FEE, DEFAULT_FEE, failureArg);
+        subject().changeParameters(
+            poolId, DEFAULT_PRIORITY_FEE, DEFAULT_FEE, failureArg
+        );
     }
 
-    function test_revert_changeParameters_priority_fee_above_max() public defaultControlledConfig isArmed {
+    function test_revert_changeParameters_priority_fee_above_max()
+        public
+        defaultControlledConfig
+        isArmed
+    {
         uint64 poolId = ghost().poolId;
         PortfolioCurve memory curve = PortfolioCurve({
             maxPrice: DEFAULT_STRIKE,
@@ -55,12 +77,21 @@ contract TestPortfolioChangeParameters is Setup {
             createdAt: 100000000
         });
         (, bytes memory revertData) = curve.checkParameters();
-        assertEq(revertData, abi.encodeWithSelector(InvalidFee.selector, curve.priorityFee));
+        assertEq(
+            revertData,
+            abi.encodeWithSelector(InvalidFee.selector, curve.priorityFee)
+        );
         vm.expectRevert(revertData);
-        subject().changeParameters(poolId, curve.priorityFee, curve.fee, curve.jit);
+        subject().changeParameters(
+            poolId, curve.priorityFee, curve.fee, curve.jit
+        );
     }
 
-    function test_revert_changeParameters_invalid_fee() public defaultControlledConfig isArmed {
+    function test_revert_changeParameters_invalid_fee()
+        public
+        defaultControlledConfig
+        isArmed
+    {
         uint16 failureArg = 2 ** 16 - 10;
         uint64 poolId = ghost().poolId;
         vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, failureArg));

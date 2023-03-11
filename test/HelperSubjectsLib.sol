@@ -32,11 +32,18 @@ library Subjects {
     error UnknownToken(bytes32);
 
     modifier ready(SubjectsState storage self) {
-        require(address(self.vm) != address(0), "did you call startDeploy(vm) first?");
+        require(
+            address(self.vm) != address(0),
+            "did you call startDeploy(vm) first?"
+        );
         _;
     }
 
-    function last_token(SubjectsState storage self) internal view returns (MockERC20) {
+    function last_token(SubjectsState storage self)
+        internal
+        view
+        returns (MockERC20)
+    {
         return self.tokens[self.tokens.length - 1];
     }
 
@@ -58,7 +65,10 @@ library Subjects {
      *    // All tests inherited from Test{test name} will run using the new_subject.
      * }
      */
-    function change_subject(SubjectsState storage self, address subject) internal {
+    function change_subject(
+        SubjectsState storage self,
+        address subject
+    ) internal {
         self.last = IPortfolio(subject);
     }
 
@@ -70,7 +80,10 @@ library Subjects {
      * self.startDeploy(vm).{...deploy_functions()}.stopDeploy();
      * ```
      */
-    function startDeploy(SubjectsState storage self, Vm vm) internal returns (SubjectsState storage) {
+    function startDeploy(
+        SubjectsState storage self,
+        Vm vm
+    ) internal returns (SubjectsState storage) {
         self.vm = vm;
 
         // Only change if unset or not the existing address.
@@ -89,7 +102,11 @@ library Subjects {
      * self.startDeploy(vm).wrapper().stopDeploy();
      * ```
      */
-    function wrapper(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
+    function wrapper(SubjectsState storage self)
+        internal
+        ready(self)
+        returns (SubjectsState storage)
+    {
         self.weth = new WETH();
         self.vm.label(address(self.weth), "WETH");
         return self;
@@ -103,7 +120,11 @@ library Subjects {
      * self.startDeploy(vm).subject().stopDeploy();
      * ```
      */
-    function subject(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
+    function subject(SubjectsState storage self)
+        internal
+        ready(self)
+        returns (SubjectsState storage)
+    {
         self.last = IPortfolio(new RMM01Portfolio(address(self.weth)));
         self.vm.label(address(self.last), "Subject");
         return self;
@@ -122,12 +143,13 @@ library Subjects {
         bytes32 what,
         bytes memory data
     ) internal ready(self) returns (SubjectsState storage) {
-        (string memory name, string memory symbol, uint8 decimals) = abi.decode(data, (string, string, uint8));
+        (string memory name, string memory symbol, uint8 decimals) =
+            abi.decode(data, (string, string, uint8));
         if (what == "token") {
             MockERC20 token = new MockERC20(name, symbol, decimals);
             self.tokens.push(token);
             self.vm.label(address(token), symbol);
-        } else if (what == "RTL") {} else {
+        } else if (what == "RTL") { } else {
             revert UnknownToken(what);
         }
         return self;
@@ -138,7 +160,11 @@ library Subjects {
      * Removing vm will cause startDeploy related calls to revert if attempted without leading
      * the chain with `startDeploy()`.
      */
-    function stopDeploy(SubjectsState storage self) internal ready(self) returns (SubjectsState storage) {
+    function stopDeploy(SubjectsState storage self)
+        internal
+        ready(self)
+        returns (SubjectsState storage)
+    {
         delete self.vm;
         return self;
     }
