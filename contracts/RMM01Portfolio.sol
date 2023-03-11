@@ -16,7 +16,7 @@ contract RMM01Portfolio is PortfolioVirtual {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
 
-    constructor(address weth) PortfolioVirtual(weth) {}
+    constructor(address weth) PortfolioVirtual(weth) { }
 
     /**
      * @dev Computes the price of the pool, which changes over time.
@@ -33,7 +33,10 @@ contract RMM01Portfolio is PortfolioVirtual {
         PortfolioPool memory pool = pools[poolId];
         if (!pool.exists()) revert NonExistentPool(poolId);
         uint256 timeSinceUpdate = _getTimePassed(pool);
-        (invariant, updatedTau) = RMM01Lib.getNextInvariant({self: pool, timeSinceUpdate: timeSinceUpdate});
+        (invariant, updatedTau) = RMM01Lib.getNextInvariant({
+            self: pool,
+            timeSinceUpdate: timeSinceUpdate
+        });
         price = RMM01Lib.getPriceWithX({
             R_x: pool.virtualX,
             stk: pool.params.maxPrice,
@@ -43,20 +46,30 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal override returns (bool) {
+    function _afterSwapEffects(
+        uint64 poolId,
+        Iteration memory iteration
+    ) internal override returns (bool) {
         // Apply priority invariant growth.
         if (msg.sender == pools[poolId].controller) {
             int256 delta = iteration.nextInvariant - iteration.prevInvariant;
             uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
             // todo: I don't like this setting internal _state...
-            if (deltaAbs != 0) _state.invariantGrowthGlobal = deltaAbs.divWadDown(iteration.liquidity);
+            if (deltaAbs != 0) {
+                _state.invariantGrowthGlobal =
+                    deltaAbs.divWadDown(iteration.liquidity);
+            }
         }
 
         return true;
     }
 
     /// @inheritdoc Objective
-    function _beforeSwapEffects(uint64 poolId) internal override returns (bool, int256) {
+    function _beforeSwapEffects(uint64 poolId)
+        internal
+        override
+        returns (bool, int256)
+    {
         (, int256 invariant,) = _computeSyncedPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
@@ -66,10 +79,15 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function checkPosition(uint64 poolId, address owner, int256 delta) public view override returns (bool) {
+    function checkPosition(
+        uint64 poolId,
+        address owner,
+        int256 delta
+    ) public view override returns (bool) {
         // Just in time liquidity protection.
         if (delta < 0) {
-            uint256 distance = positions[owner][poolId].getTimeSinceChanged(block.timestamp);
+            uint256 distance =
+                positions[owner][poolId].getTimeSinceChanged(block.timestamp);
             return (pools[poolId].params.jit <= distance);
         }
 
@@ -89,11 +107,19 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint256 reserveY
     ) public view override returns (bool, int256 nextInvariant) {
         uint256 tau = pools[poolId].lastTau();
-        nextInvariant = RMM01Lib.invariantOf({self: pools[poolId], R_x: reserveX, R_y: reserveY, timeRemainingSec: tau});
+        nextInvariant = RMM01Lib.invariantOf({
+            self: pools[poolId],
+            R_x: reserveX,
+            R_y: reserveY,
+            timeRemainingSec: tau
+        });
 
         // Invariant for RMM01 is denominated in the `quote` token.
-        int256 liveInvariantWad = invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
-        int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
+        int256 liveInvariantWad =
+            invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
+        int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(
+            pools[poolId].pair.decimalsQuote
+        );
         return (nextInvariantWad >= liveInvariantWad, nextInvariant);
     }
 
@@ -109,7 +135,9 @@ contract RMM01Portfolio is PortfolioVirtual {
             maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio
                 // between assets and liqudiity.
         } else {
-            maxInput = (pools[poolId].params.maxPrice - reserveIn).mulWadDown(liquidity); // There can be maximum
+            maxInput = (pools[poolId].params.maxPrice - reserveIn).mulWadDown(
+                liquidity
+            ); // There can be maximum
                 // strike:1 liquidity ratio between quote and liquidity.
         }
 
@@ -121,8 +149,11 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         uint256 price
     ) public view override returns (uint256 reserveX, uint256 reserveY) {
-        (reserveY, reserveX) =
-            RMM01Lib.computeReservesWithPrice({self: pools[poolId], priceWad: price, invariantWad: 0});
+        (reserveY, reserveX) = RMM01Lib.computeReservesWithPrice({
+            self: pools[poolId],
+            priceWad: price,
+            invariantWad: 0
+        });
     }
 
     /// @inheritdoc Objective
@@ -140,7 +171,12 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function getLatestEstimatedPrice(uint64 poolId) public view override returns (uint256 price) {
+    function getLatestEstimatedPrice(uint64 poolId)
+        public
+        view
+        override
+        returns (uint256 price)
+    {
         (price,,) = _computeSyncedPrice(poolId);
     }
 }

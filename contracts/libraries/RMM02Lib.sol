@@ -2,7 +2,7 @@
 pragma solidity >=0.8.13;
 
 import "solmate/utils/FixedPointMathLib.sol";
-import {PortfolioPool} from "../PortfolioLib.sol";
+import { PortfolioPool } from "../PortfolioLib.sol";
 
 /**
  * @title  RMM02Lib
@@ -52,10 +52,15 @@ library RMM02Lib {
     ) internal pure returns (uint256 amountOut) {
         self; // todo: Keeps same api as RMM01 lib, but can be changed.
         if (sellAsset) {
-            uint256 input = uint256(self.virtualX).divWadDown(uint256(self.virtualX + amountIn));
-            int256 balanceIn = int256(weightIn.divWadDown(FixedPointMathLib.WAD - weightIn));
+            uint256 input = uint256(self.virtualX).divWadDown(
+                uint256(self.virtualX + amountIn)
+            );
+            int256 balanceIn =
+                int256(weightIn.divWadDown(FixedPointMathLib.WAD - weightIn));
             int256 pow = int256(input).powWad(balanceIn);
-            amountOut = uint256(self.virtualY).mulWadDown(uint256(int256(FixedPointMathLib.WAD) - pow));
+            amountOut = uint256(self.virtualY).mulWadDown(
+                uint256(int256(FixedPointMathLib.WAD) - pow)
+            );
         } else {
             // todo: implement opposite case.
         }
@@ -73,14 +78,21 @@ library RMM02Lib {
         uint256 weightOut = FixedPointMathLib.WAD - weightX;
 
         R_x = reserveX;
-        R_y = R_x.divWadDown(price.mulWadDown(weightX.divWadDown(FixedPointMathLib.WAD - weightOut)));
+        R_y = R_x.divWadDown(
+            price.mulWadDown(
+                weightX.divWadDown(FixedPointMathLib.WAD - weightOut)
+            )
+        );
     }
 
     /**
      * @dev Computes a `price` in WAD units given a `weight` and reserve quantities in WAD units per WAD units of liquidity.
      * @custom:math price = (R_x / w_x) * ((1 - w_x) / R_y)
      */
-    function computePrice(PortfolioPool memory self, uint256 w_x) internal pure returns (uint256 price) {
+    function computePrice(
+        PortfolioPool memory self,
+        uint256 w_x
+    ) internal pure returns (uint256 price) {
         price = uint256(self.virtualX).divWadDown(w_x).mulWadDown(
             (FixedPointMathLib.WAD - w_x).divWadDown(uint256(self.virtualY))
         );

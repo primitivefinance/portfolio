@@ -46,7 +46,7 @@ function safeCastTo16(uint256 x) pure returns (uint16 y) {
  */
 library Configs {
     using SafeCastLib for uint256;
-    using {safeCastTo16} for uint256;
+    using { safeCastTo16 } for uint256;
 
     /**
      * @dev Creates a new config with defaults.
@@ -121,10 +121,14 @@ library Configs {
      *      .generate(address(subject()));
      * ```
      */
-    function generate(ConfigState memory self, address Portfolio) internal returns (uint64 poolId) {
+    function generate(
+        ConfigState memory self,
+        address Portfolio
+    ) internal returns (uint64 poolId) {
         require(self.asset != address(0), "did you set asset in config?");
         require(self.quote != address(0), "did you set quote in config?");
-        uint24 pairId = IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
+        uint24 pairId =
+            IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
         if (pairId == 0) {
             bytes[] memory data = new bytes[](2);
             data[0] = (FVMLib.encodeCreatePair(self.asset, self.quote));
@@ -148,7 +152,9 @@ library Configs {
 
             bool controlled = self.controller != address(0);
             poolId = FVMLib.encodePoolId(
-                IPortfolioGetters(Portfolio).getPairNonce(), controlled, IPortfolioGetters(Portfolio).getPoolNonce()
+                IPortfolioGetters(Portfolio).getPairNonce(),
+                controlled,
+                IPortfolioGetters(Portfolio).getPoolNonce()
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {

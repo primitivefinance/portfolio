@@ -10,7 +10,13 @@ contract TestPortfolioDraw is Setup {
         _;
     }
 
-    function test_draw_reduces_user_balance() public defaultConfig useActor fund(1 ether) isArmed {
+    function test_draw_reduces_user_balance()
+        public
+        defaultConfig
+        useActor
+        fund(1 ether)
+        isArmed
+    {
         uint256 prev = ghost().balance(address(this), ghost().asset().to_addr());
         subject().draw(ghost().asset().to_addr(), 1 ether, address(this));
         uint256 post = ghost().balance(address(this), ghost().asset().to_addr());
@@ -18,7 +24,12 @@ contract TestPortfolioDraw is Setup {
         assertEq(post, prev - 1 ether, "post-balance");
     }
 
-    function test_revert_draw_greater_than_balance() public defaultConfig useActor isArmed {
+    function test_revert_draw_greater_than_balance()
+        public
+        defaultConfig
+        useActor
+        isArmed
+    {
         address tkn = ghost().asset().to_addr();
         vm.expectRevert(DrawBalance.selector);
         subject().draw(tkn, 1 ether, address(this));
@@ -34,9 +45,17 @@ contract TestPortfolioDraw is Setup {
         assertTrue(post > prev, "draw-did-not-increase-balance");
     }
 
-    function test_draw_max_balance() public defaultConfig useActor fund(1 ether) isArmed {
+    function test_draw_max_balance()
+        public
+        defaultConfig
+        useActor
+        fund(1 ether)
+        isArmed
+    {
         uint256 prev = ghost().balance(address(this), ghost().asset().to_addr());
-        subject().draw(ghost().asset().to_addr(), type(uint256).max, address(this));
+        subject().draw(
+            ghost().asset().to_addr(), type(uint256).max, address(this)
+        );
         uint256 post = ghost().balance(address(this), ghost().asset().to_addr());
         assertEq(post, prev - 1 ether, "did-not-draw-max");
     }

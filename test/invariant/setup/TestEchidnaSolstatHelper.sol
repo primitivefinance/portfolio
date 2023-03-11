@@ -7,7 +7,8 @@ import "solmate/utils/LibString.sol";
 contract TestEchidnaSolstatHelper is Test {
     event AssertionFailed(string msg);
 
-    address private constant canRevertCaller = 0xc65f435F6dC164bE5D52Bc0a90D9A680052bFab2;
+    address private constant canRevertCaller =
+        0xc65f435F6dC164bE5D52Bc0a90D9A680052bFab2;
 
     modifier canRevert() {
         if (msg.sender == canRevertCaller) {
@@ -15,7 +16,8 @@ contract TestEchidnaSolstatHelper is Test {
         } else {
             vm.prank(canRevertCaller);
 
-            (bool success, bytes memory returndata) = address(this).call(msg.data);
+            (bool success, bytes memory returndata) =
+                address(this).call(msg.data);
 
             if (success) {
                 assembly {
@@ -27,19 +29,37 @@ contract TestEchidnaSolstatHelper is Test {
         }
     }
 
-    function assertEqCall(bytes memory calldata1, bytes memory calldata2) internal {
+    function assertEqCall(
+        bytes memory calldata1,
+        bytes memory calldata2
+    ) internal {
         assertEqCall(address(this), calldata1, address(this), calldata2, true);
     }
 
-    function assertEqCall(bytes memory calldata1, bytes memory calldata2, bool eqRevertData) internal {
-        assertEqCall(address(this), calldata1, address(this), calldata2, eqRevertData);
+    function assertEqCall(
+        bytes memory calldata1,
+        bytes memory calldata2,
+        bool eqRevertData
+    ) internal {
+        assertEqCall(
+            address(this), calldata1, address(this), calldata2, eqRevertData
+        );
     }
 
-    function assertEqCall(address addr, bytes memory calldata1, bytes memory calldata2) internal {
+    function assertEqCall(
+        address addr,
+        bytes memory calldata1,
+        bytes memory calldata2
+    ) internal {
         assertEqCall(addr, calldata1, addr, calldata2, true);
     }
 
-    function assertEqCall(address addr, bytes memory calldata1, bytes memory calldata2, bool eqRevertData) internal {
+    function assertEqCall(
+        address addr,
+        bytes memory calldata1,
+        bytes memory calldata2,
+        bool eqRevertData
+    ) internal {
         assertEqCall(addr, calldata1, addr, calldata2, eqRevertData);
     }
 
@@ -59,8 +79,10 @@ contract TestEchidnaSolstatHelper is Test {
         bytes memory calldata2,
         bool eqRevertData
     ) internal {
-        (bool success1, bytes memory returndata1) = address(address1).call(calldata1);
-        (bool success2, bytes memory returndata2) = address(address2).call(calldata2);
+        (bool success1, bytes memory returndata1) =
+            address(address1).call(calldata1);
+        (bool success2, bytes memory returndata2) =
+            address(address2).call(calldata2);
 
         if (success1 && success2) {
             assertEq(returndata1, returndata2, "Returned value does not match");
@@ -78,7 +100,9 @@ contract TestEchidnaSolstatHelper is Test {
             assert(false);
         }
         if (!success1 && !success2 && eqRevertData) {
-            assertEq(returndata1, returndata2, "Call revert data does not match");
+            assertEq(
+                returndata1, returndata2, "Call revert data does not match"
+            );
         }
     }
 
@@ -122,7 +146,8 @@ contract TestEchidnaSolstatHelper is Test {
         string memory repr = string.concat(
             x >= 0 ? "" : "-",
             (x == type(int256).min)
-                ? "-57896044618658097711785492504343953926634992332820282019728792003956564819968"
+                ?
+                "-57896044618658097711785492504343953926634992332820282019728792003956564819968"
                 : LibString.toString(uint256(x > 0 ? x : -x))
         );
         emit log_named_string(name, repr);
