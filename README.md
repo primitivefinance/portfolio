@@ -82,6 +82,10 @@ forge test --match-contract TestRMM01
 
 ## Contributing
 
+Important:
+- This codebase uses the FORGE formatter. This is not prettier. If you have not already, make sure if you use vs code that the `formatOnSave`config variable uses forge fmt instead of prettier.
+- Setup the proper settings using this guide: [forge fmt for formatOnSave vscode](https://github.com/juanfranblanco/vscode-solidity/pull/359#issue-1344943156).
+
 When making a pull request:
 - All tests pass.
 - Code coverage does not change.
