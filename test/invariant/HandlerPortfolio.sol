@@ -224,7 +224,7 @@ contract HandlerPortfolio is HandlerBase {
 
         // todo: make sure we create the last pool...
         uint64 poolId = FVM.encodePoolId(
-            pairId, isMutable, uint32(ctx.subject().getPoolNonce())
+            pairId, isMutable, uint32(ctx.subject().getPoolNonce(pairId))
         );
         // Add the created pool to the list of pools.
         // todo: fix assertTrue(getPool(address(subject()), poolId).lastPrice != 0, "pool-price-zero");

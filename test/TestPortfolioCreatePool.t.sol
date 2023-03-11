@@ -4,6 +4,9 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioCreatePool is Setup {
+    uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 5;
+    uint256 internal constant POOL_NONCE_STORAGE_SLOT = 6;
+
     function testFuzz_createPool(
         uint16 priorityFee,
         uint16 fee,
@@ -36,7 +39,8 @@ contract TestPortfolioCreatePool is Setup {
 
         subject().multiprocess(data);
 
-        uint64 poolId = FVM.encodePoolId(pairId, true, subject().getPoolNonce());
+        uint64 poolId =
+            FVM.encodePoolId(pairId, true, subject().getPoolNonce(pairId));
         setGhostPoolId(poolId);
 
         PortfolioPool memory pool = ghost().pool();
@@ -52,12 +56,14 @@ contract TestPortfolioCreatePool is Setup {
     }
 
     function test_createPool_non_controlled_default_jit() public {
+        uint24 pairNonce = uint24(1);
         bytes memory data = FVM.encodeCreatePool(
-            uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100
+            pairNonce, address(0), 1, 100, 100, 100, 100, 100, 100
         );
         subject().multiprocess(data);
-        uint64 poolId =
-            FVM.encodePoolId(uint24(1), false, uint32(subject().getPoolNonce()));
+        uint64 poolId = FVM.encodePoolId(
+            pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
+        );
         assertEq(
             ghost().poolOf(poolId).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY
         );
@@ -81,7 +87,7 @@ contract TestPortfolioCreatePool is Setup {
         // panic code for arithmetic overflow.
 
     function test_revert_createPool_above_max_pairs() public defaultConfig {
-        bytes32 slot = bytes32(uint256(5)); // slot is packed so has the pair + pool nonces.
+        bytes32 slot = bytes32(PAIR_NONCE_STORAGE_SLOT); // slot is packed so has the pair + pool nonces.
         vm.store(address(subject()), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
         assertEq(
             subject().getPairNonce(), type(uint24).max, "not set to max value"
@@ -96,14 +102,18 @@ contract TestPortfolioCreatePool is Setup {
     }
 
     function test_revert_createPool_above_max_pools() public {
-        bytes32 slot = bytes32(uint256(5)); // slot is packed so has the pair + pool nonces.
+        uint24 pairNonce = uint24(1);
+        bytes32 slot =
+            bytes32(keccak256(abi.encode(pairNonce, POOL_NONCE_STORAGE_SLOT)));
         vm.store(address(subject()), slot, bytes32(type(uint256).max)); // just set the whole slot of 0xf...
         assertEq(
-            subject().getPoolNonce(), type(uint32).max, "not set to max value"
+            subject().getPoolNonce(pairNonce),
+            type(uint32).max,
+            "not set to max value"
         );
 
         bytes memory data = FVM.encodeCreatePool(
-            uint24(1), address(0), 1, 100, 100, 100, 100, 100, 100
+            pairNonce, address(0), 1, 100, 100, 100, 100, 100, 100
         );
 
         vm.expectRevert(arithmeticError);
