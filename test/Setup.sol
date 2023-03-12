@@ -62,6 +62,8 @@ contract Setup is Test {
             "token", abi.encode("Asset-Std", "A-STD-18", uint8(18))
         ).token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
             "token", abi.encode("USDC", "USDC-6", uint8(6))
+        ).token("FOT", abi.encode("Asset-FOT", "A-FOT-18", uint8(18))).token(
+            "FOT", abi.encode("Quote-FOT", "Q-FOT-18", uint8(18))
         ).stopDeploy();
 
         _ghost = GhostState({
@@ -208,6 +210,17 @@ contract Setup is Test {
         uint64 poolId = Configs.fresh().edit(
             "asset", abi.encode(address(subjects().tokens[0]))
         ).edit("quote", abi.encode(address(subjects().tokens[2]))).generate(
+            address(subject())
+        );
+
+        setGhostPoolId(poolId);
+        _;
+    }
+
+    modifier feeOnTokenTransferConfig() {
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[3]))
+        ).edit("quote", abi.encode(address(subjects().tokens[4]))).generate(
             address(subject())
         );
 

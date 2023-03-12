@@ -5,6 +5,7 @@ import "contracts/RMM01Portfolio.sol";
 import "solmate/tokens/WETH.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
+import "contracts/test/FeeOnTransferToken.sol";
 import "forge-std/Test.sol";
 
 using Subjects for SubjectsState global;
@@ -145,13 +146,20 @@ library Subjects {
     ) internal ready(self) returns (SubjectsState storage) {
         (string memory name, string memory symbol, uint8 decimals) =
             abi.decode(data, (string, string, uint8));
+
+        MockERC20 token;
         if (what == "token") {
-            MockERC20 token = new MockERC20(name, symbol, decimals);
-            self.tokens.push(token);
-            self.vm.label(address(token), symbol);
-        } else if (what == "RTL") { } else {
+            token = new MockERC20(name, symbol, decimals);
+        } else if (what == "RTL") { } else if (what == "FOT") {
+            FeeOnTransferToken _token =
+                new FeeOnTransferToken(name, symbol, decimals);
+            token = MockERC20(address(_token));
+        } else {
             revert UnknownToken(what);
         }
+
+        self.tokens.push(token);
+        self.vm.label(address(token), symbol);
         return self;
     }
 

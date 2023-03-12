@@ -207,4 +207,28 @@ contract TestPortfolioAllocate is Setup {
             })
         );
     }
+
+    function test_allocate_fee_on_transfer_token()
+        public
+        feeOnTokenTransferConfig
+        usePairTokens(10 ether)
+        useActor
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
+
+        int256 net = ghost().net(ghost().asset().to_addr());
+
+        console.logInt(net);
+        assertTrue(net >= 0, "Negative net balance for token");
+    }
 }
