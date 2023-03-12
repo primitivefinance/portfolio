@@ -36,4 +36,9 @@ contract TestRMM01 is
     function test_version() public {
         assertEq(subject().VERSION(), "v1.0.0-beta", "version-not-equal");
     }
+
+    function test_getInvariant() public defaultConfig {
+        int256 invariant = subject().getInvariant(ghost().poolId);
+        assertEq(invariant, 0, "non-zero-invariant");
+    }
 }

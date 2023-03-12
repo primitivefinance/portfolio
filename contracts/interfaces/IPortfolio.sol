@@ -307,6 +307,11 @@ interface IPortfolioGetters {
         external
         view
         returns (uint256 price);
+
+    function getInvariant(uint64 poolid)
+        external
+        view
+        returns (int256 invariant);
 }
 
 interface IPortfolioActions {

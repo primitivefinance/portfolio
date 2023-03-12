@@ -899,4 +899,16 @@ abstract contract PortfolioVirtual is Objective {
     {
         return pools[poolId].getPoolVirtualReserves();
     }
+
+    /// @inheritdoc IPortfolioGetters
+    function getInvariant(uint64 poolId)
+        public
+        view
+        override
+        returns (int256 invariant)
+    {
+        (, invariant) = checkInvariant(
+            poolId, 0, pools[poolId].virtualX, pools[poolId].virtualY
+        );
+    }
 }
