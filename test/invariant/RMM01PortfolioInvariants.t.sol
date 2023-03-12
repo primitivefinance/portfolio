@@ -29,26 +29,27 @@ contract RMM01PortfolioInvariants is Setup {
      */
     InvariantGhostState private _ghostInvariant;
 
-    HandlerPortfolio internal _Portfolio;
+    HandlerPortfolio internal _portfolio;
     HandlerExternal internal _external;
 
     function setUp() public override {
         super.setUp();
 
-        _Portfolio = new HandlerPortfolio();
+        _portfolio = new HandlerPortfolio();
 
         {
-            bytes4[] memory selectors = new bytes4[](6);
+            bytes4[] memory selectors = new bytes4[](7);
             selectors[0] = HandlerPortfolio.deposit.selector;
             selectors[1] = HandlerPortfolio.fund_asset.selector;
             selectors[2] = HandlerPortfolio.fund_quote.selector;
             selectors[3] = HandlerPortfolio.create_pool.selector;
             selectors[4] = HandlerPortfolio.allocate.selector;
             selectors[5] = HandlerPortfolio.deallocate.selector;
+            selectors[6] = HandlerPortfolio.random_processes.selector;
             targetSelector(
-                FuzzSelector({addr: address(_Portfolio), selectors: selectors})
+                FuzzSelector({addr: address(_portfolio), selectors: selectors})
             );
-            targetContract(address(_Portfolio));
+            targetContract(address(_portfolio));
         }
 
         // Create default pool, used in handlers via `usePool(uint)` modifier.
@@ -131,7 +132,7 @@ contract RMM01PortfolioInvariants is Setup {
     function invariant_callSummary() public view {
         console.log("Call summary:");
         console.log("-------------------");
-        _Portfolio.callSummary();
+        _portfolio.callSummary();
         console.log("pools created", getPoolIds().length);
     }
 
