@@ -174,6 +174,10 @@ struct Payment {
     uint256 amount;
 }
 
+struct TransientState {
+    address beneficiary; // Used in `allocate` to send liquidity to a target address.
+}
+
 // ===== Effects ===== //
 
 function changePoolLiquidity(

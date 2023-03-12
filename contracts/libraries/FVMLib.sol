@@ -39,7 +39,7 @@ bytes1 constant UNSET02 = 0x02;
 bytes1 constant DEALLOCATE = 0x03;
 bytes1 constant CLAIM = 0x04;
 bytes1 constant SWAP = 0x05;
-bytes1 constant UNSET06 = 0x06;
+bytes1 constant TRANSIENT = 0x06;
 bytes1 constant UNSET07 = 0x07;
 bytes1 constant UNSET08 = 0x08;
 bytes1 constant UNSET09 = 0x09;
@@ -353,4 +353,18 @@ function decodeSwap(bytes calldata data)
     uint8 pointer1 = uint8(data[pointer0]);
     input = AssemblyLib.toAmount(data[pointer0 + 1:pointer1]);
     output = AssemblyLib.toAmount(data[pointer1:data.length]);
+}
+
+function encodeTransient(address beneficiary)
+    pure
+    returns (bytes memory data)
+{
+    data = abi.encodePacked(TRANSIENT, beneficiary);
+}
+
+function decodeTransient(bytes calldata data)
+    pure
+    returns (address beneficiary)
+{
+    beneficiary = address(bytes20(data[1:]));
 }

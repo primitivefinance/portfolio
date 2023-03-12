@@ -269,8 +269,11 @@ abstract contract PortfolioVirtual is Objective {
             getLiquidityDeltas(poolId, AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
+        address beneficiary = _transientState.beneficiary;
+        if (beneficiary == address(0)) beneficiary = msg.sender;
+
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
-            owner: msg.sender,
+            owner: beneficiary,
             poolId: poolId,
             timestamp: block.timestamp,
             deltaAsset: deltaAsset,
@@ -665,6 +668,15 @@ abstract contract PortfolioVirtual is Objective {
             );
     }
 
+    TransientState internal _transientState;
+
+    event Transient(address indexed beneficiary);
+
+    function _transient(address beneficiary) internal {
+        _transientState.beneficiary = beneficiary;
+        emit Transient(beneficiary);
+    }
+
     // ===== Accounting System ===== //
 
     /**
@@ -775,6 +787,9 @@ abstract contract PortfolioVirtual is Objective {
             (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) =
                 FVM.decodeClaim(data);
             _claim(poolId, deltaAsset, deltaQuote);
+        } else if (instruction == FVM.TRANSIENT) {
+            (address beneficiary) = FVM.decodeTransient(data);
+            _transient(beneficiary);
         } else {
             revert InvalidInstruction();
         }
