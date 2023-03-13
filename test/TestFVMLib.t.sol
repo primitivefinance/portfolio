@@ -269,7 +269,7 @@ contract TestFVMLib is Test {
         target.decodePoolId_(data);
     }
 
-    function test_decodePairIdFromPoolId(
+    function testFuzz_decodePairIdFromPoolId(
         uint24 pairId, bool isMutable, uint32 poolNonce
     ) public {
         uint64 decodedPairId = decodePairIdFromPoolId(
