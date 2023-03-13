@@ -86,7 +86,6 @@ abstract contract HandlerBase is
 
     modifier createActor() {
         ctx.addGhostActor(msg.sender);
-        ctx.setGhostActor(msg.sender);
         _;
     }
 
