@@ -14,6 +14,7 @@ remappings = [
 [profile.optimized] # uses via_ir and optimizer
 via_ir = true
 optimizer_runs = 0
+optimizer = true
 out = 'optimized-out'
 
 [profile.test] # does not use optimizer
