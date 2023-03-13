@@ -14,6 +14,7 @@ contract HandlerPortfolio is HandlerBase {
         console.log("create", calls["create"]);
         console.log("allocate", calls["allocate"]);
         console.log("deallocate", calls["deallocate"]);
+        console.log("random-processes", calls["random-processes"]);
     }
 
     function deposit(
@@ -362,7 +363,14 @@ contract HandlerPortfolio is HandlerBase {
 
         // Execution
         prev = fetchAccountingState();
-        // todo: fix (deltaAsset, deltaQuote) = ctx.subject().allocate(ctx.ghost().poolId, deltaLiquidity);
+        (deltaAsset, deltaQuote) = ctx.subject().getLiquidityDeltas(
+            ctx.ghost().poolId, int128(uint128(deltaLiquidity))
+        );
+        ctx.subject().multiprocess(
+            FVM.encodeAllocate(
+                uint8(0), ctx.ghost().poolId, deltaLiquidity.safeCastTo128()
+            )
+        );
         post = fetchAccountingState();
 
         // Postconditions
@@ -532,6 +540,64 @@ contract HandlerPortfolio is HandlerBase {
         assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
 
         emit FinishedCall("Check Virtual Invariant");
+    }
+
+    function random_processes(
+        uint256 deltaLiquidity,
+        uint256 seed
+    )
+        public
+        countCall("random-processes")
+        createActor
+        useActor(seed)
+        usePool(seed)
+    {
+        deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
+        uint8 totalCalls = uint8(seed % 10); // up to 10 random calls
+        for (uint256 i; i != totalCalls; ++i) {
+            if (i % 6 == 0) {
+                (uint256 amt0, uint256 amt1) = ctx.ghost().pool()
+                    .getPoolLiquidityDeltas(int128(uint128(deltaLiquidity)));
+                bool sellAsset = i % 2 == 0;
+                uint128 amountIn = uint128((sellAsset ? amt0 : amt1) / 10);
+                uint128 amountOut = ctx.subject().getAmountOut(
+                    ctx.ghost().poolId, sellAsset, amountIn
+                ).safeCastTo128();
+                instructions.push(
+                    FVM.encodeSwap(
+                        uint8(0),
+                        ctx.ghost().poolId,
+                        amountIn,
+                        amountOut,
+                        uint8(sellAsset ? 1 : 0)
+                    )
+                );
+            } else if (i % 2 == 0) {
+                instructions.push(
+                    FVM.encodeAllocate(
+                        uint8(0), ctx.ghost().poolId, uint128(deltaLiquidity)
+                    )
+                );
+            } else {
+                instructions.push(
+                    FVM.encodeAllocate(
+                        uint8(0), ctx.ghost().poolId, uint128(deltaLiquidity)
+                    )
+                );
+                instructions.push(
+                    FVM.encodeDeallocate(
+                        uint8(0),
+                        ctx.ghost().poolId,
+                        uint128(deltaLiquidity) / 2
+                    )
+                );
+            }
+        }
+
+        bytes memory payload = FVM.encodeJumpInstruction(instructions);
+        ctx.subject().multiprocess(payload);
+
+        delete instructions;
     }
 
     event log(string, uint256);
