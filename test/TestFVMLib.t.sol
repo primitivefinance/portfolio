@@ -259,4 +259,13 @@ contract TestFVMLib is Test {
         assertEq(isMutable ? uint8(1) : uint8(0), isMutable_);
         assertEq(poolNonce, poolNonce_);
     }
+
+    function test_decodePoolId_RevertsBadLength() public {
+        bytes memory data = hex"aaaaaaaaaaaaaa";
+        vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(8), uint256(7)));
+        target.decodePoolId_(data);
+        data = hex"aaaaaaaaaaaaaaaaaa";
+        vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(8), uint256(9)));
+        target.decodePoolId_(data);
+    }
 }
