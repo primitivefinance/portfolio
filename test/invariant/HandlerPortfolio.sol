@@ -542,7 +542,7 @@ contract HandlerPortfolio is HandlerBase {
         emit FinishedCall("Check Virtual Invariant");
     }
 
-    function random_processes(
+    /* function random_processes(
         uint256 deltaLiquidity,
         uint256 seed
     )
@@ -598,7 +598,7 @@ contract HandlerPortfolio is HandlerBase {
         ctx.subject().multiprocess(payload);
 
         delete instructions;
-    }
+    } */
 
     event log(string, uint256);
     event log(string, int256);
