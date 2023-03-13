@@ -164,6 +164,14 @@ function encodeCreatePair(address token0, address token1) pure returns (bytes me
     data = abi.encodePacked(CREATE_PAIR, token0, token1);
 }
 
+/**
+ * @dev Decodes the paramters of a `CREATE_PAIR` operation.
+ * The data is expected to be encoded using the following format:\
+ * `0x | CREATE_PAIR (8 bits) | tokenAsset (20 bytes) | tokenQuote (20 bytes)`
+ * @param data Encoded `CREATE_PAIR` operation following the format above
+ * @return tokenAsset Address of the asset token
+ * @return tokenQuote Address of the quote token
+ */
 function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
     if (data.length != 41) revert InvalidBytesLength(41, data.length);
 
