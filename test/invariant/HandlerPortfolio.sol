@@ -351,13 +351,13 @@ contract HandlerPortfolio is HandlerBase {
 
         // If the user has to pay externally, give them tokens.
         if (transferAssetIn) {
-            ctx.ghost().asset().to_token().mint(
-                ctx.actor(), physicalAssetPayment
+            ctx.ghost().asset().prepare(
+                ctx.actor(), address(ctx.subject()), physicalAssetPayment
             );
         }
         if (transferQuoteIn) {
-            ctx.ghost().quote().to_token().mint(
-                ctx.actor(), physicalQuotePayment
+            ctx.ghost().quote().prepare(
+                ctx.actor(), address(ctx.subject()), physicalQuotePayment
             );
         }
 
@@ -450,7 +450,6 @@ contract HandlerPortfolio is HandlerBase {
 
         // Get some liquidity.
         PortfolioPosition memory pos = ctx.ghost().position(ctx.actor());
-        require(pos.freeLiquidity >= deltaLiquidity, "Not enough liquidity");
 
         if (pos.freeLiquidity >= deltaLiquidity) {
             // Preconditions
