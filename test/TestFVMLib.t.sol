@@ -130,12 +130,11 @@ contract TestFVMLib is Test {
     }
 
     function test_decodeClaim() public {
-        bytes memory data = hex"10032a0609081204";
+        bytes memory data = hex"10ffffffffffffffff0c062a1201";
         (uint64 poolId, uint128 fee0, uint128 fee1) = target.decodeClaim_(data);
-
-        assertEq(poolId, 42);
-        assertEq(fee0, 8000 * 10 ** 6);
-        assertEq(fee1, 4 * 10 ** 18);
+        assertEq(poolId, uint64(0xffffffffffffffff));
+        assertEq(fee0, 42 * 10 ** 6);
+        assertEq(fee1, 1 * 10 ** 18);
     }
 
     function testFuzz_decodeCreatePair(address token0, address token1) public {
