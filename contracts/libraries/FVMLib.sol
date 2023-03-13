@@ -32,10 +32,7 @@ pragma solidity 0.8.13;
 
 import "./AssemblyLib.sol";
 
-uint8 constant INSTRUCTION_CODE_SIZE_BYTES = 1;
-uint8 constant INSTRUCTION_LENGTH_SIZE_BYTES = 1;
-uint8 constant TOTAL_INSTRUCTIONS_INDEX = 1;
-uint8 constant JUMP_PROCESS_START_POINTER_INDEX = 2;
+uint8 constant JUMP_PROCESS_START_POINTER = 2;
 bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
@@ -100,10 +97,10 @@ error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
  */
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
     // Encoded `data`:| 0x | opcode | amount instructions | instruction length | instruction |
-    uint8 totalInstructions = uint8(data[TOTAL_INSTRUCTIONS_INDEX]);
+    uint8 totalInstructions = uint8(data[1]);
     // The "pointer" is pointing to the first byte of an instruction,
     // which holds the data for the instruction's length in bytes.
-    uint256 idxPtr = JUMP_PROCESS_START_POINTER_INDEX;
+    uint256 idxPtr = JUMP_PROCESS_START_POINTER;
     // As the instructions are processed,
     // the pointer moves from the end to the start.
     uint256 idxInstructionStart;
@@ -115,9 +112,8 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
         // Compute the index of the next pointer by summing
         // the current pointer value, the length of the instruction,
         // and the amount of bytes the instruction length takes (which is 1 byte).
-        idxInstructionEnd = idxInstructionStart
-            + uint8(bytes1(data[idxInstructionStart]))
-            + INSTRUCTION_LENGTH_SIZE_BYTES;
+        idxInstructionEnd =
+            idxInstructionStart + uint8(bytes1(data[idxInstructionStart])) + 1;
         // Make sure the pointer is not out of bounds.
         if (idxInstructionEnd > data.length) {
             revert InvalidJump(idxInstructionEnd);
@@ -129,7 +125,7 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
         idxPtr = idxInstructionEnd;
         // Process the instruction after removing the instruction length,
         // so only instruction data is passed to `_process`.
-        _process(instruction[INSTRUCTION_LENGTH_SIZE_BYTES:]);
+        _process(instruction[1:]);
     }
 }
 
@@ -140,23 +136,22 @@ function decodeJumpInstructions(bytes calldata data)
     pure
     returns (bytes[] memory)
 {
-    uint8 totalInstructions = uint8(data[TOTAL_INSTRUCTIONS_INDEX]);
-    uint256 idxPtr = JUMP_PROCESS_START_POINTER_INDEX;
+    uint8 totalInstructions = uint8(data[1]);
+    uint256 idxPtr = JUMP_PROCESS_START_POINTER;
     uint256 idxInstructionStart;
     uint256 idxInstructionEnd;
     bytes[] memory instructions = new bytes[](totalInstructions);
     for (uint256 i; i != totalInstructions; ++i) {
         idxInstructionStart = idxPtr;
-        idxInstructionEnd = idxInstructionStart
-            + uint8(bytes1(data[idxInstructionStart]))
-            + INSTRUCTION_LENGTH_SIZE_BYTES;
+        idxInstructionEnd =
+            idxInstructionStart + uint8(bytes1(data[idxInstructionStart])) + 1;
         if (idxInstructionEnd > data.length) {
             revert InvalidJump(idxInstructionEnd);
         }
         bytes calldata instruction = data[idxInstructionStart:idxInstructionEnd];
         idxPtr = idxInstructionEnd;
 
-        instructions[i] = instruction[INSTRUCTION_LENGTH_SIZE_BYTES:];
+        instructions[i] = instruction[1:];
     }
 
     return instructions;
