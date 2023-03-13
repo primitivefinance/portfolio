@@ -121,10 +121,13 @@ function decodePoolId(bytes calldata data)
 {
     if (data.length != 8) revert InvalidBytesLength(8, data.length);
 
-    poolId = uint64(bytes8(data));
-    pairId = uint24(bytes3(data[:3]));
-    isMutable = uint8(bytes1(data[3:4]));
-    poolNonce = uint32(bytes4(data[4:]));
+    assembly {
+        let value := calldataload(data.offset)
+        poolId := shr(192, value)
+        pairId := shr(232, value)
+        isMutable := shr(248, shl(24, value))
+        poolNonce := shr(224, shl(32, value))
+    }
 }
 
 function encodeCreatePair(address token0, address token1) pure returns (bytes memory data) {
