@@ -96,8 +96,10 @@ function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes 
     return payload;
 }
 
-function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24) {
-    return uint24(poolId >> 40);
+function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24 pairId) {
+    assembly {
+        pairId := shr(40, poolId)
+    }
 }
 
 /**
