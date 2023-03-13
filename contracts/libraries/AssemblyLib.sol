@@ -28,9 +28,17 @@ library AssemblyLib {
      * assertTrue(value);
      * ```
      */
-    function isBetween(uint256 value, uint256 lower, uint256 upper) internal pure returns (bool valid) {
+    function isBetween(
+        uint256 value,
+        uint256 lower,
+        uint256 upper
+    ) internal pure returns (bool valid) {
         assembly {
-            valid := and(or(eq(value, lower), gt(value, lower)), or(eq(value, upper), lt(value, upper)))
+            valid :=
+                and(
+                    or(eq(value, lower), gt(value, lower)),
+                    or(eq(value, upper), lt(value, upper))
+                )
         }
     }
 
@@ -64,12 +72,18 @@ library AssemblyLib {
      * assertEq(output, uint128(10));
      * ```
      */
-    function addSignedDelta(uint128 input, int128 delta) internal pure returns (uint128 output) {
-        bytes memory revertData = abi.encodeWithSelector(InvalidLiquidity.selector);
+    function addSignedDelta(
+        uint128 input,
+        int128 delta
+    ) internal pure returns (uint128 output) {
+        bytes memory revertData =
+            abi.encodeWithSelector(InvalidLiquidity.selector);
         assembly {
             output := add(input, delta)
             // Reverts on overflow.
-            if gt(output, 0xffffffffffffffffffffffffffffffff) { revert(add(32, revertData), mload(revertData)) } // 0x1fff9681
+            if gt(output, 0xffffffffffffffffffffffffffffffff) {
+                revert(add(32, revertData), mload(revertData))
+            } // 0x1fff9681
         }
     }
 
@@ -85,7 +99,10 @@ library AssemblyLib {
      * assertEq(checkpoint, 122);
      * ```
      */
-    function computeCheckpoint(uint256 present, uint256 delta) internal pure returns (uint256 checkpoint) {
+    function computeCheckpoint(
+        uint256 present,
+        uint256 delta
+    ) internal pure returns (uint256 checkpoint) {
         // Overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
         assembly {
             checkpoint := add(present, delta)
@@ -101,7 +118,10 @@ library AssemblyLib {
      * assertEq(distance, 25);
      * ```
      */
-    function computeCheckpointDistance(uint256 present, uint256 past) internal pure returns (uint256 distance) {
+    function computeCheckpointDistance(
+        uint256 present,
+        uint256 past
+    ) internal pure returns (uint256 distance) {
         // Underflow by design, as these are checkpoints which can measure the distance even if underflowed.
         assembly {
             distance := sub(present, past)
@@ -113,12 +133,18 @@ library AssemblyLib {
      * are human readable.
      * @dev Reverts on overflow.
      */
-    function convertDaysToSeconds(uint256 amountDays) internal pure returns (uint256 amountSeconds) {
+    function convertDaysToSeconds(uint256 amountDays)
+        internal
+        pure
+        returns (uint256 amountSeconds)
+    {
         bytes memory revertData = abi.encodeWithSelector(InvalidDays.selector);
         assembly {
             amountSeconds := mul(amountDays, SECONDS_PER_DAY)
             // Reverts on overflow.
-            if gt(amountSeconds, 0xffffffffffffffffffffffffffffffff) { revert(add(32, revertData), mload(revertData)) }
+            if gt(amountSeconds, 0xffffffffffffffffffffffffffffffff) {
+                revert(add(32, revertData), mload(revertData))
+            }
         }
     }
 
@@ -169,7 +195,11 @@ library AssemblyLib {
      * (bytes1 upper, bytes1 lower) = separate(0x12);
      * ```
      */
-    function separate(bytes1 data) internal pure returns (bytes1 upper, bytes1 lower) {
+    function separate(bytes1 data)
+        internal
+        pure
+        returns (bytes1 upper, bytes1 lower)
+    {
         upper = data >> 4;
         lower = data & 0x0f;
     }
@@ -184,7 +214,10 @@ library AssemblyLib {
      * bytes1 0x21 = pack(0x20, 0x01);
      * ```
      */
-    function pack(bytes1 upper, bytes1 lower) internal pure returns (bytes1 data) {
+    function pack(
+        bytes1 upper,
+        bytes1 lower
+    ) internal pure returns (bytes1 data) {
         data = (upper << 4) | lower;
     }
 
@@ -194,13 +227,21 @@ library AssemblyLib {
      * - First byte: Amount of trailing zeros.
      * - Rest of the array: A hexadecimal number.
      */
-    function toAmount(bytes calldata raw) internal pure returns (uint128 amount) {
+    function toAmount(bytes calldata raw)
+        internal
+        pure
+        returns (uint128 amount)
+    {
         uint8 power = uint8(raw[0]);
         amount = uint128(toBytes16(raw[1:raw.length]));
         if (power != 0) amount = amount * uint128(10 ** power);
     }
 
-    function fromAmount(uint128 amount) internal pure returns (uint8 power, uint128 base) {
+    function fromAmount(uint128 amount)
+        internal
+        pure
+        returns (uint8 power, uint128 base)
+    {
         if (amount == 0) return (0, 0);
         base = amount;
 
@@ -214,39 +255,58 @@ library AssemblyLib {
      * @dev Scalars are used to convert token amounts between the token's decimal units
      * and WAD (10^18) units.
      */
-    function computeScalar(uint256 decimals) internal pure returns (uint256 scalar) {
+    function computeScalar(uint256 decimals)
+        internal
+        pure
+        returns (uint256 scalar)
+    {
         return 10 ** (MAX_DECIMALS - decimals); // can revert on underflow
     }
 
-    function scaleToWad(uint256 amountDec, uint256 decimals) internal pure returns (uint256 outputWad) {
+    function scaleToWad(
+        uint256 amountDec,
+        uint256 decimals
+    ) internal pure returns (uint256 outputWad) {
         uint256 factor = computeScalar(decimals);
         assembly {
             outputWad := mul(amountDec, factor)
         }
     }
 
-    function scaleFromWadUp(uint256 amountWad, uint256 decimals) internal pure returns (uint256 outputDec) {
+    function scaleFromWadUp(
+        uint256 amountWad,
+        uint256 decimals
+    ) internal pure returns (uint256 outputDec) {
         uint256 factor = computeScalar(decimals);
         assembly {
             outputDec := add(div(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
         }
     }
 
-    function scaleFromWadDown(uint256 amountWad, uint256 decimals) internal pure returns (uint256 outputDec) {
+    function scaleFromWadDown(
+        uint256 amountWad,
+        uint256 decimals
+    ) internal pure returns (uint256 outputDec) {
         uint256 factor = computeScalar(decimals);
         assembly {
             outputDec := div(amountWad, factor)
         }
     }
 
-    function scaleFromWadUpSigned(int256 amountWad, uint256 decimals) internal pure returns (int256 outputDec) {
+    function scaleFromWadUpSigned(
+        int256 amountWad,
+        uint256 decimals
+    ) internal pure returns (int256 outputDec) {
         int256 factor = int256(computeScalar(decimals));
         assembly {
             outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
         }
     }
 
-    function scaleFromWadDownSigned(int256 amountWad, uint256 decimals) internal pure returns (int256 outputDec) {
+    function scaleFromWadDownSigned(
+        int256 amountWad,
+        uint256 decimals
+    ) internal pure returns (int256 outputDec) {
         int256 factor = int256(computeScalar(decimals));
         assembly {
             outputDec := sdiv(amountWad, factor)

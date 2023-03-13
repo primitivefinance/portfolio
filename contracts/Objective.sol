@@ -14,19 +14,29 @@ abstract contract Objective is IPortfolio {
     /**
      * @dev Used to apply changes to `_state`.
      */
-    function _afterSwapEffects(uint64 poolId, Iteration memory iteration) internal virtual returns (bool);
+    function _afterSwapEffects(
+        uint64 poolId,
+        Iteration memory iteration
+    ) internal virtual returns (bool);
 
     /**
      * @dev Used to apply changes to a `pool`, like it's timestamp, before a swap occurs.
      */
-    function _beforeSwapEffects(uint64 poolId) internal virtual returns (bool success, int256 invariant);
+    function _beforeSwapEffects(uint64 poolId)
+        internal
+        virtual
+        returns (bool success, int256 invariant);
 
     /**
      * @dev Conditional check made before changing `pool.liquidity` and `position.freeLiquidity`.
      * @param delta Signed quantity of liquidity in WAD units to change liquidity by.
      * @return True if position liquidity can be changed by `delta` amount.
      */
-    function checkPosition(uint64 poolId, address owner, int256 delta) public view virtual returns (bool);
+    function checkPosition(
+        uint64 poolId,
+        address owner,
+        int256 delta
+    ) public view virtual returns (bool);
 
     /**
      * @dev Conditional check before interacting with a pool.
@@ -68,10 +78,19 @@ abstract contract Objective is IPortfolio {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn
-    ) public view virtual override(IPortfolioGetters) returns (uint256 output);
+    )
+        public
+        view
+        virtual
+        override(IPortfolioGetters)
+        returns (uint256 output);
 
     /**
      * @dev Estimates the `price` of a pool with `poolId` given the pool's reserves.
      */
-    function getLatestEstimatedPrice(uint64 poolId) public view virtual returns (uint256 price);
+    function getLatestEstimatedPrice(uint64 poolId)
+        public
+        view
+        virtual
+        returns (uint256 price);
 }

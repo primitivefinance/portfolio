@@ -40,9 +40,13 @@ contract TestPortfolioFund is Setup {
         // Store ghost variables
         FundGhostVariables memory ghost_state_prev = FundGhostVariables({
             userAddressBalance: ghost().asset().to_token().balanceOf(address(this)),
-            userSubjectBalance: ghost().balance(address(this), ghost().asset().to_addr()),
+            userSubjectBalance: ghost().balance(
+                address(this), ghost().asset().to_addr()
+                ),
             subjectReserveBalance: ghost().reserve(ghost().asset().to_addr()),
-            subjectActualBalance: ghost().asset().to_token().balanceOf(address(subject()))
+            subjectActualBalance: ghost().asset().to_token().balanceOf(
+                address(subject())
+                )
         });
 
         // Fund the account.
@@ -51,17 +55,25 @@ contract TestPortfolioFund is Setup {
         // Store the variables after funding.
         FundGhostVariables memory ghost_state_post = FundGhostVariables({
             userAddressBalance: ghost().asset().to_token().balanceOf(address(this)),
-            userSubjectBalance: ghost().balance(address(this), ghost().asset().to_addr()),
+            userSubjectBalance: ghost().balance(
+                address(this), ghost().asset().to_addr()
+                ),
             subjectReserveBalance: ghost().reserve(ghost().asset().to_addr()),
-            subjectActualBalance: ghost().asset().to_token().balanceOf(address(subject()))
+            subjectActualBalance: ghost().asset().to_token().balanceOf(
+                address(subject())
+                )
         });
 
         // Check to make sure balances increased.
         assertEq(
-            ghost_state_post.userAddressBalance, ghost_state_prev.userAddressBalance - amt, "user-addr-balance-post"
+            ghost_state_post.userAddressBalance,
+            ghost_state_prev.userAddressBalance - amt,
+            "user-addr-balance-post"
         );
         assertEq(
-            ghost_state_post.userSubjectBalance, ghost_state_prev.userSubjectBalance + amt, "user-subj-balance-post"
+            ghost_state_post.userSubjectBalance,
+            ghost_state_prev.userSubjectBalance + amt,
+            "user-subj-balance-post"
         );
         assertEq(
             ghost_state_post.subjectReserveBalance,
@@ -75,26 +87,42 @@ contract TestPortfolioFund is Setup {
         );
 
         // Max draw tokens.
-        subject().draw(ghost().asset().to_addr(), type(uint256).max, address(this));
+        subject().draw(
+            ghost().asset().to_addr(), type(uint256).max, address(this)
+        );
 
         // Get final variables.
         FundGhostVariables memory ghost_state_final = FundGhostVariables({
             userAddressBalance: ghost().asset().to_token().balanceOf(address(this)),
-            userSubjectBalance: ghost().balance(address(this), ghost().asset().to_addr()),
+            userSubjectBalance: ghost().balance(
+                address(this), ghost().asset().to_addr()
+                ),
             subjectReserveBalance: ghost().reserve(ghost().asset().to_addr()),
-            subjectActualBalance: ghost().asset().to_token().balanceOf(address(subject()))
+            subjectActualBalance: ghost().asset().to_token().balanceOf(
+                address(subject())
+                )
         });
 
         // Ghost assertions.
-        assertEq(ghost_state_final.userAddressBalance, ghost_state_prev.userAddressBalance, "user-addr-balance-final");
-        assertEq(ghost_state_final.userSubjectBalance, ghost_state_prev.userSubjectBalance, "user-subj-balance-final");
+        assertEq(
+            ghost_state_final.userAddressBalance,
+            ghost_state_prev.userAddressBalance,
+            "user-addr-balance-final"
+        );
+        assertEq(
+            ghost_state_final.userSubjectBalance,
+            ghost_state_prev.userSubjectBalance,
+            "user-subj-balance-final"
+        );
         assertEq(
             ghost_state_final.subjectReserveBalance,
             ghost_state_prev.subjectReserveBalance,
             "subj-reserve-balance-final"
         );
         assertEq(
-            ghost_state_final.subjectActualBalance, ghost_state_prev.subjectActualBalance, "subj-actual-balance-final"
+            ghost_state_final.subjectActualBalance,
+            ghost_state_prev.subjectActualBalance,
+            "subj-actual-balance-final"
         );
     }
 }

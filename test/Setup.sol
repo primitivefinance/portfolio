@@ -51,19 +51,24 @@ contract Setup is Test {
      */
     SubjectsState private _subjects;
 
-    receive() external payable {}
+    receive() external payable { }
 
     /**
      * @notice Deploys WETH, subject, and three tokens. Creates a default pool.
      * @dev Initializes the actor, subject, and poolId ghost state.
      */
     function setUp() public virtual {
-        _subjects.startDeploy(vm).wrapper().subject().token("token", abi.encode("Asset-Std", "A-STD-18", uint8(18)))
-            .token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
+        _subjects.startDeploy(vm).wrapper().subject().token(
+            "token", abi.encode("Asset-Std", "A-STD-18", uint8(18))
+        ).token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
             "token", abi.encode("USDC", "USDC-6", uint8(6))
         ).stopDeploy();
 
-        _ghost = GhostState({actor: _subjects.deployer, subject: address(_subjects.last), poolId: 0});
+        _ghost = GhostState({
+            actor: _subjects.deployer,
+            subject: address(_subjects.last),
+            poolId: 0
+        });
     }
 
     function setGhostPoolId(uint64 poolId) public virtual {
@@ -129,7 +134,12 @@ contract Setup is Test {
         return actors;
     }
 
-    function getRandomActor(uint256 index) public view virtual returns (address) {
+    function getRandomActor(uint256 index)
+        public
+        view
+        virtual
+        returns (address)
+    {
         return _actors.rand(index);
     }
 
@@ -137,7 +147,9 @@ contract Setup is Test {
 
     modifier isArmed() {
         require(ghost().poolId != 0, "did you forget to use a config modifier?");
-        require(ghost().subject != address(0), "did you forget to deploy a subject?");
+        require(
+            ghost().subject != address(0), "did you forget to deploy a subject?"
+        );
         require(ghost().actor != address(0), "did you forget to set an actor?");
         _;
     }
@@ -150,8 +162,16 @@ contract Setup is Test {
 
     modifier usePairTokens(uint256 amount) {
         // Approve and mint tokens for actor.
-        ghost().asset().prepare({owner: actor(), spender: address(subject()), amount: amount});
-        ghost().quote().prepare({owner: actor(), spender: address(subject()), amount: amount});
+        ghost().asset().prepare({
+            owner: actor(),
+            spender: address(subject()),
+            amount: amount
+        });
+        ghost().quote().prepare({
+            owner: actor(),
+            spender: address(subject()),
+            amount: amount
+        });
         _;
     }
 
@@ -163,54 +183,66 @@ contract Setup is Test {
      * ```
      */
     modifier defaultConfig() {
-        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
-            "quote", abi.encode(address(subjects().tokens[1]))
-        ).generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[0]))
+        ).edit("quote", abi.encode(address(subjects().tokens[1]))).generate(
+            address(subject())
+        );
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier defaultControlledConfig() {
-        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
-            "quote", abi.encode(address(subjects().tokens[1]))
-        ).edit("controller", abi.encode(address(this))).generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[0]))
+        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
+            "controller", abi.encode(address(this))
+        ).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier sixDecimalQuoteConfig() {
-        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
-            "quote", abi.encode(address(subjects().tokens[2]))
-        ).generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[0]))
+        ).edit("quote", abi.encode(address(subjects().tokens[2]))).generate(
+            address(subject())
+        );
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier wethConfig() {
-        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().weth))).edit(
-            "quote", abi.encode(address(subjects().tokens[1]))
-        ).generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().weth))
+        ).edit("quote", abi.encode(address(subjects().tokens[1]))).generate(
+            address(subject())
+        );
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier durationConfig(uint16 duration) {
-        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
-            "quote", abi.encode(address(subjects().tokens[1]))
-        ).edit("duration", abi.encode(duration)).generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[0]))
+        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
+            "duration", abi.encode(duration)
+        ).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
     }
 
     modifier volatilityConfig(uint16 volatility) {
-        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
-            "quote", abi.encode(address(subjects().tokens[1]))
-        ).edit("volatility", abi.encode(volatility)).generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[0]))
+        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
+            "volatility", abi.encode(volatility)
+        ).generate(address(subject()));
 
         setGhostPoolId(poolId);
         _;
@@ -221,36 +253,50 @@ contract Setup is Test {
      */
     modifier noJit() {
         uint256 LIQUIDITY_POLICY_STORAGE_SLOT = 11;
-        vm.store(address(subject()), bytes32(LIQUIDITY_POLICY_STORAGE_SLOT), bytes32(0));
+        vm.store(
+            address(subject()),
+            bytes32(LIQUIDITY_POLICY_STORAGE_SLOT),
+            bytes32(0)
+        );
         _;
     }
 
     modifier allocateSome(uint128 amt) {
-        subject().multiprocess(FVMLib.encodeAllocate(uint8(0), ghost().poolId, amt));
+        subject().multiprocess(
+            FVMLib.encodeAllocate(uint8(0), ghost().poolId, amt)
+        );
         _;
     }
 
     modifier deallocateSome(uint128 amt) {
-        subject().multiprocess(FVMLib.encodeDeallocate(uint8(0), ghost().poolId, amt));
+        subject().multiprocess(
+            FVMLib.encodeDeallocate(uint8(0), ghost().poolId, amt)
+        );
         _;
     }
 
     modifier swapSome(uint128 amt, bool sellAsset) {
-        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt).safeCastTo128();
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt)
+            .safeCastTo128();
         subject().multiprocess(
-            FVM.encodeSwap(uint8(0), ghost().poolId, amt, amtOut, uint8(sellAsset ? 1 : 0))
+            FVM.encodeSwap(
+                uint8(0), ghost().poolId, amt, amtOut, uint8(sellAsset ? 1 : 0)
+            )
         );
         _;
     }
 
     modifier swapSomeGetOut(uint128 amt, int256 amtOutDelta, bool sellAsset) {
-        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt).safeCastTo128();
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt)
+            .safeCastTo128();
         amtOut = amtOutDelta > 0
             ? amtOut + uint256(amtOutDelta).safeCastTo128()
             : amtOut - uint256(-amtOutDelta).safeCastTo128();
 
         subject().multiprocess(
-            FVM.encodeSwap(uint8(0), ghost().poolId, amt, amtOut, uint8(sellAsset ? 1 : 0))
+            FVM.encodeSwap(
+                uint8(0), ghost().poolId, amt, amtOut, uint8(sellAsset ? 1 : 0)
+            )
         );
         _;
     }
