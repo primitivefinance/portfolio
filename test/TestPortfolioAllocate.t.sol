@@ -207,4 +207,41 @@ contract TestPortfolioAllocate is Setup {
             })
         );
     }
+
+    function test_allocate_fee_on_transfer_token()
+        public
+        feeOnTokenTransferConfig
+        usePairTokens(10 ether)
+        useActor
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        (uint256 amount0, uint256 amount1) =
+            subject().getLiquidityDeltas(ghost().poolId, int128(amount));
+        uint256 fee0 = amount0 * 1 / 100;
+        uint256 fee1 = amount1 * 1 / 100;
+
+        // Tokens are popped, and quote token is last in allocate, so it reverts first.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                NegativeBalance.selector,
+                ghost().quote().to_addr(),
+                -int256(fee1)
+            )
+        );
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
+
+        int256 net = ghost().net(ghost().quote().to_addr());
+
+        console.logInt(net);
+        assertTrue(net >= 0, "Negative net balance for token");
+    }
 }

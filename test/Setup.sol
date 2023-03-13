@@ -37,6 +37,8 @@ import "./HelperUtils.sol" as Utils;
  */
 contract Setup is Test {
     using SafeCastLib for uint256;
+
+    uint256 internal constant JIT_LIQUIDITY_POLICY_STORAGE_SLOT = 12; // UPDATE IF STORAGE CHANGES.
     /**
      * @dev Manages the addresses calling the subjects in the environment.
      */
@@ -62,6 +64,8 @@ contract Setup is Test {
             "token", abi.encode("Asset-Std", "A-STD-18", uint8(18))
         ).token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
             "token", abi.encode("USDC", "USDC-6", uint8(6))
+        ).token("FOT", abi.encode("Asset-FOT", "A-FOT-18", uint8(18))).token(
+            "FOT", abi.encode("Quote-FOT", "Q-FOT-18", uint8(18))
         ).stopDeploy();
 
         _ghost = GhostState({
@@ -215,6 +219,17 @@ contract Setup is Test {
         _;
     }
 
+    modifier feeOnTokenTransferConfig() {
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[3]))
+        ).edit("quote", abi.encode(address(subjects().tokens[4]))).generate(
+            address(subject())
+        );
+
+        setGhostPoolId(poolId);
+        _;
+    }
+
     modifier wethConfig() {
         uint64 poolId = Configs.fresh().edit(
             "asset", abi.encode(address(subjects().weth))
@@ -252,10 +267,9 @@ contract Setup is Test {
      * @dev Sets internal default jit protection seconds value to 0.
      */
     modifier noJit() {
-        uint256 LIQUIDITY_POLICY_STORAGE_SLOT = 11;
         vm.store(
             address(subject()),
-            bytes32(LIQUIDITY_POLICY_STORAGE_SLOT),
+            bytes32(JIT_LIQUIDITY_POLICY_STORAGE_SLOT),
             bytes32(0)
         );
         _;

@@ -68,6 +68,7 @@ error InvalidTransfer();
 error InvalidVolatility(uint24 sigma); // todo: fix, use uint16 type.
 error JitLiquidity(uint256 distance);
 error MaxFee(uint16 fee);
+error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
 error NonExistentPosition(address owner, uint64 poolId);

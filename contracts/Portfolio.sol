@@ -40,9 +40,8 @@ abstract contract PortfolioVirtual is Objective {
     address public immutable WETH;
     /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
-    /// @inheritdoc IPortfolioGetters
-    uint32 public getPoolNonce;
 
+    mapping(uint24 => uint32) public getPoolNonce;
     mapping(uint24 => PortfolioPair) public pairs;
     mapping(uint64 => PortfolioPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
@@ -631,7 +630,7 @@ abstract contract PortfolioVirtual is Objective {
         if (pairNonce == 0) revert InvalidPair();
 
         bool hasController = controller != address(0);
-        uint32 poolNonce = ++getPoolNonce;
+        uint32 poolNonce = ++getPoolNonce[pairNonce];
         poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
 
         PortfolioPool storage pool = pools[poolId];
@@ -824,8 +823,6 @@ abstract contract PortfolioVirtual is Objective {
                 }
             }
 
-            // Token considered fully accounted for.
-            __account__.warm.pop();
             unchecked {
                 --i; // Cannot underflow because loop exits at 0!
             }
@@ -843,6 +840,19 @@ abstract contract PortfolioVirtual is Objective {
                 --px; // Cannot underflow because loop exits at 0!
             }
         }
+
+        // Sanity check the settlement invariant, which should be positive.
+        i = tokens.length;
+        do {
+            address token = tokens[i - 1];
+            int256 net = __account__.getNetBalance(token, address(this));
+            if (net < 0) revert NegativeBalance(token, net);
+            // Token considered fully accounted for.
+            __account__.warm.pop();
+            unchecked {
+                --i; // Cannot underflow because loop exits at 0!
+            }
+        } while (i != 0);
 
         __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;

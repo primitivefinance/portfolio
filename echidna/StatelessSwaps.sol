@@ -6,7 +6,7 @@ import "forge-std/StdCheats.sol";
 import "forge-std/Test.sol";
 import "solmate/tokens/WETH.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
-import {RMM01Portfolio as Portfolio} from "contracts/RMM01Portfolio.sol";
+import { RMM01Portfolio as Portfolio } from "contracts/RMM01Portfolio.sol";
 import "../Setup.sol";
 import "./Helper.sol";
 
@@ -66,7 +66,11 @@ contract StatelessSwaps is Helper, Test {
     uint16 fee = 1;
     uint64 poolId;
 
-    function bound(uint256 random, uint256 low, uint256 high) internal pure override returns (uint256) {
+    function bound(
+        uint256 random,
+        uint256 low,
+        uint256 high
+    ) internal pure override returns (uint256) {
         return between(random, low, high + 1);
     }
 
@@ -93,31 +97,44 @@ contract StatelessSwaps is Helper, Test {
             vm.prank(alice);
             createPool(vol, tau, uint128(stk), uint128(price));
             // Allocate liquidity.
-            (uint256 amountAsset, uint256 amountQuote) = portfolio.getReserves(poolId);
+            (uint256 amountAsset, uint256 amountQuote) =
+                portfolio.getReserves(poolId);
 
             // Need to bound liquidity accordingly,
             // so that the required tokens (= amount * liquidity) don't overflow.
             liquidity = bound(liquidity, 1, uint128(type(int128).max));
             if (amountAsset != 0) {
-                liquidity = bound(liquidity, amountAsset, (uint128(type(int128).max) + amountAsset - 1) / amountAsset);
+                liquidity = bound(
+                    liquidity,
+                    amountAsset,
+                    (uint128(type(int128).max) + amountAsset - 1) / amountAsset
+                );
             }
             if (amountQuote != 0) {
-                liquidity = bound(liquidity, amountQuote, (uint128(type(int128).max) + amountQuote - 1) / amountQuote);
+                liquidity = bound(
+                    liquidity,
+                    amountQuote,
+                    (uint128(type(int128).max) + amountQuote - 1) / amountQuote
+                );
             }
 
             emit LogUint256("Allocating liquidity:", liquidity);
 
             vm.prank(alice);
-            portfolio.multiprocess(FVMLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity)));
+            portfolio.multiprocess(
+                FVMLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity))
+            );
         }
 
         // Update stk to what portfolio stores, otherwise calculations will be inexcat.
         emit LogUint256("stk", stk);
         {
-            PortfolioPool memory pool = IPortfolioStruct(address(portfolio)).pools(poolId);
+            PortfolioPool memory pool =
+                IPortfolioStruct(address(portfolio)).pools(poolId);
 
             // Compute reserves to determine max input and output.
-            (uint256 R_y, uint256 R_x) = RMM01Lib.computeReservesWithPrice(pool, price, 0);
+            (uint256 R_y, uint256 R_x) =
+                RMM01Lib.computeReservesWithPrice(pool, price, 0);
 
             uint256 maxInput;
             uint256 maxOutput;
@@ -153,7 +170,9 @@ contract StatelessSwaps is Helper, Test {
         uint256 maxErr = 100 * 1e18;
 
         // Swapping back and forth should not succeed if `output > input` under normal circumstances.
-        (bool success,) = swapBackAndForthCall(sell, uint128(input), uint128(output), uint128(input + maxErr));
+        (bool success,) = swapBackAndForthCall(
+            sell, uint128(input), uint128(output), uint128(input + maxErr)
+        );
 
         //
         if (success) {
@@ -163,11 +182,19 @@ contract StatelessSwaps is Helper, Test {
             // console.log("R_y", R_y);
             // console.log("bal asset", portfolio.getBalance(self, address(asset)));
             // console.log("bal quote", portfolio.getBalance(self, address(quote)));
-            portfolio.draw(address(asset), portfolio.getBalance(self, address(asset)), self);
-            portfolio.draw(address(quote), portfolio.getBalance(self, address(quote)), self);
+            portfolio.draw(
+                address(asset), portfolio.getBalance(self, address(asset)), self
+            );
+            portfolio.draw(
+                address(quote), portfolio.getBalance(self, address(quote)), self
+            );
 
-            emit LogUint256("asset gain", asset.balanceOf(self) - INITIAL_BALANCE);
-            emit LogUint256("quote gain", quote.balanceOf(self) - INITIAL_BALANCE);
+            emit LogUint256(
+                "asset gain", asset.balanceOf(self) - INITIAL_BALANCE
+                );
+            emit LogUint256(
+                "quote gain", quote.balanceOf(self) - INITIAL_BALANCE
+                );
             emit AssertionFailed("Swap allowed to extract tokens");
             // fail();
         }
@@ -175,8 +202,24 @@ contract StatelessSwaps is Helper, Test {
 
     /* ----------------- helper ----------------- */
 
-    function createPool(uint256 volatility, uint256 duration, uint128 stk, uint128 price) internal returns (uint64) {
-        return createPool(address(asset), address(quote), self, priorityFee, fee, volatility, duration, 0, stk, price);
+    function createPool(
+        uint256 volatility,
+        uint256 duration,
+        uint128 stk,
+        uint128 price
+    ) internal returns (uint64) {
+        return createPool(
+            address(asset),
+            address(quote),
+            self,
+            priorityFee,
+            fee,
+            volatility,
+            duration,
+            0,
+            stk,
+            price
+        );
     }
 
     function createPool(
@@ -239,15 +282,23 @@ contract StatelessSwaps is Helper, Test {
             }
         }
 
-        poolId = FVM.encodePoolId(portfolio.getPairNonce(), true, portfolio.getPoolNonce());
+        uint24 pairNonce = portfolio.getPairNonce();
+        poolId =
+            FVM.encodePoolId(pairNonce, true, portfolio.getPoolNonce(pairNonce));
 
         console.log("PoolId", poolId);
 
         return poolId;
     }
 
-    function swapBackAndForth(bool sell, uint128 input, uint128 output1, uint128 output2) internal {
-        (bool success, bytes memory returndata) = swapBackAndForthCall(sell, input, output1, output2);
+    function swapBackAndForth(
+        bool sell,
+        uint128 input,
+        uint128 output1,
+        uint128 output2
+    ) internal {
+        (bool success, bytes memory returndata) =
+            swapBackAndForthCall(sell, input, output1, output2);
 
         if (!success) {
             assembly {
@@ -275,8 +326,10 @@ contract StatelessSwaps is Helper, Test {
         //     output2
         // );
 
-        instructions[0] = FVMLib.encodeSwap(0, poolId, 0, input, 0, output1, sell ? 0 : 1);
-        instructions[1] = FVMLib.encodeSwap(0, poolId, 0, output1, 0, output2, sell ? 1 : 0);
+        instructions[0] =
+            FVMLib.encodeSwap(0, poolId, 0, input, 0, output1, sell ? 0 : 1);
+        instructions[1] =
+            FVMLib.encodeSwap(0, poolId, 0, output1, 0, output2, sell ? 1 : 0);
 
         bytes memory data = FVMLib.encodeJumpInstruction(instructions);
 

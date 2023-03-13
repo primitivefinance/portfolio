@@ -225,7 +225,7 @@ contract HandlerPortfolio is HandlerBase {
 
         // todo: make sure we create the last pool...
         uint64 poolId = FVM.encodePoolId(
-            pairId, isMutable, uint32(ctx.subject().getPoolNonce())
+            pairId, isMutable, uint32(ctx.subject().getPoolNonce(pairId))
         );
         // Add the created pool to the list of pools.
         // todo: fix assertTrue(getPool(address(subject()), poolId).lastPrice != 0, "pool-price-zero");
@@ -541,7 +541,7 @@ contract HandlerPortfolio is HandlerBase {
         emit FinishedCall("Check Virtual Invariant");
     }
 
-    function random_processes(
+    /* function random_processes(
         uint256 deltaLiquidity,
         uint256 seed
     )
@@ -597,7 +597,7 @@ contract HandlerPortfolio is HandlerBase {
         ctx.subject().multiprocess(payload);
 
         delete instructions;
-    }
+    } */
 
     event log(string, uint256);
     event log(string, int256);

@@ -150,10 +150,11 @@ library Configs {
 
             IPortfolio(Portfolio).multiprocess(payload);
             bool controlled = self.controller != address(0);
+            uint24 pairNonce = IPortfolioGetters(Portfolio).getPairNonce();
             poolId = FVMLib.encodePoolId(
-                IPortfolioGetters(Portfolio).getPairNonce(),
+                pairNonce,
                 controlled,
-                IPortfolioGetters(Portfolio).getPoolNonce()
+                IPortfolioGetters(Portfolio).getPoolNonce(pairNonce)
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {

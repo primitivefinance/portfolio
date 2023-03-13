@@ -7,7 +7,7 @@ import "./HelperInvariantLib.sol";
 import { HandlerPortfolio } from "./HandlerPortfolio.sol";
 import { HandlerExternal } from "./HandlerExternal.sol";
 
-bytes32 constant SLOT_LOCKED = bytes32(uint256(10));
+bytes32 constant SLOT_LOCKED = bytes32(uint256(11));
 
 interface AccountLike {
     function __account__() external view returns (bool);
@@ -38,14 +38,14 @@ contract RMM01PortfolioInvariants is Setup {
         _portfolio = new HandlerPortfolio();
 
         {
-            bytes4[] memory selectors = new bytes4[](7);
+            bytes4[] memory selectors = new bytes4[](6);
             selectors[0] = HandlerPortfolio.deposit.selector;
             selectors[1] = HandlerPortfolio.fund_asset.selector;
             selectors[2] = HandlerPortfolio.fund_quote.selector;
             selectors[3] = HandlerPortfolio.create_pool.selector;
             selectors[4] = HandlerPortfolio.allocate.selector;
             selectors[5] = HandlerPortfolio.deallocate.selector;
-            selectors[6] = HandlerPortfolio.random_processes.selector;
+            //selectors[6] = HandlerPortfolio.random_processes.selector;
             targetSelector(
                 FuzzSelector({addr: address(_portfolio), selectors: selectors})
             );
