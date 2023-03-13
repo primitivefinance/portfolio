@@ -268,4 +268,14 @@ contract TestFVMLib is Test {
         vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(8), uint256(9)));
         target.decodePoolId_(data);
     }
+
+    function test_decodePairIdFromPoolId(
+        uint24 pairId, bool isMutable, uint32 poolNonce
+    ) public {
+        uint64 decodedPairId = decodePairIdFromPoolId(
+            encodePoolId(pairId, isMutable, poolNonce)
+        );
+
+        assertEq(decodedPairId, pairId);
+    }
 }
