@@ -126,12 +126,12 @@ contract PoolCreation is EchidnaStateHandling {
         bytes memory createPoolData,
         bool hasController
     ) private returns (PortfolioPool memory pool, uint64 poolId) {
-        uint256 preCreationPoolNonce = _portfolio.getPoolNonce();
+        uint256 preCreationPoolNonce = _portfolio.getPoolNonce(pairId);
         (bool success,) = address(_portfolio).call(createPoolData);
         assert(success);
 
         // pool nonce should increase by 1 each time a pool is created
-        uint256 poolNonce = _portfolio.getPoolNonce();
+        uint256 poolNonce = _portfolio.getPoolNonce(pairId);
         assert(poolNonce == preCreationPoolNonce + 1);
 
         // pool should be created and exist

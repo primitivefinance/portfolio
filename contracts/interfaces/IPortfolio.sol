@@ -183,7 +183,7 @@ interface IPortfolioGetters {
     /**
      * @dev Incremented when a pool is created.
      */
-    function getPoolNonce() external view returns (uint32);
+    function getPoolNonce(uint24 pairNonce) external view returns (uint32);
 
     /**
      * @dev Reverse lookup to find the `pairId` of a given `asset` and `quote`.

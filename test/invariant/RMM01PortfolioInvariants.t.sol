@@ -7,7 +7,7 @@ import "./HelperInvariantLib.sol";
 import { HandlerPortfolio } from "./HandlerPortfolio.sol";
 import { HandlerExternal } from "./HandlerExternal.sol";
 
-bytes32 constant SLOT_LOCKED = bytes32(uint256(10));
+bytes32 constant SLOT_LOCKED = bytes32(uint256(11));
 
 interface AccountLike {
     function __account__() external view returns (bool);
