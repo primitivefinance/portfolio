@@ -112,14 +112,14 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24 pairId) {
 }
 
 /**
- * @dev Returns the pool id given some pool parameters
+ * @dev Returns the pool id given specific pool parameters.
  * @param pairId Id of the pair of asset / quote tokens
  * @param isMutable True if the pool is mutable
  * @param poolNonce Current pool nonce of the Portfolio contract
  * @return Corresponding encoded pool id
  * @custom:example
  * ```
- * uint64 poolId = encodePoolId(0, true, 1);
+ * uint64 poolId = encodePoolId(7, true, 42);
  * ```
  */
 function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64) {
