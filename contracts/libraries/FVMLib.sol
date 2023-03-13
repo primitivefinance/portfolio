@@ -120,8 +120,9 @@ function decodePoolId(bytes calldata data)
     returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
 {
     if (data.length != 8) revert InvalidBytesLength(8, data.length);
+
     poolId = uint64(bytes8(data));
-    pairId = uint16(bytes2(data[:3]));
+    pairId = uint24(bytes3(data[:3]));
     isMutable = uint8(bytes1(data[3:4]));
     poolNonce = uint32(bytes4(data[4:]));
 }
@@ -310,6 +311,21 @@ function decodeSwap(bytes calldata data)
     pure
     returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
 {
+    assembly {
+        let value := calldataload(data.offset)
+        useMax := shr(252, value)
+        sellAsset := shr(248, shl(4, value))
+        let pointer0 := shr(248, shl(72, value))
+        poolId := shr(192, shl(8, value))
+        let pointer1 := shr(248, shl(72, value))
+        let power0 := shr(248, shl(72, value))
+        let base0 := shr(sub(256, mul(8, sub(data.length, 10))), shl(80, value))
+        let power1 := shr(248, shl(72, value))
+        let base1 := shr(sub(256, mul(8, sub(data.length, 10))), shl(80, value))
+        input := mul(base0, exp(10, power0))
+        output := mul(base1, exp(10, power1))
+    }
+
     useMax = uint8(data[0] >> 4);
     sellAsset = uint8(data[1]);
     uint8 pointer0 = uint8(data[2]);
