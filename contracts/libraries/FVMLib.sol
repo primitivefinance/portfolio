@@ -112,7 +112,7 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24 pairId) {
 }
 
 /**
- * @dev Returns the pool id given specific pool parameters.
+ * @dev Returns an encoded pool id given specific pool parameters.
  * @param pairId Id of the pair of asset / quote tokens
  * @param isMutable True if the pool is mutable
  * @param poolNonce Current pool nonce of the Portfolio contract
@@ -126,10 +126,26 @@ function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure retu
     return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
 }
 
+/**
+ * @dev Decodes the parameters of a pool given its id.
+ * The pool id is expected to be encoded using the following format:\
+ * `0x | pairId (24 bits) | isMutable (8 bits) | poolNonce (32 bits)`
+ * @param data Encoded pool id
+ * @return poolId Pool id converted from bytes to uint64
+ * @return pairId Pair id of the pool
+ * @return isMutable True if the pool is mutable
+ * @return poolNonce Pool nonce of the pool
+ * @custom:example
+ * ```
+ * (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
+ *     = decodePoolId(0x000007010000002a);
+ * ```
+ */
 function decodePoolId(bytes calldata data)
     pure
     returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
 {
+    // Using Solidity here doesn't impact the gas cost.
     if (data.length != 8) revert InvalidBytesLength(8, data.length);
 
     assembly {
