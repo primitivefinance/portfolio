@@ -193,9 +193,8 @@ function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (by
 
     return abi.encodePacked(
         CLAIM,
-        uint8(10), // pointer to pointer1
         poolId,
-        uint8(28), // pointer to fee1
+        uint8(27), // pointer to fee1
         powerFee0,
         baseFee0,
         powerFee1,
@@ -207,11 +206,24 @@ function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (by
  * @dev Decodes a claim operation
  */
 function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 fee0, uint128 fee1) {
-    uint8 pointer0 = uint8(bytes1(data[1]));
-    poolId = uint64(AssemblyLib.toBytes8(data[2:pointer0]));
-    uint8 pointer1 = uint8(bytes1(data[pointer0]));
-    fee0 = AssemblyLib.toAmount(data[pointer0 + 1:pointer1]);
-    fee1 = AssemblyLib.toAmount(data[pointer1:data.length]);
+    assembly {
+        let value := calldataload(data.offset)
+        poolId := shr(192, shl(8, value))
+        let pointer0 := byte(9, value)
+        let power := byte(10, value)
+        let length := sub(pointer0, 11)
+        fee0 := mul(
+            shr(sub(256, mul(8, length)), calldataload(add(data.offset, 11))),
+            exp(10, power)
+        )
+
+        power := byte(pointer0, value)
+        length := sub(data.length, add(1, pointer0))
+        fee1 := mul(
+            shr(sub(256, mul(8, length)), calldataload(add(data.offset, add(1, pointer0)))),
+            exp(10, power)
+        )
+    }
 }
 
 /**
