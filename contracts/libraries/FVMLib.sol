@@ -96,6 +96,15 @@ function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes 
     return payload;
 }
 
+/**
+ * @dev Decodes the `pair id` from a `pool id`.
+ * @param poolId Pool id to use for the decoding
+ * @return pairId Corresponding pair id
+ * @custom:example
+ * ```
+ * uint24 pairId = decodePairIdFromPoolId(46183783333895);
+ * ```
+ */
 function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24 pairId) {
     assembly {
         pairId := shr(40, poolId)
