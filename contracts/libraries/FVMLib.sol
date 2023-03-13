@@ -163,8 +163,11 @@ function encodeCreatePair(address token0, address token1) pure returns (bytes me
 
 function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset, address tokenQuote) {
     if (data.length != 41) revert InvalidBytesLength(41, data.length);
-    tokenAsset = address(bytes20(data[1:21]));
-    tokenQuote = address(bytes20(data[21:]));
+
+    assembly {
+        tokenAsset := shr(96, calldataload(add(1, data.offset)))
+        tokenQuote := shr(96, calldataload(add(21, data.offset)))
+    }
 }
 
 /**
