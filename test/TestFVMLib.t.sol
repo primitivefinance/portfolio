@@ -100,6 +100,7 @@ contract TestFVMLib is Test {
         assertEq(sellAsset ? uint8(1) : uint8(0), sellAsset_, "Wrong sellAsset");
     }
 
+    // 3637 gas
     function test_decodeSwap() public {
         bytes memory data = hex"0500042a0709081204";
 
@@ -233,6 +234,29 @@ contract TestFVMLib is Test {
     function test_decodeAllocate_RevertsBadLength() public {
         bytes memory data = hex"11aaffffffffffffbb0e";
         vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(11), uint256(10)));
-        (uint8 useMax, uint64 poolId, uint128 amount) = target.decodeAllocate_(data);
+        target.decodeAllocate_(data);
+    }
+
+    function test_decodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public {
+        uint64 poolId = encodePoolId(
+            pairId,
+            isMutable,
+            poolNonce
+        );
+
+        bytes memory data;
+
+        assembly {
+            mstore(data, 8)
+            mstore(add(0x20, data), shl(192, poolId))
+        }
+
+        (uint64 poolId_, uint24 pairId_, uint8 isMutable_, uint32 poolNonce_)
+            = target.decodePoolId_(data);
+
+        assertEq(poolId, poolId_);
+        assertEq(pairId, pairId_);
+        assertEq(isMutable ? uint8(1) : uint8(0), isMutable_);
+        assertEq(poolNonce, poolNonce_);
     }
 }
