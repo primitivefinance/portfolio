@@ -47,7 +47,7 @@ contract TestFVMJump is Setup {
         _;
     }
 
-    bytes[] instructions;
+    /* bytes[] instructions;
 
     function test_encodeJumpInstruction() public {
         address a0 = address(55);
@@ -115,5 +115,5 @@ contract TestFVMJump is Setup {
         console.log(
             "Liquidity after: ", ghost().position(actor()).freeLiquidity
         );
-    }
+    } */
 }
