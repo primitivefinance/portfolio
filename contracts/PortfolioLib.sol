@@ -173,6 +173,7 @@ struct SwapState {
 struct Payment {
     address token;
     uint256 amount;
+    uint256 balance;
 }
 
 // ===== Effects ===== //

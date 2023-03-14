@@ -248,12 +248,11 @@ contract TestPortfolioAllocate is Setup {
         uint256 fee0 = amount0 * 1 / 100;
         uint256 fee1 = amount1 * 1 / 100;
 
-        // Tokens are popped, and quote token is last in allocate, so it reverts first.
         vm.expectRevert(
             abi.encodeWithSelector(
                 NegativeBalance.selector,
-                ghost().quote().to_addr(),
-                -int256(fee1)
+                ghost().asset().to_addr(),
+                -int256(fee0)
             )
         );
         subject().multiprocess(
@@ -264,7 +263,7 @@ contract TestPortfolioAllocate is Setup {
             })
         );
 
-        int256 net = ghost().net(ghost().quote().to_addr());
+        int256 net = ghost().net(ghost().asset().to_addr());
 
         console.logInt(net);
         assertTrue(net >= 0, "Negative net balance for token");

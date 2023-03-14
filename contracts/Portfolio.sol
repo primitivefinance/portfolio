@@ -819,10 +819,18 @@ abstract contract PortfolioVirtual is Objective {
 
                 // Outstanding amount must be transferred in.
                 if (remainder > 0) {
-                    _payments.push(Payment({token: token, amount: remainder}));
+                    _payments.push(
+                        Payment({
+                            token: token,
+                            amount: remainder,
+                            balance: Account.__balanceOf__(token, address(this))
+                        })
+                    );
                 }
             }
 
+            // Token considered fully accounted for.
+            __account__.warm.pop();
             unchecked {
                 --i; // Cannot underflow because loop exits at 0!
             }
@@ -841,18 +849,24 @@ abstract contract PortfolioVirtual is Objective {
             }
         }
 
-        // Sanity check the settlement invariant, which should be positive.
-        i = tokens.length;
-        do {
-            address token = tokens[i - 1];
-            int256 net = __account__.getNetBalance(token, address(this));
-            if (net < 0) revert NegativeBalance(token, net);
-            // Token considered fully accounted for.
-            __account__.warm.pop();
-            unchecked {
-                --i; // Cannot underflow because loop exits at 0!
+        // Sanity check the payment amounts.
+        px = payments.length;
+        while (px != 0) {
+            uint256 index = px - 1;
+            address token = payments[index].token;
+            uint256 prevBalance = payments[index].balance;
+            uint256 nextBalance = Account.__balanceOf__(token, address(this));
+            uint256 expectedBalance = payments[index].amount + prevBalance;
+            if (nextBalance < expectedBalance) {
+                revert NegativeBalance(
+                    token, int256(nextBalance) - int256(expectedBalance)
+                );
             }
-        } while (i != 0);
+
+            unchecked {
+                --px; // Cannot underflow because loop exits at 0!
+            }
+        }
 
         __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;
