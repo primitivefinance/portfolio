@@ -66,7 +66,8 @@ function computeMarginalPriceQuoteIn(
     uint256 fee,
     int256 inv
 ) pure returns (uint256) {
-    Parameters memory params = Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
+    Parameters memory params =
+        Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
     uint256 volSqrtTau;
     uint256 gamma;
     {
@@ -121,7 +122,8 @@ function computeMarginalPriceAssetIn(
     uint256 fee,
     int256 inv
 ) pure returns (uint256) {
-    Parameters memory params = Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
+    Parameters memory params =
+        Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
     uint256 sqrtTau;
     uint256 volSqrtTau;
     uint256 gamma;

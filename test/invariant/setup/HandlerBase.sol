@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import {CommonBase} from "forge-std/Base.sol";
-import {StdCheats} from "forge-std/StdCheats.sol";
-import {StdUtils} from "forge-std/StdUtils.sol";
-import {console} from "forge-std/console.sol";
-import {StdAssertions} from "forge-std/StdAssertions.sol";
+import { CommonBase } from "forge-std/Base.sol";
+import { StdCheats } from "forge-std/StdCheats.sol";
+import { StdUtils } from "forge-std/StdUtils.sol";
+import { console } from "forge-std/console.sol";
+import { StdAssertions } from "forge-std/StdAssertions.sol";
 
 import "solmate/test/utils/mocks/MockERC20.sol";
 
 import "contracts/interfaces/IPortfolio.sol";
-import {GhostState} from "../../HelperGhostLib.sol";
-import {ActorsState} from "../../HelperActorsLib.sol";
+import { GhostState } from "../../HelperGhostLib.sol";
+import { ActorsState } from "../../HelperActorsLib.sol";
 import {
     PortfolioPool,
     PortfolioPosition,
@@ -66,7 +66,12 @@ interface Context {
  * @dev Target contract must inherit. Read:
  * https://github.com/dapphub/dapptools/blob/master/src/dapp/README.md#invariant-testing
  */
-abstract contract HandlerBase is CommonBase, StdCheats, StdUtils, StdAssertions {
+abstract contract HandlerBase is
+    CommonBase,
+    StdCheats,
+    StdUtils,
+    StdAssertions
+{
     Context ctx;
     mapping(bytes32 => uint256) public calls;
 
@@ -81,13 +86,16 @@ abstract contract HandlerBase is CommonBase, StdCheats, StdUtils, StdAssertions 
 
     modifier createActor() {
         ctx.addGhostActor(msg.sender);
-        ctx.setGhostActor(msg.sender);
         _;
     }
 
     modifier useActor(uint256 seed) {
         ctx.setGhostActor(ctx.getRandomActor(seed));
-        vm.startPrank(ctx.actor());
+        try vm.startPrank(ctx.actor()) { }
+        catch {
+            vm.stopPrank();
+            vm.startPrank(ctx.actor());
+        }
         _;
         vm.stopPrank();
     }

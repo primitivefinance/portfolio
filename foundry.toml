@@ -13,7 +13,8 @@ remappings = [
 
 [profile.optimized] # uses via_ir and optimizer
 via_ir = true
-optimizer_runs = 0
+optimizer_runs = 1
+optimizer = true
 out = 'optimized-out'
 
 [profile.test] # does not use optimizer
@@ -33,9 +34,9 @@ anvil = "http://127.0.0.1:8545"
 prod = "${MAINNET_URL}"
 
 [fmt]
-line_length = 120
+line_length = 80
 tab_width = 4
-bracket_spacing = false
+bracket_spacing = true
 int_types = 'long'
 multiline_func_header = 'params_first'
 quote_style = 'double'

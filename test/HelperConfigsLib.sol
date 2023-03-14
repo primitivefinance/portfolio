@@ -46,7 +46,7 @@ function safeCastTo16(uint256 x) pure returns (uint16 y) {
  */
 library Configs {
     using SafeCastLib for uint256;
-    using {safeCastTo16} for uint256;
+    using { safeCastTo16 } for uint256;
 
     /**
      * @dev Creates a new config with defaults.
@@ -121,10 +121,14 @@ library Configs {
      *      .generate(address(subject()));
      * ```
      */
-    function generate(ConfigState memory self, address Portfolio) internal returns (uint64 poolId) {
+    function generate(
+        ConfigState memory self,
+        address Portfolio
+    ) internal returns (uint64 poolId) {
         require(self.asset != address(0), "did you set asset in config?");
         require(self.quote != address(0), "did you set quote in config?");
-        uint24 pairId = IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
+        uint24 pairId =
+            IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
         if (pairId == 0) {
             bytes[] memory data = new bytes[](2);
             data[0] = (FVMLib.encodeCreatePair(self.asset, self.quote));
@@ -147,8 +151,11 @@ library Configs {
             IPortfolio(Portfolio).multiprocess(payload);
 
             bool controlled = self.controller != address(0);
+            uint24 pairNonce = IPortfolioGetters(Portfolio).getPairNonce();
             poolId = FVMLib.encodePoolId(
-                IPortfolioGetters(Portfolio).getPairNonce(), controlled, IPortfolioGetters(Portfolio).getPoolNonce()
+                pairNonce,
+                controlled,
+                IPortfolioGetters(Portfolio).getPoolNonce(pairNonce)
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {
@@ -164,6 +171,13 @@ library Configs {
                 price: self.reportedPriceWad
             });
             IPortfolio(Portfolio).multiprocess(payload);
+            bool controlled = self.controller != address(0);
+            poolId = FVMLib.encodePoolId(
+                pairId,
+                controlled,
+                IPortfolioGetters(Portfolio).getPoolNonce(pairId)
+            );
+            require(poolId != 0, "ConfigLib.generate failed to createPool");
         }
     }
 }

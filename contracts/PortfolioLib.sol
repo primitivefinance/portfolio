@@ -12,7 +12,9 @@ using FixedPointMathLib for uint256;
 using FixedPointMathLib for int256;
 using SafeCastLib for uint256;
 
-using {checkParameters, maturity, validateParameters} for PortfolioCurve global;
+using {
+    checkParameters, maturity, validateParameters
+} for PortfolioCurve global;
 using {
     changePositionLiquidity,
     syncPositionFees,
@@ -66,6 +68,7 @@ error InvalidTransfer();
 error InvalidVolatility(uint24 sigma); // todo: fix, use uint16 type.
 error JitLiquidity(uint256 distance);
 error MaxFee(uint16 fee);
+error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
 error NonExistentPosition(address owner, uint64 poolId);
@@ -200,10 +203,8 @@ function changePositionLiquidity(
     int128 liquidityDelta
 ) {
     self.lastTimestamp = uint32(timestamp);
-    self.freeLiquidity = AssemblyLib.addSignedDelta(
-        self.freeLiquidity,
-        liquidityDelta
-    );
+    self.freeLiquidity =
+        AssemblyLib.addSignedDelta(self.freeLiquidity, liquidityDelta);
 }
 
 /**
@@ -223,31 +224,22 @@ function syncPositionFees(
 {
     // fee growth current - position fee growth last
     uint256 differenceAsset = AssemblyLib.computeCheckpointDistance(
-        feeGrowthAsset,
-        self.feeGrowthAssetLast
+        feeGrowthAsset, self.feeGrowthAssetLast
     );
     uint256 differenceQuote = AssemblyLib.computeCheckpointDistance(
-        feeGrowthQuote,
-        self.feeGrowthQuoteLast
+        feeGrowthQuote, self.feeGrowthQuoteLast
     );
     uint256 differenceInvariant = AssemblyLib.computeCheckpointDistance(
-        invariantGrowth,
-        self.invariantGrowthLast
+        invariantGrowth, self.invariantGrowthLast
     );
 
     // fee growth per liquidity * position liquidity
-    feeAssetEarned = FixedPointMathLib.mulWadDown(
-        differenceAsset,
-        self.freeLiquidity
-    );
-    feeQuoteEarned = FixedPointMathLib.mulWadDown(
-        differenceQuote,
-        self.freeLiquidity
-    );
-    feeInvariantEarned = FixedPointMathLib.mulWadDown(
-        differenceInvariant,
-        self.freeLiquidity
-    );
+    feeAssetEarned =
+        FixedPointMathLib.mulWadDown(differenceAsset, self.freeLiquidity);
+    feeQuoteEarned =
+        FixedPointMathLib.mulWadDown(differenceQuote, self.freeLiquidity);
+    feeInvariantEarned =
+        FixedPointMathLib.mulWadDown(differenceInvariant, self.freeLiquidity);
 
     self.feeGrowthAssetLast = feeGrowthAsset;
     self.feeGrowthQuoteLast = feeGrowthQuote;
@@ -263,9 +255,10 @@ function syncPositionFees(
 /**
  * @dev Quantity of tokens in units of their native decimals deallocated if all liquidity was removed.
  */
-function getPoolVirtualReserves(
-    PortfolioPool memory self
-) pure returns (uint128 reserveAsset, uint128 reserveQuote) {
+function getPoolVirtualReserves(PortfolioPool memory self)
+    pure
+    returns (uint128 reserveAsset, uint128 reserveQuote)
+{
     return self.getPoolLiquidityDeltas(-int128(self.liquidity)); // Rounds down.
 }
 
@@ -308,19 +301,15 @@ function getPoolLiquidityDeltas(
     uint256 delta;
     if (deltaLiquidity > 0) {
         delta = uint128(deltaLiquidity);
-        deltaAsset = amountAssetWad
-            .mulDivUp(delta, scaleDownFactorAsset)
-            .safeCastTo128();
-        deltaQuote = amountQuoteWad
-            .mulDivUp(delta, scaleDownFactorQuote)
-            .safeCastTo128();
+        deltaAsset =
+            amountAssetWad.mulDivUp(delta, scaleDownFactorAsset).safeCastTo128();
+        deltaQuote =
+            amountQuoteWad.mulDivUp(delta, scaleDownFactorQuote).safeCastTo128();
     } else {
         delta = uint128(-deltaLiquidity);
-        deltaAsset = amountAssetWad
-            .mulDivDown(delta, scaleDownFactorAsset)
+        deltaAsset = amountAssetWad.mulDivDown(delta, scaleDownFactorAsset)
             .safeCastTo128();
-        deltaQuote = amountQuoteWad
-            .mulDivDown(delta, scaleDownFactorQuote)
+        deltaQuote = amountQuoteWad.mulDivDown(delta, scaleDownFactorQuote)
             .safeCastTo128();
     }
 }
@@ -330,9 +319,10 @@ function getPoolLiquidityDeltas(
  * @return amountAssetDec Quantity of `asset` tokens in native decimal units per WAD unit of liquidity.
  * @return amountQuoteDec Quantity of `quote` tokens in native decimal units per WAD unit of liquidity.
  */
-function getPoolAmounts(
-    PortfolioPool memory self
-) pure returns (uint256 amountAssetDec, uint256 amountQuoteDec) {
+function getPoolAmounts(PortfolioPool memory self)
+    pure
+    returns (uint256 amountAssetDec, uint256 amountQuoteDec)
+{
     (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
     amountAssetDec = amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset);
     amountQuoteDec = amountQuoteWad.scaleFromWadDown(self.pair.decimalsQuote);
@@ -343,9 +333,10 @@ function getPoolAmounts(
  * @return amountAssetWad Quantity of `asset` tokens in WAD units per WAD of liquidity.
  * @return amountQuoteWad Quantity of `quote` tokens in WAD units per WAD of liquidity.
  */
-function getAmountsWad(
-    PortfolioPool memory self
-) pure returns (uint256 amountAssetWad, uint256 amountQuoteWad) {
+function getAmountsWad(PortfolioPool memory self)
+    pure
+    returns (uint256 amountAssetWad, uint256 amountQuoteWad)
+{
     amountAssetWad = self.virtualX;
     amountQuoteWad = self.virtualY;
 }
@@ -377,24 +368,24 @@ function computeTau(
 ) pure returns (uint256) {
     uint256 end = self.params.maturity();
     unchecked {
-        // Cannot underflow as LHS is either equal to `timestamp` or greater. 
+        // Cannot underflow as LHS is either equal to `timestamp` or greater.
         return AssemblyLib.max(timestamp, end) - timestamp;
     }
 }
 
-function maturity(
-    PortfolioCurve memory self
-) pure returns (uint32 endTimestamp) {
+function maturity(PortfolioCurve memory self)
+    pure
+    returns (uint32 endTimestamp)
+{
     unchecked {
         // Portfolio duration is limited such that this addition will never overflow 256 bits.
-        endTimestamp = (AssemblyLib.convertDaysToSeconds(self.duration) +
-            self.createdAt).safeCastTo32();
+        endTimestamp = (
+            AssemblyLib.convertDaysToSeconds(self.duration) + self.createdAt
+        ).safeCastTo32();
     }
 }
 
-function validateParameters(
-    PortfolioCurve memory self
-) pure {
+function validateParameters(PortfolioCurve memory self) pure {
     (bool success, bytes memory reason) = self.checkParameters();
     if (!success) {
         assembly {
@@ -406,14 +397,15 @@ function validateParameters(
 /**
  * @dev Invalid parameters should revert. Bound checks are inclusive.
  */
-function checkParameters(
-    PortfolioCurve memory self
-) pure returns (bool, bytes memory) {
-    if (self.jit > JUST_IN_TIME_MAX)
+function checkParameters(PortfolioCurve memory self)
+    pure
+    returns (bool, bytes memory)
+{
+    if (self.jit > JUST_IN_TIME_MAX) {
         return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
-    if (
-        !AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY)
-    ) {
+    }
+    if (!AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
+    {
         return (
             false,
             abi.encodeWithSelector(InvalidVolatility.selector, self.volatility)
@@ -427,8 +419,7 @@ function checkParameters(
     }
     if (!AssemblyLib.isBetween(self.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE)) {
         return (
-            false,
-            abi.encodeWithSelector(InvalidStrike.selector, self.maxPrice)
+            false, abi.encodeWithSelector(InvalidStrike.selector, self.maxPrice)
         );
     }
     if (!AssemblyLib.isBetween(self.fee, MIN_FEE, MAX_FEE)) {
@@ -437,8 +428,7 @@ function checkParameters(
     // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
     if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
         return (
-            false,
-            abi.encodeWithSelector(InvalidFee.selector, self.priorityFee)
+            false, abi.encodeWithSelector(InvalidFee.selector, self.priorityFee)
         );
     }
 

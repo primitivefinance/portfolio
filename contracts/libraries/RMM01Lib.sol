@@ -2,7 +2,13 @@
 pragma solidity 0.8.13;
 
 import "solstat/Invariant.sol";
-import {PortfolioPool, Iteration, SwapInputTooSmall, AssemblyLib, PERCENTAGE} from "../PortfolioLib.sol";
+import {
+    PortfolioPool,
+    Iteration,
+    SwapInputTooSmall,
+    AssemblyLib,
+    PERCENTAGE
+} from "../PortfolioLib.sol";
 
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant WAD = 1 ether;
@@ -60,18 +66,21 @@ library RMM01Lib {
         uint256 secondsPassed
     ) internal pure returns (uint256 amountOut) {
         // Sets data.invariant, data.liquidity, and data.remainder.
-        (Iteration memory data, uint256 tau) = getSwapData(self, sellAsset, amountIn, secondsPassed); // Declare and assign variables individual to save on gas spent on initializing 0 values.
+        (Iteration memory data, uint256 tau) =
+            getSwapData(self, sellAsset, amountIn, secondsPassed); // Declare and assign variables individual to save on gas spent on initializing 0 values.
 
         // Uses data.invariant, data.liquidity, and data.remainder to compute next input reserve.
         // Uses next input reserve to compute output reserve.
-        (uint256 prevDep, uint256 nextDep) = computeSwapStep(self, data, sellAsset, tau);
+        (uint256 prevDep, uint256 nextDep) =
+            computeSwapStep(self, data, sellAsset, tau);
 
         // Checks to make sure next reserve decreases and computes the difference in WAD.
         if (nextDep > prevDep) revert SwapInputTooSmall();
         data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
 
         // Scale down amounts from WAD.
-        uint256 outputDec = sellAsset ? self.pair.decimalsQuote : self.pair.decimalsAsset;
+        uint256 outputDec =
+            sellAsset ? self.pair.decimalsQuote : self.pair.decimalsAsset;
         amountOut = data.output.scaleFromWadDown(outputDec);
     }
 
@@ -84,12 +93,17 @@ library RMM01Lib {
         uint256 amountIn,
         uint256 secondsPassed
     ) internal pure returns (Iteration memory, uint256 tau) {
-        uint256 fee = self.controller != address(0) ? self.params.priorityFee : self.params.fee;
+        uint256 fee = self.controller != address(0)
+            ? self.params.priorityFee
+            : self.params.fee;
 
         Iteration memory data;
-        (data.prevInvariant, tau) = getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
+        (data.prevInvariant, tau) =
+            getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
         (data.virtualX, data.virtualY) = self.getAmountsWad();
-        data.remainder = amountIn.scaleToWad(sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote);
+        data.remainder = amountIn.scaleToWad(
+            sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
+        );
         data.liquidity = self.liquidity;
         data.feeAmount = (data.remainder * fee) / PERCENTAGE;
 
@@ -116,7 +130,8 @@ library RMM01Lib {
             (prevDep, prevInd) = (data.virtualX, data.virtualY);
         }
 
-        nextInd = prevInd + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
+        nextInd = prevInd
+            + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
         if (sellAsset) {
@@ -149,9 +164,15 @@ library RMM01Lib {
         int128 invariantWad
     ) internal pure returns (uint256 R_y, uint256 R_x) {
         uint256 terminalPriceWad = self.params.maxPrice;
-        uint256 volatilityFactorWad = convertPercentageToWad(self.params.volatility);
+        uint256 volatilityFactorWad =
+            convertPercentageToWad(self.params.volatility);
         uint256 timeRemainingSec = self.lastTau(); // uses self.lastTimestamp, is it set?
-        R_x = getXWithPrice({prc: priceWad, stk: terminalPriceWad, vol: self.params.volatility, tau: timeRemainingSec});
+        R_x = getXWithPrice({
+            prc: priceWad,
+            stk: terminalPriceWad,
+            vol: self.params.volatility,
+            tau: timeRemainingSec
+        });
         R_y = Invariant.getY({
             R_x: R_x,
             stk: terminalPriceWad,
@@ -172,7 +193,12 @@ library RMM01Lib {
      * @return R_x WAD
      * @custom:math R_x = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
      */
-    function getXWithPrice(uint256 prc, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 R_x) {
+    function getXWithPrice(
+        uint256 prc,
+        uint256 stk,
+        uint256 vol,
+        uint256 tau
+    ) internal pure returns (uint256 R_x) {
         uint256 input = FixedPointMathLib.divWadDown(prc, stk); // todo: clarify + document whats going on here
         if (input != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(input));
@@ -181,9 +207,11 @@ library RMM01Lib {
             uint256 sigmaWad = convertPercentageToWad(vol);
             uint256 doubleSigma = (sigmaWad * sigmaWad) / uint256(Gaussian.TWO);
             uint256 halfSigmaTau = doubleSigma * tauYears;
-            uint256 sqrtTauSigma = (tauYears.sqrt() * SQRT_WAD).mulWadDown(sigmaWad);
+            uint256 sqrtTauSigma =
+                (tauYears.sqrt() * SQRT_WAD).mulWadDown(sigmaWad);
 
-            int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau)) / int256(sqrtTauSigma);
+            int256 lnOverVol = (ln * Gaussian.ONE + int256(halfSigmaTau))
+                / int256(sqrtTauSigma);
             int256 cdf = Gaussian.cdf(lnOverVol);
             if (cdf > Gaussian.ONE) revert OverflowWad(cdf);
             R_x = uint256(Gaussian.ONE - cdf);
@@ -201,7 +229,12 @@ library RMM01Lib {
      * @param tau seconds
      * @return prc WAD
      */
-    function getPriceWithX(uint256 R_x, uint256 stk, uint256 vol, uint256 tau) internal pure returns (uint256 prc) {
+    function getPriceWithX(
+        uint256 R_x,
+        uint256 stk,
+        uint256 vol,
+        uint256 tau
+    ) internal pure returns (uint256 prc) {
         uint256 tauYears = convertSecondsToWadYears(tau);
         uint256 volWad = convertPercentageToWad(vol);
 
@@ -224,13 +257,21 @@ library RMM01Lib {
 
     // ===== Utils ===== //
 
-    function convertSecondsToWadYears(uint256 sec) internal pure returns (uint256 yrsWad) {
+    function convertSecondsToWadYears(uint256 sec)
+        internal
+        pure
+        returns (uint256 yrsWad)
+    {
         assembly {
             yrsWad := div(mul(sec, WAD), YEAR)
         }
     }
 
-    function convertPercentageToWad(uint256 pct) internal pure returns (uint256 pctWad) {
+    function convertPercentageToWad(uint256 pct)
+        internal
+        pure
+        returns (uint256 pctWad)
+    {
         assembly {
             pctWad := div(mul(pct, WAD), PERCENTAGE)
         }
@@ -251,6 +292,8 @@ library RMM01Lib {
         tau -= timeSinceUpdate; // Time remaining less time passed since `self.lastTimestamp` was updated.
 
         (uint256 x, uint256 y) = self.getAmountsWad(); // Quantities of each reserve per WAD units of liquidity.
-        invariant = int128(invariantOf({self: self, R_x: x, R_y: y, timeRemainingSec: tau}));
+        invariant = int128(
+            invariantOf({self: self, R_x: x, R_y: y, timeRemainingSec: tau})
+        );
     }
 }

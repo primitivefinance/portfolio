@@ -49,7 +49,8 @@ library RMM01ExtendedLib {
         uint256 term_1 = term_0.sqrt(); // √(1 - ε/τ)), this sqrts WAD, so we end up with SQRT_WAD units
 
         uint256 term_2 = prc.divWadUp(params.strike); // P(t) / K, both units are already WAD
-        uint256 term_3 = uint256(int256(term_2).powWad(int256(term_1 * SQRT_WAD))); // ( P(τ) / K ) ^ ( √(1 - ε/τ) ))
+        uint256 term_3 =
+            uint256(int256(term_2).powWad(int256(term_1 * SQRT_WAD))); // ( P(τ) / K ) ^ ( √(1 - ε/τ) ))
 
         uint256 term_7;
         {
@@ -57,10 +58,12 @@ library RMM01ExtendedLib {
             uint256 tausSqrt = tauYears.sqrt() * (currentTau).sqrt(); // ( √(τ) √(τ- ε) ), sqrt(1e18) = 1e9, so 1e9 * 1e9 = 1e18
             uint256 term_4 = tausSqrt - currentTau; // ( √(τ) √(τ- ε) - (τ - ε) ), WAD - WAD = WAD
 
-            uint256 sigmaWad = RMM01Lib.convertPercentageToWad(uint256(params.sigma));
+            uint256 sigmaWad =
+                RMM01Lib.convertPercentageToWad(uint256(params.sigma));
 
             uint256 term_5 = (sigmaWad * sigmaWad) / Gaussian.DOUBLE_WAD; // ( 1 / 2 )(o^2), 1e4 * 1e4 * 1e17 / 1e4 = 1e17, which is half WAD
-            uint256 term_6 = uint256((int256(term_5.mulWadDown(term_4))).expWad()); // (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) )), exp(WAD * WAD / WAD)
+            uint256 term_6 =
+                uint256((int256(term_5.mulWadDown(term_4))).expWad()); // (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) )), exp(WAD * WAD / WAD)
             term_7 = uint256(params.strike).mulWadDown(term_6); // (K) (e^( (1/2) (o^2) ( √(τ) √(τ- ε) - (τ - ε) ) ), WAD * WAD / WAD
         }
 
@@ -91,16 +94,23 @@ library RMM01ExtendedLib {
             epsilonYears := sdiv(mul(epsilon, WAD), YEAR) // epsilon * WAD / year = epsilon in years scaled to WAD
         }
 
-        uint256 sigmaWad = RMM01Lib.convertPercentageToWad(uint256(params.sigma));
-        uint256 part0 = WAD.divWadDown(sigmaWad.mulWadDown(tauYears.sqrt() * 1e9));
-        part0 = part0.mulWadDown(uint256(int256(prc.divWadDown(params.strike)).lnWad()));
+        uint256 sigmaWad =
+            RMM01Lib.convertPercentageToWad(uint256(params.sigma));
+        uint256 part0 =
+            WAD.divWadDown(sigmaWad.mulWadDown(tauYears.sqrt() * 1e9));
+        part0 = part0.mulWadDown(
+            uint256(int256(prc.divWadDown(params.strike)).lnWad())
+        );
 
         uint256 part1 = (sigmaWad * sigmaWad) / Gaussian.DOUBLE_WAD;
         part1 = part1.mulWadDown(tauYears);
 
-        uint256 part2 = sigmaWad.mulWadDown((tauYears - epsilonYears).sqrt() * 1e9);
+        uint256 part2 =
+            sigmaWad.mulWadDown((tauYears - epsilonYears).sqrt() * 1e9);
 
-        R_y = params.strike.mulWadDown(uint256(Gaussian.cdf(int256(part0 + part1 - part2))));
+        R_y = params.strike.mulWadDown(
+            uint256(Gaussian.cdf(int256(part0 + part1 - part2)))
+        );
     }
 
     /**
@@ -119,10 +129,22 @@ library RMM01ExtendedLib {
 
         uint256 x_1 = RMM01Lib.getXWithPrice(prc, stk, vol, tau);
         curve.tau -= epsilon;
-        uint256 y_2 = Invariant.getY({R_x: x_1, stk: stk, vol: vol, tau: tau, inv: invariant});
+        uint256 y_2 = Invariant.getY({
+            R_x: x_1,
+            stk: stk,
+            vol: vol,
+            tau: tau,
+            inv: invariant
+        });
 
         i_t = int128(
-            Invariant.invariant({R_y: y_2, R_x: x_1, stk: stk, vol: RMM01Lib.convertPercentageToWad(vol), tau: tau})
+            Invariant.invariant({
+                R_y: y_2,
+                R_x: x_1,
+                stk: stk,
+                vol: RMM01Lib.convertPercentageToWad(vol),
+                tau: tau
+            })
         ); // todo: fix cast
         t_e = tau - epsilon;
     }
