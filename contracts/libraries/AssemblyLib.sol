@@ -255,12 +255,35 @@ library AssemblyLib {
 
     // WIP functions
 
+    /*
     function trimBytes(uint128 input) public pure returns (bytes memory output) {
         assembly {
             let length := 0x20
             let value := input
 
             for { } 1 { } {
+                let s := byte(0, value)
+
+                switch iszero(s)
+                    case 0 { break }
+                    case 1 {
+                        value := shl(8, value)
+                        length := sub(length, 1)
+                    }
+            }
+
+            mstore(output, length)
+            mstore(add(0x20, output), value)
+        }
+    }
+    */
+
+    function trimBytes(bytes memory input) public pure returns (bytes memory output) {
+        assembly {
+            let length := mload(input)
+            let value := mload(add(0x20, input))
+
+            for {} 1 {} {
                 let s := byte(0, value)
 
                 switch iszero(s)
