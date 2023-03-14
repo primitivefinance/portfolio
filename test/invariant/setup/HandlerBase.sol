@@ -91,7 +91,11 @@ abstract contract HandlerBase is
 
     modifier useActor(uint256 seed) {
         ctx.setGhostActor(ctx.getRandomActor(seed));
-        vm.startPrank(ctx.actor());
+        try vm.startPrank(ctx.actor()) { }
+        catch {
+            vm.stopPrank();
+            vm.startPrank(ctx.actor());
+        }
         _;
         vm.stopPrank();
     }

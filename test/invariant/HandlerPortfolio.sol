@@ -186,7 +186,8 @@ contract HandlerPortfolio is HandlerBase {
     bytes[] instructions;
 
     function _assertCreatePool(CreateArgs memory args) internal {
-        bool isMutable = true;
+        address controller = address(0);
+        bool isMutable = controller != address(0);
         uint24 pairId = ctx.subject().getPairId(args.token0, args.token1);
         {
             // PortfolioPair not created? Push a create pair call to the stack.
@@ -200,7 +201,7 @@ contract HandlerPortfolio is HandlerBase {
             instructions.push(
                 FVM.encodeCreatePool(
                     pairId,
-                    address(0),
+                    controller,
                     args.priorityFee, // priorityFee
                     args.fee, // fee
                     args.volatility, // vol
@@ -304,8 +305,7 @@ contract HandlerPortfolio is HandlerBase {
             : pool.pair.decimalsAsset;
         uint256 minLiquidity = 10 ** (18 - lowerDecimals);
         vm.assume(deltaLiquidity > minLiquidity);
-        assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
-        // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
+        require(pool.lastTimestamp != 0, "Pool not initialized");
 
         // Amounts of tokens that will be allocated to pool.
         (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject()
@@ -518,7 +518,7 @@ contract HandlerPortfolio is HandlerBase {
         // PortfolioPool memory pool = ctx.ghost().pool();
         // TODO: Breaks when we call this function on a pool with zero liquidity...
         (uint256 dAsset, uint256 dQuote) =
-            ctx.subject().getReserves(ctx.ghost().poolId);
+            ctx.subject().getVirtualReservesPerLiquidity(ctx.ghost().poolId);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 
