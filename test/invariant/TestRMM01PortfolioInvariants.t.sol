@@ -23,7 +23,7 @@ interface AccountLike {
  * Invariant 5. ∑ Portfolio.positions(owner, poolId).freeLiquidity == Portfolio.pools(poolId).liquidity, for all
  * pools.
  */
-contract RMM01PortfolioInvariants is Setup {
+contract TestRMM01PortfolioInvariants is Setup {
     /**
      * @dev Helper to manage the pools that are being interacted with via the handlers.
      */
@@ -93,7 +93,8 @@ contract RMM01PortfolioInvariants is Setup {
         PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
-            (uint256 dAsset,) = subject().getReserves(ghost().poolId);
+            (uint256 dAsset,) =
+                subject().getVirtualReservesPerLiquidity(ghost().poolId);
             uint256 bAsset = ghost().physicalBalance(ghost().asset().to_addr());
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }
@@ -103,7 +104,8 @@ contract RMM01PortfolioInvariants is Setup {
         PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
-            (, uint256 dQuote) = subject().getReserves(ghost().poolId);
+            (, uint256 dQuote) =
+                subject().getVirtualReservesPerLiquidity(ghost().poolId);
             uint256 bQuote = ghost().physicalBalance(ghost().quote().to_addr());
             assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
         }

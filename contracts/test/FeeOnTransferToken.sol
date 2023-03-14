@@ -15,6 +15,8 @@ contract FeeOnTransferToken is MockERC20 {
         uint256 amount
     ) public override returns (bool) {
         super.transferFrom(from, to, amount);
+        // DO NOT CHANGE THIS FEE
+        // ALL THE FEE TRANSFER RELATED TESTS ASSUME THE FEE IS 1%
         uint256 fee = amount * 1 / 100;
         balanceOf[to] -= fee;
         return true;

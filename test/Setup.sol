@@ -166,16 +166,20 @@ contract Setup is Test {
 
     modifier usePairTokens(uint256 amount) {
         // Approve and mint tokens for actor.
-        ghost().asset().prepare({
-            owner: actor(),
-            spender: address(subject()),
-            amount: amount
-        });
-        ghost().quote().prepare({
-            owner: actor(),
-            spender: address(subject()),
-            amount: amount
-        });
+        if (ghost().asset().to_addr() != address(subject().WETH())) {
+            ghost().asset().prepare({
+                owner: actor(),
+                spender: address(subject()),
+                amount: amount
+            });
+        }
+        if (ghost().quote().to_addr() != address(subject().WETH())) {
+            ghost().quote().prepare({
+                owner: actor(),
+                spender: address(subject()),
+                amount: amount
+            });
+        }
         _;
     }
 
