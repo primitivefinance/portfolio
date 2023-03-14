@@ -38,8 +38,8 @@ bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
 bytes1 constant DEALLOCATE = 0x03;
 bytes1 constant CLAIM = 0x04;
-bytes1 constant SWAP = 0x05;
-bytes1 constant UNSET06 = 0x06;
+bytes1 constant SWAP_QUOTE = 0x05;
+bytes1 constant SWAP_ASSET = 0x06;
 bytes1 constant UNSET07 = 0x07;
 bytes1 constant UNSET08 = 0x08;
 bytes1 constant UNSET09 = 0x09;
@@ -368,10 +368,9 @@ function encodeSwap(
     (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(amount1);
 
     data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), SWAP),
-        sellAsset,
+        AssemblyLib.pack(bytes1(useMax), sellAsset == 1 ? SWAP_ASSET : SWAP_QUOTE),
         poolId,
-        uint8(28),
+        uint8(27),
         power0,
         base0,
         power1,
@@ -389,12 +388,12 @@ function decodeSwap(bytes calldata data)
     assembly {
         let value := calldataload(data.offset)
         useMax := shr(4, byte(0, value))
-        sellAsset := byte(0, calldataload(add(1, data.offset)))
-        poolId := shr(192, calldataload(add(2, data.offset)))
-        let pointer := byte(0, calldataload(add(10, data.offset)))
-        let power0 := byte(0, calldataload(add(11, data.offset)))
-        let length0 := sub(pointer, 12)
-        let base0 := shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 12)))
+        sellAsset := eq(6, and(0x0F, byte(0, value)))
+        poolId := shr(192, calldataload(add(1, data.offset)))
+        let pointer := byte(0, calldataload(add(9, data.offset)))
+        let power0 := byte(0, calldataload(add(10, data.offset)))
+        let length0 := sub(pointer, 11)
+        let base0 := shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 11)))
         input := mul(base0, exp(10, power0))
         let power1 := byte(0, calldataload(add(pointer, data.offset)))
         let length1 := sub(data.length, add(1, pointer))

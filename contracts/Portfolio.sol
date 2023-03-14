@@ -485,7 +485,7 @@ abstract contract PortfolioVirtual is Objective {
                 liveIndependent,
                 iteration.liquidity
             );
-            
+
             deltaInput = AssemblyLib.min(iteration.remainder, maxInput); // swaps up to the maximum input
 
             iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
@@ -801,7 +801,7 @@ abstract contract PortfolioVirtual is Objective {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = FVM
                 .decodeDeallocate(data);
             _deallocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (instruction == FVM.SWAP) {
+        } else if (instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE) {
             Order memory args;
             (
                 args.useMax,
