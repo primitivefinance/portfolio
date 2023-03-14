@@ -116,14 +116,22 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24 pairId) {
  * @param pairId Id of the pair of asset / quote tokens
  * @param isMutable True if the pool is mutable
  * @param poolNonce Current pool nonce of the Portfolio contract
- * @return Corresponding encoded pool id
+ * @return poolId Corresponding encoded pool id
  * @custom:example
  * ```
  * uint64 poolId = encodePoolId(7, true, 42);
  * ```
  */
-function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64) {
-    return uint64(bytes8(abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)));
+function encodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) pure returns (uint64 poolId) {
+    assembly {
+        poolId := shl(0, or(
+            or(
+                shl(40, pairId),
+                shl(32, isMutable)
+            ),
+            poolNonce
+        ))
+    }
 }
 
 /**
@@ -243,8 +251,6 @@ function encodeCreatePool(
     (uint8 power0, uint128 base0) = AssemblyLib.fromAmount(maxPrice);
     (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(price);
 
-    bytes memory trimmedBase0 = AssemblyLib.trimBytes(abi.encode(base0));
-
     data = abi.encodePacked(
         CREATE_POOL,
         pairId,
@@ -254,11 +260,11 @@ function encodeCreatePool(
         vol,
         dur,
         jit,
-        uint8(36 + trimmedBase0.length),
+        uint8(36 + 16),
         power0,
-        trimmedBase0,
+        base0,
         power1,
-        AssemblyLib.trimBytes(abi.encode(base1))
+        base1
     );
 }
 
@@ -383,8 +389,8 @@ function decodeSwap(bytes calldata data)
 {
     assembly {
         let value := calldataload(data.offset)
-        useMax := shr(252, value)
-        sellAsset := shr(248, shl(4, value))
+        useMax := shr(4, byte(0, value))
+        sellAsset := byte(0, calldataload(add(1, data.offset)))
         let pointer0 := shr(248, shl(72, value))
         poolId := shr(192, shl(8, value))
         let pointer1 := shr(248, shl(72, value))
@@ -396,8 +402,7 @@ function decodeSwap(bytes calldata data)
         output := mul(base1, exp(10, power1))
     }
 
-    useMax = uint8(data[0] >> 4);
-    sellAsset = uint8(data[1]);
+    // sellAsset = uint8(data[1]);
     uint8 pointer0 = uint8(data[2]);
     poolId = uint64(AssemblyLib.toBytes8(data[3:pointer0]));
     uint8 pointer1 = uint8(data[pointer0]);
