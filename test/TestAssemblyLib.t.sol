@@ -44,4 +44,9 @@ contract TestAssemblyLib is Test {
         assertEq(a, uint8(a_));
         assertEq(b, uint8(b_));
     }
+
+    function test_trimBytes() public {
+        bytes memory output = AssemblyLib.trimBytes(abi.encode(42));
+        assertEq(output, hex"2a");
+    }
 }
