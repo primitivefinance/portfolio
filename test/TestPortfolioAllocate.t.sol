@@ -270,11 +270,11 @@ contract TestPortfolioAllocate is Setup {
         assertTrue(net >= 0, "Negative net balance for token");
     }
 
-    function testFuzz_allocate_low_decimals_modifies_liquidity(uint24 liquidity)
+    function testFuzz_allocate_low_decimals_modifies_liquidity(uint64 liquidity)
         public
         sixDecimalQuoteConfig
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(500 ether)
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -283,12 +283,12 @@ contract TestPortfolioAllocate is Setup {
 
     function testFuzz_allocate_duration_modifies_liquidity(
         uint16 duration,
-        uint24 liquidity
+        uint64 liquidity
     )
         public
         durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(500 ether)
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -297,12 +297,12 @@ contract TestPortfolioAllocate is Setup {
 
     function testFuzz_allocate_low_duration_modifies_liquidity(
         uint16 duration,
-        uint24 liquidity
+        uint64 liquidity
     )
         public
         durationConfig(uint16(bound(duration, MIN_DURATION, MIN_DURATION + 100)))
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(500 ether)
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -311,12 +311,12 @@ contract TestPortfolioAllocate is Setup {
 
     function testFuzz_allocate_high_duration_modifies_liquidity(
         uint16 duration,
-        uint24 liquidity
+        uint64 liquidity
     )
         public
         durationConfig(uint16(bound(duration, MAX_DURATION - 100, MAX_DURATION)))
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(500 ether)
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -325,12 +325,12 @@ contract TestPortfolioAllocate is Setup {
 
     function testFuzz_allocate_volatility_modifies_liquidity(
         uint16 volatility,
-        uint24 liquidity
+        uint64 liquidity
     )
         public
         volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(500 ether)
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -339,14 +339,14 @@ contract TestPortfolioAllocate is Setup {
 
     function testFuzz_allocate_low_volatility_modifies_liquidity(
         uint16 volatility,
-        uint24 liquidity
+        uint64 liquidity
     )
         public
         volatilityConfig(
             uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(500 ether)
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -355,14 +355,14 @@ contract TestPortfolioAllocate is Setup {
 
     function testFuzz_allocate_high_volatility_modifies_liquidity(
         uint16 volatility,
-        uint24 liquidity
+        uint64 liquidity
     )
         public
         volatilityConfig(
             uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(500 ether)
         isArmed
     {
         vm.assume(liquidity > 0);
