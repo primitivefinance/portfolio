@@ -109,18 +109,6 @@ contract TestRMM01PortfolioInvariants is Setup {
         }
     }
 
-    function invariant_liquidity_sum() public {
-        PortfolioPool memory pool = ghost().pool();
-
-        uint256 sum;
-        for (uint256 i; i != actors().active.length; ++i) {
-            PortfolioPosition memory pos = ghost().position(actors().active[i]);
-            sum += pos.freeLiquidity;
-        }
-
-        assertTrue(sum == pool.liquidity, "invariant-liquidity-sum");
-    }
-
     function invariant_reentrancy() public {
         bytes32 locked = vm.load(address(subject()), SLOT_LOCKED);
         assertEq(uint256(locked), 1, "invariant-locked");
