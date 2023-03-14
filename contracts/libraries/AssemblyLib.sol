@@ -278,7 +278,7 @@ library AssemblyLib {
     }
     */
 
-    function trimBytes(bytes memory input) public pure returns (bytes memory output) {
+    function trimBytes(bytes memory input) internal pure returns (bytes memory output) {
         assembly {
             let length := mload(input)
             let value := mload(add(0x20, input))
@@ -299,7 +299,7 @@ library AssemblyLib {
         }
     }
 
-    function trimBytes2(uint128 input) public pure returns (bytes memory output) {
+    function trimBytes2(uint128 input) internal pure returns (bytes memory output) {
         assembly {
             mstore(add(0x20, output), input)
             mstore(output, 32)
