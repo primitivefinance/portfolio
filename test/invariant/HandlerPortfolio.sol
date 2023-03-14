@@ -93,6 +93,8 @@ contract HandlerPortfolio is HandlerBase {
         ctx.ghost().quote().to_token().approve(address(ctx.subject()), amount);
         deal(address(ctx.ghost().quote().to_token()), ctx.actor(), amount);
 
+        uint256 prePhys =
+            ctx.ghost().quote().to_token().balanceOf(address(ctx.subject()));
         uint256 preRes =
             ctx.ghost().reserve(address(ctx.ghost().quote().to_token()));
         uint256 preBal = ctx.ghost().balance(
@@ -100,12 +102,15 @@ contract HandlerPortfolio is HandlerBase {
         );
 
         ctx.subject().fund(address(ctx.ghost().quote().to_token()), amount);
+        uint256 postPhys =
+            ctx.ghost().quote().to_token().balanceOf(address(ctx.subject()));
         uint256 postRes =
             ctx.ghost().reserve(address(ctx.ghost().quote().to_token()));
         uint256 postBal = ctx.ghost().balance(
             ctx.actor(), address(ctx.ghost().quote().to_token())
         );
 
+        assertEq(postPhys, prePhys + amount, "fund-delta-quote-physical");
         assertEq(postBal, preBal + amount, "fund-delta-quote-balance");
         assertEq(postRes, preRes + amount, "fund-delta-quote-reserve");
     }
