@@ -209,18 +209,18 @@ function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 f
     assembly {
         let value := calldataload(data.offset)
         poolId := shr(192, shl(8, value))
-        let pointer0 := byte(9, value)
+        let pointer := byte(9, value)
         let power := byte(10, value)
-        let length := sub(pointer0, 11)
+        let length := sub(pointer, 11)
         fee0 := mul(
             shr(sub(256, mul(8, length)), calldataload(add(data.offset, 11))),
             exp(10, power)
         )
 
-        power := byte(pointer0, value)
-        length := sub(data.length, add(1, pointer0))
+        power := byte(pointer, value)
+        length := sub(data.length, add(1, pointer))
         fee1 := mul(
-            shr(sub(256, mul(8, length)), calldataload(add(data.offset, add(1, pointer0)))),
+            shr(sub(256, mul(8, length)), calldataload(add(data.offset, add(1, pointer)))),
             exp(10, power)
         )
     }
@@ -228,7 +228,6 @@ function decodeClaim(bytes calldata data) pure returns (uint64 poolId, uint128 f
 
 /**
  * @dev Encodes a create pool operation.
- * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
 function encodeCreatePool(
     uint24 pairId,
@@ -244,6 +243,8 @@ function encodeCreatePool(
     (uint8 power0, uint128 base0) = AssemblyLib.fromAmount(maxPrice);
     (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(price);
 
+    bytes memory trimmedBase0 = AssemblyLib.trimBytes(abi.encode(base0));
+
     data = abi.encodePacked(
         CREATE_POOL,
         pairId,
@@ -253,11 +254,11 @@ function encodeCreatePool(
         vol,
         dur,
         jit,
-        uint8(52),
+        uint8(36 + trimmedBase0.length),
         power0,
-        base0,
+        trimmedBase0,
         power1,
-        base1
+        AssemblyLib.trimBytes(abi.encode(base1))
     );
 }
 
@@ -275,17 +276,30 @@ function decodeCreatePool(bytes calldata data)
         uint128 price
     )
 {
-    // if (data.length != 66) revert InvalidBytesLength(66, data.length);
-    pairId = uint24(bytes3(data[1:4]));
-    controller = address(bytes20(data[4:24]));
-    priorityFee = uint16(bytes2(data[24:26]));
-    fee = uint16(bytes2(data[26:28]));
-    vol = uint16(bytes2(data[28:30]));
-    dur = uint16(bytes2(data[30:32]));
-    jit = uint16(bytes2(data[32:34]));
-    uint8 pointer0 = uint8(bytes1(data[34]));
-    maxPrice = AssemblyLib.toAmount(data[35:pointer0]);
-    price = AssemblyLib.toAmount(data[pointer0:]);
+    assembly {
+        pairId := shr(232, calldataload(add(1, data.offset)))
+        controller := shr(96, calldataload(add(4, data.offset)))
+        priorityFee := shr(240, calldataload(add(24, data.offset)))
+        fee := shr(240, calldataload(add(26, data.offset)))
+        vol := shr(240, calldataload(add(28, data.offset)))
+        dur := shr(240, calldataload(add(30, data.offset)))
+        jit := shr(240, calldataload(add(32, data.offset)))
+        let pointer := byte(0, calldataload(add(34, data.offset)))
+        let power0 := byte(0, calldataload(add(35, data.offset)))
+        let length0 := sub(pointer, 36)
+        let base0 := shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 36)))
+        maxPrice := mul(
+            base0,
+            exp(10, power0)
+        )
+        let power1 := byte(0, calldataload(add(pointer, data.offset)))
+        let length1 := sub(data.length, add(1, pointer))
+        let base1 := shr(sub(256, mul(8, length1)), calldataload(add(data.offset, add(1, pointer))))
+        price := mul(
+            base1,
+            exp(10, power1)
+        )
+    }
 }
 
 /**
