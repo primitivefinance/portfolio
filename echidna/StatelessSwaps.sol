@@ -239,7 +239,8 @@ contract StatelessSwaps is Helper, Test {
             }
         }
 
-        poolId = FVM.encodePoolId(portfolio.getPairNonce(), true, portfolio.getPoolNonce());
+        uint24 pairNonce = portfolio.getPairNonce();
+        poolId = FVM.encodePoolId(pairNonce, true, portfolio.getPoolNonce(pairNonce));
 
         console.log("PoolId", poolId);
 

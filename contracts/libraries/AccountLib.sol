@@ -68,7 +68,9 @@ struct AccountSystem {
  * @dev Gas optimized.
  */
 function __balanceOf__(address token, address account) view returns (uint256) {
-    (bool success, bytes memory data) = token.staticcall(abi.encodeWithSelector(IERC20.balanceOf.selector, account));
+    (bool success, bytes memory data) = token.staticcall(
+        abi.encodeWithSelector(IERC20.balanceOf.selector, account)
+    );
     if (!success || data.length != 32) revert InvalidBalance();
     return abi.decode(data, (uint256));
 }
@@ -102,7 +104,12 @@ function __dangerousTransferFrom__(address token, address to, uint256 amount) {
 /**
  * @dev External call to the `to` address is dangerous.
  */
-function dangerousFund(AccountSystem storage self, address token, address to, uint256 amount) {
+function dangerousFund(
+    AccountSystem storage self,
+    address token,
+    address to,
+    uint256 amount
+) {
     self.touch(token);
     __dangerousTransferFrom__(token, to, amount); // Settlement gifts tokens to msg.sender.
 }
@@ -110,7 +117,12 @@ function dangerousFund(AccountSystem storage self, address token, address to, ui
 /**
  * @dev Increases an `owner`'s spendable balance.
  */
-function credit(AccountSystem storage self, address owner, address token, uint256 amount) {
+function credit(
+    AccountSystem storage self,
+    address owner,
+    address token,
+    uint256 amount
+) {
     self.touch(token);
     self.balances[owner][token] += amount;
 }
@@ -127,9 +139,9 @@ function debit(
     self.touch(token);
     uint256 balance = self.balances[owner][token];
     paid = AssemblyLib.min(balance, owed);
-    
+
     unchecked {
-        // Cannot underflow as `paid` is enforced to be the smaller of `balance` or `paid` 
+        // Cannot underflow as `paid` is enforced to be the smaller of `balance` or `paid`
         self.balances[owner][token] -= paid;
         remainder = owed - paid;
     }
@@ -209,7 +221,11 @@ function cache(AccountSystem storage self, address token, bool status) {
 /**
  * @dev Computes surplus (positive) or deficit (negative) in actual tokens compared to tracked amounts.
  */
-function getNetBalance(AccountSystem storage self, address token, address account) view returns (int256 net) {
+function getNetBalance(
+    AccountSystem storage self,
+    address token,
+    address account
+) view returns (int256 net) {
     uint256 internalBalance = self.reserves[token];
     uint256 physicalBalance = __balanceOf__(token, account);
     net = int256(physicalBalance) - int256(internalBalance);

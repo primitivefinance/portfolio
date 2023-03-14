@@ -4,7 +4,13 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioAllocate is Setup {
-    function test_allocate_modifies_liquidity() public defaultConfig useActor usePairTokens(10 ether) isArmed {
+    function test_allocate_modifies_liquidity()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
         // Arguments for test.
         uint128 amount = 0.1 ether;
         // Fetch the ghost variables to interact with the target pool.
@@ -12,7 +18,13 @@ contract TestPortfolioAllocate is Setup {
         // Fetch the variable we are changing (pool.liquidity).
         uint256 prev = ghost().pool().liquidity;
         // Trigger the function being tested.
-        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, deltaLiquidity: amount}));
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
         // Fetch the variable changed.
         uint256 post = ghost().pool().liquidity;
         // Ghost assertions comparing the actual and expected deltas.
@@ -25,25 +37,76 @@ contract TestPortfolioAllocate is Setup {
         );
     }
 
-    function test_allocate_does_not_modify_timestamp() public defaultConfig useActor usePairTokens(10 ether) isArmed {
+    function test_allocate_use_max()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        // Deposit tokens which will be used to compute max liquidity.
+        subject().fund(ghost().asset().to_addr(), type(uint256).max);
+        subject().fund(ghost().quote().to_addr(), type(uint256).max);
+
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(1),
+                poolId: ghost().poolId,
+                deltaLiquidity: 1
+            })
+        );
+        assertEq(
+            ghost().pool().liquidity,
+            ghost().position(actor()).freeLiquidity,
+            "position.freeLiquidity != pool.liquidity"
+        );
+    }
+
+    function test_allocate_does_not_modify_timestamp()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
         uint256 prev = ghost().pool().lastTimestamp;
-        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, deltaLiquidity: amount}));
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
         uint256 post = ghost().pool().lastTimestamp;
 
         assertEq(post, prev, "pool.lastTimestamp");
     }
 
-    function test_allocate_reserves_increase() public defaultConfig useActor usePairTokens(10 ether) isArmed {
+    function test_allocate_reserves_increase()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
         uint256 prev_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 prev_quote = ghost().reserve(ghost().quote().to_addr());
-        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
-        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, deltaLiquidity: amount}));
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
 
@@ -68,8 +131,16 @@ contract TestPortfolioAllocate is Setup {
 
         uint256 prev_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 prev_quote = ghost().reserve(ghost().quote().to_addr());
-        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
-        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, deltaLiquidity: amount}));
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
 
@@ -79,16 +150,34 @@ contract TestPortfolioAllocate is Setup {
         assertEq(post_quote, prev_quote + delta1, "pool.getReserve(quote)");
     }
 
-    function test_allocate_balances_increase() public defaultConfig useActor usePairTokens(10 ether) isArmed {
+    function test_allocate_balances_increase()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        uint256 prev_asset = ghost().asset().to_token().balanceOf(address(subject()));
-        uint256 prev_quote = ghost().quote().to_token().balanceOf(address(subject()));
-        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({deltaLiquidity: int128(amount)});
-        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, deltaLiquidity: amount}));
-        uint256 post_asset = ghost().asset().to_token().balanceOf(address(subject()));
-        uint256 post_quote = ghost().quote().to_token().balanceOf(address(subject()));
+        uint256 prev_asset =
+            ghost().asset().to_token().balanceOf(address(subject()));
+        uint256 prev_quote =
+            ghost().quote().to_token().balanceOf(address(subject()));
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
+        uint256 post_asset =
+            ghost().asset().to_token().balanceOf(address(subject()));
+        uint256 post_quote =
+            ghost().quote().to_token().balanceOf(address(subject()));
 
         assertTrue(post_asset != 0, "asset.balanceOf(subject) == 0");
         assertTrue(post_quote != 0, "quote.balanceOf(subject) == 0");
@@ -98,23 +187,221 @@ contract TestPortfolioAllocate is Setup {
 
     function test_allocate_non_existent_pool_reverts() public useActor {
         uint64 failureArg = 51;
-        vm.expectRevert(abi.encodeWithSelector(NonExistentPool.selector, failureArg));
-        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: failureArg, deltaLiquidity: 1 ether}));
-    }
-
-    function test_allocate_zero_liquidity_reverts() public defaultConfig useActor isArmed {
-        uint256 failureArg = 0;
-        vm.expectRevert(ZeroLiquidity.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(NonExistentPool.selector, failureArg)
+        );
         subject().multiprocess(
-            FVMLib.encodeAllocate({useMax: uint8(0), poolId: ghost().poolId, deltaLiquidity: uint128(failureArg)})
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: failureArg,
+                deltaLiquidity: 1 ether
+            })
         );
     }
 
-    function test_allocate_liquidity_overflow_reverts() public defaultConfig useActor isArmed {
+    function test_allocate_zero_liquidity_reverts()
+        public
+        defaultConfig
+        useActor
+        isArmed
+    {
+        uint256 failureArg = 0;
+        vm.expectRevert(ZeroLiquidity.selector);
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: ghost().poolId,
+                deltaLiquidity: uint128(failureArg)
+            })
+        );
+    }
+
+    function test_allocate_liquidity_overflow_reverts()
+        public
+        defaultConfig
+        useActor
+        isArmed
+    {
         uint256 failureArg = uint256(type(uint128).max) + 1;
         vm.expectRevert(); // safeCastTo128 reverts with no message, so it's just an "Evm Error".
         subject().multiprocess(
-            FVMLib.encodeAllocate({useMax: uint8(0), poolId: ghost().poolId, deltaLiquidity: uint128(failureArg)})
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: ghost().poolId,
+                deltaLiquidity: uint128(failureArg)
+            })
+        );
+    }
+
+    function test_allocate_fee_on_transfer_token()
+        public
+        feeOnTokenTransferConfig
+        usePairTokens(10 ether)
+        useActor
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        (uint256 amount0, uint256 amount1) =
+            subject().getLiquidityDeltas(ghost().poolId, int128(amount));
+        uint256 fee0 = amount0 * 1 / 100;
+        uint256 fee1 = amount1 * 1 / 100;
+
+        // Tokens are popped, and quote token is last in allocate, so it reverts first.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                NegativeBalance.selector,
+                ghost().quote().to_addr(),
+                -int256(fee1)
+            )
+        );
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
+
+        int256 net = ghost().net(ghost().quote().to_addr());
+
+        console.logInt(net);
+        assertTrue(net >= 0, "Negative net balance for token");
+    }
+
+    function testFuzz_allocate_low_decimals_modifies_liquidity(uint64 liquidity)
+        public
+        sixDecimalQuoteConfig
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.assume(liquidity > 0);
+        _simple_allocate_check_liquidity(liquidity);
+    }
+
+    function testFuzz_allocate_duration_modifies_liquidity(
+        uint16 duration,
+        uint64 liquidity
+    )
+        public
+        durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.assume(liquidity > 0);
+        _simple_allocate_check_liquidity(liquidity);
+    }
+
+    function testFuzz_allocate_low_duration_modifies_liquidity(
+        uint16 duration,
+        uint64 liquidity
+    )
+        public
+        durationConfig(uint16(bound(duration, MIN_DURATION, MIN_DURATION + 100)))
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.assume(liquidity > 0);
+        _simple_allocate_check_liquidity(liquidity);
+    }
+
+    function testFuzz_allocate_high_duration_modifies_liquidity(
+        uint16 duration,
+        uint64 liquidity
+    )
+        public
+        durationConfig(uint16(bound(duration, MAX_DURATION - 100, MAX_DURATION)))
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.assume(liquidity > 0);
+        _simple_allocate_check_liquidity(liquidity);
+    }
+
+    function testFuzz_allocate_volatility_modifies_liquidity(
+        uint16 volatility,
+        uint64 liquidity
+    )
+        public
+        volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.assume(liquidity > 0);
+        _simple_allocate_check_liquidity(liquidity);
+    }
+
+    function testFuzz_allocate_low_volatility_modifies_liquidity(
+        uint16 volatility,
+        uint64 liquidity
+    )
+        public
+        volatilityConfig(
+            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+        )
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.assume(liquidity > 0);
+        _simple_allocate_check_liquidity(liquidity);
+    }
+
+    function testFuzz_allocate_high_volatility_modifies_liquidity(
+        uint16 volatility,
+        uint64 liquidity
+    )
+        public
+        volatilityConfig(
+            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+        )
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.assume(liquidity > 0);
+        _simple_allocate_check_liquidity(liquidity);
+    }
+
+    function _simple_allocate_check_liquidity(uint128 amount) internal {
+        uint64 xid = ghost().poolId;
+        (uint128 expectedA, uint128 expectedQ) =
+            subject().getLiquidityDeltas(ghost().poolId, int128(amount));
+        uint256 prev = ghost().pool().liquidity;
+        subject().multiprocess(
+            FVMLib.encodeAllocate({
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
+
+        uint256 post = ghost().pool().liquidity;
+        (uint256 postA, uint256 postQ) = (
+            ghost().asset().to_token().balanceOf(address(subject())),
+            ghost().quote().to_token().balanceOf(address(subject()))
+        );
+
+        (uint256 postR_A, uint256 postR_Q) = (
+            ghost().reserve(ghost().asset().to_addr()),
+            ghost().reserve(ghost().quote().to_addr())
+        );
+
+        assertEq(postA, expectedA, "pool asset balance");
+        assertEq(postQ, expectedQ, "pool quote balance");
+        assertEq(postR_A, postA, "pool asset reserve");
+        assertEq(postR_Q, postQ, "pool quote reserve");
+        assertEq(post, prev + amount, "pool.liquidity");
+        assertEq(
+            ghost().pool().liquidity,
+            ghost().position(actor()).freeLiquidity,
+            "position.freeLiquidity != pool.liquidity"
         );
     }
 }

@@ -4,10 +4,10 @@ pragma solidity ^0.8.4;
 import "../Setup.sol";
 import "./HelperInvariantLib.sol";
 
-import {HandlerPortfolio} from "./HandlerPortfolio.sol";
-import {HandlerExternal} from "./HandlerExternal.sol";
+import { HandlerPortfolio } from "./HandlerPortfolio.sol";
+import { HandlerExternal } from "./HandlerExternal.sol";
 
-bytes32 constant SLOT_LOCKED = bytes32(uint256(10));
+bytes32 constant SLOT_LOCKED = bytes32(uint256(11));
 
 interface AccountLike {
     function __account__() external view returns (bool);
@@ -23,19 +23,19 @@ interface AccountLike {
  * Invariant 5. ∑ Portfolio.positions(owner, poolId).freeLiquidity == Portfolio.pools(poolId).liquidity, for all
  * pools.
  */
-contract RMM01PortfolioInvariants is Setup {
+contract TestRMM01PortfolioInvariants is Setup {
     /**
      * @dev Helper to manage the pools that are being interacted with via the handlers.
      */
     InvariantGhostState private _ghostInvariant;
 
-    HandlerPortfolio internal _Portfolio;
+    HandlerPortfolio internal _portfolio;
     HandlerExternal internal _external;
 
     function setUp() public override {
         super.setUp();
 
-        _Portfolio = new HandlerPortfolio();
+        _portfolio = new HandlerPortfolio();
 
         {
             bytes4[] memory selectors = new bytes4[](6);
@@ -45,14 +45,19 @@ contract RMM01PortfolioInvariants is Setup {
             selectors[3] = HandlerPortfolio.create_pool.selector;
             selectors[4] = HandlerPortfolio.allocate.selector;
             selectors[5] = HandlerPortfolio.deallocate.selector;
-            targetSelector(FuzzSelector({addr: address(_Portfolio), selectors: selectors}));
-            targetContract(address(_Portfolio));
+            //selectors[6] = HandlerPortfolio.random_processes.selector;
+            targetSelector(
+                FuzzSelector({addr: address(_portfolio), selectors: selectors})
+            );
+            targetContract(address(_portfolio));
         }
 
         // Create default pool, used in handlers via `usePool(uint)` modifier.
-        uint64 poolId = Configs.fresh().edit("asset", abi.encode(address(subjects().tokens[0]))).edit(
-            "quote", abi.encode(address(subjects().tokens[1]))
-        ).generate(address(subject()));
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[0]))
+        ).edit("quote", abi.encode(address(subjects().tokens[1]))).generate(
+            address(subject())
+        );
 
         setGhostPoolId(poolId);
     }
@@ -88,7 +93,8 @@ contract RMM01PortfolioInvariants is Setup {
         PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
-            (uint256 dAsset,) = subject().getReserves(ghost().poolId);
+            (uint256 dAsset,) =
+                subject().getVirtualReservesPerLiquidity(ghost().poolId);
             uint256 bAsset = ghost().physicalBalance(ghost().asset().to_addr());
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }
@@ -98,7 +104,8 @@ contract RMM01PortfolioInvariants is Setup {
         PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
-            (, uint256 dQuote) = subject().getReserves(ghost().poolId);
+            (, uint256 dQuote) =
+                subject().getVirtualReservesPerLiquidity(ghost().poolId);
             uint256 bQuote = ghost().physicalBalance(ghost().quote().to_addr());
             assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
         }
@@ -127,13 +134,17 @@ contract RMM01PortfolioInvariants is Setup {
     function invariant_callSummary() public view {
         console.log("Call summary:");
         console.log("-------------------");
-        _Portfolio.callSummary();
+        _portfolio.callSummary();
         console.log("pools created", getPoolIds().length);
     }
 
     // ===== Helpers ===== //
 
-    function ghost_invariant() internal virtual returns (InvariantGhostState storage) {
+    function ghost_invariant()
+        internal
+        virtual
+        returns (InvariantGhostState storage)
+    {
         return _ghostInvariant;
     }
 
@@ -145,11 +156,20 @@ contract RMM01PortfolioInvariants is Setup {
         return _ghostInvariant.poolIds;
     }
 
-    function getRandomPoolId(uint256 index) public view virtual returns (uint64) {
+    function getRandomPoolId(uint256 index)
+        public
+        view
+        virtual
+        returns (uint64)
+    {
         return _ghostInvariant.rand(index);
     }
 
-    function getBalances(address token) internal view returns (uint256 reserve, uint256 physical, uint256 balances) {
+    function getBalances(address token)
+        internal
+        view
+        returns (uint256 reserve, uint256 physical, uint256 balances)
+    {
         if (ghost().subject != address(0)) {
             reserve = ghost().reserve(token);
             physical = ghost().physicalBalance(token);
@@ -157,7 +177,12 @@ contract RMM01PortfolioInvariants is Setup {
         }
     }
 
-    function getBalanceSum(address token) public view virtual returns (uint256) {
+    function getBalanceSum(address token)
+        public
+        view
+        virtual
+        returns (uint256)
+    {
         address[] memory actors = getActors();
         uint256 sum;
         for (uint256 x; x != actors.length; ++x) {

@@ -19,5 +19,5 @@ jobs:
         with:
           version: nightly
 
-      - name: Run tests
-        run: FOUNDRY_PROFILE=optimized forge build --sizes
+      - name: Run build
+        run: FOUNDRY_PROFILE=optimized forge build --sizes --skip test

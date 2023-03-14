@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import {PortfolioCurve, PortfolioPair} from "../PortfolioLib.sol";
+import { PortfolioCurve, PortfolioPair } from "../PortfolioLib.sol";
 
 interface IPortfolioEvents {
     /**
@@ -14,14 +14,18 @@ interface IPortfolioEvents {
      * @dev Emitted on `deallocate`, `swap`, or `fund`.
      * @param amount Quantity of token in token's native decimal units.
      */
-    event IncreaseUserBalance(address indexed account, address indexed token, uint256 amount);
+    event IncreaseUserBalance(
+        address indexed account, address indexed token, uint256 amount
+    );
 
     /**
      * @notice Unassigns `amount` of `token` from `account`.
      * @dev Emitted on `allocate`, `swap`, or `draw`.
      * @param amount Quantity of token in token's native decimal units.
      */
-    event DecreaseUserBalance(address indexed account, address indexed token, uint256 amount);
+    event DecreaseUserBalance(
+        address indexed account, address indexed token, uint256 amount
+    );
 
     /**
      * @notice Assigns an additional `amount` of `token` to Portfolio's internally tracked balance.
@@ -84,7 +88,12 @@ interface IPortfolioEvents {
     /**
      * @dev Emits a `0` for unchanged parameters.
      */
-    event ChangeParameters(uint64 indexed poolId, uint16 indexed priorityFee, uint16 indexed fee, uint16 jit);
+    event ChangeParameters(
+        uint64 indexed poolId,
+        uint16 indexed priorityFee,
+        uint16 indexed fee,
+        uint16 jit
+    );
 
     /**
      * @notice Reduces `feeAssetDec` amount of `asset` and `feeQuoteDec` amount of `quote` from the position's state.
@@ -102,14 +111,22 @@ interface IPortfolioEvents {
      * @notice Emitted on pair creation.
      */
     event CreatePair(
-        uint24 indexed pairId, address indexed asset, address indexed quote, uint8 decimalsAsset, uint8 decimalsQuote
+        uint24 indexed pairId,
+        address indexed asset,
+        address indexed quote,
+        uint8 decimalsAsset,
+        uint8 decimalsQuote
     );
 
     /**
      * @param price Estimated price of the initialized pool in WAD units.
      */
     event CreatePool(
-        uint64 indexed poolId, bool isMutable, address indexed asset, address indexed quote, uint256 price
+        uint64 indexed poolId,
+        bool isMutable,
+        address indexed asset,
+        address indexed quote,
+        uint256 price
     );
 }
 
@@ -119,7 +136,10 @@ interface IPortfolioGetters {
      * @dev Internally owned balance of `token` of `owner`.
      * @return Balance held, in native `token` decimal units.
      */
-    function getBalance(address owner, address token) external view returns (uint256);
+    function getBalance(
+        address owner,
+        address token
+    ) external view returns (uint256);
 
     /**
      * @dev Internally tracked global balance of all `token`s assigned to an address or a pool.
@@ -163,18 +183,26 @@ interface IPortfolioGetters {
     /**
      * @dev Incremented when a pool is created.
      */
-    function getPoolNonce() external view returns (uint32);
+    function getPoolNonce(uint24 pairNonce) external view returns (uint32);
 
     /**
      * @dev Reverse lookup to find the `pairId` of a given `asset` and `quote`.
      * Order matters! There can be two pairs for every two tokens.
      */
-    function getPairId(address asset, address quote) external view returns (uint24 pairId);
+    function getPairId(
+        address asset,
+        address quote
+    ) external view returns (uint24 pairId);
 
     function pairs(uint24 pairId)
         external
         view
-        returns (address tokenAsset, uint8 decimalsAsset, address tokenQuote, uint8 decimalsQuote);
+        returns (
+            address tokenAsset,
+            uint8 decimalsAsset,
+            address tokenQuote,
+            uint8 decimalsQuote
+        );
 
     /**
      * @dev Structs in memory are returned as tuples, e.g. (foo, bar...).
@@ -241,7 +269,10 @@ interface IPortfolioGetters {
      * @return deltaAsset Quantity of `asset` tokens in native decimal units.
      * @return deltaQuote Quantity of `quote` tokens in native decimal units.
      */
-    function getReserves(uint64 poolId) external view returns (uint256 deltaAsset, uint256 deltaQuote);
+    function getReserves(uint64 poolId)
+        external
+        view
+        returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
      * @dev Amount of tokens scaled to WAD units per WAD liquidity.
@@ -261,14 +292,21 @@ interface IPortfolioGetters {
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
      * @return amountOut of tokens in native token decimal units.
      */
-    function getAmountOut(uint64 poolId, bool sellAsset, uint256 amountIn) external view returns (uint256);
+    function getAmountOut(
+        uint64 poolId,
+        bool sellAsset,
+        uint256 amountIn
+    ) external view returns (uint256);
 
     /**
      * @dev Computes an estimated on-chain price of the `poolId`.
      * @custom:mev Vulnerable to manipulation, do not rely on this function on-chain.
      * @return price Estimated price in wad units of `quote` tokens per `asset` token.
      */
-    function getLatestEstimatedPrice(uint64 poolId) external view returns (uint256 price);
+    function getLatestEstimatedPrice(uint64 poolId)
+        external
+        view
+        returns (uint256 price);
 }
 
 interface IPortfolioActions {
@@ -319,7 +357,16 @@ interface IPortfolioActions {
      * @param fee New fee of the pool in basis points (1 = 0.01%).
      * @param jit New JIT policy of the pool in seconds (1 = 1 second).
      */
-    function changeParameters(uint64 poolId, uint16 priorityFee, uint16 fee, uint16 jit) external;
+    function changeParameters(
+        uint64 poolId,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 jit
+    ) external;
 }
 
-interface IPortfolio is IPortfolioActions, IPortfolioEvents, IPortfolioGetters {}
+interface IPortfolio is
+    IPortfolioActions,
+    IPortfolioEvents,
+    IPortfolioGetters
+{ }

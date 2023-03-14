@@ -52,44 +52,133 @@ error InvalidJump(uint256 pointer); // 0x80f63bd1
 error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
 
 /**
- * @dev  [jump instruction, instructions.length, pointer, ...instruction, pointer, ...etc]
+ * @dev Expects a serialized encoding of instructions.
+ *      Serialized byte array -> [Jump Instruction Opcode,Total Amount of Instructions, Length of instruction[0], Data of instruction[0], Length of instruction[1],...]
+ *
+ * Motivation
+ *      This serialization is intentional because it enables the use of a dynamic array for instructions.
+ *      A fixed instruction array would pad unfilled array data with zeroes, wasting potentially a lot of bytes.
+ *      On optimistic rollups, these bytes are the most expensive (in gas) bytes!
+ *
+ * Simple Guide
+ *      First, information is added about the set of instructions that will be processed.
+ *          - The jump instruction code, to signal we want to process multiple instructions.
+ *          - The amount of instructions we want to process.
+ *          - The length of the next instruction.
+ *          - The instruction data.
+ *          - The length of the next instruction.
+ *          - Etc...
+ *      Since we want to process multiple instructions that are in one big string,
+ *      the encoding has to put information at the beginning of the instruction to say
+ *      "this instruction is 22 bytes long".
+ *      Then when it's decoded using the assumption "so the next instruction starts after 22 bytes".
+ *
+ * Glossary
+ * | Term | Description | Size |
+ * ---------------------------------
+ * | Pointer | Index of the jump calldata that holds the length of an instruction. | 1 byte |
+ * | Instruction Code | FVM "op code" to signal which operation to execute | 1 byte |
+ * | Total Instructions | Amount of instructions to be executed | 1 byte |
+ *
+ * Conclusion
+ *      To summarize, the calldata can be sliced to get the length of the instruction, e.g. `data[3:4]`.
+ *      The `pointer` is initialized as this value. The pointer acts as an accumulator that moves across the bytes string.
+ *      This accumulated value is the byte index of the last byte of the instruction.
+ *
+ * Example
+ * | Byte Index                 | Data               |
+ * ----------------------------------------------------------
+ * | bytes[0]                   | 0xAA Instruction code     |
+ * | bytes[1]                   | Amount of Instructions    |
+ * | bytes[2]                   | ptr[0] := Length of instruction[0]
+ * | bytes[2:ptr[0] + 1]        | Data of instruction[0]. Calldata slice does not include end index.   |
+ * | bytes[ptr[0] + 1]          | ptr[1] := Length of instruction[1] |
+ * | ...                        | Repeats in a loop for each instruction. |
  */
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
-    uint8 length = uint8(data[1]);
-    uint8 pointer = JUMP_PROCESS_START_POINTER;
-    uint256 start;
+    // Encoded `data`:| 0x | opcode | amount instructions | instruction length | instruction |
+    uint8 totalInstructions = uint8(data[1]);
+    // The "pointer" is pointing to the first byte of an instruction,
+    // which holds the data for the instruction's length in bytes.
+    uint256 idxPtr = JUMP_PROCESS_START_POINTER;
+    // As the instructions are processed,
+    // the pointer moves from the end to the start.
+    uint256 idxInstructionStart;
+    uint256 idxInstructionEnd;
     // For each instruction set...
-    for (uint256 i; i != length; ++i) {
-        // Start at the index of the first byte of the next instruction.
-        start = pointer;
-        // Set the new pointer to the next instruction, located at the pointer.
-        pointer = uint8(data[pointer]);
-        // The `start:` includes the pointer byte, while the `:end` `pointer` is excluded.
-        if (pointer > data.length) revert InvalidJump(pointer);
-        bytes calldata instruction = data[start:pointer];
-        // Process the instruction.
-        _process(instruction[1:]); // note: Removes the pointer to the next instruction.
+    for (uint256 i; i != totalInstructions; ++i) {
+        // Start the instruction where the pointer is.
+        idxInstructionStart = idxPtr;
+        // Compute the index of the next pointer by summing
+        // the current pointer value, the length of the instruction,
+        // and the amount of bytes the instruction length takes (which is 1 byte).
+        idxInstructionEnd =
+            idxInstructionStart + uint8(bytes1(data[idxInstructionStart])) + 1;
+        // Make sure the pointer is not out of bounds.
+        if (idxInstructionEnd > data.length) {
+            revert InvalidJump(idxInstructionEnd);
+        }
+        // Calldata slicing EXCLUDES the `idxInstructionEnd` byte.
+        bytes calldata instruction = data[idxInstructionStart:idxInstructionEnd];
+        // Move the pointer to the EXCLUDED `idxInstructionEnd` byte.
+        // This byte holds the data for the index of byte with the next instruction's length.
+        idxPtr = idxInstructionEnd;
+        // Process the instruction after removing the instruction length,
+        // so only instruction data is passed to `_process`.
+        _process(instruction[1:]);
     }
 }
 
-function encodeJumpInstruction(bytes[] memory instructions) pure returns (bytes memory) {
-    uint8 nextPointer;
-    uint8 len = uint8(instructions.length);
-    bytes memory payload = bytes.concat(INSTRUCTION_JUMP, bytes1(len));
+/**
+ * @dev For debugging jump instructions, pass the jump instruction calldata to this function to get the individual instructions.
+ */
+function decodeJumpInstructions(bytes calldata data)
+    pure
+    returns (bytes[] memory)
+{
+    uint8 totalInstructions = uint8(data[1]);
+    uint256 idxPtr = JUMP_PROCESS_START_POINTER;
+    uint256 idxInstructionStart;
+    uint256 idxInstructionEnd;
+    bytes[] memory instructions = new bytes[](totalInstructions);
+    for (uint256 i; i != totalInstructions; ++i) {
+        idxInstructionStart = idxPtr;
+        idxInstructionEnd =
+            idxInstructionStart + uint8(bytes1(data[idxInstructionStart])) + 1;
+        if (idxInstructionEnd > data.length) {
+            revert InvalidJump(idxInstructionEnd);
+        }
+        bytes calldata instruction = data[idxInstructionStart:idxInstructionEnd];
+        idxPtr = idxInstructionEnd;
+
+        instructions[i] = instruction[1:];
+    }
+
+    return instructions;
+}
+
+/**
+ * @dev Serializes an array of instructions by appending the length of the instruction to each instruction packet.
+ * Adds the INSTRUCTION_JUMP opcode and total instructions quantity to the front of the `bytes` array.
+ * @param instructions Dynamically sized array of FVM encoded instructions.
+ */
+function encodeJumpInstruction(bytes[] memory instructions)
+    pure
+    returns (bytes memory)
+{
+    uint8 totalInstructions = uint8(instructions.length);
+    bytes memory payload =
+        bytes.concat(INSTRUCTION_JUMP, bytes1(totalInstructions));
 
     // for each instruction set...
-    for (uint256 i; i != len; ++i) {
+    for (uint256 i; i != totalInstructions; ++i) {
         bytes memory instruction = instructions[i];
-        uint8 size = uint8(instruction.length);
-
-        // Using instruction and index of instruction in list, we create a new array with a pointer to the next instruction in front of the instruction payload.
-        if (i == 0) {
-            nextPointer = size + 3; // [added0, instruction, added1, nextPointer]
-        } else {
-            nextPointer = nextPointer + size + 1; // [currentPointer, instruction, nextPointer]
-        }
-
-        bytes memory edited = bytes.concat(bytes1(nextPointer), instruction);
+        // Amount of bytes of data for this instruction.
+        uint8 instructionLength = uint8(instruction.length);
+        // Appends pointer to next instruction to the beginning of this instruction.
+        bytes memory edited =
+            bytes.concat(bytes1(instructionLength), instruction);
+        // Concats the serialized bytes data with this edited instruction.
         payload = bytes.concat(payload, edited);
     }
 
@@ -168,7 +257,10 @@ function decodePoolId(bytes calldata data)
     }
 }
 
-function encodeCreatePair(address token0, address token1) pure returns (bytes memory data) {
+function encodeCreatePair(
+    address token0,
+    address token1
+) pure returns (bytes memory data) {
     data = abi.encodePacked(CREATE_PAIR, token0, token1);
 }
 
@@ -195,7 +287,11 @@ function decodeCreatePair(bytes calldata data) pure returns (address tokenAsset,
  * because it preserves all the trailing zeros for each type. An improved version
  * should be made to reduce the calldata size by removing the extra zeros.
  */
-function encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) pure returns (bytes memory data) {
+function encodeClaim(
+    uint64 poolId,
+    uint128 fee0,
+    uint128 fee1
+) pure returns (bytes memory data) {
     (uint8 powerFee0, uint128 baseFee0) = AssemblyLib.fromAmount(fee0);
     (uint8 powerFee1, uint128 baseFee1) = AssemblyLib.fromAmount(fee1);
 
@@ -312,9 +408,15 @@ function decodeCreatePool(bytes calldata data)
  * @dev Encodes a allocate operation.
  * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
-function encodeAllocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+function encodeAllocate(
+    uint8 useMax,
+    uint64 poolId,
+    uint128 deltaLiquidity
+) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base);
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base
+    );
 }
 
 function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
@@ -335,9 +437,15 @@ function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 
  * @dev Encodes a deallocate operation.
  * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
-function encodeDeallocate(uint8 useMax, uint64 poolId, uint128 deltaLiquidity) pure returns (bytes memory data) {
+function encodeDeallocate(
+    uint8 useMax,
+    uint64 poolId,
+    uint128 deltaLiquidity
+) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
-    data = abi.encodePacked(AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base);
+    data = abi.encodePacked(
+        AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base
+    );
 }
 
 function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
@@ -383,7 +491,13 @@ function encodeSwap(
  */
 function decodeSwap(bytes calldata data)
     pure
-    returns (uint8 useMax, uint64 poolId, uint128 input, uint128 output, uint8 sellAsset)
+    returns (
+        uint8 useMax,
+        uint64 poolId,
+        uint128 input,
+        uint128 output,
+        uint8 sellAsset
+    )
 {
     assembly {
         let value := calldataload(data.offset)

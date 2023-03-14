@@ -40,9 +40,8 @@ abstract contract PortfolioVirtual is Objective {
     address public immutable WETH;
     /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
-    /// @inheritdoc IPortfolioGetters
-    uint32 public getPoolNonce;
 
+    mapping(uint24 => uint32) public getPoolNonce;
     mapping(uint24 => PortfolioPair) public pairs;
     mapping(uint64 => PortfolioPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
@@ -158,9 +157,7 @@ abstract contract PortfolioVirtual is Objective {
             Account.__dangerousUnwrapEther__(WETH, to, amount);
         } else {
             Account.SafeTransferLib.safeTransfer(
-                Account.ERC20(token),
-                to,
-                amount
+                Account.ERC20(token), to, amount
             );
         }
 
@@ -219,22 +216,20 @@ abstract contract PortfolioVirtual is Objective {
             address asset,
             address quote
         ) = (
-                pool.feeGrowthGlobalAsset,
-                pool.feeGrowthGlobalQuote,
-                pool.invariantGrowthGlobal,
-                pool.pair.tokenAsset,
-                pool.pair.tokenQuote
-            );
+            pool.feeGrowthGlobalAsset,
+            pool.feeGrowthGlobalQuote,
+            pool.invariantGrowthGlobal,
+            pool.pair.tokenAsset,
+            pool.pair.tokenQuote
+        );
 
         pos.syncPositionFees(growthAsset, growthQuote, growthInvariant);
 
         // 2^128 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
-        uint256 claimedAssets = deltaAsset == type(uint128).max
-            ? pos.tokensOwedAsset
-            : deltaAsset;
-        uint256 claimedQuotes = deltaQuote == type(uint128).max
-            ? pos.tokensOwedQuote
-            : deltaQuote;
+        uint256 claimedAssets =
+            deltaAsset == type(uint128).max ? pos.tokensOwedAsset : deltaAsset;
+        uint256 claimedQuotes =
+            deltaQuote == type(uint128).max ? pos.tokensOwedQuote : deltaQuote;
 
         pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
         pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
@@ -243,13 +238,8 @@ abstract contract PortfolioVirtual is Objective {
         if (claimedQuotes > 0) _applyCredit(quote, claimedQuotes);
 
         emit Collect(
-            poolId,
-            msg.sender,
-            claimedAssets,
-            asset,
-            claimedQuotes,
-            quote
-        );
+            poolId, msg.sender, claimedAssets, asset, claimedQuotes, quote
+            );
     }
 
     /**
@@ -262,10 +252,8 @@ abstract contract PortfolioVirtual is Objective {
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
-        (address asset, address quote) = (
-            pools[poolId].pair.tokenAsset,
-            pools[poolId].pair.tokenQuote
-        );
+        (address asset, address quote) =
+            (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
 
         if (useMax) {
             deltaLiquidity = getMaxLiquidity({
@@ -276,10 +264,8 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = getLiquidityDeltas(
-            poolId,
-            AssemblyLib.toInt128(deltaLiquidity)
-        ); // note: Rounds up.
+        (deltaAsset, deltaQuote) =
+            getLiquidityDeltas(poolId, AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
@@ -296,13 +282,8 @@ abstract contract PortfolioVirtual is Objective {
         _changeLiquidity(args);
 
         emit Allocate(
-            poolId,
-            asset,
-            quote,
-            deltaAsset,
-            deltaQuote,
-            deltaLiquidity
-        );
+            poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
+            );
     }
 
     /**
@@ -314,20 +295,16 @@ abstract contract PortfolioVirtual is Objective {
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
-        (address asset, address quote) = (
-            pools[poolId].pair.tokenAsset,
-            pools[poolId].pair.tokenQuote
-        );
+        (address asset, address quote) =
+            (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
 
         if (useMax) {
             deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) = getLiquidityDeltas(
-            poolId,
-            -AssemblyLib.toInt128(deltaLiquidity)
-        ); // note: Rounds down.
+        (deltaAsset, deltaQuote) =
+            getLiquidityDeltas(poolId, -AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds down.
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -343,25 +320,16 @@ abstract contract PortfolioVirtual is Objective {
         _changeLiquidity(args);
 
         emit Deallocate(
-            poolId,
-            asset,
-            quote,
-            deltaAsset,
-            deltaQuote,
-            deltaLiquidity
-        );
+            poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
+            );
     }
 
-    function _changeLiquidity(
-        ChangeLiquidityParams memory args
-    )
+    function _changeLiquidity(ChangeLiquidityParams memory args)
         internal
         returns (uint256 feeAsset, uint256 feeQuote, uint256 invariantGrowth)
     {
-        (PortfolioPool storage pool, PortfolioPosition storage position) = (
-            pools[args.poolId],
-            positions[args.owner][args.poolId]
-        );
+        (PortfolioPool storage pool, PortfolioPosition storage position) =
+            (pools[args.poolId], positions[args.owner][args.poolId]);
 
         (feeAsset, feeQuote, invariantGrowth) = position.syncPositionFees(
             pool.feeGrowthGlobalAsset,
@@ -369,11 +337,8 @@ abstract contract PortfolioVirtual is Objective {
             pool.invariantGrowthGlobal
         );
 
-        bool canUpdate = checkPosition(
-            args.poolId,
-            args.owner,
-            args.deltaLiquidity
-        );
+        bool canUpdate =
+            checkPosition(args.poolId, args.owner, args.deltaLiquidity);
         if (!canUpdate) revert JitLiquidity(pool.params.jit);
 
         position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
@@ -392,9 +357,7 @@ abstract contract PortfolioVirtual is Objective {
     /**
      * @dev Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote) for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
      */
-    function _swap(
-        Order memory args
-    )
+    function _swap(Order memory args)
         internal
         returns (
             uint64 poolId,
@@ -445,10 +408,8 @@ abstract contract PortfolioVirtual is Objective {
             iteration.remainder = remainder;
             iteration.liquidity = pool.liquidity;
             iteration.output = output;
-            (iteration.virtualX, iteration.virtualY) = (
-                pool.virtualX,
-                pool.virtualY
-            );
+            (iteration.virtualX, iteration.virtualY) =
+                (pool.virtualX, pool.virtualY);
         }
 
         if (iteration.output == 0) revert ZeroOutput();
@@ -469,21 +430,14 @@ abstract contract PortfolioVirtual is Objective {
 
             // Virtual reserves
             if (_state.sell) {
-                (liveIndependent, liveDependent) = (
-                    iteration.virtualX,
-                    iteration.virtualY
-                );
+                (liveIndependent, liveDependent) =
+                    (iteration.virtualX, iteration.virtualY);
             } else {
-                (liveDependent, liveIndependent) = (
-                    iteration.virtualX,
-                    iteration.virtualY
-                );
+                (liveDependent, liveIndependent) =
+                    (iteration.virtualX, iteration.virtualY);
             }
             maxInput = computeMaxInput(
-                args.poolId,
-                _state.sell,
-                liveIndependent,
-                iteration.liquidity
+                args.poolId, _state.sell, liveIndependent, iteration.liquidity
             );
 
             deltaInput = AssemblyLib.min(iteration.remainder, maxInput); // swaps up to the maximum input
@@ -491,12 +445,10 @@ abstract contract PortfolioVirtual is Objective {
             iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
 
             deltaInputLessFee = deltaInput - iteration.feeAmount;
-            nextIndependent =
-                liveIndependent +
-                deltaInputLessFee.divWadDown(iteration.liquidity);
+            nextIndependent = liveIndependent
+                + deltaInputLessFee.divWadDown(iteration.liquidity);
             nextDependent =
-                liveDependent -
-                deltaOutput.divWadDown(iteration.liquidity);
+                liveDependent - deltaOutput.divWadDown(iteration.liquidity);
             iteration.remainder -= deltaInput;
             iteration.input += deltaInput;
         }
@@ -506,15 +458,11 @@ abstract contract PortfolioVirtual is Objective {
             int256 nextInvariantWad;
 
             if (_state.sell) {
-                (iteration.virtualX, iteration.virtualY) = (
-                    nextIndependent,
-                    nextDependent
-                );
+                (iteration.virtualX, iteration.virtualY) =
+                    (nextIndependent, nextDependent);
             } else {
-                (iteration.virtualX, iteration.virtualY) = (
-                    nextDependent,
-                    nextIndependent
-                );
+                (iteration.virtualX, iteration.virtualY) =
+                    (nextDependent, nextIndependent);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
@@ -526,8 +474,7 @@ abstract contract PortfolioVirtual is Objective {
 
             if (!validInvariant) {
                 revert InvalidInvariant(
-                    iteration.prevInvariant,
-                    nextInvariantWad
+                    iteration.prevInvariant, nextInvariantWad
                 );
             }
             iteration.nextInvariant = int128(nextInvariantWad);
@@ -546,8 +493,7 @@ abstract contract PortfolioVirtual is Objective {
 
             if (iteration.nextInvariant > 0) {
                 _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(
-                    iteration.feeAmount,
-                    iteration.liquidity
+                    iteration.feeAmount, iteration.liquidity
                 );
             }
 
@@ -584,15 +530,12 @@ abstract contract PortfolioVirtual is Objective {
                 iteration.output,
                 iteration.feeAmount,
                 iteration.nextInvariant
-            );
+                );
         }
 
         delete _state;
         return (
-            args.poolId,
-            iteration.remainder,
-            iteration.input,
-            iteration.output
+            args.poolId, iteration.remainder, iteration.input, iteration.output
         );
     }
 
@@ -626,16 +569,13 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         pool.feeGrowthGlobalAsset = AssemblyLib.computeCheckpoint(
-            pool.feeGrowthGlobalAsset,
-            feeGrowthGlobalAsset
+            pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset
         );
         pool.feeGrowthGlobalQuote = AssemblyLib.computeCheckpoint(
-            pool.feeGrowthGlobalQuote,
-            feeGrowthGlobalQuote
+            pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote
         );
         pool.invariantGrowthGlobal = AssemblyLib.computeCheckpoint(
-            pool.invariantGrowthGlobal,
-            invariantGrowthGlobal
+            pool.invariantGrowthGlobal, invariantGrowthGlobal
         );
     }
 
@@ -648,10 +588,8 @@ abstract contract PortfolioVirtual is Objective {
         pairId = getPairId[asset][quote];
         if (pairId != 0) revert PairExists(pairId);
 
-        (uint8 decimalsAsset, uint8 decimalsQuote) = (
-            IERC20(asset).decimals(),
-            IERC20(quote).decimals()
-        );
+        (uint8 decimalsAsset, uint8 decimalsQuote) =
+            (IERC20(asset).decimals(), IERC20(quote).decimals());
         if (!decimalsAsset.isBetween(MIN_DECIMALS, MAX_DECIMALS)) {
             revert InvalidDecimals(decimalsAsset);
         }
@@ -692,7 +630,7 @@ abstract contract PortfolioVirtual is Objective {
         if (pairNonce == 0) revert InvalidPair();
 
         bool hasController = controller != address(0);
-        uint32 poolNonce = ++getPoolNonce;
+        uint32 poolNonce = ++getPoolNonce[pairNonce];
         poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
 
         PortfolioPool storage pool = pools[poolId];
@@ -723,7 +661,7 @@ abstract contract PortfolioVirtual is Objective {
             pool.pair.tokenAsset,
             pool.pair.tokenQuote,
             price
-        );
+            );
     }
 
     // ===== Accounting System ===== //
@@ -794,22 +732,17 @@ abstract contract PortfolioVirtual is Objective {
         (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == FVM.ALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = FVM
-                .decodeAllocate(data);
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
+                FVM.decodeAllocate(data);
             _allocate(useMax == 1, poolId, deltaLiquidity);
         } else if (instruction == FVM.DEALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) = FVM
-                .decodeDeallocate(data);
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
+                FVM.decodeDeallocate(data);
             _deallocate(useMax == 1, poolId, deltaLiquidity);
         } else if (instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE) {
             Order memory args;
-            (
-                args.useMax,
-                args.poolId,
-                args.input,
-                args.output,
-                args.sellAsset
-            ) = FVM.decodeSwap(data);
+            (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
+            = FVM.decodeSwap(data);
             _swap(args);
         } else if (instruction == FVM.CREATE_POOL) {
             (
@@ -838,8 +771,8 @@ abstract contract PortfolioVirtual is Objective {
             (address asset, address quote) = FVM.decodeCreatePair(data);
             _createPair(asset, quote);
         } else if (instruction == FVM.CLAIM) {
-            (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) = FVM
-                .decodeClaim(data);
+            (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) =
+                FVM.decodeClaim(data);
             _claim(poolId, deltaAsset, deltaQuote);
         } else {
             revert InvalidInstruction();
@@ -868,8 +801,8 @@ abstract contract PortfolioVirtual is Objective {
             // Loop backwards to pop tokens off.
             address token = tokens[i - 1];
             // Apply credits or debits to net balance.
-            (uint256 credited, uint256 debited, uint256 remainder) = __account__
-                .settle(token, address(this));
+            (uint256 credited, uint256 debited, uint256 remainder) =
+                __account__.settle(token, address(this));
 
             // Reserves were not tracking some tokens, increase the reserves to account for them.
             if (credited > 0) {
@@ -890,8 +823,6 @@ abstract contract PortfolioVirtual is Objective {
                 }
             }
 
-            // Token considered fully accounted for.
-            __account__.warm.pop();
             unchecked {
                 --i; // Cannot underflow because loop exits at 0!
             }
@@ -903,14 +834,25 @@ abstract contract PortfolioVirtual is Objective {
         while (px != 0) {
             uint256 index = px - 1;
             Account.__dangerousTransferFrom__(
-                payments[index].token,
-                address(this),
-                payments[index].amount
+                payments[index].token, address(this), payments[index].amount
             );
             unchecked {
                 --px; // Cannot underflow because loop exits at 0!
             }
         }
+
+        // Sanity check the settlement invariant, which should be positive.
+        i = tokens.length;
+        do {
+            address token = tokens[i - 1];
+            int256 net = __account__.getNetBalance(token, address(this));
+            if (net < 0) revert NegativeBalance(token, net);
+            // Token considered fully accounted for.
+            __account__.warm.pop();
+            unchecked {
+                --i; // Cannot underflow because loop exits at 0!
+            }
+        } while (i != 0);
 
         __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;
@@ -918,9 +860,11 @@ abstract contract PortfolioVirtual is Objective {
 
     // ===== Internal View ===== //
 
-    function _getTimePassed(
-        PortfolioPool memory pool
-    ) internal view returns (uint256) {
+    function _getTimePassed(PortfolioPool memory pool)
+        internal
+        view
+        returns (uint256)
+    {
         unchecked {
             // `pool.lastTimestamp` is only ever synced to `block.timestamp` and so may never exceed it.
             return block.timestamp - pool.lastTimestamp;
@@ -947,16 +891,22 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /// @inheritdoc IPortfolioGetters
-    function getReserves(
-        uint64 poolId
-    ) public view override returns (uint256 deltaAsset, uint256 deltaQuote) {
+    function getReserves(uint64 poolId)
+        public
+        view
+        override
+        returns (uint256 deltaAsset, uint256 deltaQuote)
+    {
         return pools[poolId].getPoolAmounts();
     }
 
     /// @inheritdoc IPortfolioGetters
-    function getVirtualReservesPerLiquidity(
-        uint64 poolId
-    ) public view override returns (uint128 deltaAsset, uint128 deltaQuote) {
+    function getVirtualReservesPerLiquidity(uint64 poolId)
+        public
+        view
+        override
+        returns (uint128 deltaAsset, uint128 deltaQuote)
+    {
         return pools[poolId].getPoolVirtualReserves();
     }
 }

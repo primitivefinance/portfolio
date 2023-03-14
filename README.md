@@ -6,6 +6,10 @@ On-chain portfolio management. Optimized for managing risk and liquidity.
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/primitivefinance/portfolio#contributing) [![](https://dcbadge.vercel.app/api/server/primitive?style=flat)](https://discord.gg/primitive) [![Twitter Badge](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/primitivefi)
 
+## Yellow Paper
+
+A technical summary of Portfolio is detailed in the [Yellow Paper](https://www.primitive.xyz/papers/yellow.pdf).
+
 ## System Invariants
 
 The system is designed around a single invariant:
@@ -77,6 +81,10 @@ forge test --match-contract TestRMM01
 
 
 ## Contributing
+
+Important:
+- This codebase uses the FORGE formatter. This is not prettier. If you have not already, make sure if you use vs code that the `formatOnSave`config variable uses forge fmt instead of prettier.
+- Setup the proper settings using this guide: [forge fmt for formatOnSave vscode](https://github.com/juanfranblanco/vscode-solidity/pull/359#issue-1344943156).
 
 When making a pull request:
 - All tests pass.

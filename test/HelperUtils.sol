@@ -13,7 +13,7 @@ import "solmate/test/utils/mocks/MockERC20.sol";
  */
 type Coin is address;
 
-using {prepare, to_token, to_addr} for Coin global;
+using { prepare, to_token, to_addr } for Coin global;
 
 /**
  * @dev For use in any tests that require some tokens to be transferred from an actor.
