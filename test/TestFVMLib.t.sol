@@ -89,8 +89,6 @@ contract TestFVMLib is Test {
             sellAsset ? uint8(1) : uint8(0)
         );
 
-        console.logBytes(data);
-
         (uint8 useMax_, uint64 poolId_, uint128 input_, uint128 output_, uint8 sellAsset_) = target.decodeSwap_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_, "Wrong use max");
@@ -100,9 +98,16 @@ contract TestFVMLib is Test {
         assertEq(sellAsset ? uint8(1) : uint8(0), sellAsset_, "Wrong sellAsset");
     }
 
-    // 3637 gas
     function test_decodeSwap() public {
-        bytes memory data = hex"0500042a0709081204";
+        bytes memory data = encodeSwap(
+            1,
+            0xaaffffffffffffbb,
+            1 ether,
+            2000 * 10 ** 6,
+            1
+        );
+
+        console.logBytes(data);
 
         (
             uint8 useMax,
@@ -112,11 +117,11 @@ contract TestFVMLib is Test {
             uint8 sellAsset
         ) = target.decodeSwap_(data);
 
-        assertEq(useMax, 0);
-        assertEq(poolId, 42);
-        assertEq(input, 8000 * 10 ** 6);
-        assertEq(output, 4 * 10 ** 18);
-        assertEq(sellAsset, 0);
+        assertEq(useMax, 1);
+        assertEq(poolId, 0xaaffffffffffffbb);
+        assertEq(input, 1 ether);
+        assertEq(output, 2000 * 10 ** 6);
+        assertEq(sellAsset, 1);
     }
 
     function testFuzz_encodeClaim(uint64 poolId, uint128 fee0, uint128 fee1) public {
