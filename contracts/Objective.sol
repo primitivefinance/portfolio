@@ -88,7 +88,7 @@ abstract contract Objective is IPortfolio {
     /**
      * @dev Estimates the `price` of a pool with `poolId` given the pool's reserves.
      */
-    function getLatestEstimatedPrice(uint64 poolId)
+    function getVirtualPrice(uint64 poolId)
         public
         view
         virtual

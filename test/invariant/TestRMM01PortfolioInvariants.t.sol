@@ -93,8 +93,7 @@ contract TestRMM01PortfolioInvariants is Setup {
         PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
-            (uint256 dAsset,) =
-                subject().getVirtualReservesPerLiquidity(ghost().poolId);
+            (uint256 dAsset,) = subject().getPoolReserves(ghost().poolId);
             uint256 bAsset = ghost().physicalBalance(ghost().asset().to_addr());
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }
@@ -104,8 +103,7 @@ contract TestRMM01PortfolioInvariants is Setup {
         PortfolioPool memory pool = ghost().pool();
 
         if (pool.liquidity > 0) {
-            (, uint256 dQuote) =
-                subject().getVirtualReservesPerLiquidity(ghost().poolId);
+            (, uint256 dQuote) = subject().getPoolReserves(ghost().poolId);
             uint256 bQuote = ghost().physicalBalance(ghost().quote().to_addr());
             assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
         }

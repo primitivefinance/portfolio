@@ -518,7 +518,7 @@ contract HandlerPortfolio is HandlerBase {
         // PortfolioPool memory pool = ctx.ghost().pool();
         // TODO: Breaks when we call this function on a pool with zero liquidity...
         (uint256 dAsset, uint256 dQuote) =
-            ctx.subject().getVirtualReservesPerLiquidity(ctx.ghost().poolId);
+            ctx.subject().getPoolReserves(ctx.ghost().poolId);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 

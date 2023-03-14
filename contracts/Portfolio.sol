@@ -520,7 +520,7 @@ abstract contract PortfolioVirtual is Objective {
 
         {
             uint64 id = args.poolId;
-            uint256 price = getLatestEstimatedPrice(id);
+            uint256 price = getVirtualPrice(id);
             emit Swap(
                 id,
                 price,
@@ -891,13 +891,13 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /// @inheritdoc IPortfolioGetters
-    function getReserves(uint64 poolId)
+    function getPoolReserves(uint64 poolId)
         public
         view
         override
         returns (uint256 deltaAsset, uint256 deltaQuote)
     {
-        return pools[poolId].getPoolAmounts();
+        return pools[poolId].getPoolReserves();
     }
 
     /// @inheritdoc IPortfolioGetters
@@ -907,6 +907,6 @@ abstract contract PortfolioVirtual is Objective {
         override
         returns (uint128 deltaAsset, uint128 deltaQuote)
     {
-        return pools[poolId].getPoolVirtualReserves();
+        return pools[poolId].getVirtualReservesPerLiquidity();
     }
 }

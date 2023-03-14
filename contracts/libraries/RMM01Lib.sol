@@ -100,7 +100,8 @@ library RMM01Lib {
         Iteration memory data;
         (data.prevInvariant, tau) =
             getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
-        (data.virtualX, data.virtualY) = self.getAmountsWad();
+        (data.virtualX, data.virtualY) =
+            self.getVirtualPoolReservesPerLiquidityInWad();
         data.remainder = amountIn.scaleToWad(
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
@@ -185,7 +186,7 @@ library RMM01Lib {
     // ===== Raw Functions ===== //
 
     /**
-     * @dev Used in `getAmounts` to compute the virtual amount of assets at the self's price.
+     * @dev Used in `getVirtualPoolReservesPerLiquidityInWad` to compute the virtual amount of assets at the self's price.
      * @param prc WAD
      * @param stk WAD
      * @param vol percentage
@@ -291,7 +292,7 @@ library RMM01Lib {
         tau = self.lastTau(); // Compute block.timestamp - self.lastTimestamp.
         tau -= timeSinceUpdate; // Time remaining less time passed since `self.lastTimestamp` was updated.
 
-        (uint256 x, uint256 y) = self.getAmountsWad(); // Quantities of each reserve per WAD units of liquidity.
+        (uint256 x, uint256 y) = self.getVirtualPoolReservesPerLiquidityInWad(); // Quantities of each reserve per WAD units of liquidity.
         invariant = int128(
             invariantOf({self: self, R_x: x, R_y: y, timeRemainingSec: tau})
         );

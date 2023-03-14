@@ -23,7 +23,8 @@ contract GlobalInvariants is
     function global_token_balance_greater_or_equal_reserves() public view {
         uint256 reserveBalance = 0;
         uint256 tokenBalance = 0;
-        for (uint8 i = 0; i < EchidnaStateHandling.PortfolioTokens.length; i++) {
+        for (uint8 i = 0; i < EchidnaStateHandling.PortfolioTokens.length; i++)
+        {
             EchidnaERC20 token = EchidnaStateHandling.get_token_at_index(i);
 
             // retrieve reserves of the token and add to tracked reserve balance
@@ -44,13 +45,16 @@ contract GlobalInvariants is
             PortfolioPair memory pair = pool.pair;
 
             // retrieve reserves of the token and add to tracked reserve balance
-            uint256 assetReserveBalance = getReserve(address(_portfolio), pair.tokenAsset);
-            uint256 quoteReserveBalance = getReserve(address(_portfolio), pair.tokenQuote);
+            uint256 assetReserveBalance =
+                getReserve(address(_portfolio), pair.tokenAsset);
+            uint256 quoteReserveBalance =
+                getReserve(address(_portfolio), pair.tokenQuote);
 
             // reserve/poolLiquidity
             // compare after
 
-            (uint256 assetAmount, uint256 quoteAmount) = _portfolio.getReserves(poolId);
+            (uint256 assetAmount, uint256 quoteAmount) =
+                _portfolio.getPoolReserves(poolId);
 
             assert(assetReserveBalance >= assetAmount);
             assert(quoteReserveBalance >= quoteAmount);
@@ -87,7 +91,9 @@ contract GlobalInvariants is
         if (pool.controller != address(0)) {
             if (pool.params.priorityFee == 0) {
                 emit LogUint256("priority feel value", pool.params.priorityFee);
-                emit AssertionFailed("BUG: Mutable pool has a non zero priority fee.");
+                emit AssertionFailed(
+                    "BUG: Mutable pool has a non zero priority fee."
+                    );
             }
         }
     }
@@ -98,10 +104,12 @@ contract GlobalInvariants is
             PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _portfolio.getLatestEstimatedPrice(poolId));
+            emit LogUint256(
+                "pool's last price", _portfolio.getVirtualPrice(poolId)
+                );
             emit LogUint256("strike price", curve.maxPrice);
 
-            assert(_portfolio.getLatestEstimatedPrice(poolId) <= curve.maxPrice);
+            assert(_portfolio.getVirtualPrice(poolId) <= curve.maxPrice);
         }
     }
 
@@ -113,7 +121,9 @@ contract GlobalInvariants is
             PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("pool's last price", _portfolio.getLatestEstimatedPrice(poolId));
+            emit LogUint256(
+                "pool's last price", _portfolio.getVirtualPrice(poolId)
+                );
             emit LogUint256("strike price", curve.maxPrice);
 
             if (curve.maxPrice == 0) {
@@ -128,11 +138,15 @@ contract GlobalInvariants is
             PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
-            emit LogUint256("Portfolio pool last timestamp: ", pool.lastTimestamp);
+            emit LogUint256(
+                "Portfolio pool last timestamp: ", pool.lastTimestamp
+                );
             emit LogUint256("maturity", curve.maturity());
 
             if (curve.maturity() < pool.lastTimestamp) {
-                emit AssertionFailed("BUG: curve maturity is less than last timestamp");
+                emit AssertionFailed(
+                    "BUG: curve maturity is less than last timestamp"
+                    );
             }
         }
     }
@@ -144,33 +158,47 @@ contract GlobalInvariants is
             PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             emit LogUint256("last timestamp", uint256(pool.lastTimestamp));
 
-            if (_portfolio.getLatestEstimatedPrice(poolId) != 0) {
-                emit LogUint256("pool's last price", _portfolio.getLatestEstimatedPrice(poolId));
+            if (_portfolio.getVirtualPrice(poolId) != 0) {
+                emit LogUint256(
+                    "pool's last price", _portfolio.getVirtualPrice(poolId)
+                    );
                 if (pool.liquidity == 0) {
-                    emit AssertionFailed("BUG: non zero last price should have a non zero liquidity");
+                    emit AssertionFailed(
+                        "BUG: non zero last price should have a non zero liquidity"
+                        );
                 }
             } else {
                 if (pool.liquidity != 0) {
-                    emit AssertionFailed("BUG: zero last price should have a zero liquidity.");
+                    emit AssertionFailed(
+                        "BUG: zero last price should have a zero liquidity."
+                        );
                 }
             }
         }
     }
 
-    function pool_liquidity_delta_never_returns_zeroes(uint256 id, int128 deltaLiquidity) public {
+    function pool_liquidity_delta_never_returns_zeroes(
+        uint256 id,
+        int128 deltaLiquidity
+    ) public {
         require(deltaLiquidity != 0);
         (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
 
         emit LogInt128("deltaLiquidity", deltaLiquidity);
 
-        (uint128 deltaAsset, uint128 deltaQuote) = _portfolio.getLiquidityDeltas(poolId, deltaLiquidity);
+        (uint128 deltaAsset, uint128 deltaQuote) =
+            _portfolio.getLiquidityDeltas(poolId, deltaLiquidity);
         emit LogUint256("deltaAsset", deltaAsset);
         if (deltaAsset == 0) {
-            emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaAsset");
+            emit AssertionFailed(
+                "BUG: getLiquidityDeltas returned 0 for deltaAsset"
+                );
         }
         emit LogUint256("deltaQuote", deltaQuote);
         if (deltaQuote == 0) {
-            emit AssertionFailed("BUG: getLiquidityDeltas returned 0 for deltaQuote");
+            emit AssertionFailed(
+                "BUG: getLiquidityDeltas returned 0 for deltaQuote"
+                );
         }
     }
 
@@ -197,7 +225,8 @@ contract GlobalInvariants is
             // The `getVirtualReserves` method always returns values less than Portfolio’s respective `getReserve` function for each token of the pool’s pair.
 
             // `getVirtualReserves method`
-            (uint128 deltaAsset, uint128 deltaQuote) = _portfolio.getReserves(poolId);
+            (uint128 deltaAsset, uint128 deltaQuote) =
+                _portfolio.getPoolReserves(poolId);
 
             // Portfolio's `getReserve` function for each of the pool's pair
             uint256 assetReserves = _portfolio.getReserve(pair.tokenAsset);
@@ -206,25 +235,30 @@ contract GlobalInvariants is
             if (deltaAsset > assetReserves) {
                 emit LogUint256("deltaAsset", deltaAsset);
                 emit LogUint256("assetReserves", assetReserves);
-                emit AssertionFailed("BUG (`asset`): virtualReserves returned more than getReserve function");
+                emit AssertionFailed(
+                    "BUG (`asset`): virtualReserves returned more than getReserve function"
+                    );
             }
             if (deltaQuote > quoteReserves) {
                 emit LogUint256("deltaQuote", deltaQuote);
                 emit LogUint256("quoteReserves", quoteReserves);
-                emit AssertionFailed("BUG (`asset`): virtualReserves returned more than getReserve function");
+                emit AssertionFailed(
+                    "BUG (`asset`): virtualReserves returned more than getReserve function"
+                    );
             }
         }
     }
 
     function pool_get_amounts_wad_returns_safe_bounds() public {
-        // The `getAmountsWad` method always returns less than `1e18` for `amountAssetWad` and `pool.params.strike()` for `amountQuoteWad`.
+        // The `getVirtualPoolReservesPerLiquidityInWad` method always returns less than `1e18` for `amountAssetWad` and `pool.params.strike()` for `amountQuoteWad`.
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioCurve memory curve = pool.params;
 
-            (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
+            (uint256 amountAssetWad, uint256 amountQuoteWad) =
+                pool.getVirtualPoolReservesPerLiquidityInWad();
 
             if (amountAssetWad > 1e18) {
                 emit LogUint256("amountAssetWad", amountAssetWad);
@@ -233,33 +267,41 @@ contract GlobalInvariants is
             // Inclusive of strike price?
             if (amountQuoteWad > curve.maxPrice) {
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
-                emit AssertionFailed("BUG amountQuoteWad is greater than strike");
+                emit AssertionFailed(
+                    "BUG amountQuoteWad is greater than strike"
+                    );
             }
         }
     }
 
     function pool_get_amounts_returns_less_than_get_amounts_wad() public {
-        // The `getAmounts` method always returns values less than or equal to `getAmountsWad`.
+        // The `getAmounts` method always returns values less than or equal to `getVirtualPoolReservesPerLiquidityInWad`.
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
             PortfolioPool memory pool = getPool(address(_portfolio), poolId);
 
-            (uint256 amountAssetDec, uint256 amountQuoteDec) = pool.getPoolAmounts();
+            (uint256 amountAssetDec, uint256 amountQuoteDec) =
+                pool.getPoolAmountsPerLiquidity();
 
-            (uint256 amountAssetWad, uint256 amountQuoteWad) = pool.getAmountsWad();
+            (uint256 amountAssetWad, uint256 amountQuoteWad) =
+                pool.getVirtualPoolReservesPerLiquidityInWad();
 
             // Assumes inclusivity of bounds (i.e: equivalence is okay)
             if (amountAssetDec > amountAssetWad) {
                 emit LogUint256("amountAssetDec", amountAssetDec);
                 emit LogUint256("amountAssetWad", amountAssetWad);
-                emit AssertionFailed("BUG (asset): getAmounts returned more than getAmountsWad");
+                emit AssertionFailed(
+                    "BUG (asset): getAmounts returned more than getVirtualPoolReservesPerLiquidityInWad"
+                    );
             }
             // Assumes inclusivity of bounds (i.e: equivalence is okay)
             if (amountQuoteDec > amountQuoteWad) {
                 emit LogUint256("amountQuoteDec", amountQuoteDec);
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
-                emit AssertionFailed("BUG (quote): getAmounts returned more than getAmountsWad");
+                emit AssertionFailed(
+                    "BUG (quote): getAmounts returned more than getVirtualPoolReservesPerLiquidityInWad"
+                    );
             }
         }
     }
