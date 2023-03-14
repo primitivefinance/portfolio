@@ -17,7 +17,7 @@ jobs:
           version: nightly
 
       - name: Run build
-        run: FOUNDRY_PROFILE=default forge build --sizes --skip test
+        run: FOUNDRY_PROFILE=default forge build --skip test
       
       - name: Run tests RMM01Portfolio
         run: FOUNDRY_PROFILE=default forge test --gas-report --match-contract TestRMM01Portfolio -vvv
