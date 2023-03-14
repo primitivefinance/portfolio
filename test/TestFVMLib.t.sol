@@ -150,9 +150,6 @@ contract TestFVMLib is Test {
         target.decodeCreatePair_(data);
     }
 
-    /************
-
-    This test is broken keeps hanging forever ¯\_(ツ)_/¯
 
     function testFuzz_encodeCreatePool(
         uint24 pairId,
@@ -179,12 +176,19 @@ contract TestFVMLib is Test {
 
         CreatePoolParams memory params = target.decodeCreatePool_(data);
 
-        // TODO: Add some assert statements when the test will be fixed
+        assertEq(pairId, params.pairId);
+        assertEq(controller, params.controller);
+        assertEq(priorityFee, params.priorityFee);
+        assertEq(fee, params.fee);
+        assertEq(vol, params.vol);
+        assertEq(dur, params.dur);
+        assertEq(jit, params.jit);
+        assertEq(maxPrice, params.maxPrice);
+        assertEq(price, params.price);
     }
 
-    *********/
 
-    function test_decodeCreatePool() public {
+    function test_encodeCreatePool() public {
         CreatePoolParams memory params = CreatePoolParams({
             pairId: uint24(0xaaaaaa),
             controller: address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF),
@@ -220,6 +224,22 @@ contract TestFVMLib is Test {
         assertEq(decoded.jit, params.jit);
         assertEq(decoded.maxPrice, params.maxPrice);
         assertEq(decoded.price, params.price);
+    }
+
+    function test_decodeCreatePool() public {
+        CreatePoolParams memory decoded = target.decodeCreatePool_(
+            hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff2509021203"
+        );
+
+        assertEq(decoded.pairId, uint24(0xaaaaaa));
+        assertEq(decoded.controller, address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
+        assertEq(decoded.priorityFee, uint16(0xbbbb));
+        assertEq(decoded.fee, uint16(0xcccc));
+        assertEq(decoded.vol, uint16(0xdddd));
+        assertEq(decoded.dur, uint16(0xeeee));
+        assertEq(decoded.jit, uint16(0xffff));
+        assertEq(decoded.maxPrice, 2 * 10 ** 9);
+        assertEq(decoded.price, 3 * 10 ** 18);
     }
 
     function testFuzz_encodeAllocate(
@@ -272,12 +292,24 @@ contract TestFVMLib is Test {
         target.decodeAllocate_(data);
     }
 
+    function test_encodePoolId() public {
+        uint64 poolId = encodePoolId(
+            uint24(0xaaaaaa),
+            true,
+            uint32(0xbbbbbbbb)
+        );
+
+        assertEq(poolId, uint64(0xaaaaaa01bbbbbbbb));
+    }
+
     function testFuzz_decodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public {
         uint64 poolId = encodePoolId(
             pairId,
             isMutable,
             poolNonce
         );
+
+        console.log(poolId);
 
         bytes memory data;
 
