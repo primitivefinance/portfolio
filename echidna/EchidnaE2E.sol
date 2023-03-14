@@ -202,7 +202,7 @@ contract EchidnaE2E is GlobalInvariants {
 
         (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getReserves(poolId);
 
-        _portfolio.multiprocess(FVMLib.encodeDeallocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(FVMLib.encodeAllocateOrDeallocate(false, uint8(0), poolId, 0x0, amount));
 
         // Save post unallocation state
         PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);

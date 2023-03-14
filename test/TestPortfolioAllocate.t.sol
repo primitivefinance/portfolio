@@ -19,7 +19,8 @@ contract TestPortfolioAllocate is Setup {
         uint256 prev = ghost().pool().liquidity;
         // Trigger the function being tested.
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount
@@ -49,7 +50,8 @@ contract TestPortfolioAllocate is Setup {
         subject().fund(ghost().quote().to_addr(), type(uint256).max);
 
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(1),
                 poolId: ghost().poolId,
                 deltaLiquidity: 1
@@ -74,7 +76,8 @@ contract TestPortfolioAllocate is Setup {
 
         uint256 prev = ghost().pool().lastTimestamp;
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount
@@ -101,7 +104,8 @@ contract TestPortfolioAllocate is Setup {
             deltaLiquidity: int128(amount)
         });
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount
@@ -135,7 +139,8 @@ contract TestPortfolioAllocate is Setup {
             deltaLiquidity: int128(amount)
         });
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount
@@ -168,7 +173,8 @@ contract TestPortfolioAllocate is Setup {
             deltaLiquidity: int128(amount)
         });
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount
@@ -191,7 +197,8 @@ contract TestPortfolioAllocate is Setup {
             abi.encodeWithSelector(NonExistentPool.selector, failureArg)
         );
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: failureArg,
                 deltaLiquidity: 1 ether
@@ -208,7 +215,8 @@ contract TestPortfolioAllocate is Setup {
         uint256 failureArg = 0;
         vm.expectRevert(ZeroLiquidity.selector);
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: ghost().poolId,
                 deltaLiquidity: uint128(failureArg)
@@ -225,7 +233,8 @@ contract TestPortfolioAllocate is Setup {
         uint256 failureArg = uint256(type(uint128).max) + 1;
         vm.expectRevert(); // safeCastTo128 reverts with no message, so it's just an "Evm Error".
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: ghost().poolId,
                 deltaLiquidity: uint128(failureArg)
@@ -257,7 +266,8 @@ contract TestPortfolioAllocate is Setup {
             )
         );
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount
@@ -375,7 +385,8 @@ contract TestPortfolioAllocate is Setup {
             subject().getLiquidityDeltas(ghost().poolId, int128(amount));
         uint256 prev = ghost().pool().liquidity;
         subject().multiprocess(
-            FVMLib.encodeAllocate({
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount

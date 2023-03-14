@@ -8,7 +8,7 @@ contract Swaps is EchidnaStateHandling {
     function mint_and_allocate(PortfolioPair memory pair, uint128 amount, uint64 poolId) internal {
         mint_and_approve(EchidnaERC20(pair.tokenAsset), amount);
         mint_and_approve(EchidnaERC20(pair.tokenQuote), amount);
-        _portfolio.multiprocess(FVMLib.encodeAllocate(uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(FVMLib.encodeAllocateOrDeallocate(true, uint8(0), poolId, 0x0, amount));
     }
 
     function clamp_liquidity(uint256 id, uint64 poolId) internal returns (uint256 liquidity) {

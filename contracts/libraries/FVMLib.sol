@@ -405,50 +405,23 @@ function decodeCreatePool(bytes calldata data)
 }
 
 /**
- * @dev Encodes a allocate operation.
+ * @dev Encodes a allocate or deallocate operation.
  * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
-function encodeAllocate(
+function encodeAllocateOrDeallocate(
+    bool shouldAllocate,
     uint8 useMax,
     uint64 poolId,
     uint128 deltaLiquidity
 ) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
     data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base
+        AssemblyLib.pack(bytes1(useMax), shouldAllocate ? ALLOCATE : DEALLOCATE), poolId, power, base
     );
 }
 
-function decodeAllocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
+function decodeAllocateOrDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     // Looks like using Solidity or Assembly is the same in terms of gas cost.
-    if (data.length < 11) revert InvalidBytesLength(11, data.length);
-
-    assembly {
-        let value := calldataload(data.offset)
-        useMax := shr(252, value)
-        poolId := shr(192, shl(8, value))
-        let power := shr(248, shl(72, value))
-        let base := shr(sub(256, mul(8, sub(data.length, 10))), shl(80, value))
-        deltaLiquidity := mul(base, exp(10, power))
-    }
-}
-
-/**
- * @dev Encodes a deallocate operation.
- * FIXME: Same issue as `encodeClaim`... This function is not optimized!
- */
-function encodeDeallocate(
-    uint8 useMax,
-    uint64 poolId,
-    uint128 deltaLiquidity
-) pure returns (bytes memory data) {
-    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
-    data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base
-    );
-}
-
-function decodeDeallocate(bytes calldata data) pure returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) {
     if (data.length < 11) revert InvalidBytesLength(11, data.length);
 
     assembly {

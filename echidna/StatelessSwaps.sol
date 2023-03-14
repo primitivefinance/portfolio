@@ -108,7 +108,7 @@ contract StatelessSwaps is Helper, Test {
             emit LogUint256("Allocating liquidity:", liquidity);
 
             vm.prank(alice);
-            portfolio.multiprocess(FVMLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity)));
+            portfolio.multiprocess(FVMLib.encodeAllocateOrDeallocate(true, uint8(0), poolId, 0x0, uint128(liquidity)));
         }
 
         // Update stk to what portfolio stores, otherwise calculations will be inexcat.
