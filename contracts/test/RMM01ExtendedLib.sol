@@ -145,7 +145,7 @@ library RMM01ExtendedLib {
                 vol: RMM01Lib.convertPercentageToWad(vol),
                 tau: tau
             })
-        ); // todo: fix cast
+        );
         t_e = tau - epsilon;
     }
 }

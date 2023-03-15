@@ -50,8 +50,20 @@ abstract contract PortfolioVirtual is Objective {
     uint256 internal _locked = 1;
     uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
 
+    /**
+     * @dev Manipulated in `_settlement` only.
+     * @custom:invariant MUST be deleted after every transaction that uses it.
+     */
     Payment[] private _payments;
-    SwapState internal _state; // todo: should remain private, with special internal functions to manipulate.
+
+    /**
+     * @dev
+     * Manipulated in `_swap` to avoid stack too deep and let higher level contract acess.
+     * Utilized in virtual function implementations to handle fee growth, if any.
+     *
+     * @custom:invariant MUST be deleted after every transaction that uses it.
+     */
+    SwapState internal _state;
 
     /**
      * @dev
@@ -117,7 +129,10 @@ abstract contract PortfolioVirtual is Objective {
 
     /// @inheritdoc IPortfolioActions
     function deposit() external payable override lock {
+        // Checks
         if (msg.value == 0) revert ZeroValue();
+
+        // Wraps msg.value.
         _deposit();
 
         // Interactions
@@ -126,6 +141,7 @@ abstract contract PortfolioVirtual is Objective {
 
     /// @inheritdoc IPortfolioActions
     function multiprocess(bytes calldata data) external payable lock {
+        // Wraps msg.value.
         _deposit();
 
         // Effects
@@ -167,6 +183,7 @@ abstract contract PortfolioVirtual is Objective {
 
     /// @inheritdoc IPortfolioActions
     function fund(address token, uint256 amount) external override lock {
+        // Checks
         if (amount == type(uint256).max) {
             amount = Account.__balanceOf__(token, msg.sender);
         }
@@ -199,6 +216,11 @@ abstract contract PortfolioVirtual is Objective {
 
     // ===== Internal ===== //
 
+    /**
+     * @dev Re-assigns the tokens owed of a position to the `msg.sender`'s internal balance.
+     * @param deltaAsset Quantity of asset tokens in native token decimals to re-assign.
+     * @param deltaQuote Quantity of quote tokens in native token decimals to re-assign.
+     */
     function _claim(
         uint64 poolId,
         uint128 deltaAsset,
@@ -325,6 +347,9 @@ abstract contract PortfolioVirtual is Objective {
             );
     }
 
+    /**
+     * @dev Manipulates reserves depending on if liquidity is being allocated or deallocated.
+     */
     function _changeLiquidity(ChangeLiquidityParams memory args)
         internal
         returns (uint256 feeAsset, uint256 feeQuote, uint256 invariantGrowth)
@@ -356,7 +381,11 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
-     * @dev Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote) for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
+     * @dev
+     * Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote)
+     * for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
+     *
+     * @custom:invariant MUST not change liquidity of a pool.
      */
     function _swap(Order memory args)
         internal

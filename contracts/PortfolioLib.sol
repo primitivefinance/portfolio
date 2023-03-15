@@ -48,7 +48,6 @@ uint256 constant MAX_DURATION = 500; // days, but without units
 uint256 constant JUST_IN_TIME_MAX = 600 seconds;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
-// todo: add selectors for debugging?
 error DrawBalance();
 error InsufficientPosition(uint64 poolId);
 error InvalidAmountOut();
@@ -65,7 +64,7 @@ error InvalidSettlement();
 error InvalidStrike(uint128 strike);
 error InvalidTick(int24);
 error InvalidTransfer();
-error InvalidVolatility(uint24 sigma); // todo: fix, use uint16 type.
+error InvalidVolatility(uint16 sigma);
 error JitLiquidity(uint256 distance);
 error MaxFee(uint16 fee);
 error NegativeBalance(address token, int256 net);

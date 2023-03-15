@@ -325,9 +325,7 @@ interface IPortfolioActions {
      * This means that token deficits can be carried over between calls
      * and paid by future ones (within the same multiprocess transaction)!
      *
-     * todo: Investigate the amount of operations that can be processed, since it uses a loop.
      * todo: Update multiprocess to return data, or information that can help debugging.
-     * todo: Update the custom encoded `data` to use regular abi-encoded data to match multicall.
      */
     function multiprocess(bytes calldata data) external payable;
 

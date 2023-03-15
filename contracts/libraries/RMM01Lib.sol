@@ -205,7 +205,7 @@ library RMM01Lib {
         uint256 vol,
         uint256 tau
     ) internal pure returns (uint256 R_x) {
-        uint256 input = FixedPointMathLib.divWadDown(prc, stk); // todo: clarify + document whats going on here
+        uint256 input = FixedPointMathLib.divWadDown(prc, stk);
         if (input != 0) {
             int256 ln = FixedPointMathLib.lnWad(int256(input));
             uint256 tauYears = convertSecondsToWadYears(tau);

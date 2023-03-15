@@ -56,7 +56,7 @@ struct AccountSystem {
     mapping(address => mapping(address => uint256)) balances;
     // token -> virtual reserve.
     mapping(address => uint256) reserves;
-    // token -> cached status. todo: make this a bitmap
+    // token -> cached status.
     mapping(address => bool) cached;
     // Transiently stored cached tokens, must be length zero outside of execution.
     address[] warm;
@@ -206,7 +206,7 @@ function touch(AccountSystem storage self, address token) {
  * @dev Account system is reset after settlement is successful.
  */
 function reset(AccountSystem storage self) {
-    assert(self.warm.length == 0); // todo: this is a valid assertion, but should we use assert?
+    assert(self.warm.length == 0);
     self.settled = true;
     delete self.warm;
 }

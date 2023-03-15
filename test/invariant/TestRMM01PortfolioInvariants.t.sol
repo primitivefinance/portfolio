@@ -73,16 +73,17 @@ contract TestRMM01PortfolioInvariants is Setup {
 
     // ===== Invariants ===== //
 
-    // todo: Invariant test suite needs further work to get allocate + deallocate calls working.
-    /* function invariant_asset_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical,) = getBalances(ghost().asset().to_addr());
+    function invariant_asset_balance_gte_reserves() public {
+        (uint256 reserve, uint256 physical,) =
+            getBalances(ghost().asset().to_addr());
         assertTrue(physical >= reserve, "invariant-asset-physical-balance");
     }
 
     function invariant_quote_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical,) = getBalances(ghost().quote().to_addr());
+        (uint256 reserve, uint256 physical,) =
+            getBalances(ghost().quote().to_addr());
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
-    } */
+    }
 
     function invariant_account_settled() public {
         bool settled = AccountLike(address(subject())).__account__();
