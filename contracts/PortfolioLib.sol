@@ -162,7 +162,7 @@ struct Iteration {
 
 struct SwapState {
     bool sell;
-    address sellAsset;
+    address tokenInput;
     uint16 fee;
     address tokenOutput;
     uint256 feeGrowthGlobal;

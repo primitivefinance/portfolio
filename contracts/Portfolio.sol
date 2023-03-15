@@ -58,12 +58,13 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev
-     * Manipulated in `_swap` to avoid stack too deep and let higher level contract acess.
+     * Manipulated in `_swap` to avoid stack too deep.
      * Utilized in virtual function implementations to handle fee growth, if any.
+     * Implements internal functions to manipulate `feeGrowthGlobal` and `invariantGrowthGlobal`.
      *
      * @custom:invariant MUST be deleted after every transaction that uses it.
      */
-    SwapState internal _state;
+    SwapState private _state;
 
     /**
      * @dev
@@ -385,37 +386,44 @@ abstract contract PortfolioVirtual is Objective {
      * Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote)
      * for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
      *
+     * Fees can be saved into two buckets:
+     * 1. Re-invested into the pool, increasing the value of liquidity.
+     * 2. Pro-rata distribution to all liquidity position's `owed` tokens, via fee growth accumulator.
+     *
+     * These different fee buckets are applied using this logic:
+     * 1. Add the input swap amount, fee included, to the per liquidity reserves in `syncPool`.
+     * 2. Add the input swap amount less the fee, to the per liquidity reserves in `syncPool`
+     *    and increase the `feeGrowthGlobal` value by the `feeAmount` divided by `pool.liquidity`.
+     *
      * @custom:invariant MUST not change liquidity of a pool.
      */
     function _swap(Order memory args)
         internal
-        returns (
-            uint64 poolId,
-            uint256 remainder,
-            uint256 input,
-            uint256 output
-        )
+        returns (uint64 poolId, uint256 input, uint256 output)
     {
+        // =---= Checks =---= //
         if (args.input == 0) revert ZeroInput();
 
         PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
-        _state.sell = args.sellAsset == 1; // 1: true, 0: false
+        // -=- Load Fee & Token Info -=- //
+        _state.sell = args.sellAsset == 1;
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
             : pool.params.fee;
 
         if (_state.sell) {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
-            _state.sellAsset = pool.pair.tokenAsset;
+            _state.tokenInput = pool.pair.tokenAsset;
             _state.tokenOutput = pool.pair.tokenQuote;
         } else {
             _state.feeGrowthGlobal = pool.feeGrowthGlobalQuote;
-            _state.sellAsset = pool.pair.tokenQuote;
+            _state.tokenInput = pool.pair.tokenQuote;
             _state.tokenOutput = pool.pair.tokenAsset;
         }
 
+        // -=- Load Swap Info -=- //
         Iteration memory iteration;
         {
             (bool success, int256 invariant) = _beforeSwapEffects(args.poolId);
@@ -425,8 +433,8 @@ abstract contract PortfolioVirtual is Objective {
                 msg.sender,
                 _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
             );
-            remainder = args.useMax == 1 ? internalBalance : args.input;
-            remainder = remainder.scaleToWad(
+            input = args.useMax == 1 ? internalBalance : args.input;
+            input = input.scaleToWad(
                 _state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote
             );
             output = args.output;
@@ -435,7 +443,7 @@ abstract contract PortfolioVirtual is Objective {
             );
 
             iteration.prevInvariant = invariant;
-            iteration.remainder = remainder;
+            iteration.input = input;
             iteration.liquidity = pool.liquidity;
             iteration.output = output;
             (iteration.virtualX, iteration.virtualY) =
@@ -443,17 +451,18 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         if (iteration.output == 0) revert ZeroOutput();
-        if (iteration.remainder == 0) revert ZeroInput();
+        if (iteration.input == 0) revert ZeroInput();
         if (iteration.liquidity == 0) revert ZeroLiquidity();
 
-        // These are WAD values.
+        // These are WAD values per WAD of liquidity.
         uint256 liveIndependent;
         uint256 nextIndependent;
+        uint256 nextIndependentLessFee;
         uint256 liveDependent;
         uint256 nextDependent;
 
+        //  -=- Compute New Reserves -=- //
         {
-            uint256 maxInput;
             uint256 deltaInput;
             uint256 deltaInputLessFee;
             uint256 deltaOutput = iteration.output;
@@ -466,33 +475,41 @@ abstract contract PortfolioVirtual is Objective {
                 (liveDependent, liveIndependent) =
                     (iteration.virtualX, iteration.virtualY);
             }
-            maxInput = computeMaxInput(
-                args.poolId, _state.sell, liveIndependent, iteration.liquidity
-            );
 
-            deltaInput = AssemblyLib.min(iteration.remainder, maxInput); // swaps up to the maximum input
-
+            deltaInput = iteration.input;
             iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
-
             deltaInputLessFee = deltaInput - iteration.feeAmount;
-            nextIndependent = liveIndependent
+
+            // This value should be used in `syncPool` if fees are re-invested into the pool.
+            nextIndependent =
+                liveIndependent + deltaInput.divWadDown(iteration.liquidity);
+
+            // This is a very critical piece of code!
+            // This value should be used in `syncPool` if fees are not re-invested.
+            // The next independent amount is computed with the fee amount applied.
+            // This means the lesser next independent reserve and dependent reserve
+            // will pass the invariant.
+            // The fee amount has to be added to the reserve to re-invest it in the pool.
+            // This will mean the independent reserve has more tokens than expected,
+            // leading to a larger invariant.
+            nextIndependentLessFee = liveIndependent
                 + deltaInputLessFee.divWadDown(iteration.liquidity);
             nextDependent =
                 liveDependent - deltaOutput.divWadDown(iteration.liquidity);
-            iteration.remainder -= deltaInput;
-            iteration.input += deltaInput;
         }
 
+        // -=- Assert Invariant Passes -=- //
         {
             bool validInvariant;
             int256 nextInvariantWad;
 
+            // This is revisited depending on if fees are saved in claimable balances.
             if (_state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextIndependent, nextDependent);
+                    (nextIndependentLessFee, nextDependent);
             } else {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextDependent, nextIndependent);
+                    (nextDependent, nextIndependentLessFee);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
@@ -510,30 +527,25 @@ abstract contract PortfolioVirtual is Objective {
             iteration.nextInvariant = int128(nextInvariantWad);
         }
 
+        // -=- Apply Fee Saving Method -=- //
         {
-            uint256 inputDec;
-            uint256 outputDec;
-            if (_state.sell) {
-                inputDec = pool.pair.decimalsAsset;
-                outputDec = pool.pair.decimalsQuote;
-            } else {
-                inputDec = pool.pair.decimalsQuote;
-                outputDec = pool.pair.decimalsAsset;
-            }
+            // Fees are saved by incrementing the fee growth accumulator.
+            bool saved = _feeSavingEffects(args.poolId, iteration);
 
-            if (iteration.nextInvariant > 0) {
-                _state.feeGrowthGlobal = FixedPointMathLib.divWadDown(
-                    iteration.feeAmount, iteration.liquidity
-                );
+            // If the fees are not saved,
+            // apply the full next independent amount with fee amount included.
+            // Fees were not saved in the claimable balances,
+            // so this will re-invest the fees into the pool.
+            if (!saved) {
+                if (_state.sell) {
+                    iteration.virtualX = nextIndependent;
+                } else {
+                    iteration.virtualY = nextIndependent;
+                }
             }
-
-            iteration.input = iteration.input.scaleFromWadDown(inputDec);
-            iteration.output = iteration.output.scaleFromWadDown(outputDec);
         }
 
-        // =---= Post-Swap Effects =---= //
-
-        _afterSwapEffects(args.poolId, iteration); // todo: This needs to be _locked down, I don't like it in its current state.
+        // =---= Effects =---= //
 
         _syncPool(
             args.poolId,
@@ -545,28 +557,54 @@ abstract contract PortfolioVirtual is Objective {
             _state.invariantGrowthGlobal
         );
 
-        _increaseReserves(_state.sellAsset, iteration.input);
-        _decreaseReserves(_state.tokenOutput, iteration.output);
-
+        // -=- Scale Amounts to Native Token Decimals -=- //
         {
-            uint64 id = args.poolId;
-            uint256 price = getVirtualPrice(id);
-            emit Swap(
-                id,
-                price,
-                _state.sellAsset,
-                iteration.input,
-                _state.tokenOutput,
-                iteration.output,
-                iteration.feeAmount,
-                iteration.nextInvariant
-                );
+            uint256 inputDec;
+            uint256 outputDec;
+            if (_state.sell) {
+                inputDec = pool.pair.decimalsAsset;
+                outputDec = pool.pair.decimalsQuote;
+            } else {
+                inputDec = pool.pair.decimalsQuote;
+                outputDec = pool.pair.decimalsAsset;
+            }
+
+            // Scaling the input here is important. ALl the math was done using WAD units.
+            // But all the token related amounts must be in their native token decimals.
+            iteration.input = iteration.input.scaleFromWadDown(inputDec);
+            iteration.output = iteration.output.scaleFromWadDown(outputDec);
         }
 
+        // Increasing reserves expects a debit from `msg.sender`,
+        // a gifted surplus of tokens that is not synced (e.g. tokens transferred to Portfolio),
+        // or tokens sent into Portfolio via `transferFrom` in the `_settlement` function.
+        // Decreasing reserves credits the `msg.sender`'s account.
+        _increaseReserves(_state.tokenInput, iteration.input);
+        _decreaseReserves(_state.tokenOutput, iteration.output);
+
+        emit Swap(
+            args.poolId,
+            getVirtualPrice(args.poolId),
+            _state.tokenInput,
+            iteration.input,
+            _state.tokenOutput,
+            iteration.output,
+            iteration.feeAmount,
+            iteration.nextInvariant
+            );
+
         delete _state;
-        return (
-            args.poolId, iteration.remainder, iteration.input, iteration.output
-        );
+        return (args.poolId, iteration.input, iteration.output);
+    }
+
+    function _syncFeeGrowthAccumulator(uint256 feeGrowthGlobal) internal {
+        _state.feeGrowthGlobal = feeGrowthGlobal;
+    }
+
+    function _syncInvariantGrowthAccumulator(uint256 invariantGrowthGlobal)
+        internal
+    {
+        _state.invariantGrowthGlobal = invariantGrowthGlobal;
     }
 
     /**

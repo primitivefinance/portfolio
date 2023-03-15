@@ -12,9 +12,13 @@ import "./interfaces/IPortfolio.sol";
  */
 abstract contract Objective is IPortfolio {
     /**
-     * @dev Used to apply changes to `_state`.
+     * @dev
+     * Uses swap information provided by `iteration` to conditionally alter
+     * fee accumulators.
+     *
+     * @return bool True if the fees were saved in position's owed tokens instead of re-invested.
      */
-    function _afterSwapEffects(
+    function _feeSavingEffects(
         uint64 poolId,
         Iteration memory iteration
     ) internal virtual returns (bool);

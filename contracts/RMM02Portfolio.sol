@@ -22,7 +22,7 @@ contract RMM02Portfolio is PortfolioVirtual {
     // Implemented
 
     /// @inheritdoc Objective
-    function _afterSwapEffects(
+    function _feeSavingEffects(
         uint64 poolId,
         Iteration memory iteration
     ) internal override returns (bool) {
