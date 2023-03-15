@@ -1,0 +1,21 @@
+on: [push]
+
+name: Gas profiling (profile=optimized)
+
+jobs:
+  check:
+    name: Gas profile optimized (profile=optimized)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run gas profiling for RMM01Portfolio
+        run: FOUNDRY_PROFILE=optimized forge test --gas-report --match-contract TestGas
+

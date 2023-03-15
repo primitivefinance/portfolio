@@ -267,6 +267,11 @@ contract Setup is Test {
         _;
     }
 
+    modifier pauseGas() {
+        vm.pauseGasMetering();
+        _;
+    }
+
     /**
      * @dev Sets internal default jit protection seconds value to 0.
      */
