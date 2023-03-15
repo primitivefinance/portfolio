@@ -102,6 +102,7 @@ struct PortfolioCurve {
     uint16 volatility;
     uint16 priorityFee;
     uint32 createdAt;
+    bool perpetual;
 }
 
 struct PortfolioPool {
@@ -371,6 +372,8 @@ function computeTau(
     PortfolioPool memory self,
     uint256 timestamp
 ) pure returns (uint256) {
+    if (self.params.perpetual) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
+
     uint256 end = self.params.maturity();
     unchecked {
         // Cannot underflow as LHS is either equal to `timestamp` or greater.

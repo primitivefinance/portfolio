@@ -681,6 +681,7 @@ abstract contract PortfolioVirtual is Objective {
     /**
      * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
      * @param controller An address that can change the `fee`, `priorityFee`, and `jit` parameters of the created pool.
+     * @param duration Sets the quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
      */
     function _createPool(
         uint24 pairId,
@@ -698,8 +699,10 @@ abstract contract PortfolioVirtual is Objective {
         if (pairNonce == 0) revert InvalidPair();
 
         bool hasController = controller != address(0);
-        uint32 poolNonce = ++getPoolNonce[pairNonce];
-        poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
+        {
+            uint32 poolNonce = ++getPoolNonce[pairNonce];
+            poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
+        }
 
         PortfolioPool storage pool = pools[poolId];
         pool.controller = controller;
@@ -709,14 +712,16 @@ abstract contract PortfolioVirtual is Objective {
         pool.lastTimestamp = timestamp;
         pool.pair = pairs[pairNonce];
 
+        bool isPerpetual = duration == type(uint16).max ? true : false; // type(uint16).max is a magic variable
         PortfolioCurve memory params = PortfolioCurve({
             maxPrice: maxPrice,
             jit: hasController ? jit : uint8(_liquidityPolicy),
             fee: fee,
-            duration: duration,
+            duration: isPerpetual ? uint16(MAX_DURATION) : duration, // Set duration to the max if perpetual.
             volatility: volatility,
             priorityFee: hasController ? priorityFee : 0,
-            createdAt: timestamp
+            createdAt: timestamp,
+            perpetual: isPerpetual
         });
         pool.changePoolParameters(params);
 
