@@ -56,18 +56,18 @@ library RMM01Lib {
      * @dev Approximation of amount out of tokens given a swap `amountIn`.
      * It is not exactly precise to the optimal amount.
      * @param amountIn Quantity of tokens in, units are native token decimals.
-     * @param secondsPassed Amount of seconds that have eclipsed since the last swap.
+     * @param timestamp Timestamp to use to compute the remaining duration in the Portfolio.
      * @custom:error Maximum absolute error of 1e-6.
      */
     function getAmountOut(
         PortfolioPool memory self,
         bool sellAsset,
         uint256 amountIn,
-        uint256 secondsPassed
+        uint256 timestamp
     ) internal pure returns (uint256 amountOut) {
         // Sets data.invariant, data.liquidity, and data.remainder.
         (Iteration memory data, uint256 tau) =
-            getSwapData(self, sellAsset, amountIn, secondsPassed); // Declare and assign variables individual to save on gas spent on initializing 0 values.
+            getSwapData(self, sellAsset, amountIn, timestamp); // Declare and assign variables individual to save on gas spent on initializing 0 values.
 
         // Uses data.invariant, data.liquidity, and data.remainder to compute next input reserve.
         // Uses next input reserve to compute output reserve.
@@ -91,17 +91,22 @@ library RMM01Lib {
         PortfolioPool memory self,
         bool sellAsset,
         uint256 amountIn,
-        uint256 secondsPassed
+        uint256 timestamp
     ) internal pure returns (Iteration memory, uint256 tau) {
+        Iteration memory data;
         uint256 fee = self.controller != address(0)
             ? self.params.priorityFee
             : self.params.fee;
 
-        Iteration memory data;
-        (data.prevInvariant, tau) =
-            getNextInvariant({self: self, timeSinceUpdate: secondsPassed});
         (data.virtualX, data.virtualY) =
             self.getVirtualPoolReservesPerLiquidityInWad();
+        tau = self.computeTau(timestamp);
+        data.prevInvariant = invariantOf({
+            self: self,
+            R_x: data.virtualX,
+            R_y: data.virtualY,
+            timeRemainingSec: tau
+        });
         data.remainder = amountIn.scaleToWad(
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
@@ -163,7 +168,7 @@ library RMM01Lib {
         PortfolioPool memory self,
         uint256 priceWad,
         int128 invariantWad
-    ) internal pure returns (uint256 R_y, uint256 R_x) {
+    ) internal pure returns (uint256 R_x, uint256 R_y) {
         uint256 terminalPriceWad = self.params.maxPrice;
         uint256 volatilityFactorWad =
             convertPercentageToWad(self.params.volatility);
@@ -276,25 +281,5 @@ library RMM01Lib {
         assembly {
             pctWad := div(mul(pct, WAD), PERCENTAGE)
         }
-    }
-
-    // ===== Swaps ===== //
-
-    /**
-     * @notice RMM-01 is time dependent.
-     * @dev Invariant will move over time theoretically, but changes are not reflected until a swap is executed.
-     * @param timeSinceUpdate Amount of seconds passed since the last swap.
-     */
-    function getNextInvariant(
-        PortfolioPool memory self,
-        uint256 timeSinceUpdate
-    ) internal pure returns (int128 invariant, uint256 tau) {
-        tau = self.lastTau(); // Compute block.timestamp - self.lastTimestamp.
-        tau -= timeSinceUpdate; // Time remaining less time passed since `self.lastTimestamp` was updated.
-
-        (uint256 x, uint256 y) = self.getVirtualPoolReservesPerLiquidityInWad(); // Quantities of each reserve per WAD units of liquidity.
-        invariant = int128(
-            invariantOf({self: self, R_x: x, R_y: y, timeRemainingSec: tau})
-        );
     }
 }

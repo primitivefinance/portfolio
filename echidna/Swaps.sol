@@ -51,7 +51,7 @@ contract Swaps is EchidnaStateHandling {
         uint256 stk = curve.maxPrice;
 
         // Compute reserves to determine max input and output.
-        (uint256 R_y, uint256 R_x) =
+        (uint256 R_x, uint256 R_y) =
             RMM01Lib.computeReservesWithPrice(pool, stk, 0);
 
         if (sellAsset) {

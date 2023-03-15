@@ -186,7 +186,8 @@ abstract contract PortfolioVirtual is Objective {
         PortfolioPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
-        PortfolioCurve memory modified = pool.params;
+        PortfolioCurve memory modified;
+        modified = pool.params;
         if (jit != 0) modified.jit = jit;
         if (fee != 0) modified.fee = fee;
         if (priorityFee != 0) modified.priorityFee = priorityFee;
@@ -208,7 +209,7 @@ abstract contract PortfolioVirtual is Objective {
             revert NonExistentPosition(msg.sender, poolId);
         }
 
-        PortfolioPool memory pool = pools[poolId];
+        PortfolioPool storage pool = pools[poolId];
         (
             uint256 growthAsset,
             uint256 growthQuote,
@@ -550,24 +551,13 @@ abstract contract PortfolioVirtual is Objective {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote,
         uint256 invariantGrowthGlobal
-    ) internal returns (uint256 timeDelta) {
+    ) internal {
         PortfolioPool storage pool = pools[poolId];
 
-        timeDelta = _getTimePassed(pool);
-
-        if (pool.virtualX != nextVirtualX) {
-            pool.virtualX = nextVirtualX.safeCastTo128();
-        }
-        if (pool.virtualY != nextVirtualY) {
-            pool.virtualY = nextVirtualY.safeCastTo128();
-        }
-        if (pool.liquidity != liquidity) {
-            pool.liquidity = liquidity.safeCastTo128();
-        }
-        if (pool.lastTimestamp != block.timestamp) {
-            pool.syncPoolTimestamp(block.timestamp);
-        }
-
+        pool.virtualX = nextVirtualX.safeCastTo128();
+        pool.virtualY = nextVirtualY.safeCastTo128();
+        pool.liquidity = liquidity.safeCastTo128();
+        pool.syncPoolTimestamp(block.timestamp);
         pool.feeGrowthGlobalAsset = AssemblyLib.computeCheckpoint(
             pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset
         );
@@ -870,19 +860,6 @@ abstract contract PortfolioVirtual is Objective {
 
         __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;
-    }
-
-    // ===== Internal View ===== //
-
-    function _getTimePassed(PortfolioPool memory pool)
-        internal
-        view
-        returns (uint256)
-    {
-        unchecked {
-            // `pool.lastTimestamp` is only ever synced to `block.timestamp` and so may never exceed it.
-            return block.timestamp - pool.lastTimestamp;
-        }
     }
 
     // ===== Public View ===== //

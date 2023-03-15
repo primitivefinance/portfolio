@@ -25,20 +25,21 @@ contract RMM01Portfolio is PortfolioVirtual {
      * movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _computeSyncedPrice(uint64 poolId)
+    function _getLatestInvariantAndVirtualPrice(uint64 poolId)
         internal
         view
         returns (uint256 price, int256 invariant, uint256 updatedTau)
     {
-        PortfolioPool memory pool = pools[poolId];
-        if (!pool.exists()) revert NonExistentPool(poolId);
-        uint256 timeSinceUpdate = _getTimePassed(pool);
-        (invariant, updatedTau) = RMM01Lib.getNextInvariant({
-            self: pool,
-            timeSinceUpdate: timeSinceUpdate
-        });
+        PortfolioPool storage pool = pools[poolId];
+        updatedTau = pool.computeTau(block.timestamp);
+
+        (uint256 x, uint256 y) = pool.getVirtualPoolReservesPerLiquidityInWad();
+        invariant = int128(
+            pool.invariantOf({R_x: x, R_y: y, timeRemainingSec: updatedTau})
+        );
+
         price = RMM01Lib.getPriceWithX({
-            R_x: pool.virtualX,
+            R_x: x,
             stk: pool.params.maxPrice,
             vol: pool.params.volatility,
             tau: updatedTau
@@ -70,7 +71,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         override
         returns (bool, int256)
     {
-        (, int256 invariant,) = _computeSyncedPrice(poolId);
+        (, int256 invariant,) = _getLatestInvariantAndVirtualPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
         if (pools[poolId].lastTau() == 0) return (false, invariant);
@@ -149,7 +150,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         uint256 price
     ) public view override returns (uint256 reserveX, uint256 reserveY) {
-        (reserveY, reserveX) = RMM01Lib.computeReservesWithPrice({
+        (reserveX, reserveY) = RMM01Lib.computeReservesWithPrice({
             self: pools[poolId],
             priceWad: price,
             invariantWad: 0
@@ -166,7 +167,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
-            secondsPassed: block.timestamp - pool.lastTimestamp
+            timestamp: block.timestamp
         });
     }
 
@@ -177,6 +178,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         override
         returns (uint256 price)
     {
-        (price,,) = _computeSyncedPrice(poolId);
+        (price,,) = _getLatestInvariantAndVirtualPrice(poolId);
     }
 }

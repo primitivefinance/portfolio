@@ -133,7 +133,7 @@ contract StatelessSwaps is Helper, Test {
                 IPortfolioStruct(address(portfolio)).pools(poolId);
 
             // Compute reserves to determine max input and output.
-            (uint256 R_y, uint256 R_x) =
+            (uint256 R_x, uint256 R_y) =
                 RMM01Lib.computeReservesWithPrice(pool, price, 0);
 
             uint256 maxInput;
