@@ -20,12 +20,12 @@ contract DecodeJump {
         return FVM.decodeCreatePair(data);
     }
 
-    function decodeAllocate(bytes calldata data)
+    function decodeAllocateOrDeallocate(bytes calldata data)
         public
         view
         returns (uint8, uint64, uint128)
     {
-        return FVM.decodeAllocate(data);
+        return FVM.decodeAllocateOrDeallocate(data);
     }
 
     function sliceCalldata(
@@ -55,7 +55,7 @@ contract TestFVMJump is Setup {
         uint64 poolId = uint64(5);
         uint128 amount = uint128(7);
         instructions.push(FVM.encodeCreatePair(a0, a1));
-        instructions.push(FVM.encodeAllocate(uint8(0), poolId, amount));
+        instructions.push(FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, amount));
         bytes memory payload = FVM.encodeJumpInstruction(instructions);
 
         DecodeJump _contract = new DecodeJump();
@@ -63,7 +63,7 @@ contract TestFVMJump is Setup {
         (address decoded_a0, address decoded_a1) =
             _contract.decodeCreatePair(decoded[0]);
         (, uint64 decoded_poolId, uint128 decoded_amount) =
-            _contract.decodeAllocate(decoded[1]);
+            _contract.decodeAllocateOrDeallocate(decoded[1]);
         assertEq(decoded_a0, a0, "invalid-a0");
         assertEq(decoded_a1, a1, "invalid-a1");
         assertEq(decoded_poolId, poolId, "invalid-poolId");
@@ -89,12 +89,12 @@ contract TestFVMJump is Setup {
         for (uint256 i; i != totalCalls; ++i) {
             if (i % 2 == 0) {
                 instructions.push(
-                    FVMLib.encodeAllocate(uint8(0), ghost().poolId, amount)
+                    FVMLib.encodeAllocateOrDeallocate(true, uint8(0), ghost().poolId, amount)
                 );
             } else {
                 instructions.push(
-                    FVMLib.encodeDeallocate(
-                        uint8(0), ghost().poolId, amount / 2
+                    FVMLib.encodeAllocateOrDeallocate(
+                        false, uint8(0), ghost().poolId, amount / 2
                     )
                 );
             }

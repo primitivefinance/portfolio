@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
 import "contracts/libraries/FVMLib.sol";
 
-struct DecodedCreatePool {
+struct CreatePoolParams {
     uint24 pairId;
     address controller;
     uint16 priorityFee;
@@ -61,11 +61,7 @@ contract FVMLibTarget is Test {
         return decodeCreatePair(data);
     }
 
-    function decodeCreatePool_(bytes calldata data)
-        external
-        pure
-        returns (DecodedCreatePool memory pool)
-    {
+    function decodeCreatePool_(bytes calldata data) external pure returns (CreatePoolParams memory params) {
         (
             uint24 pairId,
             address controller,
@@ -78,31 +74,23 @@ contract FVMLibTarget is Test {
             uint128 price
         ) = decodeCreatePool(data);
 
-        pool.pairId = pairId;
-        pool.controller = controller;
-        pool.priorityFee = priorityFee;
-        pool.fee = fee;
-        pool.vol = vol;
-        pool.dur = dur;
-        pool.jit = jit;
-        pool.maxPrice = maxPrice;
-        pool.price = price;
+        params.pairId = pairId;
+        params.controller = controller;
+        params.priorityFee = priorityFee;
+        params.fee = fee;
+        params.vol = vol;
+        params.dur = dur;
+        params.jit = jit;
+        params.maxPrice = maxPrice;
+        params.price = price;
     }
 
-    function decodeAllocate_(bytes calldata data)
+    function decodeAllocateOrDeallocate_(bytes calldata data)
         external
         pure
         returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
     {
-        return decodeAllocate(data);
-    }
-
-    function decodeDeallocate_(bytes calldata data)
-        external
-        pure
-        returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
-    {
-        return decodeDeallocate(data);
+        return decodeAllocateOrDeallocate(data);
     }
 }
 
@@ -124,15 +112,7 @@ contract TestFVMLib is Test {
             sellAsset ? uint8(1) : uint8(0)
         );
 
-        console.logBytes(data);
-
-        (
-            uint8 useMax_,
-            uint64 poolId_,
-            uint128 input_,
-            uint128 output_,
-            uint8 sellAsset_
-        ) = target.decodeSwap_(data);
+        (uint8 useMax_, uint64 poolId_, uint128 input_, uint128 output_, uint8 sellAsset_) = target.decodeSwap_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_, "Wrong use max");
         assertEq(poolId, poolId_);
@@ -142,7 +122,15 @@ contract TestFVMLib is Test {
     }
 
     function test_decodeSwap() public {
-        bytes memory data = hex"0500042a0709081204";
+        bytes memory data = encodeSwap(
+            1,
+            0xaaffffffffffffbb,
+            1 ether,
+            2000 * 10 ** 6,
+            1
+        );
+
+        console.logBytes(data);
 
         (
             uint8 useMax,
@@ -152,11 +140,11 @@ contract TestFVMLib is Test {
             uint8 sellAsset
         ) = target.decodeSwap_(data);
 
-        assertEq(useMax, 0);
-        assertEq(poolId, 42);
-        assertEq(input, 8000 * 10 ** 6);
-        assertEq(output, 4 * 10 ** 18);
-        assertEq(sellAsset, 0);
+        assertEq(useMax, 1);
+        assertEq(poolId, 0xaaffffffffffffbb);
+        assertEq(input, 1 ether);
+        assertEq(output, 2000 * 10 ** 6);
+        assertEq(sellAsset, 1);
     }
 
     function testFuzz_encodeClaim(
@@ -175,12 +163,11 @@ contract TestFVMLib is Test {
     }
 
     function test_decodeClaim() public {
-        bytes memory data = hex"10032a0609081204";
+        bytes memory data = hex"10ffffffffffffffff0c062a1201";
         (uint64 poolId, uint128 fee0, uint128 fee1) = target.decodeClaim_(data);
-
-        assertEq(poolId, 42);
-        assertEq(fee0, 8000 * 10 ** 6);
-        assertEq(fee1, 4 * 10 ** 18);
+        assertEq(poolId, uint64(0xffffffffffffffff));
+        assertEq(fee0, 42 * 10 ** 6);
+        assertEq(fee1, 1 * 10 ** 18);
     }
 
     function testFuzz_decodeCreatePair(address token0, address token1) public {
@@ -195,6 +182,7 @@ contract TestFVMLib is Test {
         vm.expectRevert();
         target.decodeCreatePair_(data);
     }
+
 
     function testFuzz_encodeCreatePool(
         uint24 pairId,
@@ -211,17 +199,72 @@ contract TestFVMLib is Test {
             pairId, controller, priorityFee, fee, vol, dur, jit, maxPrice, price
         );
 
-        DecodedCreatePool memory pool = target.decodeCreatePool_(data);
+        CreatePoolParams memory params = target.decodeCreatePool_(data);
 
-        assertEq(pairId, pool.pairId);
-        assertEq(controller, pool.controller);
-        assertEq(priorityFee, pool.priorityFee);
-        assertEq(fee, pool.fee);
-        assertEq(vol, pool.vol);
-        assertEq(dur, pool.dur);
-        assertEq(jit, pool.jit);
-        assertEq(maxPrice, pool.maxPrice);
-        assertEq(price, pool.price);
+        assertEq(pairId, params.pairId);
+        assertEq(controller, params.controller);
+        assertEq(priorityFee, params.priorityFee);
+        assertEq(fee, params.fee);
+        assertEq(vol, params.vol);
+        assertEq(dur, params.dur);
+        assertEq(jit, params.jit);
+        assertEq(maxPrice, params.maxPrice);
+        assertEq(price, params.price);
+    }
+
+
+    function test_encodeCreatePool() public {
+        CreatePoolParams memory params = CreatePoolParams({
+            pairId: uint24(0xaaaaaa),
+            controller: address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF),
+            priorityFee: uint16(0xbbbb),
+            fee: uint16(0xcccc),
+            vol: uint16(0xdddd),
+            dur: uint16(0xeeee),
+            jit: uint16(0xffff),
+            maxPrice: 2000 * 10 ** 6,
+            price: 3 * 10 ** 18
+        });
+
+        bytes memory data = encodeCreatePool(
+            params.pairId,
+            params.controller,
+            params.priorityFee,
+            params.fee,
+            params.vol,
+            params.dur,
+            params.jit,
+            params.maxPrice,
+            params.price
+        );
+
+        CreatePoolParams memory decoded = target.decodeCreatePool_(data);
+
+        assertEq(decoded.pairId, params.pairId);
+        assertEq(decoded.controller, params.controller);
+        assertEq(decoded.priorityFee, params.priorityFee);
+        assertEq(decoded.fee, params.fee);
+        assertEq(decoded.vol, params.vol);
+        assertEq(decoded.dur, params.dur);
+        assertEq(decoded.jit, params.jit);
+        assertEq(decoded.maxPrice, params.maxPrice);
+        assertEq(decoded.price, params.price);
+    }
+
+    function test_decodeCreatePool() public {
+        CreatePoolParams memory decoded = target.decodeCreatePool_(
+            hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff2509021203"
+        );
+
+        assertEq(decoded.pairId, uint24(0xaaaaaa));
+        assertEq(decoded.controller, address(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
+        assertEq(decoded.priorityFee, uint16(0xbbbb));
+        assertEq(decoded.fee, uint16(0xcccc));
+        assertEq(decoded.vol, uint16(0xdddd));
+        assertEq(decoded.dur, uint16(0xeeee));
+        assertEq(decoded.jit, uint16(0xffff));
+        assertEq(decoded.maxPrice, 2 * 10 ** 9);
+        assertEq(decoded.price, 3 * 10 ** 18);
     }
 
     function testFuzz_encodeAllocate(
@@ -230,10 +273,10 @@ contract TestFVMLib is Test {
         uint128 deltaLiquidity
     ) public {
         bytes memory data =
-            encodeAllocate(useMax ? uint8(1) : uint8(0), poolId, deltaLiquidity);
+            encodeAllocateOrDeallocate(true, useMax ? uint8(1) : uint8(0), poolId, deltaLiquidity);
 
         (uint8 useMax_, uint64 poolId_, uint128 deltaLiquidity_) =
-            target.decodeAllocate_(data);
+            target.decodeAllocateOrDeallocate_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_);
         assertEq(poolId, poolId_);
@@ -245,31 +288,86 @@ contract TestFVMLib is Test {
         uint64 poolId,
         uint128 deltaLiquidity
     ) public {
-        bytes memory data = encodeDeallocate(
-            useMax ? uint8(1) : uint8(0), poolId, deltaLiquidity
+        bytes memory data = encodeAllocateOrDeallocate(
+            false,
+            useMax ? uint8(1) : uint8(0),
+            poolId,
+            deltaLiquidity
         );
 
         (uint8 useMax_, uint64 poolId_, uint128 deltaLiquidity_) =
-            target.decodeDeallocate_(data);
+            target.decodeAllocateOrDeallocate_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_);
         assertEq(poolId, poolId_);
         assertEq(deltaLiquidity, deltaLiquidity_);
     }
 
-    /*
-    function testFuzz_encodePoolId(
-        uint24 pairId,
-        bool isMutable,
-        uint32 poolNonce
-    ) public {
-        uint64 poolId = encodePoolId(pairId, isMutable, poolNonce);
-        (uint64 poolId_, uint24 pairId_, uint8 isMutable_, uint32 poolNonce_) = target.decodePoolId_(abi.encode(poolId));
+    function test_decodeAllocateOrDeallocate() public {
+        bytes memory data = hex"11aaffffffffffffbb0e016b";
+        (uint8 useMax, uint64 poolId, uint128 amount) = target.decodeAllocateOrDeallocate_(data);
+        assertEq(useMax, 1);
+        assertEq(poolId, uint64(0xaaffffffffffffbb));
+        assertEq(amount, uint128(0.0363 ether));
+    }
+
+    function test_decodeAllocateOrDeallocate_RevertsBadLength() public {
+        bytes memory data = hex"11aaffffffffffffbb0e";
+        vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(11), uint256(10)));
+        target.decodeAllocateOrDeallocate_(data);
+    }
+
+    function test_encodePoolId() public {
+        uint64 poolId = encodePoolId(
+            uint24(0xaaaaaa),
+            true,
+            uint32(0xbbbbbbbb)
+        );
+
+        assertEq(poolId, uint64(0xaaaaaa01bbbbbbbb));
+    }
+
+    function testFuzz_decodePoolId(uint24 pairId, bool isMutable, uint32 poolNonce) public {
+        uint64 poolId = encodePoolId(
+            pairId,
+            isMutable,
+            poolNonce
+        );
+
+        console.log(poolId);
+
+        bytes memory data;
+
+        assembly {
+            mstore(data, 8)
+            mstore(add(0x20, data), shl(192, poolId))
+        }
+
+        (uint64 poolId_, uint24 pairId_, uint8 isMutable_, uint32 poolNonce_)
+            = target.decodePoolId_(data);
 
         assertEq(poolId, poolId_);
         assertEq(pairId, pairId_);
         assertEq(isMutable ? uint8(1) : uint8(0), isMutable_);
         assertEq(poolNonce, poolNonce_);
     }
-    */
+
+    function test_decodePoolId_RevertsBadLength() public {
+        bytes memory data = hex"aaaaaaaaaaaaaa";
+        vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(8), uint256(7)));
+        target.decodePoolId_(data);
+        data = hex"aaaaaaaaaaaaaaaaaa";
+        vm.expectRevert(abi.encodePacked(InvalidBytesLength.selector, uint256(8), uint256(9)));
+        target.decodePoolId_(data);
+    }
+
+    function testFuzz_decodePairIdFromPoolId(
+        uint24 pairId, bool isMutable, uint32 poolNonce
+    ) public {
+        uint64 decodedPairId = decodePairIdFromPoolId(
+            encodePoolId(pairId, isMutable, poolNonce)
+        );
+
+        assertEq(decodedPairId, pairId);
+    }
 }
