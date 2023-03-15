@@ -26,6 +26,8 @@ abstract contract Objective is IPortfolio {
 
     /**
      * @dev Used to apply changes to a `pool`, like it's timestamp, before a swap occurs.
+     * @return success True if pool can be swapped in.
+     * @return invariant Current invariant value of the pool in WAD units.
      */
     function _beforeSwapEffects(uint64 poolId)
         internal
@@ -45,17 +47,23 @@ abstract contract Objective is IPortfolio {
 
     /**
      * @dev Conditional check before interacting with a pool.
+     * @return True if pool exists and is ready to be interacted with.
      */
     function checkPool(uint64 poolId) public view virtual returns (bool);
 
     /**
      * @dev Computes the invariant given `reserveX` and `reserveY` and returns the invariant condition status.
+     * @param invariant Last invariant value of the pool in WAD units.
+     * @param reserveX Amount of "asset" reserves in WAD units per WAD of liquidity.
+     * @param reserveY Amount of "quote" reserves in WAD units per WAD of liquidity.
+     * @param timestamp Timestamp at which the invariant condition will be checked. Used to compute time until maturity.
      */
     function checkInvariant(
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
-        uint256 reserveY
+        uint256 reserveY,
+        uint256 timestamp
     ) public view virtual returns (bool success, int256 nextInvariant);
 
     /**
@@ -69,7 +77,8 @@ abstract contract Objective is IPortfolio {
     ) public view virtual returns (uint256);
 
     /**
-     * @dev Computes the reserves in WAD units using a `price`.
+     * @dev Computes the reserves in WAD units using a `price` in WAD units.
+     * @param price Quote tokens per Asset token in WAD units.
      */
     function computeReservesFromPrice(
         uint64 poolId,
@@ -78,6 +87,7 @@ abstract contract Objective is IPortfolio {
 
     /**
      * @dev Computes an amount of tokens out given an amount in, units are in the token's decimals.
+     * @param amountIn Quantity to swap in, in native decimals.
      */
     function getAmountOut(
         uint64 poolId,
@@ -91,7 +101,10 @@ abstract contract Objective is IPortfolio {
         returns (uint256 output);
 
     /**
-     * @dev Estimates the `price` of a pool with `poolId` given the pool's reserves.
+     * @dev
+     * WARNING! Do not rely on this price value. This CAN be manipulated. It is also an estimate that has error.
+     * Estimates the `price` of a pool with `poolId` given the pool's reserves.
+     * @return price Estimated quantity of "Quote" tokens per "Asset" tokens in WAD units.
      */
     function getVirtualPrice(uint64 poolId)
         public

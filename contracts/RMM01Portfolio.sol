@@ -90,6 +90,9 @@ contract RMM01Portfolio is PortfolioVirtual {
         (, int256 invariant,) = _getLatestInvariantAndVirtualPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
+        // Buffer for post-maturity swaps would go here.
+        // Without a buffer, it's never possible to take trades at tau == 0.
+        // This is acceptable.
         if (pools[poolId].lastTau() == 0) return (false, invariant);
 
         return (true, invariant);
@@ -121,9 +124,10 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
-        uint256 reserveY
+        uint256 reserveY,
+        uint256 timestamp
     ) public view override returns (bool, int256 nextInvariant) {
-        uint256 tau = pools[poolId].lastTau();
+        uint256 tau = pools[poolId].computeTau(timestamp); // Computes the time until `timestamp`.
         nextInvariant = RMM01Lib.invariantOf({
             self: pools[poolId],
             R_x: reserveX,

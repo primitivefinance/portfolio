@@ -431,7 +431,7 @@ abstract contract PortfolioVirtual is Objective {
         Iteration memory iteration;
         {
             (bool success, int256 invariant) = _beforeSwapEffects(args.poolId);
-            if (!success) revert PoolExpired(); // todo: update for generalized error
+            if (!success) revert PoolExpired();
 
             uint256 internalBalance = getBalance(
                 msg.sender,
@@ -527,7 +527,8 @@ abstract contract PortfolioVirtual is Objective {
                 args.poolId,
                 iteration.prevInvariant,
                 iteration.virtualX,
-                iteration.virtualY
+                iteration.virtualY,
+                block.timestamp
             );
 
             if (!validInvariant) {
@@ -778,7 +779,7 @@ abstract contract PortfolioVirtual is Objective {
      *      Positive credits are only applied to the internal balance of the account.
      *      Therefore, it does not require a state change for the global reserves.
      *
-     * @custom:security Directly manipulates intrernal balances.
+     * @custom:security Directly manipulates internal balances.
      */
     function _applyCredit(address to, address token, uint256 amount) internal {
         __account__.credit(to, token, amount);
@@ -790,7 +791,7 @@ abstract contract PortfolioVirtual is Objective {
      *      If a balance exists for the token for the internal balance of `msg.sender`,
      *      it will be used to pay the debit. Else, the contract expects tokens to be transferred in.
      *
-     * @custom:security Directly manipulates intrernal balances.
+     * @custom:security Directly manipulates internal balances.
      */
     function _applyDebit(address token, uint256 amount) internal {
         __account__.debit(msg.sender, token, amount);
