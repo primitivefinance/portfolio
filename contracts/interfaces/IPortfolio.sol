@@ -128,6 +128,11 @@ interface IPortfolioEvents {
         address indexed quote,
         uint256 price
     );
+
+    /**
+     * @dev Emitted on updating the `protocolFee` state value.
+     */
+    event UpdateProtocolFee(uint256 prevFee, uint256 nextFee);
 }
 
 interface IPortfolioGetters {
@@ -174,6 +179,11 @@ interface IPortfolioGetters {
      * @dev Wrapped Ether address initialized on creating the Portfolio.
      */
     function WETH() external view returns (address);
+
+    /**
+     * @dev Contract for storing canonical Portfolio deployments.
+     */
+    function REGISTRY() external view returns (address);
 
     /**
      * @dev Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
@@ -361,6 +371,12 @@ interface IPortfolioActions {
         uint16 fee,
         uint16 jit
     ) external;
+
+    /**
+     * @dev Sets the `protocolFee` state value.
+     * @param fee Must be within the range: 4 <= x <= 20.
+     */
+    function setProtocolFee(uint256 fee) external;
 }
 
 interface IPortfolio is

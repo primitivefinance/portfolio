@@ -6,6 +6,7 @@ import "solmate/tokens/WETH.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
 import "contracts/test/FeeOnTransferToken.sol";
+import "contracts/test/SimpleRegistry.sol";
 import "forge-std/Test.sol";
 
 using Subjects for SubjectsState global;
@@ -13,6 +14,7 @@ using Subjects for SubjectsState global;
 struct SubjectsState {
     Vm vm;
     address deployer;
+    address registry;
     IPortfolio last;
     WETH weth;
     MockERC20[] tokens;
@@ -113,6 +115,16 @@ library Subjects {
         return self;
     }
 
+    function registrar(SubjectsState storage self)
+        internal
+        ready(self)
+        returns (SubjectsState storage)
+    {
+        self.registry = address(new SimpleRegistry());
+        self.vm.label(address(self.registry), "REGISTRY");
+        return self;
+    }
+
     /**
      * @dev Chain from `startDeploy()` to startDeploy the default Portfolio contract subject.
      * Must have `vm` in context via inheriting `forge-std/Test.sol`.
@@ -126,7 +138,8 @@ library Subjects {
         ready(self)
         returns (SubjectsState storage)
     {
-        self.last = IPortfolio(new RMM01Portfolio(address(self.weth)));
+        self.last =
+            IPortfolio(new RMM01Portfolio(address(self.weth), self.registry));
         self.vm.label(address(self.last), "Subject");
         return self;
     }

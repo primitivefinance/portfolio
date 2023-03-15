@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 import "./PortfolioLib.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
+import "./interfaces/IPortfolioRegistry.sol";
 
 /**
  * @title   Objective

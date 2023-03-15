@@ -15,7 +15,10 @@ contract RMM02Portfolio is PortfolioVirtual {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
 
-    constructor(address weth) PortfolioVirtual(weth) { }
+    constructor(
+        address weth,
+        address registry
+    ) PortfolioVirtual(weth, registry) { }
 
     uint256 public weight = 0.5 ether;
 

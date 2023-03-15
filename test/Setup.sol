@@ -60,7 +60,7 @@ contract Setup is Test {
      * @dev Initializes the actor, subject, and poolId ghost state.
      */
     function setUp() public virtual {
-        _subjects.startDeploy(vm).wrapper().subject().token(
+        _subjects.startDeploy(vm).wrapper().registrar().subject().token(
             "token", abi.encode("Asset-Std", "A-STD-18", uint8(18))
         ).token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
             "token", abi.encode("USDC", "USDC-6", uint8(6))

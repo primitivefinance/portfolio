@@ -39,6 +39,8 @@ abstract contract PortfolioVirtual is Objective {
     /// @inheritdoc IPortfolioGetters
     address public immutable WETH;
     /// @inheritdoc IPortfolioGetters
+    address public immutable REGISTRY;
+    /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
 
     mapping(uint24 => uint32) public getPoolNonce;
@@ -49,6 +51,7 @@ abstract contract PortfolioVirtual is Objective {
 
     uint256 internal _locked = 1;
     uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
+    uint256 private _protocolFee;
 
     /**
      * @dev Manipulated in `_settlement` only.
@@ -97,8 +100,9 @@ abstract contract PortfolioVirtual is Objective {
      * @notice
      * Tokens sent to this contract are lost.
      */
-    constructor(address weth) {
+    constructor(address weth, address registry) {
         WETH = weth;
+        REGISTRY = registry;
         __account__.settled = true;
     }
 
@@ -258,8 +262,8 @@ abstract contract PortfolioVirtual is Objective {
         pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
         pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
 
-        if (claimedAssets > 0) _applyCredit(asset, claimedAssets);
-        if (claimedQuotes > 0) _applyCredit(quote, claimedQuotes);
+        if (claimedAssets > 0) _applyCredit(msg.sender, asset, claimedAssets);
+        if (claimedQuotes > 0) _applyCredit(msg.sender, quote, claimedQuotes);
 
         emit Collect(
             poolId, msg.sender, claimedAssets, asset, claimedQuotes, quote
@@ -477,7 +481,14 @@ abstract contract PortfolioVirtual is Objective {
             }
 
             deltaInput = iteration.input;
+
             iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
+            if (_protocolFee != 0) {
+                uint256 protocolFeeAmount = iteration.feeAmount / _protocolFee;
+                iteration.feeAmount -= protocolFeeAmount;
+                _applyCredit(REGISTRY, _state.tokenInput, protocolFeeAmount);
+            }
+
             deltaInputLessFee = deltaInput - iteration.feeAmount;
 
             // This value should be used in `syncPool` if fees are re-invested into the pool.
@@ -764,9 +775,9 @@ abstract contract PortfolioVirtual is Objective {
      *
      * @custom:security Directly manipulates intrernal balances.
      */
-    function _applyCredit(address token, uint256 amount) internal {
-        __account__.credit(msg.sender, token, amount);
-        emit IncreaseUserBalance(msg.sender, token, amount);
+    function _applyCredit(address to, address token, uint256 amount) internal {
+        __account__.credit(to, token, amount);
+        emit IncreaseUserBalance(to, token, amount);
     }
 
     /**
@@ -929,6 +940,18 @@ abstract contract PortfolioVirtual is Objective {
 
         __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;
+    }
+
+    function setProtocolFee(uint256 fee) external override lock {
+        if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
+            revert NotController();
+        }
+        if (fee > 20 || fee < 4) revert InvalidFee(uint16(fee));
+
+        uint256 prevFee = _protocolFee;
+        _protocolFee = fee;
+
+        emit UpdateProtocolFee(prevFee, fee);
     }
 
     // ===== Public View ===== //
