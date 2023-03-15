@@ -29,7 +29,7 @@ contract TestRMM01 is
         super.setUp();
 
         // todo: Update this when each portfolio exists. Right now, default portfolio is RMM01.
-        // address new_subject = address(new CCPortfolio(address(subjects().weth)));
+        // address new_subject = address(new RMM01Portfolio(address(subjects().weth)));
         // subjects().change_subject(new_subject);
     }
 

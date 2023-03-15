@@ -42,12 +42,7 @@ contract DecodeJump {
 }
 
 contract TestFVMJump is Setup {
-    modifier pauseGas() {
-        vm.pauseGasMetering();
-        _;
-    }
-
-    /* bytes[] instructions;
+/* bytes[] instructions;
 
     function test_encodeJumpInstruction() public {
         address a0 = address(55);

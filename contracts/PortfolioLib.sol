@@ -38,7 +38,6 @@ using {
 uint256 constant PERCENTAGE = 10_000;
 uint256 constant MIN_MAX_PRICE = 1;
 uint256 constant MAX_MAX_PRICE = type(uint128).max;
-uint256 constant BUFFER = 300 seconds;
 uint256 constant MIN_FEE = 1; // 0.01%
 uint256 constant MAX_FEE = 1000; // 10%
 uint256 constant MIN_VOLATILITY = 100; // 1%
@@ -48,10 +47,7 @@ uint256 constant MAX_DURATION = 500; // days, but without units
 uint256 constant JUST_IN_TIME_MAX = 600 seconds;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
-// todo: add selectors for debugging?
 error DrawBalance();
-error InsufficientPosition(uint64 poolId);
-error InvalidAmountOut();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
@@ -60,26 +56,19 @@ error InvalidInvariant(int256 prev, int256 next);
 error InvalidJit(uint16);
 error InvalidPair();
 error InvalidReentrancy();
-error InvalidReward();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
-error InvalidTick(int24);
 error InvalidTransfer();
-error InvalidVolatility(uint24 sigma); // todo: fix, use uint16 type.
+error InvalidVolatility(uint16 sigma);
 error JitLiquidity(uint256 distance);
-error MaxFee(uint16 fee);
 error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
 error NonExistentPosition(address owner, uint64 poolId);
 error PairExists(uint24 pairId);
-error PerLiquidityError(uint256 deltaAsset);
-error PoolExists();
 error PoolExpired();
-error PositionZeroLiquidity(uint96 positionId);
 error SameTokenError();
 error SwapInputTooSmall();
-error SwapLimitReached();
 error ZeroAmounts();
 error ZeroInput();
 error ZeroLiquidity();
@@ -88,21 +77,22 @@ error ZeroPrice();
 error ZeroValue();
 
 struct PortfolioPair {
-    address tokenAsset;
+    address tokenAsset; // Base asset, referred to as "X" reserve.
     uint8 decimalsAsset;
-    address tokenQuote;
+    address tokenQuote; // Quote asset, referred to as "Y" reserve.
     uint8 decimalsQuote;
 }
 
 struct PortfolioCurve {
     // single slot
-    uint128 maxPrice;
-    uint16 jit;
-    uint16 fee;
-    uint16 duration;
-    uint16 volatility;
-    uint16 priorityFee;
-    uint32 createdAt;
+    uint128 maxPrice; // Can be used as a terminal price (max price that can be reached by maturity).
+    uint16 jit; // Set to a default value in seconds for non-controlled pools.
+    uint16 fee; // Can be manipulated by a controller of a pool, if there is one.
+    uint16 duration; // Set to max duration for perpetual pools.
+    uint16 volatility; // Effects the pool like an amplification factor, increasing price impact of swaps.
+    uint16 priorityFee; // Only set for controlled pools, and can be changed by controller.
+    uint32 createdAt; // Set to the `block.timestamp` on pool creation.
+    bool perpetual; // Set to `true` if the `duration` variable in pool creation is the magic variable type(uint16).max.
 }
 
 struct PortfolioPool {
@@ -121,12 +111,12 @@ struct PortfolioPool {
 struct PortfolioPosition {
     uint128 freeLiquidity;
     uint32 lastTimestamp;
-    uint256 invariantGrowthLast;
+    uint256 invariantGrowthLast; // Increases when the invariant increases from a positive value.
     uint256 feeGrowthAssetLast;
     uint256 feeGrowthQuoteLast;
     uint128 tokensOwedAsset;
     uint128 tokensOwedQuote;
-    uint128 invariantOwed;
+    uint128 invariantOwed; // Not used by Portfolio, but can be used by a pool controller.
 }
 
 struct ChangeLiquidityParams {
@@ -144,7 +134,6 @@ struct Order {
     uint8 useMax;
     uint64 poolId;
     uint128 input;
-    // For swapExactIn or swapExactOut, output is the limit price.
     uint128 output;
     uint8 sellAsset;
 }
@@ -163,7 +152,7 @@ struct Iteration {
 
 struct SwapState {
     bool sell;
-    address sellAsset;
+    address tokenInput;
     uint16 fee;
     address tokenOutput;
     uint256 feeGrowthGlobal;
@@ -372,6 +361,8 @@ function computeTau(
     PortfolioPool memory self,
     uint256 timestamp
 ) pure returns (uint256) {
+    if (self.params.perpetual) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
+
     uint256 end = self.params.maturity();
     unchecked {
         // Cannot underflow as LHS is either equal to `timestamp` or greater.

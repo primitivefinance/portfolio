@@ -128,6 +128,11 @@ interface IPortfolioEvents {
         address indexed quote,
         uint256 price
     );
+
+    /**
+     * @dev Emitted on updating the `protocolFee` state value.
+     */
+    event UpdateProtocolFee(uint256 prevFee, uint256 nextFee);
 }
 
 interface IPortfolioGetters {
@@ -174,6 +179,11 @@ interface IPortfolioGetters {
      * @dev Wrapped Ether address initialized on creating the Portfolio.
      */
     function WETH() external view returns (address);
+
+    /**
+     * @dev Contract for storing canonical Portfolio deployments.
+     */
+    function REGISTRY() external view returns (address);
 
     /**
      * @dev Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
@@ -325,9 +335,7 @@ interface IPortfolioActions {
      * This means that token deficits can be carried over between calls
      * and paid by future ones (within the same multiprocess transaction)!
      *
-     * todo: Investigate the amount of operations that can be processed, since it uses a loop.
      * todo: Update multiprocess to return data, or information that can help debugging.
-     * todo: Update the custom encoded `data` to use regular abi-encoded data to match multicall.
      */
     function multiprocess(bytes calldata data) external payable;
 
@@ -363,6 +371,12 @@ interface IPortfolioActions {
         uint16 fee,
         uint16 jit
     ) external;
+
+    /**
+     * @dev Sets the `protocolFee` state value.
+     * @param fee Must be within the range: 4 <= x <= 20.
+     */
+    function setProtocolFee(uint256 fee) external;
 }
 
 interface IPortfolio is

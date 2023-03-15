@@ -74,7 +74,8 @@ contract TestPortfolioChangeParameters is Setup {
             duration: DEFAULT_DURATION,
             volatility: DEFAULT_VOLATILITY,
             priorityFee: 56,
-            createdAt: 100000000
+            createdAt: 100000000,
+            perpetual: false
         });
         (, bytes memory revertData) = curve.checkParameters();
         assertEq(

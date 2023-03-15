@@ -4,6 +4,7 @@ pragma solidity 0.8.13;
 error InvalidLiquidity();
 error InvalidDays();
 
+uint256 constant SECONDS_PER_YEAR = 31556953 seconds;
 uint256 constant SECONDS_PER_DAY = 86_400 seconds;
 uint8 constant MIN_DECIMALS = 6;
 uint8 constant MAX_DECIMALS = 18;

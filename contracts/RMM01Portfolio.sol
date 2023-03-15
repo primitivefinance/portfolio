@@ -16,7 +16,10 @@ contract RMM01Portfolio is PortfolioVirtual {
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
 
-    constructor(address weth) PortfolioVirtual(weth) { }
+    constructor(
+        address weth,
+        address registry
+    ) PortfolioVirtual(weth, registry) { }
 
     /**
      * @dev Computes the price of the pool, which changes over time.
@@ -47,22 +50,35 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function _afterSwapEffects(
+    function _feeSavingEffects(
         uint64 poolId,
         Iteration memory iteration
     ) internal override returns (bool) {
-        // Apply priority invariant growth.
+        // =---= Swap Effects =---= //
         if (msg.sender == pools[poolId].controller) {
             int256 delta = iteration.nextInvariant - iteration.prevInvariant;
             uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-            // todo: I don't like this setting internal _state...
+
+            // Apply priority invariant growth if invariant changed positively.
             if (deltaAbs != 0) {
-                _state.invariantGrowthGlobal =
-                    deltaAbs.divWadDown(iteration.liquidity);
+                _syncInvariantGrowthAccumulator(
+                    deltaAbs.divWadDown(iteration.liquidity)
+                );
             }
         }
 
-        return true;
+        // Do not re-invest fees if next invariant is positive.
+        if (iteration.nextInvariant > 0) {
+            _syncFeeGrowthAccumulator(
+                FixedPointMathLib.divWadDown(
+                    iteration.feeAmount, iteration.liquidity
+                )
+            );
+
+            return true;
+        }
+
+        return false;
     }
 
     /// @inheritdoc Objective
@@ -74,6 +90,9 @@ contract RMM01Portfolio is PortfolioVirtual {
         (, int256 invariant,) = _getLatestInvariantAndVirtualPrice(poolId);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
+        // Buffer for post-maturity swaps would go here.
+        // Without a buffer, it's never possible to take trades at tau == 0.
+        // This is acceptable.
         if (pools[poolId].lastTau() == 0) return (false, invariant);
 
         return (true, invariant);
@@ -105,9 +124,10 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
-        uint256 reserveY
+        uint256 reserveY,
+        uint256 timestamp
     ) public view override returns (bool, int256 nextInvariant) {
-        uint256 tau = pools[poolId].lastTau();
+        uint256 tau = pools[poolId].computeTau(timestamp); // Computes the time until `timestamp`.
         nextInvariant = RMM01Lib.invariantOf({
             self: pools[poolId],
             R_x: reserveX,

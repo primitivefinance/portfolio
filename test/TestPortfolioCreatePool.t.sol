@@ -119,4 +119,39 @@ contract TestPortfolioCreatePool is Setup {
         vm.expectRevert(arithmeticError);
         subject().multiprocess(data);
     }
+
+    function test_createPool_perpetual() public {
+        uint16 perpetualMagicVariable = type(uint16).max;
+        uint24 pairNonce = uint24(1);
+        bytes memory data = FVM.encodeCreatePool(
+            pairNonce,
+            address(0),
+            1,
+            100,
+            100,
+            perpetualMagicVariable,
+            100,
+            100,
+            100
+        );
+        subject().multiprocess(data);
+        uint64 poolId = FVM.encodePoolId(
+            pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
+        );
+        assertEq(
+            ghost().poolOf(poolId).params.duration,
+            MAX_DURATION,
+            "duration != max duration"
+        );
+        assertEq(
+            ghost().poolOf(poolId).computeTau(0),
+            SECONDS_PER_YEAR,
+            "tau != year"
+        );
+        assertEq(
+            ghost().poolOf(poolId).lastTau(),
+            SECONDS_PER_YEAR,
+            "lastTau != year"
+        );
+    }
 }
