@@ -56,105 +56,89 @@ contract TestBrainMath is Test {
 
     function test_getDeltaAToNextPrice_should_round_up() public {
         int24 currentSlotIndex = 0;
-
         uint256 deltaA = getDeltaAToNextPrice(
             getSqrtPriceAtSlot(10),
             getSqrtPriceAtSlot(currentSlotIndex),
             10,
             Rounding.Up
         );
-
         assertEq(deltaA, 1);
     }
 
     function test_getDeltaAToNextPrice_should_round_down() public {
         int24 currentSlotIndex = 0;
-
         uint256 deltaA = getDeltaAToNextPrice(
             getSqrtPriceAtSlot(10),
             getSqrtPriceAtSlot(currentSlotIndex),
             10,
             Rounding.Down
         );
-
         assertEq(deltaA, 0);
     }
 
     function test_getDeltaAToNextPrice_higher_next_price() public {
         int24 currentSlotIndex = 20000;
-
         uint256 deltaX = getDeltaAToNextPrice(
             getSqrtPriceAtSlot(20100),
             getSqrtPriceAtSlot(currentSlotIndex),
             1000000000,
             Rounding.Up
         );
-
         assertEq(deltaX, 1834807);
     }
 
     function test_getDeltaAToNextPrice_lower_next_price() public {
         int24 currentSlotIndex = 20100;
-
         uint256 deltaX = getDeltaAToNextPrice(
             getSqrtPriceAtSlot(20000),
             getSqrtPriceAtSlot(currentSlotIndex),
             1000000000,
             Rounding.Up
         );
-
         assertEq(deltaX, 1834807);
     }
 
     function test_getDeltaBToNextPrice_should_round_up() public {
         int24 currentSlotIndex = 0;
-
         uint256 deltaY = getDeltaBToNextPrice(
             getSqrtPriceAtSlot(10),
             getSqrtPriceAtSlot(currentSlotIndex),
             10,
             Rounding.Up
         );
-
         assertEq(deltaY, 1);
     }
 
     function test_getDeltaBToNextPrice_should_round_down() public {
         int24 currentSlotIndex = 0;
-
         uint256 deltaY = getDeltaBToNextPrice(
             getSqrtPriceAtSlot(10),
             getSqrtPriceAtSlot(currentSlotIndex),
             10,
             Rounding.Down
         );
-
         assertEq(deltaY, 0);
     }
 
     function test_getDeltaBToNextPrice_higher_next_price() public {
         int24 currentSlotIndex = 20000;
-
         uint256 deltaY = getDeltaBToNextPrice(
             getSqrtPriceAtSlot(20100),
             getSqrtPriceAtSlot(currentSlotIndex),
             1000000000,
             Rounding.Up
         );
-
         assertEq(deltaY, 13624081);
     }
 
     function test_getDeltaBToNextPrice_lower_next_price() public {
         int24 currentSlotIndex = 20100;
-
         uint256 deltaY = getDeltaBToNextPrice(
             getSqrtPriceAtSlot(20000),
             getSqrtPriceAtSlot(currentSlotIndex),
             1000000000,
             Rounding.Up
         );
-
         assertEq(deltaY, 13624081);
     }
 
@@ -162,9 +146,9 @@ contract TestBrainMath is Test {
         UD60x18 targetPrice = getTargetPriceUsingDeltaA(
             getSqrtPriceAtSlot(20000),
             1000000000000000000000000000,
-            10000000000
+            10000000000,
+            true
         );
-
         assertApproxEqRel(unwrap(targetPrice), 2718145926819817600, MAX_PERCENT_DELTA);
     }
 
@@ -172,9 +156,9 @@ contract TestBrainMath is Test {
         UD60x18 targetPrice = getTargetPriceUsingDeltaB(
             getSqrtPriceAtSlot(20000),
             1000000000000000000000000000,
-            10000000000
+            10000000000,
+            true
         );
-
         assertApproxEqRel(unwrap(targetPrice), 2718145926819817600, MAX_PERCENT_DELTA);
     }
 }

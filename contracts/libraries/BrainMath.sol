@@ -107,18 +107,32 @@ function getDeltaBToNextPrice(
 function getTargetPriceUsingDeltaA(
     UD60x18 sqrtPriceCurrentSlot,
     uint256 liquidity,
-    uint256 deltaA
+    uint256 deltaA,
+    bool fixedIn
 ) pure returns (UD60x18) {
-    return
-        toUD60x18(liquidity).mul(sqrtPriceCurrentSlot).div(
-            toUD60x18(deltaA).mul(sqrtPriceCurrentSlot).add(toUD60x18(liquidity))
-        );
+    UD60x18 numerator = toUD60x18(liquidity).mul(sqrtPriceCurrentSlot);
+    UD60x18 deltaDenominator = toUD60x18(deltaA).mul(sqrtPriceCurrentSlot);
+    if (fixedIn) {
+        // moving down
+        return numerator.div(toUD60x18(liquidity).add(deltaDenominator));
+    } else {
+        // moving up
+        return numerator.div(toUD60x18(liquidity).sub(deltaDenominator));
+    }
 }
 
 function getTargetPriceUsingDeltaB(
     UD60x18 sqrtPriceCurrentSlot,
     uint256 liquidity,
-    uint256 deltaB
+    uint256 deltaB,
+    bool fixedIn
 ) pure returns (UD60x18) {
-    return toUD60x18(deltaB).div(toUD60x18(liquidity)).add(sqrtPriceCurrentSlot);
+    UD60x18 deltaTerm = toUD60x18(deltaB).div(toUD60x18(liquidity));
+    if (fixedIn) {
+        // moving up
+        return sqrtPriceCurrentSlot.add(deltaTerm);
+    } else {
+        // moving down
+        return sqrtPriceCurrentSlot.sub(deltaTerm);
+    }
 }
