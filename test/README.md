@@ -40,7 +40,7 @@ Thanks to horsefacts.eth for their stellar walkthrough of building an invariant 
 #### Global
 
 - Token balances of Portfolio should be greater than or equal to the `reserves` of all tokens.
-- For every pool, `reserves` of the pool's tokens should always be greater than the `getPoolAmounts` output for the pool's entire liquidity.
+- For every pool, `reserves` of the pool's tokens should always be greater than the `getPoolAmountsPerLiquidity` output for the pool's entire liquidity.
 - The sum of liquidity in all pools must be equal to the sum of liquidity of every position.
 - The `lock` variable must always return `1` outside of execution.
 - The `__account__.settled` variable must always return true outside of execution.
@@ -113,8 +113,8 @@ Thanks to horsefacts.eth for their stellar walkthrough of building an invariant 
   - The `msg.sender`'s `positions` `freeLiquidity` for `poolId` always increased by `deltaLiquidity`.
   - Calling `deallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same `msg.sender` allocated to `poolId` and the pool's fee growth condition is met (e.g. pool's invariant is positive) the position's change in `feeGrowth{}` must not be zero.
-  - Portfolio's `reserves` value for the pool's tokens increased by respective amounts computed with `getPoolAmounts`, if the `msg.sender` did not have enough tokens in their `balances`.
-  - The `balanceOf` Portfolio for the pool's tokens increased by respective amounts computed with `getPoolAmounts`, if the `msg.sender` did not have enough tokens in their `balances`.
+  - Portfolio's `reserves` value for the pool's tokens increased by respective amounts computed with `getPoolAmountsPerLiquidity`, if the `msg.sender` did not have enough tokens in their `balances`.
+  - The `balanceOf` Portfolio for the pool's tokens increased by respective amounts computed with `getPoolAmountsPerLiquidity`, if the `msg.sender` did not have enough tokens in their `balances`.
   - The `ChangePosition` event is emitted.
   - The `Allocate` event is emitted.
 
@@ -130,7 +130,7 @@ Thanks to horsefacts.eth for their stellar walkthrough of building an invariant 
   - The `pools` `liquidity` for `poolId` never increases.
   - The `msg.sender`'s `positions` `freeLiquidity` for `poolId` always decreases by `deltaLiquidity`.
   - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same `msg.sender` allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
-  - The `msg.sender`'s `balances` value for the pool's tokens increases by respective amounts computed with `getPoolAmounts`.
+  - The `msg.sender`'s `balances` value for the pool's tokens increases by respective amounts computed with `getPoolAmountsPerLiquidity`.
   - Portfolio's `reserves` value for the pool's tokens stays the same.
   - The `balanceOf` Portfolio for the pool's tokens stays the same.
   - The `DecreasePosition` event is emitted.

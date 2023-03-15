@@ -32,4 +32,37 @@ contract TestPortfolioSwap is Setup {
 
         assertTrue(post > prev, "balance-did-not-increase");
     }
+
+    function test_swap_after_time_passed()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+        isArmed
+    {
+        bool sellAsset = true;
+        uint128 amtIn = 0.1 ether;
+        uint128 amtOut =
+            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn));
+
+        uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
+
+        vm.warp(
+            block.timestamp
+                + (uint256(ghost().pool().params.duration) / 2 * 60 * 60 * 24)
+        );
+        subject().multiprocess(
+            FVMLib.encodeSwap(
+                uint8(0),
+                ghost().poolId,
+                amtIn,
+                amtOut,
+                uint8(sellAsset ? 1 : 0)
+            )
+        );
+        uint256 post = ghost().balance(address(this), ghost().quote().to_addr());
+
+        assertTrue(post > prev, "balance-did-not-increase");
+    }
 }

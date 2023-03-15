@@ -59,6 +59,8 @@ contract HandlerPortfolio is HandlerBase {
         ctx.ghost().asset().to_token().approve(address(ctx.subject()), amount);
         deal(address(ctx.ghost().asset().to_token()), ctx.actor(), amount);
 
+        uint256 prePhys =
+            ctx.ghost().asset().to_token().balanceOf(address(ctx.subject()));
         uint256 preRes =
             ctx.ghost().reserve(address(ctx.ghost().asset().to_token()));
         uint256 preBal = ctx.ghost().balance(
@@ -66,20 +68,33 @@ contract HandlerPortfolio is HandlerBase {
         );
 
         ctx.subject().fund(address(ctx.ghost().asset().to_token()), amount);
+        uint256 postPhys =
+            ctx.ghost().asset().to_token().balanceOf(address(ctx.subject()));
         uint256 postRes =
             ctx.ghost().reserve(address(ctx.ghost().asset().to_token()));
         uint256 postBal = ctx.ghost().balance(
             ctx.actor(), address(ctx.ghost().asset().to_token())
         );
 
+        // This assertion is a little more complicated because we want to handle the VALID scenario
+        // of balances changing with fee on transfer tokens.
+        // If we fund an `amount` of a fee on transfer token, Portfolio will only credit
+        // the user the amount transferred in, NOT the `amount`.
+        // However, this test file is not aware of that! So we do some math to compute
+        // the tokens sent in, and compare that to the updated user balance.
+
+        uint256 amountTransferredIn = postPhys - prePhys;
+        uint256 amountCredited = postBal - preBal;
+        uint256 amountCreditedReserve = postRes - preRes;
+
         assertEq(
-            postBal,
-            preBal + amount + uint256(netAssetBalance),
-            "fund-delta-asset-balance"
+            amountTransferredIn,
+            amountCredited,
+            "fund-delta-asset-physical-balance"
         );
         assertEq(
-            postRes,
-            preRes + amount + uint256(netQuoteBalance),
+            amountCreditedReserve,
+            amountTransferredIn,
             "fund-delta-asset-reserve"
         );
     }
@@ -93,6 +108,8 @@ contract HandlerPortfolio is HandlerBase {
         ctx.ghost().quote().to_token().approve(address(ctx.subject()), amount);
         deal(address(ctx.ghost().quote().to_token()), ctx.actor(), amount);
 
+        uint256 prePhys =
+            ctx.ghost().quote().to_token().balanceOf(address(ctx.subject()));
         uint256 preRes =
             ctx.ghost().reserve(address(ctx.ghost().quote().to_token()));
         uint256 preBal = ctx.ghost().balance(
@@ -100,14 +117,35 @@ contract HandlerPortfolio is HandlerBase {
         );
 
         ctx.subject().fund(address(ctx.ghost().quote().to_token()), amount);
+        uint256 postPhys =
+            ctx.ghost().quote().to_token().balanceOf(address(ctx.subject()));
         uint256 postRes =
             ctx.ghost().reserve(address(ctx.ghost().quote().to_token()));
         uint256 postBal = ctx.ghost().balance(
             ctx.actor(), address(ctx.ghost().quote().to_token())
         );
 
-        assertEq(postBal, preBal + amount, "fund-delta-quote-balance");
-        assertEq(postRes, preRes + amount, "fund-delta-quote-reserve");
+        // This assertion is a little more complicated because we want to handle the VALID scenario
+        // of balances changing with fee on transfer tokens.
+        // If we fund an `amount` of a fee on transfer token, Portfolio will only credit
+        // the user the amount transferred in, NOT the `amount`.
+        // However, this test file is not aware of that! So we do some math to compute
+        // the tokens sent in, and compare that to the updated user balance.
+
+        uint256 amountTransferredIn = postPhys - prePhys;
+        uint256 amountCredited = postBal - preBal;
+        uint256 amountCreditedReserve = postRes - preRes;
+
+        assertEq(
+            amountTransferredIn,
+            amountCredited,
+            "fund-delta-quote-physical-balance"
+        );
+        assertEq(
+            amountCreditedReserve,
+            amountTransferredIn,
+            "fund-delta-quote-reserve"
+        );
     }
 
     function create_pool(
@@ -368,7 +406,10 @@ contract HandlerPortfolio is HandlerBase {
         );
         ctx.subject().multiprocess(
             FVM.encodeAllocateOrDeallocate(
-                true, uint8(0), ctx.ghost().poolId, deltaLiquidity.safeCastTo128()
+                true,
+                uint8(0),
+                ctx.ghost().poolId,
+                deltaLiquidity.safeCastTo128()
             )
         );
         post = fetchAccountingState();
@@ -469,7 +510,10 @@ contract HandlerPortfolio is HandlerBase {
 
             ctx.subject().multiprocess(
                 FVM.encodeAllocateOrDeallocate(
-                    false, uint8(0), ctx.ghost().poolId, deltaLiquidity.safeCastTo128()
+                    false,
+                    uint8(0),
+                    ctx.ghost().poolId,
+                    deltaLiquidity.safeCastTo128()
                 )
             );
 
@@ -518,7 +562,7 @@ contract HandlerPortfolio is HandlerBase {
         // PortfolioPool memory pool = ctx.ghost().pool();
         // TODO: Breaks when we call this function on a pool with zero liquidity...
         (uint256 dAsset, uint256 dQuote) =
-            ctx.subject().getVirtualReservesPerLiquidity(ctx.ghost().poolId);
+            ctx.subject().getPoolReserves(ctx.ghost().poolId);
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 

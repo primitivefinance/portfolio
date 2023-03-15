@@ -1,0 +1,26 @@
+on: [push]
+
+name: Default Build & Tests (profile=default)
+
+jobs:
+  check:
+    name: Build & Test (profile=default)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run build
+        run: FOUNDRY_PROFILE=default forge build --skip test
+      
+      - name: Run tests RMM01Portfolio
+        run: FOUNDRY_PROFILE=default forge test --gas-report --match-contract TestRMM01Portfolio -vvv
+
+      - name: Run tests RMM02Portfolio
+        run: FOUNDRY_PROFILE=default forge test --match-contract TestRMM02Portfolio

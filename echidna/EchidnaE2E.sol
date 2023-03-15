@@ -51,10 +51,11 @@ contract EchidnaE2E is GlobalInvariants {
             PortfolioPool memory pool = getPool(address(_portfolio), poolId);
             PortfolioPair memory pair = pool.pair;
 
-            // The `getReserves` method always returns values less than Portfolio’s respective `getReserve` function for each token of the pool’s pair.
+            // The `getPoolReserves` method always returns values less than Portfolio’s respective `getReserve` function for each token of the pool’s pair.
 
-            // `getReserves method`
-            (uint128 deltaAsset, uint128 deltaQuote) = _portfolio.getReserves(poolId);
+            // `getPoolReserves method`
+            (uint128 deltaAsset, uint128 deltaQuote) =
+                _portfolio.getPoolReserves(poolId);
 
             // Portfolio's `getReserve` function for each of the pool's pair
             uint256 assetReserves = _portfolio.getReserve(pair.tokenAsset);
@@ -63,12 +64,16 @@ contract EchidnaE2E is GlobalInvariants {
             if (deltaAsset > assetReserves) {
                 emit LogUint256("deltaAsset", deltaAsset);
                 emit LogUint256("assetReserves", assetReserves);
-                emit AssertionFailed("BUG (`asset`): virtualReserves returned more than getReserve function");
+                emit AssertionFailed(
+                    "BUG (`asset`): virtualReserves returned more than getReserve function"
+                    );
             }
             if (deltaQuote > quoteReserves) {
                 emit LogUint256("deltaQuote", deltaQuote);
                 emit LogUint256("quoteReserves", quoteReserves);
-                emit AssertionFailed("BUG (`asset`): virtualReserves returned more than getReserve function");
+                emit AssertionFailed(
+                    "BUG (`asset`): virtualReserves returned more than getReserve function"
+                    );
             }
         }
     }
@@ -90,7 +95,8 @@ contract EchidnaE2E is GlobalInvariants {
         uint16 jit,
         uint128 price
     ) public {
-        (PortfolioPool memory preChangeState, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId,,) =
+            retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(preChangeState.isMutable());
@@ -99,7 +105,8 @@ contract EchidnaE2E is GlobalInvariants {
             // scaling remaining pool creation values
             fee = uint16(between(fee, MIN_FEE, MAX_FEE));
             priorityFee = uint16(between(priorityFee, 1, fee));
-            volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
+            volatility =
+                uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
             duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
             // maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
             jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
@@ -108,10 +115,13 @@ contract EchidnaE2E is GlobalInvariants {
 
         _portfolio.changeParameters(poolId, priorityFee, fee, jit);
         {
-            (PortfolioPool memory postChangeState,,,) = retrieve_random_pool_and_tokens(id);
+            (PortfolioPool memory postChangeState,,,) =
+                retrieve_random_pool_and_tokens(id);
             PortfolioCurve memory preChangeCurve = preChangeState.params;
             PortfolioCurve memory postChangeCurve = postChangeState.params;
-            assert(postChangeState.lastTimestamp == preChangeState.lastTimestamp);
+            assert(
+                postChangeState.lastTimestamp == preChangeState.lastTimestamp
+            );
             assert(postChangeState.controller == address(this));
             assert(postChangeCurve.createdAt == preChangeCurve.createdAt);
             assert(postChangeCurve.priorityFee == priorityFee);
@@ -136,7 +146,8 @@ contract EchidnaE2E is GlobalInvariants {
     ) public {
         maxPrice;
 
-        (PortfolioPool memory preChangeState, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory preChangeState, uint64 poolId,,) =
+            retrieve_random_pool_and_tokens(id);
         emit LogUint256("created pools", poolIds.length);
         emit LogUint256("pool ID", uint256(poolId));
         require(!preChangeState.isMutable());
@@ -145,7 +156,8 @@ contract EchidnaE2E is GlobalInvariants {
             // scaling remaining pool creation values
             fee = uint16(between(fee, MIN_FEE, MAX_FEE));
             priorityFee = uint16(between(priorityFee, 1, fee));
-            volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
+            volatility =
+                uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
             duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
             // maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
             jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
@@ -153,8 +165,10 @@ contract EchidnaE2E is GlobalInvariants {
         }
 
         try _portfolio.changeParameters(poolId, priorityFee, fee, jit) {
-            emit AssertionFailed("BUG: Changing pool parameters of a nonmutable pool should not be possible");
-        } catch {}
+            emit AssertionFailed(
+                "BUG: Changing pool parameters of a nonmutable pool should not be possible"
+                );
+        } catch { }
     }
 
     using SafeCastLib for uint256;
@@ -168,10 +182,13 @@ contract EchidnaE2E is GlobalInvariants {
         (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
         emit LogUint256("pool id:", uint256(poolId));
 
-        PortfolioPosition memory preClaimPosition = getPosition(address(_portfolio), address(this), poolId);
+        PortfolioPosition memory preClaimPosition =
+            getPosition(address(_portfolio), address(this), poolId);
         require(preClaimPosition.lastTimestamp != 0);
 
-        try _portfolio.multiprocess(FVMLib.encodeClaim(poolId, deltaAsset, deltaQuote)) {
+        try _portfolio.multiprocess(
+            FVMLib.encodeClaim(poolId, deltaAsset, deltaQuote)
+        ) {
             // if tokens were owned, decrement from position
             // if tokens were owed, getBalance of tokens increased for the caller
         } catch {
@@ -188,33 +205,60 @@ contract EchidnaE2E is GlobalInvariants {
     // A user should not be able to allocate more than they own
 
     // ******************** Deallocate ********************
-    function deallocate_with_correct_preconditions_should_work(uint256 id, uint256 amount) public {
+    function deallocate_with_correct_preconditions_should_work(
+        uint256 id,
+        uint256 amount
+    ) public {
         address[] memory owners = new address[](1);
-        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
-            retrieve_random_pool_and_tokens(id);
+        (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
 
         // Save pre unallocation state
-        PortfolioState memory preState = getState(address(_portfolio), poolId, address(this), owners);
+        PortfolioState memory preState =
+            getState(address(_portfolio), poolId, address(this), owners);
         uint256 preDeallocateAssetBalance = _asset.balanceOf(address(this));
         uint256 preDeallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
-        require(pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY);
+        require(
+            pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY
+        );
 
-        (uint256 deltaAsset, uint256 deltaQuote) = _portfolio.getReserves(poolId);
+        (uint256 deltaAsset, uint256 deltaQuote) =
+            _portfolio.getPoolReserves(poolId);
 
-        _portfolio.multiprocess(FVMLib.encodeAllocateOrDeallocate(false, uint8(0), poolId, 0x0, amount));
+        _portfolio.multiprocess(
+            FVMLib.encodeAllocateOrDeallocate(
+                false, uint8(0), poolId, 0x0, amount
+            )
+        );
 
         // Save post unallocation state
-        PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
+        PortfolioState memory postState =
+            getState(address(_portfolio), poolId, address(this), owners);
         {
             uint256 postDeallocateAssetBalance = _asset.balanceOf(address(this));
             uint256 postDeallocateQuoteBalance = _quote.balanceOf(address(this));
-            assert(preDeallocateAssetBalance + deltaAsset == postDeallocateAssetBalance);
-            assert(preDeallocateQuoteBalance + deltaQuote == postDeallocateQuoteBalance);
+            assert(
+                preDeallocateAssetBalance + deltaAsset
+                    == postDeallocateAssetBalance
+            );
+            assert(
+                preDeallocateQuoteBalance + deltaQuote
+                    == postDeallocateQuoteBalance
+            );
         }
 
-        assert(preState.totalPoolLiquidity - amount == postState.totalPoolLiquidity);
-        assert(preState.callerPositionLiquidity - amount == postState.callerPositionLiquidity);
+        assert(
+            preState.totalPoolLiquidity - amount == postState.totalPoolLiquidity
+        );
+        assert(
+            preState.callerPositionLiquidity - amount
+                == postState.callerPositionLiquidity
+        );
         assert(preState.reserveAsset == postState.reserveAsset);
         assert(preState.reserveQuote == postState.reserveQuote);
         assert(preState.physicalBalanceAsset == postState.physicalBalanceAsset);
@@ -222,11 +266,20 @@ contract EchidnaE2E is GlobalInvariants {
     }
 
     // Swaps
-    function swap_should_succeed(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_should_succeed(
+        uint256 id,
+        bool sellAsset,
+        uint256 amount,
+        uint256 limit
+    ) public {
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
-            retrieve_random_pool_and_tokens(id);
+        (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         amount = between(amount, 1, type(uint256).max);
         limit = between(limit, 1, type(uint256).max);
@@ -242,22 +295,45 @@ contract EchidnaE2E is GlobalInvariants {
         if (curve.maturity() <= block.timestamp) {
             emit LogUint256("Maturity timestamp", curve.maturity());
             emit LogUint256("block.timestamp", block.timestamp);
-            swap_should_fail(curve, poolId, true, amount, amount, "BUG: Swap on an expired pool should have failed.");
+            swap_should_fail(
+                curve,
+                poolId,
+                true,
+                amount,
+                amount,
+                "BUG: Swap on an expired pool should have failed."
+            );
         } else {
             try _portfolio.multiprocess(
-                FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+                FVMLib.encodeSwap(
+                    uint8(0),
+                    poolId,
+                    0x0,
+                    amount,
+                    0x0,
+                    limit,
+                    uint8(sellAsset ? 1 : 0)
+                )
             ) {
                 // PortfolioState memory postState = getState(address(_portfolio), poolId, address(this), owners);
-            } catch {}
+            } catch { }
         }
     }
 
     function swap_on_zero_amount_should_fail(uint256 id) public {
         // Will always return a pool that exists
-        (PortfolioPool memory pool, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
+        (PortfolioPool memory pool, uint64 poolId,,) =
+            retrieve_random_pool_and_tokens(id);
         uint256 amount = 0;
 
-        swap_should_fail(pool.params, poolId, true, amount, id, "BUG: Swap with zero amount should fail.");
+        swap_should_fail(
+            pool.params,
+            poolId,
+            true,
+            amount,
+            id,
+            "BUG: Swap with zero amount should fail."
+        );
     }
 
     function swap_should_fail(
@@ -272,19 +348,36 @@ contract EchidnaE2E is GlobalInvariants {
         limit;
 
         try _portfolio.multiprocess(
-            FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, amount, uint8(sellAsset ? 1 : 0))
+            FVMLib.encodeSwap(
+                uint8(0),
+                poolId,
+                0x0,
+                amount,
+                0x0,
+                amount,
+                uint8(sellAsset ? 1 : 0)
+            )
         ) {
             emit AssertionFailed(message);
-        } catch {}
+        } catch { }
     }
 
-    function swap_assets_in_always_decreases_price(uint256 id, bool sellAsset, uint128 amount, uint128 limit) public {
+    function swap_assets_in_always_decreases_price(
+        uint256 id,
+        bool sellAsset,
+        uint128 amount,
+        uint128 limit
+    ) public {
         require(sellAsset);
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
-            retrieve_random_pool_and_tokens(id);
+        (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
@@ -297,18 +390,32 @@ contract EchidnaE2E is GlobalInvariants {
         emit LogUint256("amount: ", amount);
         emit LogUint256("limit:", limit);
 
-        uint256 prevReserveSell = getReserve(address(_portfolio), address(_asset));
-        uint256 prevReserveBuy = getReserve(address(_portfolio), address(_quote));
+        uint256 prevReserveSell =
+            getReserve(address(_portfolio), address(_asset));
+        uint256 prevReserveBuy =
+            getReserve(address(_portfolio), address(_quote));
 
-        uint256 prePoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
+        uint256 prePoolLastPrice = _portfolio.getVirtualPrice(poolId);
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
-        _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0)));
+        _portfolio.multiprocess(
+            FVMLib.encodeSwap(
+                uint8(0),
+                poolId,
+                0x0,
+                amount,
+                0x0,
+                limit,
+                uint8(sellAsset ? 1 : 0)
+            )
+        );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
 
-        uint256 postReserveSell = getReserve(address(_portfolio), address(_asset));
-        uint256 postReserveBuy = getReserve(address(_portfolio), address(_quote));
+        uint256 postReserveSell =
+            getReserve(address(_portfolio), address(_asset));
+        uint256 postReserveBuy =
+            getReserve(address(_portfolio), address(_quote));
 
-        uint256 postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
+        uint256 postPoolLastPrice = _portfolio.getVirtualPrice(poolId);
 
         if (postPoolLastPrice == 0) {
             emit LogUint256("lastPrice", postPoolLastPrice);
@@ -317,7 +424,9 @@ contract EchidnaE2E is GlobalInvariants {
         if (postPoolLastPrice > prePoolLastPrice) {
             emit LogUint256("price before swap", prePoolLastPrice);
             emit LogUint256("price after swap", postPoolLastPrice);
-            emit AssertionFailed("BUG: pool.lastPrice increased after swapping assets in, it should have decreased.");
+            emit AssertionFailed(
+                "BUG: pool.lastPrice increased after swapping assets in, it should have decreased."
+                );
         }
 
         // feeGrowthSell = asset
@@ -346,13 +455,22 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 postReserveBuy;
     }
 
-    function swap_quote_in_always_increases_price(uint256 id, bool sellAsset, uint128 amount, uint128 limit) public {
+    function swap_quote_in_always_increases_price(
+        uint256 id,
+        bool sellAsset,
+        uint128 amount,
+        uint128 limit
+    ) public {
         require(!sellAsset);
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
-            retrieve_random_pool_and_tokens(id);
+        (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
@@ -368,7 +486,7 @@ contract EchidnaE2E is GlobalInvariants {
         _T_ memory t = _T_({
             prevReserveSell: getReserve(address(_portfolio), address(_quote)),
             prevReserveBuy: getReserve(address(_portfolio), address(_asset)),
-            prePoolLastPrice: _portfolio.getLatestEstimatedPrice(poolId),
+            prePoolLastPrice: _portfolio.getVirtualPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
@@ -377,15 +495,25 @@ contract EchidnaE2E is GlobalInvariants {
         {
             PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
             _portfolio.multiprocess(
-                FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0))
+                FVMLib.encodeSwap(
+                    uint8(0),
+                    poolId,
+                    0x0,
+                    amount,
+                    0x0,
+                    limit,
+                    uint8(sellAsset ? 1 : 0)
+                )
             );
             PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
-            t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
+            t.postPoolLastPrice = _portfolio.getVirtualPrice(poolId);
 
             if (t.postPoolLastPrice < t.prePoolLastPrice) {
                 emit LogUint256("price before swap", t.prePoolLastPrice);
                 emit LogUint256("price after swap", t.postPoolLastPrice);
-                emit AssertionFailed("BUG: pool.lastPrice decreased after swapping quote in, it should have increased.");
+                emit AssertionFailed(
+                    "BUG: pool.lastPrice decreased after swapping quote in, it should have increased."
+                    );
             }
 
             t.postReserveSell = getReserve(address(_portfolio), address(_quote));
@@ -409,13 +537,22 @@ contract EchidnaE2E is GlobalInvariants {
         }
     }
 
-    function swap_asset_in_increases_reserve(uint256 id, bool sellAsset, uint256 amount, uint256 limit) public {
+    function swap_asset_in_increases_reserve(
+        uint256 id,
+        bool sellAsset,
+        uint256 amount,
+        uint256 limit
+    ) public {
         require(sellAsset);
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
-            retrieve_random_pool_and_tokens(id);
+        (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
@@ -431,16 +568,26 @@ contract EchidnaE2E is GlobalInvariants {
         _T_ memory t = _T_({
             prevReserveSell: getReserve(address(_portfolio), address(_quote)),
             prevReserveBuy: getReserve(address(_portfolio), address(_asset)),
-            prePoolLastPrice: _portfolio.getLatestEstimatedPrice(poolId),
+            prePoolLastPrice: _portfolio.getVirtualPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
-        _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0)));
+        _portfolio.multiprocess(
+            FVMLib.encodeSwap(
+                uint8(0),
+                poolId,
+                0x0,
+                amount,
+                0x0,
+                limit,
+                uint8(sellAsset ? 1 : 0)
+            )
+        );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
-        t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
+        t.postPoolLastPrice = _portfolio.getVirtualPrice(poolId);
 
         t.postReserveSell = getReserve(address(_portfolio), address(_asset));
         t.postReserveBuy = getReserve(address(_portfolio), address(_quote));
@@ -448,7 +595,9 @@ contract EchidnaE2E is GlobalInvariants {
         if (t.postReserveSell < t.prevReserveSell) {
             emit LogUint256("asset reserve before swap", t.prevReserveSell);
             emit LogUint256("asset reserve after swap", t.postReserveSell);
-            emit AssertionFailed("BUG: reserve decreased after swapping asset in, it should have increased.");
+            emit AssertionFailed(
+                "BUG: reserve decreased after swapping asset in, it should have increased."
+                );
         }
 
         // feeGrowthSell = asset
@@ -468,13 +617,22 @@ contract EchidnaE2E is GlobalInvariants {
         );
     }
 
-    function swap_quote_in_increases_reserve(uint256 id, bool sellAsset, uint128 amount, uint128 limit) public {
+    function swap_quote_in_increases_reserve(
+        uint256 id,
+        bool sellAsset,
+        uint128 amount,
+        uint128 limit
+    ) public {
         require(!sellAsset);
 
         // address[] memory owners = new address[](1);
         // Will always return a pool that exists
-        (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 _asset, EchidnaERC20 _quote) =
-            retrieve_random_pool_and_tokens(id);
+        (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 _asset,
+            EchidnaERC20 _quote
+        ) = retrieve_random_pool_and_tokens(id);
         PortfolioCurve memory curve = pool.params;
         require(curve.maturity() > block.timestamp);
 
@@ -490,16 +648,26 @@ contract EchidnaE2E is GlobalInvariants {
         _T_ memory t = _T_({
             prevReserveSell: getReserve(address(_portfolio), address(_quote)),
             prevReserveBuy: getReserve(address(_portfolio), address(_asset)),
-            prePoolLastPrice: _portfolio.getLatestEstimatedPrice(poolId),
+            prePoolLastPrice: _portfolio.getVirtualPrice(poolId),
             postPoolLastPrice: 0,
             postReserveSell: 0,
             postReserveBuy: 0
         });
 
         PortfolioPool memory prePool = getPool(address(_portfolio), poolId);
-        _portfolio.multiprocess(FVMLib.encodeSwap(uint8(0), poolId, 0x0, amount, 0x0, limit, uint8(sellAsset ? 1 : 0)));
+        _portfolio.multiprocess(
+            FVMLib.encodeSwap(
+                uint8(0),
+                poolId,
+                0x0,
+                amount,
+                0x0,
+                limit,
+                uint8(sellAsset ? 1 : 0)
+            )
+        );
         PortfolioPool memory postPool = getPool(address(_portfolio), poolId);
-        t.postPoolLastPrice = _portfolio.getLatestEstimatedPrice(poolId);
+        t.postPoolLastPrice = _portfolio.getVirtualPrice(poolId);
 
         t.postReserveSell = getReserve(address(_portfolio), address(_quote));
         t.postReserveBuy = getReserve(address(_portfolio), address(_asset));
@@ -507,7 +675,9 @@ contract EchidnaE2E is GlobalInvariants {
         if (t.prevReserveSell < t.prevReserveSell) {
             emit LogUint256("quote reserve before swap", t.prevReserveSell);
             emit LogUint256("quote reserve after swap", t.prevReserveSell);
-            emit AssertionFailed("BUG: reserve decreased after swapping quote in, it should have increased.");
+            emit AssertionFailed(
+                "BUG: reserve decreased after swapping quote in, it should have increased."
+                );
         }
 
         // feeGrowthSell = quote

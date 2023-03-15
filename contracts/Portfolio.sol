@@ -186,7 +186,8 @@ abstract contract PortfolioVirtual is Objective {
         PortfolioPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
-        PortfolioCurve memory modified = pool.params;
+        PortfolioCurve memory modified;
+        modified = pool.params;
         if (jit != 0) modified.jit = jit;
         if (fee != 0) modified.fee = fee;
         if (priorityFee != 0) modified.priorityFee = priorityFee;
@@ -208,7 +209,7 @@ abstract contract PortfolioVirtual is Objective {
             revert NonExistentPosition(msg.sender, poolId);
         }
 
-        PortfolioPool memory pool = pools[poolId];
+        PortfolioPool storage pool = pools[poolId];
         (
             uint256 growthAsset,
             uint256 growthQuote,
@@ -520,7 +521,7 @@ abstract contract PortfolioVirtual is Objective {
 
         {
             uint64 id = args.poolId;
-            uint256 price = getLatestEstimatedPrice(id);
+            uint256 price = getVirtualPrice(id);
             emit Swap(
                 id,
                 price,
@@ -550,24 +551,13 @@ abstract contract PortfolioVirtual is Objective {
         uint256 feeGrowthGlobalAsset,
         uint256 feeGrowthGlobalQuote,
         uint256 invariantGrowthGlobal
-    ) internal returns (uint256 timeDelta) {
+    ) internal {
         PortfolioPool storage pool = pools[poolId];
 
-        timeDelta = _getTimePassed(pool);
-
-        if (pool.virtualX != nextVirtualX) {
-            pool.virtualX = nextVirtualX.safeCastTo128();
-        }
-        if (pool.virtualY != nextVirtualY) {
-            pool.virtualY = nextVirtualY.safeCastTo128();
-        }
-        if (pool.liquidity != liquidity) {
-            pool.liquidity = liquidity.safeCastTo128();
-        }
-        if (pool.lastTimestamp != block.timestamp) {
-            pool.syncPoolTimestamp(block.timestamp);
-        }
-
+        pool.virtualX = nextVirtualX.safeCastTo128();
+        pool.virtualY = nextVirtualY.safeCastTo128();
+        pool.liquidity = liquidity.safeCastTo128();
+        pool.syncPoolTimestamp(block.timestamp);
         pool.feeGrowthGlobalAsset = AssemblyLib.computeCheckpoint(
             pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset
         );
@@ -739,7 +729,9 @@ abstract contract PortfolioVirtual is Objective {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
                 FVM.decodeAllocateOrDeallocate(data);
             _deallocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE) {
+        } else if (
+            instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
+        ) {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
             = FVM.decodeSwap(data);
@@ -819,10 +811,18 @@ abstract contract PortfolioVirtual is Objective {
 
                 // Outstanding amount must be transferred in.
                 if (remainder > 0) {
-                    _payments.push(Payment({token: token, amount: remainder}));
+                    _payments.push(
+                        Payment({
+                            token: token,
+                            amount: remainder,
+                            balance: Account.__balanceOf__(token, address(this))
+                        })
+                    );
                 }
             }
 
+            // Token considered fully accounted for.
+            __account__.warm.pop();
             unchecked {
                 --i; // Cannot underflow because loop exits at 0!
             }
@@ -841,34 +841,27 @@ abstract contract PortfolioVirtual is Objective {
             }
         }
 
-        // Sanity check the settlement invariant, which should be positive.
-        i = tokens.length;
-        do {
-            address token = tokens[i - 1];
-            int256 net = __account__.getNetBalance(token, address(this));
-            if (net < 0) revert NegativeBalance(token, net);
-            // Token considered fully accounted for.
-            __account__.warm.pop();
-            unchecked {
-                --i; // Cannot underflow because loop exits at 0!
+        // Sanity check the payment amounts.
+        px = payments.length;
+        while (px != 0) {
+            uint256 index = px - 1;
+            address token = payments[index].token;
+            uint256 prevBalance = payments[index].balance;
+            uint256 nextBalance = Account.__balanceOf__(token, address(this));
+            uint256 expectedBalance = payments[index].amount + prevBalance;
+            if (nextBalance < expectedBalance) {
+                revert NegativeBalance(
+                    token, int256(nextBalance) - int256(expectedBalance)
+                );
             }
-        } while (i != 0);
+
+            unchecked {
+                --px; // Cannot underflow because loop exits at 0!
+            }
+        }
 
         __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;
-    }
-
-    // ===== Internal View ===== //
-
-    function _getTimePassed(PortfolioPool memory pool)
-        internal
-        view
-        returns (uint256)
-    {
-        unchecked {
-            // `pool.lastTimestamp` is only ever synced to `block.timestamp` and so may never exceed it.
-            return block.timestamp - pool.lastTimestamp;
-        }
     }
 
     // ===== Public View ===== //
@@ -891,13 +884,13 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /// @inheritdoc IPortfolioGetters
-    function getReserves(uint64 poolId)
+    function getPoolReserves(uint64 poolId)
         public
         view
         override
         returns (uint256 deltaAsset, uint256 deltaQuote)
     {
-        return pools[poolId].getPoolAmounts();
+        return pools[poolId].getPoolReserves();
     }
 
     /// @inheritdoc IPortfolioGetters
@@ -907,6 +900,6 @@ abstract contract PortfolioVirtual is Objective {
         override
         returns (uint128 deltaAsset, uint128 deltaQuote)
     {
-        return pools[poolId].getPoolVirtualReserves();
+        return pools[poolId].getVirtualReservesPerLiquidity();
     }
 }

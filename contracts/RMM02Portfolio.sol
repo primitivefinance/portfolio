@@ -114,7 +114,7 @@ contract RMM02Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function getLatestEstimatedPrice(uint64 poolId)
+    function getVirtualPrice(uint64 poolId)
         public
         view
         override

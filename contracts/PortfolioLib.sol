@@ -24,11 +24,11 @@ using {
     changePoolLiquidity,
     changePoolParameters,
     exists,
-    getPoolAmounts,
-    getAmountsWad,
+    getVirtualReservesPerLiquidity,
+    getVirtualPoolReservesPerLiquidityInWad,
     getPoolLiquidityDeltas,
     getPoolMaxLiquidity,
-    getPoolVirtualReserves,
+    getPoolReserves,
     isMutable,
     syncPoolTimestamp,
     lastTau,
@@ -164,8 +164,8 @@ struct Iteration {
 struct SwapState {
     bool sell;
     address sellAsset;
-    address tokenOutput;
     uint16 fee;
+    address tokenOutput;
     uint256 feeGrowthGlobal;
     uint256 invariantGrowthGlobal;
 }
@@ -173,6 +173,7 @@ struct SwapState {
 struct Payment {
     address token;
     uint256 amount;
+    uint256 balance;
 }
 
 // ===== Effects ===== //
@@ -255,7 +256,7 @@ function syncPositionFees(
 /**
  * @dev Quantity of tokens in units of their native decimals deallocated if all liquidity was removed.
  */
-function getPoolVirtualReserves(PortfolioPool memory self)
+function getPoolReserves(PortfolioPool memory self)
     pure
     returns (uint128 reserveAsset, uint128 reserveQuote)
 {
@@ -275,7 +276,8 @@ function getPoolMaxLiquidity(
     deltaAsset = deltaAsset.scaleToWad(self.pair.decimalsAsset).safeCastTo128();
     deltaQuote = deltaQuote.scaleToWad(self.pair.decimalsQuote).safeCastTo128();
 
-    (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
+    (uint256 amountAssetWad, uint256 amountQuoteWad) =
+        self.getVirtualPoolReservesPerLiquidityInWad();
     uint256 liquidity0 = deltaAsset.divWadDown(amountAssetWad); // L_0 = X / (X / L)
     uint256 liquidity1 = deltaQuote.divWadDown(amountQuoteWad); // L_1 = Y / (Y / L)
     deltaLiquidity = AssemblyLib.min(liquidity0, liquidity1).safeCastTo128();
@@ -290,7 +292,8 @@ function getPoolLiquidityDeltas(
 ) pure returns (uint128 deltaAsset, uint128 deltaQuote) {
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
 
-    (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
+    (uint256 amountAssetWad, uint256 amountQuoteWad) =
+        self.getVirtualPoolReservesPerLiquidityInWad();
     uint256 scaleDownFactorAsset = AssemblyLib.computeScalar(
         self.pair.decimalsAsset
     ) * FixedPointMathLib.WAD;
@@ -319,13 +322,16 @@ function getPoolLiquidityDeltas(
  * @return amountAssetDec Quantity of `asset` tokens in native decimal units per WAD unit of liquidity.
  * @return amountQuoteDec Quantity of `quote` tokens in native decimal units per WAD unit of liquidity.
  */
-function getPoolAmounts(PortfolioPool memory self)
+function getVirtualReservesPerLiquidity(PortfolioPool memory self)
     pure
-    returns (uint256 amountAssetDec, uint256 amountQuoteDec)
+    returns (uint128 amountAssetDec, uint128 amountQuoteDec)
 {
-    (uint256 amountAssetWad, uint256 amountQuoteWad) = self.getAmountsWad();
-    amountAssetDec = amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset);
-    amountQuoteDec = amountQuoteWad.scaleFromWadDown(self.pair.decimalsQuote);
+    (uint256 amountAssetWad, uint256 amountQuoteWad) =
+        self.getVirtualPoolReservesPerLiquidityInWad();
+    amountAssetDec =
+        amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset).safeCastTo128();
+    amountQuoteDec =
+        amountQuoteWad.scaleFromWadDown(self.pair.decimalsQuote).safeCastTo128();
 }
 
 /**
@@ -333,9 +339,9 @@ function getPoolAmounts(PortfolioPool memory self)
  * @return amountAssetWad Quantity of `asset` tokens in WAD units per WAD of liquidity.
  * @return amountQuoteWad Quantity of `quote` tokens in WAD units per WAD of liquidity.
  */
-function getAmountsWad(PortfolioPool memory self)
+function getVirtualPoolReservesPerLiquidityInWad(PortfolioPool memory self)
     pure
-    returns (uint256 amountAssetWad, uint256 amountQuoteWad)
+    returns (uint128 amountAssetWad, uint128 amountQuoteWad)
 {
     amountAssetWad = self.virtualX;
     amountQuoteWad = self.virtualY;

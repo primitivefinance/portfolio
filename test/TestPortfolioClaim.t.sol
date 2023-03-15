@@ -227,7 +227,9 @@ contract TestPortfolioClaim is Setup {
         // add a tiny amount of liquidity so we can test easier
         uint128 delLiquidity = 100_000 wei; // with the pool params, asset reserves will be about 300 wei.
         subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate(true, uint8(0), ghost().poolId, delLiquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, delLiquidity
+            )
         );
 
         // swap a small amount so we generate fees
@@ -244,7 +246,9 @@ contract TestPortfolioClaim is Setup {
 
         // withdraw all the liquidity after the swap, to sync fees.
         subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate(false, uint8(0), ghost().poolId, delLiquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                false, uint8(0), ghost().poolId, delLiquidity
+            )
         );
 
         // withdraw all internal balances

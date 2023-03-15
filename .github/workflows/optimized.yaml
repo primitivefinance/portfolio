@@ -1,0 +1,29 @@
+on: [push]
+
+name: Optimized Build & Tests (profile=optimized)
+
+jobs:
+  check:
+    name: Forge build (profile=optimized)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Run build
+        run: FOUNDRY_PROFILE=optimized forge build --sizes --skip test
+      
+      - name: Run tests RMM01Portfolio
+        run: FOUNDRY_PROFILE=optimized forge test --match-contract TestRMM01Portfolio
+
+      - name: Run tests RMM02Portfolio
+        run: FOUNDRY_PROFILE=optimized forge test --match-contract TestRMM02Portfolio
+
+      - name: Run invariant tests
+        run: FOUNDRY_PROFILE=optimized forge test --gas-report --match-contract TestRMM01PortfolioInvariants -vvv

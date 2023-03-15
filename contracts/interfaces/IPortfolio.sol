@@ -269,13 +269,13 @@ interface IPortfolioGetters {
      * @return deltaAsset Quantity of `asset` tokens in native decimal units.
      * @return deltaQuote Quantity of `quote` tokens in native decimal units.
      */
-    function getReserves(uint64 poolId)
+    function getPoolReserves(uint64 poolId)
         external
         view
         returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
-     * @dev Amount of tokens scaled to WAD units per WAD liquidity.
+     * @dev Amount of tokens in native token decimals per WAD liquidity.
      * @return deltaAsset Quantity of `asset` tokens in wad units.
      * @return deltaQuote Quantity of `quote` tokens in wad units.
      */
@@ -303,7 +303,7 @@ interface IPortfolioGetters {
      * @custom:mev Vulnerable to manipulation, do not rely on this function on-chain.
      * @return price Estimated price in wad units of `quote` tokens per `asset` token.
      */
-    function getLatestEstimatedPrice(uint64 poolId)
+    function getVirtualPrice(uint64 poolId)
         external
         view
         returns (uint256 price);
