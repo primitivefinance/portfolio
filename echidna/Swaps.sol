@@ -13,7 +13,9 @@ contract Swaps is EchidnaStateHandling {
         mint_and_approve(EchidnaERC20(pair.tokenAsset), amount);
         mint_and_approve(EchidnaERC20(pair.tokenQuote), amount);
         _portfolio.multiprocess(
-            FVMLib.encodeAllocate(uint8(0), poolId, 0x0, amount)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), poolId, 0x0, amount
+            )
         );
     }
 

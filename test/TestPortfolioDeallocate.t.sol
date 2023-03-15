@@ -14,13 +14,17 @@ contract TestPortfolioDeallocate is Setup {
     {
         uint128 liquidity = 1 ether;
         subject().multiprocess(
-            FVMLib.encodeAllocate(uint8(0), ghost().poolId, liquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, liquidity
+            )
         );
 
         // Deallocating liquidity can round down.
         uint256 prev = ghost().position(actor()).freeLiquidity;
         subject().multiprocess(
-            FVMLib.encodeDeallocate(uint8(1), ghost().poolId, liquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                false, uint8(1), ghost().poolId, liquidity
+            )
         );
         uint256 post = ghost().position(actor()).freeLiquidity;
 
@@ -39,7 +43,9 @@ contract TestPortfolioDeallocate is Setup {
     {
         vm.assume(liquidity > 0);
         subject().multiprocess(
-            FVMLib.encodeAllocate(uint8(0), ghost().poolId, liquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, liquidity
+            )
         );
         _simple_deallocate(liquidity);
     }
@@ -57,7 +63,9 @@ contract TestPortfolioDeallocate is Setup {
     {
         vm.assume(liquidity > 0);
         subject().multiprocess(
-            FVMLib.encodeAllocate(uint8(0), ghost().poolId, liquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, liquidity
+            )
         );
         _simple_deallocate(liquidity);
     }
@@ -75,7 +83,9 @@ contract TestPortfolioDeallocate is Setup {
     {
         vm.assume(liquidity > 0);
         subject().multiprocess(
-            FVMLib.encodeAllocate(uint8(0), ghost().poolId, liquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, liquidity
+            )
         );
         _simple_deallocate(liquidity);
     }
@@ -91,7 +101,9 @@ contract TestPortfolioDeallocate is Setup {
         vm.assume(liquidity > 0);
         vm.deal(actor(), 250 ether);
         subject().multiprocess{value: 250 ether}(
-            FVMLib.encodeAllocate(uint8(0), ghost().poolId, liquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, liquidity
+            )
         );
         _simple_deallocate(liquidity);
     }
@@ -102,7 +114,9 @@ contract TestPortfolioDeallocate is Setup {
     ) public noJit defaultConfig useActor usePairTokens(500 ether) isArmed {
         vm.assume(liquidity > 0);
         subject().multiprocess(
-            FVMLib.encodeAllocate(uint8(0), ghost().poolId, liquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, liquidity
+            )
         );
         vm.warp(block.timestamp + timestep);
         _simple_deallocate(liquidity);
@@ -111,7 +125,9 @@ contract TestPortfolioDeallocate is Setup {
     function _simple_deallocate(uint128 amount) internal {
         uint256 prev = ghost().position(actor()).freeLiquidity;
         subject().multiprocess(
-            FVMLib.encodeDeallocate(uint8(1), ghost().poolId, amount)
+            FVMLib.encodeAllocateOrDeallocate(
+                false, uint8(1), ghost().poolId, amount
+            )
         );
         uint256 post = ghost().position(actor()).freeLiquidity;
 

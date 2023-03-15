@@ -122,7 +122,9 @@ contract StatelessSwaps is Helper, Test {
 
             vm.prank(alice);
             portfolio.multiprocess(
-                FVMLib.encodeAllocate(uint8(0), poolId, 0x0, uint128(liquidity))
+                FVMLib.encodeAllocateOrDeallocate(
+                    true, uint8(0), poolId, 0x0, uint128(liquidity)
+                )
             );
         }
 

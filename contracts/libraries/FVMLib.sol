@@ -38,8 +38,8 @@ bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
 bytes1 constant DEALLOCATE = 0x03;
 bytes1 constant CLAIM = 0x04;
-bytes1 constant SWAP = 0x05;
-bytes1 constant UNSET06 = 0x06;
+bytes1 constant SWAP_QUOTE = 0x05;
+bytes1 constant SWAP_ASSET = 0x06;
 bytes1 constant UNSET07 = 0x07;
 bytes1 constant UNSET08 = 0x08;
 bytes1 constant UNSET09 = 0x09;
@@ -185,42 +185,74 @@ function encodeJumpInstruction(bytes[] memory instructions)
     return payload;
 }
 
-function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24) {
-    return uint24(poolId >> 40);
+/**
+ * @dev Decodes the `pair id` from a `pool id`.
+ * @param poolId Pool id to use for the decoding
+ * @return pairId Corresponding pair id
+ * @custom:example
+ * ```
+ * uint24 pairId = decodePairIdFromPoolId(46183783333895);
+ * ```
+ */
+function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24 pairId) {
+    assembly {
+        pairId := shr(40, poolId)
+    }
 }
 
 /**
- * @dev Returns the pool id given some pool parameters
+ * @dev Returns an encoded pool id given specific pool parameters.
  * @param pairId Id of the pair of asset / quote tokens
  * @param isMutable True if the pool is mutable
  * @param poolNonce Current pool nonce of the Portfolio contract
- * @return Corresponding encoded pool id
+ * @return poolId Corresponding encoded pool id
  * @custom:example
  * ```
- * uint64 poolId = encodePoolId(0, true, 1);
+ * uint64 poolId = encodePoolId(7, true, 42);
  * ```
  */
 function encodePoolId(
     uint24 pairId,
     bool isMutable,
     uint32 poolNonce
-) pure returns (uint64) {
-    return uint64(
-        bytes8(
-            abi.encodePacked(pairId, isMutable ? uint8(1) : uint8(0), poolNonce)
-        )
-    );
+) pure returns (uint64 poolId) {
+    assembly {
+        poolId := shl(0, or(or(shl(40, pairId), shl(32, isMutable)), poolNonce))
+    }
 }
 
+/**
+ * @dev Decodes the parameters of a pool given its id.
+ * The pool id is expected to be encoded using the following format:\
+ * `0x | pairId (24 bits) | isMutable (8 bits) | poolNonce (32 bits)`
+ * @param data Encoded pool id
+ * @return poolId Pool id converted from bytes to uint64
+ * @return pairId Pair id of the pool
+ * @return isMutable True if the pool is mutable
+ * @return poolNonce Pool nonce of the pool
+ * @custom:example
+ * ```
+ * (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
+ *     = decodePoolId(0x000007010000002a);
+ * ```
+ */
 function decodePoolId(bytes calldata data)
     pure
     returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
 {
+    // Using Solidity here doesn't impact the gas cost.
     if (data.length != 8) revert InvalidBytesLength(8, data.length);
-    poolId = uint64(bytes8(data));
-    pairId = uint16(bytes2(data[:3]));
-    isMutable = uint8(bytes1(data[3:4]));
-    poolNonce = uint32(bytes4(data[4:]));
+
+    assembly {
+        // For some reason not using calldataload all the time helps reducing
+        // the gas cost. I think it might be linked to going too deep into the
+        // stack.
+        let value := calldataload(data.offset)
+        poolId := shr(192, calldataload(data.offset))
+        pairId := shr(232, calldataload(data.offset))
+        isMutable := shr(248, calldataload(add(3, data.offset)))
+        poolNonce := shr(224, shl(32, value))
+    }
 }
 
 function encodeCreatePair(
@@ -230,13 +262,24 @@ function encodeCreatePair(
     data = abi.encodePacked(CREATE_PAIR, token0, token1);
 }
 
+/**
+ * @dev Decodes the paramters of a `CREATE_PAIR` operation.
+ * The data is expected to be encoded using the following format:\
+ * `0x | CREATE_PAIR (8 bits) | tokenAsset (20 bytes) | tokenQuote (20 bytes)`
+ * @param data Encoded `CREATE_PAIR` operation following the format above
+ * @return tokenAsset Address of the asset token
+ * @return tokenQuote Address of the quote token
+ */
 function decodeCreatePair(bytes calldata data)
     pure
     returns (address tokenAsset, address tokenQuote)
 {
     if (data.length != 41) revert InvalidBytesLength(41, data.length);
-    tokenAsset = address(bytes20(data[1:21]));
-    tokenQuote = address(bytes20(data[21:]));
+
+    assembly {
+        tokenAsset := shr(96, calldataload(add(1, data.offset)))
+        tokenQuote := shr(96, calldataload(add(21, data.offset)))
+    }
 }
 
 /**
@@ -255,9 +298,8 @@ function encodeClaim(
 
     return abi.encodePacked(
         CLAIM,
-        uint8(10), // pointer to pointer1
         poolId,
-        uint8(28), // pointer to fee1
+        uint8(27), // pointer to fee1
         powerFee0,
         baseFee0,
         powerFee1,
@@ -272,16 +314,33 @@ function decodeClaim(bytes calldata data)
     pure
     returns (uint64 poolId, uint128 fee0, uint128 fee1)
 {
-    uint8 pointer0 = uint8(bytes1(data[1]));
-    poolId = uint64(AssemblyLib.toBytes8(data[2:pointer0]));
-    uint8 pointer1 = uint8(bytes1(data[pointer0]));
-    fee0 = AssemblyLib.toAmount(data[pointer0 + 1:pointer1]);
-    fee1 = AssemblyLib.toAmount(data[pointer1:data.length]);
+    assembly {
+        let value := calldataload(data.offset)
+        poolId := shr(192, shl(8, value))
+        let pointer := byte(9, value)
+        let power := byte(10, value)
+        let length := sub(pointer, 11)
+        fee0 :=
+            mul(
+                shr(sub(256, mul(8, length)), calldataload(add(data.offset, 11))),
+                exp(10, power)
+            )
+
+        power := byte(pointer, value)
+        length := sub(data.length, add(1, pointer))
+        fee1 :=
+            mul(
+                shr(
+                    sub(256, mul(8, length)),
+                    calldataload(add(data.offset, add(1, pointer)))
+                ),
+                exp(10, power)
+            )
+    }
 }
 
 /**
  * @dev Encodes a create pool operation.
- * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
 function encodeCreatePool(
     uint24 pairId,
@@ -306,7 +365,7 @@ function encodeCreatePool(
         vol,
         dur,
         jit,
-        uint8(52),
+        uint8(36 + 16),
         power0,
         base0,
         power1,
@@ -328,68 +387,65 @@ function decodeCreatePool(bytes calldata data)
         uint128 price
     )
 {
-    // if (data.length != 66) revert InvalidBytesLength(66, data.length);
-    pairId = uint24(bytes3(data[1:4]));
-    controller = address(bytes20(data[4:24]));
-    priorityFee = uint16(bytes2(data[24:26]));
-    fee = uint16(bytes2(data[26:28]));
-    vol = uint16(bytes2(data[28:30]));
-    dur = uint16(bytes2(data[30:32]));
-    jit = uint16(bytes2(data[32:34]));
-    uint8 pointer0 = uint8(bytes1(data[34]));
-    maxPrice = AssemblyLib.toAmount(data[35:pointer0]);
-    price = AssemblyLib.toAmount(data[pointer0:]);
+    assembly {
+        pairId := shr(232, calldataload(add(1, data.offset)))
+        controller := shr(96, calldataload(add(4, data.offset)))
+        priorityFee := shr(240, calldataload(add(24, data.offset)))
+        fee := shr(240, calldataload(add(26, data.offset)))
+        vol := shr(240, calldataload(add(28, data.offset)))
+        dur := shr(240, calldataload(add(30, data.offset)))
+        jit := shr(240, calldataload(add(32, data.offset)))
+        let pointer := byte(0, calldataload(add(34, data.offset)))
+        let power0 := byte(0, calldataload(add(35, data.offset)))
+        let length0 := sub(pointer, 36)
+        let base0 :=
+            shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 36)))
+        maxPrice := mul(base0, exp(10, power0))
+        let power1 := byte(0, calldataload(add(pointer, data.offset)))
+        let length1 := sub(data.length, add(1, pointer))
+        let base1 :=
+            shr(
+                sub(256, mul(8, length1)),
+                calldataload(add(data.offset, add(1, pointer)))
+            )
+        price := mul(base1, exp(10, power1))
+    }
 }
 
 /**
- * @dev Encodes a allocate operation.
+ * @dev Encodes a allocate or deallocate operation.
  * FIXME: Same issue as `encodeClaim`... This function is not optimized!
  */
-function encodeAllocate(
+function encodeAllocateOrDeallocate(
+    bool shouldAllocate,
     uint8 useMax,
     uint64 poolId,
     uint128 deltaLiquidity
 ) pure returns (bytes memory data) {
     (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
     data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), ALLOCATE), poolId, power, base
+        AssemblyLib.pack(bytes1(useMax), shouldAllocate ? ALLOCATE : DEALLOCATE),
+        poolId,
+        power,
+        base
     );
 }
 
-function decodeAllocate(bytes calldata data)
+function decodeAllocateOrDeallocate(bytes calldata data)
     pure
     returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
 {
-    if (data.length < 9) revert InvalidBytesLength(9, data.length);
-    (bytes1 maxFlag,) = AssemblyLib.separate(data[0]);
-    useMax = uint8(maxFlag);
-    poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = AssemblyLib.toAmount(data[9:]);
-}
+    // Looks like using Solidity or Assembly is the same in terms of gas cost.
+    if (data.length < 11) revert InvalidBytesLength(11, data.length);
 
-/**
- * @dev Encodes a deallocate operation.
- * FIXME: Same issue as `encodeClaim`... This function is not optimized!
- */
-function encodeDeallocate(
-    uint8 useMax,
-    uint64 poolId,
-    uint128 deltaLiquidity
-) pure returns (bytes memory data) {
-    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
-    data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), DEALLOCATE), poolId, power, base
-    );
-}
-
-function decodeDeallocate(bytes calldata data)
-    pure
-    returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
-{
-    if (data.length < 9) revert InvalidBytesLength(9, data.length);
-    useMax = uint8(data[0] >> 4);
-    poolId = uint64(bytes8(data[1:9]));
-    deltaLiquidity = AssemblyLib.toAmount(data[9:]);
+    assembly {
+        let value := calldataload(data.offset)
+        useMax := shr(252, value)
+        poolId := shr(192, shl(8, value))
+        let power := shr(248, shl(72, value))
+        let base := shr(sub(256, mul(8, sub(data.length, 10))), shl(80, value))
+        deltaLiquidity := mul(base, exp(10, power))
+    }
 }
 
 /**
@@ -407,11 +463,11 @@ function encodeSwap(
     (uint8 power1, uint128 base1) = AssemblyLib.fromAmount(amount1);
 
     data = abi.encodePacked(
-        AssemblyLib.pack(bytes1(useMax), SWAP),
-        sellAsset,
-        uint8(11), // pointer to pointer1
+        AssemblyLib.pack(
+            bytes1(useMax), sellAsset == 1 ? SWAP_ASSET : SWAP_QUOTE
+        ),
         poolId,
-        uint8(29),
+        uint8(27),
         power0,
         base0,
         power1,
@@ -432,11 +488,24 @@ function decodeSwap(bytes calldata data)
         uint8 sellAsset
     )
 {
-    useMax = uint8(data[0] >> 4);
-    sellAsset = uint8(data[1]);
-    uint8 pointer0 = uint8(data[2]);
-    poolId = uint64(AssemblyLib.toBytes8(data[3:pointer0]));
-    uint8 pointer1 = uint8(data[pointer0]);
-    input = AssemblyLib.toAmount(data[pointer0 + 1:pointer1]);
-    output = AssemblyLib.toAmount(data[pointer1:data.length]);
+    assembly {
+        let value := calldataload(data.offset)
+        useMax := shr(4, byte(0, value))
+        sellAsset := eq(6, and(0x0F, byte(0, value)))
+        poolId := shr(192, calldataload(add(1, data.offset)))
+        let pointer := byte(0, calldataload(add(9, data.offset)))
+        let power0 := byte(0, calldataload(add(10, data.offset)))
+        let length0 := sub(pointer, 11)
+        let base0 :=
+            shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 11)))
+        input := mul(base0, exp(10, power0))
+        let power1 := byte(0, calldataload(add(pointer, data.offset)))
+        let length1 := sub(data.length, add(1, pointer))
+        let base1 :=
+            shr(
+                sub(256, mul(8, length1)),
+                calldataload(add(data.offset, add(1, pointer)))
+            )
+        output := mul(base1, exp(10, power1))
+    }
 }

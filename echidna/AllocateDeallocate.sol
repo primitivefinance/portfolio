@@ -67,7 +67,9 @@ contract AllocateDeallocate is EchidnaStateHandling {
         (uint256 allocateAsset, uint256 allocateQuote) =
             _portfolio.getLiquidityDeltas(deltaLiquidity);
         _portfolio.multiprocess(
-            FVMLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), poolId, 0x0, deltaLiquidity
+            )
         );
         emit LogUint256("allocate asset return", allocateAsset);
         emit LogUint256("allocate quote return", allocateQuote);
@@ -169,7 +171,9 @@ contract AllocateDeallocate is EchidnaStateHandling {
         mint_and_approve(_quote, deltaQuote);
 
         try _portfolio.multiprocess(
-            FVMLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), poolId, 0x0, deltaLiquidity
+            )
         ) {
             emit AssertionFailed(
                 "BUG: allocate with non existent pool should fail"
@@ -206,7 +210,9 @@ contract AllocateDeallocate is EchidnaStateHandling {
         mint_and_approve(_quote, deltaQuote);
 
         try _portfolio.multiprocess(
-            FVMLib.encodeAllocate(uint8(0), poolId, 0x0, deltaLiquidity)
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), poolId, 0x0, deltaLiquidity
+            )
         ) {
             emit AssertionFailed(
                 "BUG: allocate with deltaLiquidity=0 should fail"
@@ -245,7 +251,9 @@ contract AllocateDeallocate is EchidnaStateHandling {
             _portfolio.getPoolReserves(poolId);
 
         _portfolio.multiprocess(
-            FVMLib.encodeDeallocate(uint8(0), poolId, 0x0, amount)
+            FVMLib.decodeAllocateOrDeallocate_(
+                false, uint8(0), poolId, 0x0, amount
+            )
         );
 
         // Save post unallocation state
@@ -315,7 +323,9 @@ contract AllocateDeallocate is EchidnaStateHandling {
         string memory failureMsg
     ) private {
         try _portfolio.multiprocess(
-            FVMLib.encodeDeallocate(uint8(0), poolId, 0x0, amount)
+            FVMLib.decodeAllocateOrDeallocate_(
+                false, uint8(0), poolId, 0x0, amount
+            )
         ) {
             emit AssertionFailed(failureMsg);
         } catch { }
@@ -357,7 +367,9 @@ contract AllocateDeallocate is EchidnaStateHandling {
             poolId, _asset, _quote, deltaAsset, deltaQuote, amount
         );
         _portfolio.multiprocess(
-            FVMLib.encodeDeallocate(uint8(0), poolId, 0x0, amount)
+            FVMLib.decodeAllocateOrDeallocate(
+                false, uint8(0), poolId, 0x0, amount
+            )
         );
     }
 }

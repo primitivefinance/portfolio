@@ -405,8 +405,11 @@ contract HandlerPortfolio is HandlerBase {
             ctx.ghost().poolId, int128(uint128(deltaLiquidity))
         );
         ctx.subject().multiprocess(
-            FVM.encodeAllocate(
-                uint8(0), ctx.ghost().poolId, deltaLiquidity.safeCastTo128()
+            FVM.encodeAllocateOrDeallocate(
+                true,
+                uint8(0),
+                ctx.ghost().poolId,
+                deltaLiquidity.safeCastTo128()
             )
         );
         post = fetchAccountingState();
@@ -506,8 +509,11 @@ contract HandlerPortfolio is HandlerBase {
             prev = fetchAccountingState();
 
             ctx.subject().multiprocess(
-                FVM.encodeDeallocate(
-                    uint8(0), ctx.ghost().poolId, deltaLiquidity.safeCastTo128()
+                FVM.encodeAllocateOrDeallocate(
+                    false,
+                    uint8(0),
+                    ctx.ghost().poolId,
+                    deltaLiquidity.safeCastTo128()
                 )
             );
 
@@ -611,18 +617,19 @@ contract HandlerPortfolio is HandlerBase {
                 );
             } else if (i % 2 == 0) {
                 instructions.push(
-                    FVM.encodeAllocate(
-                        uint8(0), ctx.ghost().poolId, uint128(deltaLiquidity)
+                    FVM.encodeAllocateOrDeallocate(
+                        true, uint8(0), ctx.ghost().poolId, uint128(deltaLiquidity)
                     )
                 );
             } else {
                 instructions.push(
-                    FVM.encodeAllocate(
-                        uint8(0), ctx.ghost().poolId, uint128(deltaLiquidity)
+                    FVM.encodeAllocateOrDeallocate(
+                        true, uint8(0), ctx.ghost().poolId, uint128(deltaLiquidity)
                     )
                 );
                 instructions.push(
-                    FVM.encodeDeallocate(
+                    FVM.encodeAllocateOrDeallocate(
+                        false,
                         uint8(0),
                         ctx.ghost().poolId,
                         uint128(deltaLiquidity) / 2
