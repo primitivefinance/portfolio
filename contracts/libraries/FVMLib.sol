@@ -202,6 +202,7 @@ function decodePairIdFromPoolId(uint64 poolId) pure returns (uint24 pairId) {
 
 /**
  * @dev Returns an encoded pool id given specific pool parameters.
+ * The encoding is simply packing the different parameters together.
  * @param pairId Id of the pair of asset / quote tokens
  * @param isMutable True if the pool is mutable
  * @param poolNonce Current pool nonce of the Portfolio contract
@@ -255,6 +256,13 @@ function decodePoolId(bytes calldata data)
     }
 }
 
+/**
+ * @dev Encodes a `CREATE_PAIR` operation.
+ * See the `decodeCreatePair` for details of the encoding.
+ * @param token0 Address of the asset token
+ * @param token1 Address of the quote token
+ * @return data Encoded `CREATE_PAIR` operation
+ */
 function encodeCreatePair(
     address token0,
     address token1
@@ -263,9 +271,9 @@ function encodeCreatePair(
 }
 
 /**
- * @dev Decodes the paramters of a `CREATE_PAIR` operation.
+ * @dev Decodes the parameters of a `CREATE_PAIR` operation.
  * The data is expected to be encoded using the following format:\
- * `0x | CREATE_PAIR (8 bits) | tokenAsset (20 bytes) | tokenQuote (20 bytes)`
+ * `0x | CREATE_PAIR (1 byte) | tokenAsset (20 bytes) | tokenQuote (20 bytes)`
  * @param data Encoded `CREATE_PAIR` operation following the format above
  * @return tokenAsset Address of the asset token
  * @return tokenQuote Address of the quote token
@@ -283,9 +291,9 @@ function decodeCreatePair(bytes calldata data)
 }
 
 /**
- * @dev Encodes a claim operation.
+ * @dev Encodes a `CLAIM` operation.
  * FIXME: This function is not optimized! Using `encodePacked` is not ideal
- * because it preserves all the trailing zeros for each type. An improved version
+ * because it preserves all the leading zeros for each type. An improved version
  * should be made to reduce the calldata size by removing the extra zeros.
  */
 function encodeClaim(
@@ -299,7 +307,7 @@ function encodeClaim(
     return abi.encodePacked(
         CLAIM,
         poolId,
-        uint8(27), // pointer to fee1
+        uint8(27), // Static pointer due to the current fixed encoding
         powerFee0,
         baseFee0,
         powerFee1,
@@ -308,7 +316,13 @@ function encodeClaim(
 }
 
 /**
- * @dev Decodes a claim operation
+ * @dev Decodes a `CLAIM` operation.
+ * The data is expected to be encoded using the following format:\
+ * `0x | CLAIM (1 byte) | poolId (8 bytes) | pointerPowerFee1 (1 byte) | powerFee0 (1 byte) | baseFee0 (? bytes) | powerFee1 (1 byte) | baseFee1 (? bytes)`\
+ * @param data Encoded `CLAIM` operation following the format above
+ * @return poolId Id of the pool
+ * @return fee0 Fee of the asset token
+ * @return fee1 Fee of the quote token
  */
 function decodeClaim(bytes calldata data)
     pure
@@ -340,7 +354,18 @@ function decodeClaim(bytes calldata data)
 }
 
 /**
- * @dev Encodes a create pool operation.
+ * @dev Encodes a `CREATE_POOL` operation.
+ * FIXME: This function is not optimized! See `encodeClaim` for an explanation.
+ * @param pairId Id of the pair
+ * @param controller Address of the controller
+ * @param priorityFee Priority fee of the pool
+ * @param fee Swap fee of the pool
+ * @param vol Volatility of the pool
+ * @param dur Duration of the pool (in days)
+ * @param jit JUST IN TIME liquidity parameter of the pool (in blocks)
+ * @param maxPrice Maximum price of the pool
+ * @param price Current price of the asset token expressed in quote token
+ * @return data Encoded `CREATE_POOL` operation
  */
 function encodeCreatePool(
     uint24 pairId,
@@ -365,7 +390,7 @@ function encodeCreatePool(
         vol,
         dur,
         jit,
-        uint8(36 + 16),
+        uint8(36 + 16), // Static pointer due to the current fixed encoding
         power0,
         base0,
         power1,
@@ -373,6 +398,21 @@ function encodeCreatePool(
     );
 }
 
+/**
+ * @dev Decodes a `CREATE_POOL` operation.
+ * The data is expected to be encoded using the following format:\
+ * `0x | CREATE_POOL (1 byte) | pairId (3 bytes) | controller (20 bytes) | priorityFee (2 bytes) | fee (2 bytes) | vol (2 bytes) | dur (2 bytes) | jit (2 bytes) | pointerPrice (1 byte) | powerMaxPrice (1 byte) | baseMaxPrice (? bytes) | powerPrice (1 byte) | basePrice (? bytes)`\
+ * @param data Encoded `CREATE_POOL` operation following the format above
+ * @return pairId Id of the pair
+ * @return controller Address of the controller
+ * @return priorityFee Priority fee of the pool
+ * @return fee Swap fee of the pool
+ * @return vol Volatility of the pool
+ * @return dur Duration of the pool (in days)
+ * @return jit JUST IN TIME liquidity parameter of the pool (in blocks)
+ * @return maxPrice Maximum price of the pool
+ * @return price Current price of the asset token expressed in quote token
+ */
 function decodeCreatePool(bytes calldata data)
     pure
     returns (
@@ -413,8 +453,8 @@ function decodeCreatePool(bytes calldata data)
 }
 
 /**
- * @dev Encodes a allocate or deallocate operation.
- * FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ * @dev Encodes a `ALLOCATE` or `DEALLOCATE` operation.
+ * FIXME: This function is not optimized! See `encodeClaim` for an explanation.
  */
 function encodeAllocateOrDeallocate(
     bool shouldAllocate,
@@ -431,6 +471,15 @@ function encodeAllocateOrDeallocate(
     );
 }
 
+/**
+ * Decodes a `ALLOCATE` or `DEALLOCATE` operation.
+ * The data is expected to be encoded using the following format:\
+ * `0x | ALLOCATE or DEALLOCATE (1 byte) | useMax (1 byte) | poolId (8 bytes) | power (1 byte) | base (? bytes)`
+ * @param data Encoded `ALLOCATE` or `DEALLOCATE` operation
+ * @return useMax 1 if the maximum amount should be used
+ * @return poolId Pool id of the pool
+ * @return deltaLiquidity Amount of liquidity to allocate or deallocate
+ */
 function decodeAllocateOrDeallocate(bytes calldata data)
     pure
     returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
@@ -449,8 +498,13 @@ function decodeAllocateOrDeallocate(bytes calldata data)
 }
 
 /**
- * @dev Encodes a swap operation
- * FIXME: Same issue as `encodeClaim`... This function is not optimized!
+ * @dev Encodes a `SWAP` operation.
+ * FIXME: This function is not optimized! See `encodeClaim` for an explanation.
+ * @param useMax 1 if the maximum amount should be used
+ * @param poolId Pool id of the pool
+ * @param amount0 Amount of asset token to swap
+ * @param amount1 Amount of quote token to swap
+ * @param sellAsset 1 if the asset token should be sold, 0 if the quote token should be sold
  */
 function encodeSwap(
     uint8 useMax,
@@ -477,6 +531,14 @@ function encodeSwap(
 
 /**
  * @dev Decodes a swap operation.
+ * The data is expected to be encoded using the following format:\
+ * `0x | useMax (4  bits) | SWAP (4 bits) | poolId (8 bytes) | pointer (1 byte) | power0 (1 byte) | base0 (? bytes) | power1 (1 byte) | base1 (? bytes)`
+ * @param data Encoded `SWAP` operation following the format above
+ * @return useMax 1 if the maximum amount should be used
+ * @return poolId Pool id of the pool
+ * @return input Amount of asset token to swap
+ * @return output Amount of quote token to swap
+ * @return sellAsset 1 if the asset token should be sold, 0 if the quote token should be sold
  */
 function decodeSwap(bytes calldata data)
     pure
