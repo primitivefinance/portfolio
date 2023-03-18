@@ -278,7 +278,8 @@ abstract contract PortfolioVirtual is Objective {
         uint64 poolId,
         uint128 deltaLiquidity
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
-        if (!checkPool(poolId)) revert NonExistentPool(poolId);
+        uint24 pairNonce = pairId == 0 ? getPairNonce : pairId;
+        if (pairNonce == 0) revert InvalidPair();
 
         (address asset, address quote) =
             (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
