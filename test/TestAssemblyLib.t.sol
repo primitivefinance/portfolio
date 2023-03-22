@@ -14,20 +14,19 @@ contract TestAssemblyLib is Test {
         }
     }
 
-    /*
-    FIXME: These tests are not working yet.
-
     function testFuzz_isBetween(uint256 value, uint256 lower, uint256 upper) public {
         vm.assume(lower <= upper);
         bool valid = AssemblyLib.isBetween(value, lower, upper);
 
-        if (lower >= value && value <= upper) {
+        if (value >= lower && value <= upper) {
             assertTrue(valid);
         } else {
             assertFalse(valid);
         }
     }
 
+    /*
+    FIXME: These tests are not working yet.
     function testFuzz_addSignedDelta(uint128 input, int128 delta) public {
         assertEq(
             AssemblyLib.addSignedDelta(input, delta),
