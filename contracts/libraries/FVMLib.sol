@@ -225,7 +225,7 @@ function encodePoolId(
 /**
  * @dev Decodes the parameters of a pool given its id.
  * The pool id is expected to be encoded using the following format:\
- * `0x | pairId (24 bits) | isMutable (8 bits) | poolNonce (32 bits)`
+ * `0x | pairId (3 bytes) | isMutable (1 byte) | poolNonce (4 bytes)`
  * @param data Encoded pool id
  * @return poolId Pool id converted from bytes to uint64
  * @return pairId Pair id of the pool
