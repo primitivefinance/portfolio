@@ -276,7 +276,9 @@ abstract contract PortfolioVirtual is Objective {
     function _allocate(
         bool useMax,
         uint64 poolId,
-        uint128 deltaLiquidity
+        uint128 deltaLiquidity,
+        uint128 maxDeltaAsset,
+        uint128 maxDeltaQuote
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
@@ -295,6 +297,7 @@ abstract contract PortfolioVirtual is Objective {
         (deltaAsset, deltaQuote) =
             getLiquidityDeltas(poolId, AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
+        if (deltaAsset > maxDeltaAsset || deltaQuote > maxDeltaQuote) revert();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
@@ -320,7 +323,9 @@ abstract contract PortfolioVirtual is Objective {
     function _deallocate(
         bool useMax,
         uint64 poolId,
-        uint128 deltaLiquidity
+        uint128 deltaLiquidity,
+        uint128 minDeltaAsset,
+        uint128 minDeltaQuote
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
         (address asset, address quote) =
@@ -333,7 +338,7 @@ abstract contract PortfolioVirtual is Objective {
         if (deltaLiquidity == 0) revert ZeroLiquidity();
         (deltaAsset, deltaQuote) =
             getLiquidityDeltas(poolId, -AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds down.
-
+        if (deltaAsset < minDeltaAsset || deltaQuote < minDeltaQuote) revert();
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
             poolId: poolId,
@@ -806,13 +811,13 @@ abstract contract PortfolioVirtual is Objective {
         (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == FVM.ALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 deltaAsset, uint128 deltaQuote) =
                 FVM.decodeAllocateOrDeallocate(data);
-            _allocate(useMax == 1, poolId, deltaLiquidity);
+            _allocate(useMax == 1, poolId, deltaLiquidity, deltaAsset, deltaQuote);
         } else if (instruction == FVM.DEALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 deltaAsset, uint128 deltaQuote) =
                 FVM.decodeAllocateOrDeallocate(data);
-            _deallocate(useMax == 1, poolId, deltaLiquidity);
+            _deallocate(useMax == 1, poolId, deltaLiquidity, deltaAsset, deltaQuote);
         } else if (
             instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
         ) {

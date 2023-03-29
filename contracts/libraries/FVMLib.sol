@@ -460,21 +460,32 @@ function encodeAllocateOrDeallocate(
     bool shouldAllocate,
     uint8 useMax,
     uint64 poolId,
-    uint128 deltaLiquidity
+    uint128 deltaLiquidity,
+    uint128 deltaAsset,
+    uint128 deltaQuote
 ) pure returns (bytes memory data) {
-    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
+    (uint8 powerDeltaLiquidity, uint128 baseDeltaLiquidity) = AssemblyLib.fromAmount(deltaLiquidity);
+    (uint8 powerDeltaAsset, uint128 baseDeltaAsset) = AssemblyLib.fromAmount(deltaAsset);
+    (uint8 powerDeltaQuote, uint128 baseDeltaQuote) = AssemblyLib.fromAmount(deltaQuote);
+
     data = abi.encodePacked(
         AssemblyLib.pack(bytes1(useMax), shouldAllocate ? ALLOCATE : DEALLOCATE),
         poolId,
-        power,
-        base
+        uint8(28), // Pointing to powerDeltaAsset
+        uint8(45), // Pointing to powerDeltaQuote
+        powerDeltaLiquidity,
+        baseDeltaLiquidity,
+        powerDeltaAsset,
+        baseDeltaAsset,
+        powerDeltaQuote,
+        baseDeltaQuote
     );
 }
 
 /**
  * Decodes a `ALLOCATE` or `DEALLOCATE` operation.
  * The data is expected to be encoded using the following format:\
- * `0x | ALLOCATE or DEALLOCATE (1 byte) | useMax (1 byte) | poolId (8 bytes) | power (1 byte) | base (? bytes)`
+ * `0x | ALLOCATE or DEALLOCATE (1 byte) | useMax (1 byte) | poolId (8 bytes) | pointerPowerDeltaAsset | pointerDeltaQuote | powerDeltaLiquidity (1 byte) | baseDeltaLiquidity (? bytes) | powerDeltaAsset (1 byte) | baseDeltaAsset (? bytes) | powerDeltaQuote (1 byte) | baseDeltaQuote (? bytes)`\
  * @param data Encoded `ALLOCATE` or `DEALLOCATE` operation
  * @return useMax 1 if the maximum amount should be used
  * @return poolId Pool id of the pool
@@ -482,7 +493,7 @@ function encodeAllocateOrDeallocate(
  */
 function decodeAllocateOrDeallocate(bytes calldata data)
     pure
-    returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
+    returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 deltaAsset, uint128 deltaQuote)
 {
     // Looks like using Solidity or Assembly is the same in terms of gas cost.
     if (data.length < 11) revert InvalidBytesLength(11, data.length);
@@ -491,9 +502,23 @@ function decodeAllocateOrDeallocate(bytes calldata data)
         let value := calldataload(data.offset)
         useMax := shr(252, value)
         poolId := shr(192, shl(8, value))
-        let power := shr(248, shl(72, value))
-        let base := shr(sub(256, mul(8, sub(data.length, 10))), shl(80, value))
+
+        let pointer1 := byte(0, calldataload(add(9, data.offset)))
+        let pointer2 := byte(0, calldataload(add(10, data.offset)))
+        let power := byte(0, calldataload(add(11, data.offset)))
+        let length := sub(pointer1, 12)
+        let base := shr(sub(256, mul(8, length)), calldataload(add(12, data.offset)))
         deltaLiquidity := mul(base, exp(10, power))
+
+        power := byte(0, calldataload(add(pointer1, data.offset)))
+        length := sub(pointer2, add(1, pointer1))
+        base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer1), data.offset)))
+        deltaAsset := mul(base, exp(10, power))
+
+        power := byte(0, calldataload(add(pointer2, data.offset)))
+        length := sub(data.length, add(1, pointer2))
+        base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer2), data.offset)))
+        deltaQuote := mul(base, exp(10, power))
     }
 }
 
