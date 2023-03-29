@@ -23,7 +23,7 @@ contract DecodeJump {
     function decodeAllocateOrDeallocate(bytes calldata data)
         public
         view
-        returns (uint8, uint64, uint128)
+        returns (uint8, uint64, uint128, uint128, uint128)
     {
         return FVM.decodeAllocateOrDeallocate(data);
     }

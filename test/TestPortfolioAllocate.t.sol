@@ -23,7 +23,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
         // Fetch the variable changed.
@@ -54,7 +56,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(1),
                 poolId: ghost().poolId,
-                deltaLiquidity: 1
+                deltaLiquidity: 1,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
         assertEq(
@@ -80,7 +84,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
         uint256 post = ghost().pool().lastTimestamp;
@@ -108,7 +114,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
@@ -143,7 +151,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
@@ -177,7 +187,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
         uint256 post_asset =
@@ -201,7 +213,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: failureArg,
-                deltaLiquidity: 1 ether
+                deltaLiquidity: 1 ether,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
     }
@@ -219,7 +233,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: ghost().poolId,
-                deltaLiquidity: uint128(failureArg)
+                deltaLiquidity: uint128(failureArg),
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
     }
@@ -237,7 +253,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: ghost().poolId,
-                deltaLiquidity: uint128(failureArg)
+                deltaLiquidity: uint128(failureArg),
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
     }
@@ -269,7 +287,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
 
@@ -388,7 +408,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: 0
             })
         );
 

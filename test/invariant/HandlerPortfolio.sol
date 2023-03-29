@@ -409,7 +409,9 @@ contract HandlerPortfolio is HandlerBase {
                 true,
                 uint8(0),
                 ctx.ghost().poolId,
-                deltaLiquidity.safeCastTo128()
+                deltaLiquidity.safeCastTo128(),
+                0,
+                0
             )
         );
         post = fetchAccountingState();
@@ -513,7 +515,9 @@ contract HandlerPortfolio is HandlerBase {
                     false,
                     uint8(0),
                     ctx.ghost().poolId,
-                    deltaLiquidity.safeCastTo128()
+                    deltaLiquidity.safeCastTo128(),
+                    0,
+                    0
                 )
             );
 
