@@ -279,6 +279,13 @@ contract TestFVMLib is Test {
         assertEq(decoded.price, 3 * 10 ** 18);
     }
 
+    function test_decodeCreatePool_RevertOverflow() public {
+        vm.expectRevert(Overflow.selector);
+        CreatePoolParams memory decoded = target.decodeCreatePool_(
+            hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff25090201ffffffffffffffffffffffffffffffff"
+        );
+    }
+
     function testFuzz_encodeAllocate(
         bool useMax,
         uint64 poolId,
