@@ -509,6 +509,7 @@ function decodeAllocateOrDeallocate(bytes calldata data)
 {
     // Looks like using Solidity or Assembly is the same in terms of gas cost.
     if (data.length < 11) revert InvalidBytesLength(11, data.length);
+    bytes4 overflowErrorSelector = Overflow.selector;
 
     assembly {
         let value := calldataload(data.offset)
@@ -532,8 +533,16 @@ function decodeAllocateOrDeallocate(bytes calldata data)
         base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer2), data.offset)))
         deltaQuote := mul(base, exp(10, power))
 
-        if gt(deltaLiquidity, 0xffffffffffffffffffffffffffffffff) {
-            revert(0, 0)
+        // Checks if one of these variables overflows
+        if or(
+            gt(deltaLiquidity, 0xffffffffffffffffffffffffffffffff),
+            or(
+                gt(deltaAsset, 0xffffffffffffffffffffffffffffffff),
+                gt(deltaQuote, 0xffffffffffffffffffffffffffffffff)
+            )
+        ) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
         }
     }
 }
