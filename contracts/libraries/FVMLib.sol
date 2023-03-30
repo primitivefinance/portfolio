@@ -600,6 +600,8 @@ function decodeSwap(bytes calldata data)
         uint8 sellAsset
     )
 {
+    bytes4 overflowErrorSelector = Overflow.selector;
+
     assembly {
         let value := calldataload(data.offset)
         useMax := shr(4, byte(0, value))
@@ -619,5 +621,14 @@ function decodeSwap(bytes calldata data)
                 calldataload(add(data.offset, add(1, pointer)))
             )
         output := mul(base1, exp(10, power1))
+
+        // Checks if one of these variables overflows
+        if or(
+            gt(input, 0xffffffffffffffffffffffffffffffff),
+            gt(output, 0xffffffffffffffffffffffffffffffff)
+        ) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
     }
 }
