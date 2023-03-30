@@ -50,6 +50,7 @@ bytes1 constant INSTRUCTION_JUMP = 0xAA;
 
 error InvalidJump(uint256 pointer); // 0x80f63bd1
 error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
+error Overflow(); // 0x35278d12
 
 /**
  * @dev Expects a serialized encoding of instructions.
@@ -427,6 +428,8 @@ function decodeCreatePool(bytes calldata data)
         uint128 price
     )
 {
+    bytes4 overflowErrorSelector = Overflow.selector;
+
     assembly {
         pairId := shr(232, calldataload(add(1, data.offset)))
         controller := shr(96, calldataload(add(4, data.offset)))
@@ -449,6 +452,15 @@ function decodeCreatePool(bytes calldata data)
                 calldataload(add(data.offset, add(1, pointer)))
             )
         price := mul(base1, exp(10, power1))
+
+        // Checks if one of these variables overflows
+        if or(
+            gt(maxPrice, 0xffffffffffffffffffffffffffffffff),
+            gt(price, 0xffffffffffffffffffffffffffffffff)
+        ) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
     }
 }
 
@@ -519,6 +531,10 @@ function decodeAllocateOrDeallocate(bytes calldata data)
         length := sub(data.length, add(1, pointer2))
         base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer2), data.offset)))
         deltaQuote := mul(base, exp(10, power))
+
+        if gt(deltaLiquidity, 0xffffffffffffffffffffffffffffffff) {
+            revert(0, 0)
+        }
     }
 }
 
