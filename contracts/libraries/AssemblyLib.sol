@@ -219,7 +219,7 @@ library AssemblyLib {
         bytes1 upper,
         bytes1 lower
     ) internal pure returns (bytes1 data) {
-        data = (upper << 4) | lower;
+        data = upper << 4 | (lower & 0x0F);
     }
 
     /**
