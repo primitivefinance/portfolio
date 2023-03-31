@@ -90,4 +90,14 @@ contract TestAssemblyLib is Test {
         vm.expectRevert(DataTooLong.selector);
         AssemblyLib.toBytes8(input);
     }
+    
+    function test_pack() public {
+        bytes1 output = AssemblyLib.pack(bytes1(0x01), bytes1(0x02));
+        assertEq(output, bytes1(0x12));
+    }
+
+    function test_pack_dirtyBits() public {
+        bytes1 output = AssemblyLib.pack(bytes1(0x11), bytes1(0x22));
+        assertEq(output, bytes1(0x12));
+    }
 }

@@ -218,7 +218,7 @@ function encodePoolId(
     uint32 poolNonce
 ) pure returns (uint64 poolId) {
     assembly {
-        poolId := shl(0, or(or(shl(40, pairId), shl(32, isMutable)), poolNonce))
+        poolId := or(or(shl(40, pairId), shl(32, isMutable)), poolNonce)
     }
 }
 
