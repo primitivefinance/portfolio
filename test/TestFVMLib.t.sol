@@ -382,13 +382,31 @@ contract TestFVMLib is Test {
         assertEq(deltaQuote, uint128(6000000000));
     }
 
-    function test_decodeAllocateOrDeallocate_RevertsBadLength() public {
+    function test_decodeAllocateOrDeallocate_RevertBadLength() public {
         bytes memory data = hex"11aaffffffffffffbb0e";
         vm.expectRevert(
             abi.encodePacked(
                 InvalidBytesLength.selector, uint256(11), uint256(10)
             )
         );
+        target.decodeAllocateOrDeallocate_(data);
+    }
+
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaLiquidityOverflows() public {
+        bytes memory data = hex"1100000000aabbccdd1c2d01ffffffffffffffffffffffffffffffff03000000000000000000000000000000010300000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeAllocateOrDeallocate_(data);
+    }
+
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaAssetOverflows() public {
+        bytes memory data = hex"1100000000aabbccdd1c2d010000000000000000000000000000000103ffffffffffffffffffffffffffffffff0300000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeAllocateOrDeallocate_(data);
+    }
+
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaQuoteOverflows() public {
+        bytes memory data = hex"1100000000aabbccdd1c2d0100000000000000000000000000000001030000000000000000000000000000000103ffffffffffffffffffffffffffffffff";
+        vm.expectRevert(Overflow.selector);
         target.decodeAllocateOrDeallocate_(data);
     }
 
