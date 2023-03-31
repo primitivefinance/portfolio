@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 error InvalidLiquidity();
 error InvalidDays();
+error DataTooLong();
 
 uint256 constant SECONDS_PER_YEAR = 31556953 seconds;
 uint256 constant SECONDS_PER_DAY = 86_400 seconds;
@@ -154,7 +155,14 @@ library AssemblyLib {
      * handles it for us.
      */
     function toBytes16(bytes memory raw) internal pure returns (bytes16 data) {
+        bytes4 errorSelector = DataTooLong.selector;
+
         assembly {
+            if gt(mload(raw), 16) {
+                mstore(0, errorSelector)
+                revert(0, 4)
+            }
+
             data := mload(add(raw, 32))
             let shift := mul(sub(16, mload(raw)), 8)
             data := shr(shift, data)
@@ -166,7 +174,14 @@ library AssemblyLib {
      * handles it for us.
      */
     function toBytes8(bytes memory raw) internal pure returns (bytes8 data) {
+        bytes4 errorSelector = DataTooLong.selector;
+
         assembly {
+            if gt(mload(raw), 8) {
+                mstore(0, errorSelector)
+                revert(0, 4)
+            }
+
             data := mload(add(raw, 32))
             let shift := mul(sub(8, mload(raw)), 8)
             data := shr(shift, data)
