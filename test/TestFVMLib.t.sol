@@ -158,6 +158,18 @@ contract TestFVMLib is Test {
         assertEq(sellAsset, 1);
     }
 
+    function test_decodeSwap_RevertIfMaxPriceOverflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b12ffffffffffffffffffffffffffffffff0901";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
+    }
+
+    function test_decodeSwap_RevertIfPriceOverflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b120000000000000000000000000000000109ffffffffffffffffffffffffffffffff";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
+    }
+
     function testFuzz_encodeClaim(
         uint64 poolId,
         uint128 fee0,
