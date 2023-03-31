@@ -329,6 +329,8 @@ function decodeClaim(bytes calldata data)
     pure
     returns (uint64 poolId, uint128 fee0, uint128 fee1)
 {
+    bytes4 overflowErrorSelector = Overflow.selector;
+
     assembly {
         let value := calldataload(data.offset)
         poolId := shr(192, shl(8, value))
@@ -351,6 +353,15 @@ function decodeClaim(bytes calldata data)
                 ),
                 exp(10, power)
             )
+
+        // Checks if one of these variables overflows
+        if or(
+            gt(fee0, 0xffffffffffffffffffffffffffffffff),
+            gt(fee1, 0xffffffffffffffffffffffffffffffff)
+        ) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
     }
 }
 
