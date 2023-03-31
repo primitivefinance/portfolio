@@ -141,8 +141,6 @@ contract TestFVMLib is Test {
         bytes memory data =
             encodeSwap(1, 0xaaffffffffffffbb, 1 ether, 2000 * 10 ** 6, 1);
 
-        console.logBytes(data);
-
         (
             uint8 useMax,
             uint64 poolId,
@@ -158,13 +156,13 @@ contract TestFVMLib is Test {
         assertEq(sellAsset, 1);
     }
 
-    function test_decodeSwap_RevertIfMaxPriceOverflows() public {
+    function test_decodeSwap_RevertIfInputOverflows() public {
         bytes memory data = hex"16aaffffffffffffbb1b12ffffffffffffffffffffffffffffffff0901";
         vm.expectRevert(Overflow.selector);
         target.decodeSwap_(data);
     }
 
-    function test_decodeSwap_RevertIfPriceOverflows() public {
+    function test_decodeSwap_RevertIfOuputOverflows() public {
         bytes memory data = hex"16aaffffffffffffbb1b120000000000000000000000000000000109ffffffffffffffffffffffffffffffff";
         vm.expectRevert(Overflow.selector);
         target.decodeSwap_(data);
@@ -291,9 +289,16 @@ contract TestFVMLib is Test {
         assertEq(decoded.price, 3 * 10 ** 18);
     }
 
-    function test_decodeCreatePool_RevertOverflow() public {
+    function test_decodeCreatePool_RevertIfMaxPriceOverflows () public {
         vm.expectRevert(Overflow.selector);
-        CreatePoolParams memory decoded = target.decodeCreatePool_(
+        target.decodeCreatePool_(
+            hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff3409ffffffffffffffffffffffffffffffff0101"
+        );
+    }
+
+    function test_decodeCreatePool_RevertIfPriceOverflows () public {
+        vm.expectRevert(Overflow.selector);
+        target.decodeCreatePool_(
             hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff25090201ffffffffffffffffffffffffffffffff"
         );
     }
