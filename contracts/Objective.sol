@@ -92,7 +92,8 @@ abstract contract Objective is IPortfolio {
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
-        uint256 amountIn
+        uint256 amountIn,
+        address swapper
     )
         public
         view
