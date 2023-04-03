@@ -171,65 +171,29 @@ library RMM01Lib {
                 tau: tau,
                 inv: data.prevInvariant
             });
-
-            nextDep = uint256(
-                bisection(
-                    args,
-                    int256(nextDep * 9999 / 10000),
-                    int256(nextDep * 10001 / 10000),
-                    1,
-                    256,
-                    optimizeQuote
-                )
-            );
         }
 
-        Bisection memory args;
-        args.optimizeQuoteReserve = sellAsset;
-        args.terminalPriceWad = self.params.maxPrice;
-        args.volatilityWad = volatilityWad;
-        args.tauSeconds = tau;
-        args.reserveWadPerLiquidity = nextInd;
+        Bisection memory args = Bisection({
+            terminalPriceWad: self.params.maxPrice,
+            volatilityFactorWad: volatilityWad,
+            timeRemainingSec: tau,
+            independentReserve: nextIndWadPerLiquidity,
+            dependentReserve: nextDep
+        });
 
-        uint256 lower = nextDep.mulDivDown(9999, 10000);
-        uint256 upper = nextDep.mulDivUp(10001, 10000);
-        // Each reserve has a minimum lower bound of 0.
-        // Each reserve has its own upper bound per liquidity unit.
-        // The quote reserve is bounded by the max price.
-        // The asset reserve is bounded by 1E18.
-        uint256 maximum = sellAsset ? args.terminalPriceWad : 1 ether;
-        upper = upper > maximum ? maximum : upper;
-
-        // Using the approximated next dependent reserve,
-        // optimize around 0.01% error to find the precise dependent reserve.
-        nextDep = bisection(
-            args,
-            lower,
-            upper,
-            BISECTION_EPSILON,
-            256, // todo: potentially expose the max iteration parameter to the Portfolio `getAmountOut` function.
-            optimizeDependentReserve
+        nextDepWadPerLiquidity = uint256(
+            bisection(
+                args,
+                int256(nextDep * 9999 / 10000),
+                int256(nextDep * 10001 / 10000),
+                1,
+                256,
+                optimizeQuote
+            )
         );
 
-        // Round up the next dependent reserve.
-        // Ouput amount is previous - next dependent reserve,
-        // so if next is rounded up, output is consequentially rounded down.
-        if (nextDep != 0) {
-            nextDep++;
-        }
-    }
-
-    function optimizeDependentReserve(
-        Bisection memory args,
-        uint256 optimized
-    ) internal pure returns (int256) {
-        return Invariant.invariant({
-            R_y: args.optimizeQuoteReserve ? optimized : args.reserveWadPerLiquidity,
-            R_x: args.optimizeQuoteReserve ? args.reserveWadPerLiquidity : optimized,
-            stk: args.terminalPriceWad,
-            vol: args.volatilityWad,
-            tau: args.tauSeconds
-        });
+        // Scales the next dependent per liquidity to total dependent reserves, in WAD units.
+        nextDep = nextDepWadPerLiquidity.mulWadDown(data.liquidity);
     }
 
     function optimizeQuote(
