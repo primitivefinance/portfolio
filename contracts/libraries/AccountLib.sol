@@ -49,7 +49,6 @@ using {
 error EtherTransferFail(); // 0x75f42683
 error InsufficientReserve(uint256 amount, uint256 delta); // 0x315276c9
 error InvalidBalance(); // 0xc52e3eff
-error AlreadySettled();
 
 struct AccountSystem {
     // user -> token -> internal balance.
