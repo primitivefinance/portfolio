@@ -463,10 +463,10 @@ abstract contract PortfolioVirtual is Objective {
             // This is revisited depending on if fees are saved in claimable balances.
             if (_state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextIndependentLessFee, nextDependent);
+                    (nextIndependent, nextDependent);
             } else {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextDependent, nextIndependentLessFee);
+                    (nextDependent, nextIndependent);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
@@ -918,5 +918,17 @@ abstract contract PortfolioVirtual is Objective {
         returns (uint128 deltaAsset, uint128 deltaQuote)
     {
         return pools[poolId].getVirtualReservesPerLiquidity();
+    }
+
+    function getInvariant(uint64 poolId)
+        public
+        view
+        override
+        returns (int256 invariant)
+    {
+        PortfolioPool memory pool = pools[poolId];
+        (, invariant) = checkInvariant(
+            poolId, int256(0), pool.virtualX, pool.virtualY, block.timestamp
+        );
     }
 }

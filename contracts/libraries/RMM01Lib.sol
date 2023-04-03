@@ -9,6 +9,8 @@ import {
     AssemblyLib,
     PERCENTAGE
 } from "../PortfolioLib.sol";
+import "./BisectionLib.sol";
+import { console as logger } from "forge-std/Console.sol";
 
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant WAD = 1 ether;
@@ -65,7 +67,7 @@ library RMM01Lib {
         uint256 amountIn,
         uint256 timestamp,
         address swapper
-    ) internal pure returns (uint256 amountOut) {
+    ) internal view returns (uint256 amountOut) {
         // Sets data.invariant, data.liquidity, and data.remainder.
         (Iteration memory data, uint256 tau) =
             getSwapData(self, sellAsset, amountIn, timestamp, swapper); // Declare and assign variables individual to save on gas spent on initializing 0 values.
@@ -126,7 +128,7 @@ library RMM01Lib {
         Iteration memory data,
         bool sellAsset,
         uint256 tau
-    ) internal pure returns (uint256 prevDep, uint256 nextDep) {
+    ) internal view returns (uint256 prevDep, uint256 nextDep) {
         uint256 prevInd;
         uint256 nextInd;
         uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
@@ -140,26 +142,139 @@ library RMM01Lib {
 
         nextInd = prevInd
             + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
+        uint256 nextIndFull =
+            prevInd + data.remainder.divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
-        if (sellAsset) {
-            nextDep = Invariant.getY({
-                R_x: nextInd,
-                stk: self.params.maxPrice,
-                vol: volatilityWad,
-                tau: tau,
-                inv: data.prevInvariant
+        {
+            if (sellAsset) {
+                nextDep = Invariant.getY({
+                    R_x: nextInd,
+                    stk: self.params.maxPrice,
+                    vol: volatilityWad,
+                    tau: tau,
+                    inv: data.prevInvariant
+                });
+            } else {
+                nextDep = Invariant.getX({
+                    R_y: nextInd,
+                    stk: self.params.maxPrice,
+                    vol: volatilityWad,
+                    tau: tau,
+                    inv: data.prevInvariant
+                });
+            }
+
+            Bisection memory args = Bisection({
+                terminalPriceWad: self.params.maxPrice,
+                volatilityFactorWad: volatilityWad,
+                timeRemainingSec: tau,
+                independentReserve: nextIndFull,
+                dependentReserve: nextDep
             });
-        } else {
-            nextDep = Invariant.getX({
-                R_y: nextInd,
-                stk: self.params.maxPrice,
-                vol: volatilityWad,
-                tau: tau,
-                inv: data.prevInvariant
-            });
+
+            nextDep = uint256(
+                bisectionQuote(
+                    args,
+                    int256(nextDep * 9999 / 10000),
+                    int256(nextDep * 10001 / 10000),
+                    1,
+                    256,
+                    optimizeQuote
+                )
+            );
         }
     }
+
+    function optimizeQuote(
+        Bisection memory args,
+        int256 optimized
+    ) internal view returns (int256) {
+        uint256 y = args.independentReserve;
+        uint256 x = uint256(optimized);
+        uint256 stk = args.terminalPriceWad;
+        uint256 vol = args.volatilityFactorWad;
+        uint256 tau = args.timeRemainingSec;
+
+        int256 invariant =
+            Invariant.invariant({R_y: y, R_x: x, stk: stk, vol: vol, tau: tau});
+        logger.log("Logging x: %s", x);
+        logger.log("Logging y: %s", y);
+        logger.log("Logging int256 invariant: %s");
+        logger.logInt(invariant);
+        return invariant;
+    }
+
+    /* function optimizeQuoteOut(Bisection memory args)
+        internal
+        pure
+        returns (uint256)
+    {
+        uint256 y = args.dependentReserve;
+        uint256 x = args.independentReserve;
+        uint256 stk = args.terminalPriceWad;
+        uint256 vol = args.volatilityFactorWad;
+        uint256 tau = args.timeRemainingSec;
+        uint256 epsilon = 1e6;
+
+        uint256 minimum = epsilon > y ? 0 : y - epsilon;
+        uint256 maximum = y + epsilon > stk ? stk : y + epsilon;
+
+        int256 invariant =
+            Invariant.invariant({R_y: y, R_x: x, stk: stk, vol: vol, tau: tau});
+
+        int256 minInvariant = Invariant.invariant({
+            R_y: minimum,
+            R_x: x,
+            stk: stk,
+            vol: vol,
+            tau: tau
+        });
+
+        int256 maxInvariant = Invariant.invariant({
+            R_y: maximum,
+            R_x: x,
+            stk: stk,
+            vol: vol,
+            tau: tau
+        });
+
+        int256 root;
+        uint256 difference = maximum - minimum;
+        uint256 iterations;
+        do {
+            root = int256((minimum + maximum) / 2);
+
+            int256 invariantRoot = Invariant.invariant({
+                R_y: y + root > stk ? stk : y + root,
+                R_x: x,
+                stk: stk,
+                vol: vol,
+                tau: tau
+            });
+
+            if (invariantRoot == 0) break;
+
+            minInvariant = Invariant.invariant({
+                R_y: y + minimum > stk ? stk : y + minimum,
+                R_x: x,
+                stk: stk,
+                vol: vol,
+                tau: tau
+            });
+
+            int256 product = maxInvariant * minInvariant;
+            if (product < 0) {
+                minimum = root;
+            } else {
+                maximum = root;
+            }
+
+            unchecked {
+                iterations++;
+            }
+        } while (difference >= epsilon && iterations < 256);
+    } */
 
     /**
      * @dev Computes the amount of `asset` and `quote` tokens scaled to WAD units to track per WAD units of liquidity.
