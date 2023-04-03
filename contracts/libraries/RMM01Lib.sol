@@ -173,42 +173,37 @@ library RMM01Lib {
             });
         }
 
-        Bisection memory args = Bisection({
-            terminalPriceWad: self.params.maxPrice,
-            volatilityFactorWad: volatilityWad,
-            timeRemainingSec: tau,
-            independentReserve: nextIndWadPerLiquidity,
-            dependentReserve: nextDep
-        });
+        Bisection memory args;
+        args.optimizeQuoteReserve = sellAsset;
+        args.terminalPriceWad = self.params.maxPrice;
+        args.volatilityWad = volatilityWad;
+        args.tauSeconds = tau;
+        args.reserveWadPerLiquidity = nextIndWadPerLiquidity;
 
-        nextDepWadPerLiquidity = uint256(
-            bisection(
-                args,
-                int256(nextDep * 9999 / 10000),
-                int256(nextDep * 10001 / 10000),
-                1,
-                256,
-                optimizeQuote
-            )
+        nextDepWadPerLiquidity = bisection(
+            args,
+            nextDep * 9999 / 10000,
+            nextDep * 10001 / 10000,
+            1,
+            256,
+            optimizeDependentReserve
         );
 
         // Scales the next dependent per liquidity to total dependent reserves, in WAD units.
         nextDep = nextDepWadPerLiquidity.mulWadDown(data.liquidity);
     }
 
-    function optimizeQuote(
+    function optimizeDependentReserve(
         Bisection memory args,
-        int256 optimized
+        uint256 optimized
     ) internal pure returns (int256) {
-        uint256 y = args.independentReserve;
-        uint256 x = uint256(optimized);
-        uint256 stk = args.terminalPriceWad;
-        uint256 vol = args.volatilityFactorWad;
-        uint256 tau = args.timeRemainingSec;
-
-        int256 invariant =
-            Invariant.invariant({R_y: y, R_x: x, stk: stk, vol: vol, tau: tau});
-        return invariant;
+        return Invariant.invariant({
+            R_y: args.optimizeQuoteReserve ? optimized : args.reserveWadPerLiquidity,
+            R_x: args.optimizeQuoteReserve ? args.reserveWadPerLiquidity : optimized,
+            stk: args.terminalPriceWad,
+            vol: args.volatilityWad,
+            tau: args.tauSeconds
+        });
     }
 
     /**
