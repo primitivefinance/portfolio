@@ -737,11 +737,18 @@ abstract contract PortfolioVirtual is Objective {
 
         emit CreatePool(
             poolId,
-            hasController,
             pool.pair.tokenAsset,
             pool.pair.tokenQuote,
+            hasController,
+            controller,
+            priorityFee,
+            fee,
+            volatility,
+            duration,
+            jit,
+            maxPrice,
             price
-            );
+        );
     }
 
     // ===== Accounting System ===== //
