@@ -1,53 +1,68 @@
 pragma solidity ^0.8.4;
 
 struct Bisection {
+    bool optimizeQuoteReserve;
     uint256 terminalPriceWad;
-    uint256 volatilityFactorWad;
-    uint256 timeRemainingSec;
-    uint256 independentReserve;
-    uint256 dependentReserve;
+    uint256 volatilityWad;
+    uint256 tauSeconds;
+    uint256 reserveWadPerLiquidity;
 }
 
+error NotInsideBounds(uint256 lower, uint256 upper);
+error InvalidBounds(uint256 lower, uint256 upper);
+
+/**
+ * @dev Bisection is a method of finding the root of a function.
+ * The root is the point where the function crosses the x-axis.
+ * @notice The function `fx` must be continuous and monotonic.
+ * @param args The arguments to pass to the function `fx`.
+ * @param lower The lower bound of the root.
+ * @param upper The upper bound of the root.
+ * @param epsilon The distance between the lower and upper bounds.
+ * @param maxIterations The maximum amount of iterations to run.
+ * @param fx The function to find the root of.
+ * @return root The root of the function `fx`.
+ */
 function bisection(
     Bisection memory args,
-    int256 ain,
-    int256 bin,
-    int256 eps,
-    int256 max,
-    function(Bisection memory,int256) pure returns (int256) fx
-) pure returns (int256 root) {
-    // Chosen `a` and `b` are incorrect.
-    // False if ain * bin < 0, !(ain * bin < 0).
-    int256 fxa = fx(args, ain);
-    int256 fxb = fx(args, bin);
-    require(fxa * fxb < 0, "gt 0");
-    /* assembly {
-            if iszero(slt(mul(fxa, fxb), 0)) { revert(0, 0) }
-        } */
+    uint256 lower,
+    uint256 upper,
+    uint256 epsilon,
+    uint256 maxIterations,
+    function(Bisection memory,uint256) pure returns (int256) fx
+) pure returns (uint256 root) {
+    if (lower > upper) revert InvalidBounds(lower, upper);
+    // Passes the lower and upper bounds to the optimized function.
+    // Reverts if the optimized function `fx` returns both negative or both positive values.
+    // This means that the root is not between the bounds.
+    // The root is between the bounds if the product of the two values is negative.
+    int256 lowerOutput = fx(args, lower);
+    int256 upperOutput = fx(args, upper);
+    if (lowerOutput * upperOutput > 0) revert NotInsideBounds(lower, upper);
 
-    int256 dif;
-    int256 itr;
-    assembly {
-        dif := sub(bin, ain) // todo: check for overflow/underflow
-    } // Are we getting closer to epsilon?
+    // Distance is optimized to equal `epsilon`.
+    uint256 distance = upper - lower;
 
+    uint256 iterations; // Bounds the amount of loops to `maxIterations`.
     do {
-        assembly {
-            root := sdiv(add(ain, bin), 2) // todo: check for overflow
-        } // root = a + b / 2
+        // Bisection uses the point between the lower and upper bounds.
+        // The `distance` is halved each iteration.
+        root = (lower + upper) / 2;
 
-        int256 fxr = fx(args, root);
-        if (fxr == 0) break;
-        fxa = fx(args, ain);
+        int256 output = fx(args, root);
+        if (output == 0) break; // Found the root.
+        lowerOutput = fx(args, lower); // Lower point could have changed in the previous iteration.
 
-        assembly {
-            // todo: check for overflow
-            switch slt(mul(fxr, fxa), 0)
-            // Decide which side to repeat, `a` or `b`.
-            case 1 { bin := root }
-            // 1 if fxr * fxa < 0
-            case 0 { ain := root } // else 0
-            itr := add(itr, 1) // Increment iterator.
+        // If the product is negative, the root is between the lower and root.
+        // If the product is positive, the root is between the root and upper.
+        if (output * lowerOutput < 0) {
+            upper = root; // Set the new upper bound to the root because we know its between the lower and root.
+        } else {
+            lower = root; // Set the new lower bound to the root because we know its between the upper and root.
         }
-    } while (dif >= eps && itr < max);
+
+        unchecked {
+            iterations++; // Increment the iterator.
+        }
+    } while (distance > epsilon && iterations != maxIterations);
 }
