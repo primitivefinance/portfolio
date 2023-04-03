@@ -166,7 +166,14 @@ contract TestPortfolioSwap is Setup {
         allocateSome(1 ether)
         isArmed
     {
-        int256 invariant = subject().getInvariant(ghost().poolId);
+        PortfolioPool memory pool = ghost().pool();
+        (, int256 invariant) = subject().checkInvariant(
+            ghost().poolId,
+            int256(0),
+            pool.virtualX,
+            pool.virtualY,
+            block.timestamp
+        );
 
         bool sellAsset = false;
         uint256 amountIn = uint256(1 ether).scaleFromWadDown(
@@ -186,7 +193,14 @@ contract TestPortfolioSwap is Setup {
         );
 
         int256 prev = invariant;
-        invariant = subject().getInvariant(ghost().poolId);
+        pool = ghost().pool();
+        (, invariant) = subject().checkInvariant(
+            ghost().poolId,
+            int256(0),
+            pool.virtualX,
+            pool.virtualY,
+            block.timestamp
+        );
         console.logInt(invariant);
         int256 post = invariant;
         int256 diff = post - prev;

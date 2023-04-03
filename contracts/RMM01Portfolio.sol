@@ -4,7 +4,6 @@ pragma solidity 0.8.13;
 import "./Portfolio.sol";
 import "./libraries/RMM01Lib.sol";
 import "./libraries/BisectionLib.sol";
-import { console as logger } from "forge-std/Console.sol";
 
 /**
  * @title   RMM-01 Portfolio
@@ -156,82 +155,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         });
     }
 
-    /* function getAmountOutBisection(
-        uint64 poolId,
-        bool sellAsset,
-        uint256 amountIn
-    ) public returns (uint256 output) {
-        PortfolioPool storage pool = pools[poolId];
-
-        uint256 decimalIndependent;
-        uint256 decimalDependent;
-        if (sellAsset) {
-            decimalIndependent = pool.pair.decimalsAsset;
-            decimalDependent = pool.pair.decimalsQuote;
-        } else {
-            decimalIndependent = pool.pair.decimalsQuote;
-            decimalDependent = pool.pair.decimalsAsset;
-        }
-
-        output = pool.getAmountOut({
-            sellAsset: sellAsset,
-            amountIn: amountIn,
-            timestamp: block.timestamp
-        });
-
-        uint128 dIndependent = amountIn.scaleToWad(decimalIndependent)
-            .divWadDown(pool.liquidity).safeCastTo128();
-
-        uint128 nextIndependent = sellAsset ? pool.virtualX : pool.virtualY;
-        nextIndependent += dIndependent;
-        if (sellAsset) {
-            pool.virtualX = nextIndependent;
-        } else {
-            pool.virtualY = nextIndependent;
-        }
-
-        int256 invariant = pool.invariantOf({
-            R_x: pool.virtualX
-                - AssemblyLib.scaleToWad(uint256(output), decimalDependent).divWadDown(
-                    pool.liquidity
-                ).safeCastTo128(),
-            R_y: pool.virtualY,
-            timeRemainingSec: pool.computeTau(block.timestamp)
-        });
-        logger.logInt(invariant);
-
-        logger.log("output", output);
-
-        uint256 EPSILON = 1;
-
-        _args.poolId = poolId;
-        int256 iterations = 100;
-
-        uint128 dDependent = AssemblyLib.scaleToWad(
-            uint256(output), decimalDependent
-        ).divWadDown(pool.liquidity).safeCastTo128();
-
-        int256 min = 1;
-        logger.log("dDependent: %s", dDependent);
-        int256 max = int256(uint256(pool.virtualX)); //int256(AssemblyLib.toInt128(1e18 - dDependent));
-        output = uint256(
-            bisection(
-                min,
-                max,
-                int256(EPSILON),
-                iterations,
-                _amountOutBisectionAssetOut
-            )
-        );
-
-        invariant = pool.invariantOf({
-            R_x: pool.virtualX - output,
-            R_y: pool.virtualY,
-            timeRemainingSec: pool.computeTau(block.timestamp)
-        });
-        logger.logInt(invariant);
-    } */
-
     /// @inheritdoc Objective
     function getVirtualPrice(uint64 poolId)
         public
@@ -241,25 +164,4 @@ contract RMM01Portfolio is PortfolioVirtual {
     {
         (price,,) = _getLatestInvariantAndVirtualPrice(poolId);
     }
-
-    /* struct BisectionParams {
-        uint64 poolId;
-    }
-
-    BisectionParams private _args;
-
-    function _amountOutBisectionAssetOut(int256 dX)
-        internal
-        view
-        returns (int256 output)
-    {
-        PortfolioPool memory pool = pools[_args.poolId];
-
-        logger.log("invariantOf: dDependent: %s", uint256(dX));
-        output = pool.invariantOf({
-            R_x: pool.virtualX - uint256(dX),
-            R_y: pool.virtualY,
-            timeRemainingSec: pool.computeTau(block.timestamp)
-        });
-    } */
 }

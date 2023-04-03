@@ -278,11 +278,6 @@ interface IPortfolioGetters {
         view
         returns (uint128 deltaAsset, uint128 deltaQuote);
 
-    function getInvariant(uint64 poolId)
-        external
-        view
-        returns (int256 invariant);
-
     // ===== Objective View ===== //
 
     /**
