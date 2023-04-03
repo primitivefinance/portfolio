@@ -553,6 +553,8 @@ function decodeSwap(bytes calldata data)
     assembly {
         let value := calldataload(data.offset)
         useMax := shr(4, byte(0, value))
+        // 6 corresponds to SWAP_ASSET, we don't use the constant here because
+        // the bytes1 variable is padded to the left and shifting would cost gas.
         sellAsset := eq(6, and(0x0F, byte(0, value)))
         poolId := shr(192, calldataload(add(1, data.offset)))
         let pointer := byte(0, calldataload(add(9, data.offset)))
