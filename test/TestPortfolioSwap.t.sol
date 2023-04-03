@@ -167,7 +167,8 @@ contract TestPortfolioSwap is Setup {
         isArmed
     {
         PortfolioPool memory pool = ghost().pool();
-        (, int256 invariant) = subject().checkInvariant(
+        (, int256 invariant) = RMM01Portfolio(payable(address(subject())))
+            .checkInvariant(
             ghost().poolId,
             int256(0),
             pool.virtualX,
@@ -194,7 +195,8 @@ contract TestPortfolioSwap is Setup {
 
         int256 prev = invariant;
         pool = ghost().pool();
-        (, invariant) = subject().checkInvariant(
+        (, invariant) = RMM01Portfolio(payable(address(subject())))
+            .checkInvariant(
             ghost().poolId,
             int256(0),
             pool.virtualX,
@@ -206,7 +208,7 @@ contract TestPortfolioSwap is Setup {
         int256 diff = post - prev;
         console.logInt(diff);
 
-        PortfolioPool memory pool = ghost().pool();
+        pool = ghost().pool();
         (uint256 x, uint256 y) = (pool.virtualX, pool.virtualY);
 
         console.log("X: %s", x);

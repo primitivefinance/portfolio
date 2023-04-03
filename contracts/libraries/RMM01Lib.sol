@@ -145,44 +145,43 @@ library RMM01Lib {
             prevInd + data.remainder.divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
-        {
-            if (sellAsset) {
-                nextDep = Invariant.getY({
-                    R_x: nextInd,
-                    stk: self.params.maxPrice,
-                    vol: volatilityWad,
-                    tau: tau,
-                    inv: data.prevInvariant
-                });
-            } else {
-                nextDep = Invariant.getX({
-                    R_y: nextInd,
-                    stk: self.params.maxPrice,
-                    vol: volatilityWad,
-                    tau: tau,
-                    inv: data.prevInvariant
-                });
-            }
 
-            Bisection memory args = Bisection({
-                terminalPriceWad: self.params.maxPrice,
-                volatilityFactorWad: volatilityWad,
-                timeRemainingSec: tau,
-                independentReserve: nextIndFull,
-                dependentReserve: nextDep
+        if (sellAsset) {
+            nextDep = Invariant.getY({
+                R_x: nextInd,
+                stk: self.params.maxPrice,
+                vol: volatilityWad,
+                tau: tau,
+                inv: data.prevInvariant
             });
-
-            nextDep = uint256(
-                bisection(
-                    args,
-                    int256(nextDep * 9999 / 10000),
-                    int256(nextDep * 10001 / 10000),
-                    1,
-                    256,
-                    optimizeQuote
-                )
-            );
+        } else {
+            nextDep = Invariant.getX({
+                R_y: nextInd,
+                stk: self.params.maxPrice,
+                vol: volatilityWad,
+                tau: tau,
+                inv: data.prevInvariant
+            });
         }
+
+        Bisection memory args = Bisection({
+            terminalPriceWad: self.params.maxPrice,
+            volatilityFactorWad: volatilityWad,
+            timeRemainingSec: tau,
+            independentReserve: nextIndFull,
+            dependentReserve: nextDep
+        });
+
+        nextDep = uint256(
+            bisection(
+                args,
+                int256(nextDep * 9999 / 10000),
+                int256(nextDep * 10001 / 10000),
+                1,
+                256,
+                optimizeQuote
+            )
+        );
     }
 
     function optimizeQuote(
