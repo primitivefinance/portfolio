@@ -8,14 +8,14 @@ struct Bisection {
     uint256 dependentReserve;
 }
 
-function bisectionQuote(
+function bisection(
     Bisection memory args,
     int256 ain,
     int256 bin,
     int256 eps,
     int256 max,
-    function(Bisection memory,int256) view returns (int256) fx
-) view returns (int256 root) {
+    function(Bisection memory,int256) pure returns (int256) fx
+) pure returns (int256 root) {
     // Chosen `a` and `b` are incorrect.
     // False if ain * bin < 0, !(ain * bin < 0).
     int256 fxa = fx(args, ain);

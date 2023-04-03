@@ -463,10 +463,10 @@ abstract contract PortfolioVirtual is Objective {
             // This is revisited depending on if fees are saved in claimable balances.
             if (_state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextIndependent, nextDependent);
+                    (nextIndependentLessFee, nextDependent);
             } else {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextDependent, nextIndependent);
+                    (nextDependent, nextIndependentLessFee);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
