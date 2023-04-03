@@ -259,11 +259,15 @@ abstract contract PortfolioVirtual is Objective {
         uint256 claimedQuotes =
             deltaQuote == type(uint128).max ? pos.tokensOwedQuote : deltaQuote;
 
-        pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
-        pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
+        if (claimedAssets > 0) {
+            pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
+            _applyCredit(msg.sender, asset, claimedAssets);
+        }
 
-        if (claimedAssets > 0) _applyCredit(msg.sender, asset, claimedAssets);
-        if (claimedQuotes > 0) _applyCredit(msg.sender, quote, claimedQuotes);
+        if (claimedQuotes > 0) {
+            pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
+            _applyCredit(msg.sender, quote, claimedQuotes);
+        }
 
         emit Collect(
             poolId, msg.sender, claimedAssets, asset, claimedQuotes, quote
