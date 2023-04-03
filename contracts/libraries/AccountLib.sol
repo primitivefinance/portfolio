@@ -212,7 +212,7 @@ function reset(AccountSystem storage self) {
 }
 
 /**
- * @dev Used to check if a token was already activated after being interacted with again.
+ * @dev Set the cache status of a token.
  */
 function cache(AccountSystem storage self, address token, bool status) {
     self.cached[token] = status;
