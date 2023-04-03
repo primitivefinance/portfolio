@@ -445,8 +445,7 @@ abstract contract PortfolioVirtual is Objective {
             input = input.scaleToWad(
                 _state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote
             );
-            output = args.output;
-            output = output.scaleToWad(
+            output = uint256(args.output).scaleToWad(
                 _state.sell ? pool.pair.decimalsQuote : pool.pair.decimalsAsset
             );
 
