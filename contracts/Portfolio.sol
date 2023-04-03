@@ -409,9 +409,6 @@ abstract contract PortfolioVirtual is Objective {
         internal
         returns (uint64 poolId, uint256 input, uint256 output)
     {
-        // =---= Checks =---= //
-        if (args.input == 0) revert ZeroInput();
-
         PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
