@@ -141,11 +141,8 @@ library RMM01Lib {
 
         nextInd = prevInd
             + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
-        uint256 nextIndFull =
-            prevInd + data.remainder.divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
-
         if (sellAsset) {
             nextDep = Invariant.getY({
                 R_x: nextInd,
@@ -168,7 +165,7 @@ library RMM01Lib {
             terminalPriceWad: self.params.maxPrice,
             volatilityFactorWad: volatilityWad,
             timeRemainingSec: tau,
-            independentReserve: nextIndFull,
+            independentReserve: nextInd, // note: Using the next independent reserve less the input fee amount to compute the optimal output amount.
             dependentReserve: nextDep
         });
 
