@@ -16,7 +16,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut =
-            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn));
+            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn, address(this)));
 
         uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
         subject().multiprocess(
@@ -44,7 +44,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut =
-            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn));
+            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn, address(this)));
 
         uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
 
@@ -81,7 +81,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut =
-            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn));
+            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn, address(this)));
 
         subject().multiprocess(
             FVMLib.encodeSwap(

@@ -179,7 +179,7 @@ contract TestPortfolioClaim is Setup {
         // eve waits for some swaps to happen. basicSwap will sell assets and increment asset fee growth.
         uint128 amountIn = 1500;
         uint128 amountOut = (
-            subject().getAmountOut(ghost().poolId, true, amountIn) - 10
+            subject().getAmountOut(ghost().poolId, true, amountIn, address(this)) - 10
         ).safeCastTo128(); // Subtract
             // small amount to get positive invariant growth (not an optimal trade).
         subject().multiprocess(
@@ -235,7 +235,7 @@ contract TestPortfolioClaim is Setup {
         // swap a small amount so we generate fees
         uint128 amountIn = 10_000 wei; // 1% fees will generate 100 wei of asset fee growth
         uint128 amountOut = (
-            subject().getAmountOut(ghost().poolId, true, amountIn) - 10
+            subject().getAmountOut(ghost().poolId, true, amountIn, address(this)) - 10
         ).safeCastTo128(); // Subtract
             // small amount to get positive invariant growth (not an optimal trade).
         subject().multiprocess(
