@@ -213,5 +213,7 @@ contract TestPortfolioSwap is Setup {
 
         console.log("X: %s", x);
         console.log("Y: %s", y);
+        // Invariant should increase because fees are non-zero.
+        assertTrue(invariant > prev, "invariant-did-not-increase");
     }
 }

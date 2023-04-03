@@ -14,6 +14,7 @@ import "./BisectionLib.sol";
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant WAD = 1 ether;
 uint256 constant YEAR = 31556953 seconds;
+uint256 constant BISECTION_EPSILON = 1;
 
 /**
  * @title   RMM01Lib
@@ -168,12 +169,23 @@ library RMM01Lib {
         args.tauSeconds = tau;
         args.reserveWadPerLiquidity = nextInd;
 
+        uint256 lower = nextDep.mulDivDown(9999, 10000);
+        uint256 upper = nextDep.mulDivUp(10001, 10000);
+        // Each reserve has a minimum lower bound of 0.
+        // Each reserve has its own upper bound per liquidity unit.
+        // The quote reserve is bounded by the max price.
+        // The asset reserve is bounded by 1E18.
+        uint256 maximum = sellAsset ? args.terminalPriceWad : 1 ether;
+        upper = upper > maximum ? maximum : upper;
+
+        // Using the approximated next dependent reserve,
+        // optimize around 0.01% error to find the precise dependent reserve.
         nextDep = bisection(
             args,
-            nextDep * 9999 / 10000,
-            nextDep * 10001 / 10000,
-            1,
-            256,
+            lower,
+            upper,
+            BISECTION_EPSILON,
+            256, // todo: potentially expose the max iteration parameter to the Portfolio `getAmountOut` function.
             optimizeDependentReserve
         );
     }
