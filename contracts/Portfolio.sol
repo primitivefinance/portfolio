@@ -716,7 +716,7 @@ abstract contract PortfolioVirtual is Objective {
         bool isPerpetual = duration == type(uint16).max ? true : false; // type(uint16).max is a magic variable
         PortfolioCurve memory params = PortfolioCurve({
             maxPrice: maxPrice,
-            jit: hasController ? jit : uint8(_liquidityPolicy),
+            jit: hasController ? jit : uint16(_liquidityPolicy),
             fee: fee,
             duration: isPerpetual ? uint16(MAX_DURATION) : duration, // Set duration to the max if perpetual.
             volatility: volatility,
