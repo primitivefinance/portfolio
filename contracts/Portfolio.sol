@@ -808,7 +808,14 @@ abstract contract PortfolioVirtual is Objective {
     function _process(bytes calldata data) internal {
         (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
-        if (instruction == FVM.ALLOCATE) {
+        if (
+            instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
+        ) {
+            Order memory args;
+            (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
+            = FVM.decodeSwap(data);
+            _swap(args);
+        } else if (instruction == FVM.ALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
                 FVM.decodeAllocateOrDeallocate(data);
             _allocate(useMax == 1, poolId, deltaLiquidity);
@@ -816,13 +823,6 @@ abstract contract PortfolioVirtual is Objective {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
                 FVM.decodeAllocateOrDeallocate(data);
             _deallocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (
-            instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
-        ) {
-            Order memory args;
-            (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
-            = FVM.decodeSwap(data);
-            _swap(args);
         } else if (instruction == FVM.CREATE_POOL) {
             (
                 uint24 pairId,
