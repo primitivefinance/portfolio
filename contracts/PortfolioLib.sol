@@ -17,7 +17,6 @@ using {
 } for PortfolioCurve global;
 using {
     changePositionLiquidity,
-    syncPositionFees,
     getTimeSinceChanged
 } for PortfolioPosition global;
 using {
