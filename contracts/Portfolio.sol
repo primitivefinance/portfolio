@@ -797,11 +797,7 @@ abstract contract PortfolioVirtual is Objective {
         } else if (instruction == FVM.CREATE_PAIR) {
             (address asset, address quote) = FVM.decodeCreatePair(data);
             _createPair(asset, quote);
-        } else if (instruction == FVM.CLAIM) {
-            (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) =
-                FVM.decodeClaim(data);
-            _claim(poolId, deltaAsset, deltaQuote);
-        } else {
+        }  else {
             revert InvalidInstruction();
         }
     }
