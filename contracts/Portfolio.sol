@@ -313,9 +313,8 @@ abstract contract PortfolioVirtual is Objective {
         (PortfolioPool storage pool, PortfolioPosition storage position) =
             (pools[args.poolId], positions[args.owner][args.poolId]);
 
-        (feeAsset, feeQuote, invariantGrowth) = position.syncPositionFees(
-            pool.feeGrowthGlobalAsset,
-            pool.feeGrowthGlobalQuote,
+        // TODO: Rename this to syncInvariantGrowthGlobal, nuke the fees
+        (invariantGrowth) = position.syncPositionFees(
             pool.invariantGrowthGlobal
         );
 
@@ -369,11 +368,9 @@ abstract contract PortfolioVirtual is Objective {
             : pool.params.fee;
 
         if (_state.sell) {
-            _state.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
             _state.tokenInput = pool.pair.tokenAsset;
             _state.tokenOutput = pool.pair.tokenQuote;
         } else {
-            _state.feeGrowthGlobal = pool.feeGrowthGlobalQuote;
             _state.tokenInput = pool.pair.tokenQuote;
             _state.tokenOutput = pool.pair.tokenAsset;
         }
@@ -493,18 +490,16 @@ abstract contract PortfolioVirtual is Objective {
         // -=- Apply Fee Saving Method -=- //
         {
             // Fees are saved by incrementing the fee growth accumulator.
-            bool saved = _feeSavingEffects(args.poolId, iteration);
+            _feeSavingEffects(args.poolId, iteration);
 
             // If the fees are not saved,
             // apply the full next independent amount with fee amount included.
             // Fees were not saved in the claimable balances,
             // so this will re-invest the fees into the pool.
-            if (!saved) {
-                if (_state.sell) {
-                    iteration.virtualX = nextIndependent;
-                } else {
-                    iteration.virtualY = nextIndependent;
-                }
+            if (_state.sell) {
+                iteration.virtualX = nextIndependent;
+            } else {
+                iteration.virtualY = nextIndependent;
             }
         }
 
@@ -515,8 +510,6 @@ abstract contract PortfolioVirtual is Objective {
             iteration.virtualX,
             iteration.virtualY,
             iteration.liquidity,
-            _state.sell ? _state.feeGrowthGlobal : 0,
-            _state.sell ? 0 : _state.feeGrowthGlobal,
             _state.invariantGrowthGlobal
         );
 
@@ -560,10 +553,6 @@ abstract contract PortfolioVirtual is Objective {
         return (args.poolId, iteration.input, iteration.output);
     }
 
-    function _syncFeeGrowthAccumulator(uint256 feeGrowthGlobal) internal {
-        _state.feeGrowthGlobal = feeGrowthGlobal;
-    }
-
     function _syncInvariantGrowthAccumulator(uint256 invariantGrowthGlobal)
         internal
     {
@@ -578,8 +567,6 @@ abstract contract PortfolioVirtual is Objective {
         uint256 nextVirtualX,
         uint256 nextVirtualY,
         uint256 liquidity,
-        uint256 feeGrowthGlobalAsset,
-        uint256 feeGrowthGlobalQuote,
         uint256 invariantGrowthGlobal
     ) internal {
         PortfolioPool storage pool = pools[poolId];
@@ -588,12 +575,6 @@ abstract contract PortfolioVirtual is Objective {
         pool.virtualY = nextVirtualY.safeCastTo128();
         pool.liquidity = liquidity.safeCastTo128();
         pool.syncPoolTimestamp(block.timestamp);
-        pool.feeGrowthGlobalAsset = AssemblyLib.computeCheckpoint(
-            pool.feeGrowthGlobalAsset, feeGrowthGlobalAsset
-        );
-        pool.feeGrowthGlobalQuote = AssemblyLib.computeCheckpoint(
-            pool.feeGrowthGlobalQuote, feeGrowthGlobalQuote
-        );
         pool.invariantGrowthGlobal = AssemblyLib.computeCheckpoint(
             pool.invariantGrowthGlobal, invariantGrowthGlobal
         );
