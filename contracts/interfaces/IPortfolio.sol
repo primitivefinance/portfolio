@@ -214,7 +214,6 @@ interface IPortfolioGetters {
             uint128 liquidity,
             uint32 lastTimestamp,
             address controller,
-            uint256 invariantGrowthGlobal,
             PortfolioCurve memory,
             PortfolioPair memory
         );
@@ -227,9 +226,7 @@ interface IPortfolioGetters {
         view
         returns (
             uint128 freeLiquidity,
-            uint32 lastTimestamp,
-            uint256 invariantGrowthLast,
-            uint128 invariantOwed
+            uint32 lastTimestamp
         );
 
     // ===== Portfolio View ===== //

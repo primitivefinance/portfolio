@@ -50,27 +50,6 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function _feeSavingEffects(
-        uint64 poolId,
-        Iteration memory iteration
-    ) internal override returns (bool) {
-        // =---= Swap Effects =---= //
-        if (msg.sender == pools[poolId].controller) {
-            int256 delta = iteration.nextInvariant - iteration.prevInvariant;
-            uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-
-            // Apply priority invariant growth if invariant changed positively.
-            if (deltaAbs != 0) {
-                _syncInvariantGrowthAccumulator(
-                    deltaAbs.divWadDown(iteration.liquidity)
-                );
-            }
-        }
-
-        return false;
-    }
-
-    /// @inheritdoc Objective
     function _beforeSwapEffects(uint64 poolId)
         internal
         override

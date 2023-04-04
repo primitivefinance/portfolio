@@ -63,7 +63,6 @@ abstract contract PortfolioVirtual is Objective {
      * @dev
      * Manipulated in `_swap` to avoid stack too deep.
      * Utilized in virtual function implementations to handle fee growth, if any.
-     * Implements internal functions to manipulate `feeGrowthGlobal` and `invariantGrowthGlobal`.
      *
      * @custom:invariant MUST be deleted after every transaction that uses it.
      */
@@ -308,15 +307,9 @@ abstract contract PortfolioVirtual is Objective {
      */
     function _changeLiquidity(ChangeLiquidityParams memory args)
         internal
-        returns (uint256 feeAsset, uint256 feeQuote, uint256 invariantGrowth)
     {
         (PortfolioPool storage pool, PortfolioPosition storage position) =
             (pools[args.poolId], positions[args.owner][args.poolId]);
-
-        // TODO: Rename this to syncInvariantGrowthGlobal, nuke the fees
-        (invariantGrowth) = position.syncPositionFees(
-            pool.invariantGrowthGlobal
-        );
 
         bool canUpdate =
             checkPosition(args.poolId, args.owner, args.deltaLiquidity);
@@ -489,9 +482,6 @@ abstract contract PortfolioVirtual is Objective {
 
         // -=- Apply Fee Saving Method -=- //
         {
-            // Fees are saved by incrementing the fee growth accumulator.
-            _feeSavingEffects(args.poolId, iteration);
-
             // If the fees are not saved,
             // apply the full next independent amount with fee amount included.
             // Fees were not saved in the claimable balances,
@@ -509,8 +499,7 @@ abstract contract PortfolioVirtual is Objective {
             args.poolId,
             iteration.virtualX,
             iteration.virtualY,
-            iteration.liquidity,
-            _state.invariantGrowthGlobal
+            iteration.liquidity
         );
 
         // -=- Scale Amounts to Native Token Decimals -=- //
@@ -553,12 +542,6 @@ abstract contract PortfolioVirtual is Objective {
         return (args.poolId, iteration.input, iteration.output);
     }
 
-    function _syncInvariantGrowthAccumulator(uint256 invariantGrowthGlobal)
-        internal
-    {
-        _state.invariantGrowthGlobal = invariantGrowthGlobal;
-    }
-
     /**
      * @dev Effects on a `pool` after a successful swap.
      */
@@ -566,8 +549,7 @@ abstract contract PortfolioVirtual is Objective {
         uint64 poolId,
         uint256 nextVirtualX,
         uint256 nextVirtualY,
-        uint256 liquidity,
-        uint256 invariantGrowthGlobal
+        uint256 liquidity
     ) internal {
         PortfolioPool storage pool = pools[poolId];
 
@@ -575,9 +557,6 @@ abstract contract PortfolioVirtual is Objective {
         pool.virtualY = nextVirtualY.safeCastTo128();
         pool.liquidity = liquidity.safeCastTo128();
         pool.syncPoolTimestamp(block.timestamp);
-        pool.invariantGrowthGlobal = AssemblyLib.computeCheckpoint(
-            pool.invariantGrowthGlobal, invariantGrowthGlobal
-        );
     }
 
     function _createPair(
