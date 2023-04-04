@@ -96,18 +96,6 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @notice Reduces `feeAssetDec` amount of `asset` and `feeQuoteDec` amount of `quote` from the position's state.
-     */
-    event Collect(
-        uint64 poolId,
-        address indexed account,
-        uint256 feeAssetDec,
-        address indexed asset,
-        uint256 feeQuoteDec,
-        address indexed quote
-    );
-
-    /**
      * @notice Emitted on pair creation.
      */
     event CreatePair(
@@ -227,8 +215,6 @@ interface IPortfolioGetters {
             uint32 lastTimestamp,
             address controller,
             uint256 invariantGrowthGlobal,
-            uint256 feeGrowthGlobalAsset,
-            uint256 feeGrowthGlobalQuote,
             PortfolioCurve memory,
             PortfolioPair memory
         );
@@ -243,10 +229,6 @@ interface IPortfolioGetters {
             uint128 freeLiquidity,
             uint32 lastTimestamp,
             uint256 invariantGrowthLast,
-            uint256 feeGrowthAssetLast,
-            uint256 feeGrowthQuoteLast,
-            uint128 tokensOwedAsset,
-            uint128 tokensOwedQuote,
             uint128 invariantOwed
         );
 
