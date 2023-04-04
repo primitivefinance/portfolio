@@ -222,55 +222,6 @@ abstract contract PortfolioVirtual is Objective {
     // ===== Internal ===== //
 
     /**
-     * @dev Re-assigns the tokens owed of a position to the `msg.sender`'s internal balance.
-     * @param deltaAsset Quantity of asset tokens in native token decimals to re-assign.
-     * @param deltaQuote Quantity of quote tokens in native token decimals to re-assign.
-     */
-    function _claim(
-        uint64 poolId,
-        uint128 deltaAsset,
-        uint128 deltaQuote
-    ) internal {
-        PortfolioPosition storage pos = positions[msg.sender][poolId];
-        if (pos.lastTimestamp == 0) {
-            revert NonExistentPosition(msg.sender, poolId);
-        }
-
-        PortfolioPool storage pool = pools[poolId];
-        (
-            uint256 growthAsset,
-            uint256 growthQuote,
-            uint256 growthInvariant,
-            address asset,
-            address quote
-        ) = (
-            pool.feeGrowthGlobalAsset,
-            pool.feeGrowthGlobalQuote,
-            pool.invariantGrowthGlobal,
-            pool.pair.tokenAsset,
-            pool.pair.tokenQuote
-        );
-
-        pos.syncPositionFees(growthAsset, growthQuote, growthInvariant);
-
-        // 2^128 is a magic variable to claim the maximum amount of owed tokens after it has been synced.
-        uint256 claimedAssets =
-            deltaAsset == type(uint128).max ? pos.tokensOwedAsset : deltaAsset;
-        uint256 claimedQuotes =
-            deltaQuote == type(uint128).max ? pos.tokensOwedQuote : deltaQuote;
-
-        pos.tokensOwedAsset -= claimedAssets.safeCastTo128();
-        pos.tokensOwedQuote -= claimedQuotes.safeCastTo128();
-
-        if (claimedAssets > 0) _applyCredit(msg.sender, asset, claimedAssets);
-        if (claimedQuotes > 0) _applyCredit(msg.sender, quote, claimedQuotes);
-
-        emit Collect(
-            poolId, msg.sender, claimedAssets, asset, claimedQuotes, quote
-            );
-    }
-
-    /**
      * @dev Increases virtual reserves and liquidity. Debits `msg.sender`.
      */
     function _allocate(
