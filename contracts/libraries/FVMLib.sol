@@ -93,8 +93,8 @@ error TooManyInstructions();
  * | bytes[0]                   | 0xAA Instruction code     |
  * | bytes[1]                   | Amount of Instructions    |
  * | bytes[2]                   | ptr[0] := Length of instruction[0]
- * | bytes[2:ptr[0] + 1]        | Data of instruction[0]. Calldata slice does not include end index.   |
- * | bytes[ptr[0] + 1]          | ptr[1] := Length of instruction[1] |
+ * | bytes[3:3 + ptr[0]]        | Data of instruction[0]. Calldata slice does not include end index.   |
+ * | bytes[3 + ptr[0]]          | ptr[1] := Length of instruction[1] |
  * | ...                        | Repeats in a loop for each instruction. |
  */
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
