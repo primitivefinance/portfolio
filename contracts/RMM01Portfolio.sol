@@ -67,17 +67,6 @@ contract RMM01Portfolio is PortfolioVirtual {
             }
         }
 
-        // Do not re-invest fees if next invariant is positive.
-        if (iteration.nextInvariant > 0) {
-            _syncFeeGrowthAccumulator(
-                FixedPointMathLib.divWadDown(
-                    iteration.feeAmount, iteration.liquidity
-                )
-            );
-
-            return true;
-        }
-
         return false;
     }
 
