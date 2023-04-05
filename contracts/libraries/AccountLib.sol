@@ -228,5 +228,10 @@ function getNetBalance(
 ) view returns (int256 net) {
     uint256 internalBalance = self.reserves[token];
     uint256 physicalBalance = __balanceOf__(token, account);
+
+    // Before casting `internalBalance` into an `int256`,
+    // we must ensure it fits within. If it does not, we revert.
+    if (internalBalance > uint256(type(int256).max)) revert();
+
     net = int256(physicalBalance) - int256(internalBalance);
 }
