@@ -536,7 +536,7 @@ abstract contract PortfolioVirtual is Objective {
                     iteration.prevInvariant, nextInvariantWad
                 );
             }
-            iteration.nextInvariant = int128(nextInvariantWad);
+            iteration.nextInvariant = nextInvariantWad;
         }
 
         // -=- Apply Fee Saving Method -=- //
