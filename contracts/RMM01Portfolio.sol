@@ -37,9 +37,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         updatedTau = pool.computeTau(block.timestamp);
 
         (uint256 x, uint256 y) = pool.getVirtualPoolReservesPerLiquidityInWad();
-        invariant = int128(
-            pool.invariantOf({R_x: x, R_y: y, timeRemainingSec: updatedTau})
-        );
+        invariant = pool.invariantOf({R_x: x, R_y: y, timeRemainingSec: updatedTau});
 
         price = RMM01Lib.getPriceWithX({
             R_x: x,
