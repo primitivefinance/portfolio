@@ -231,22 +231,6 @@ library AssemblyLib {
         data = upper << 4 | (lower & 0x0F);
     }
 
-    /**
-     * @dev Converts an array of bytes into an uint128, the array must adhere
-     * to the the following format:
-     * - First byte: Amount of trailing zeros.
-     * - Rest of the array: A hexadecimal number.
-     */
-    function toAmount(bytes calldata raw)
-        internal
-        pure
-        returns (uint128 amount)
-    {
-        uint8 power = uint8(raw[0]);
-        amount = uint128(toBytes16(raw[1:raw.length]));
-        if (power != 0) amount = amount * uint128(10 ** power);
-    }
-
     function fromAmount(uint128 amount)
         internal
         pure
