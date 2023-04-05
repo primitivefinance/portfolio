@@ -249,6 +249,9 @@ function getPoolReserves(PortfolioPool memory self)
     pure
     returns (uint128 reserveAsset, uint128 reserveQuote)
 {
+    // Check if -`self.liquidity` fits within an int128 by checking if it's
+    // greater than the minimum negative value of an int128.
+    if (self.liquidity > 170141183460469231731687303715884105728) revert();
     return self.getPoolLiquidityDeltas(-int128(self.liquidity)); // Rounds down.
 }
 
