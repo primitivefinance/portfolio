@@ -50,6 +50,7 @@ bytes1 constant INSTRUCTION_JUMP = 0xAA;
 
 error InvalidJump(uint256 pointer); // 0x80f63bd1
 error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
+error TooManyInstructions();
 
 /**
  * @dev Expects a serialized encoding of instructions.
@@ -167,6 +168,9 @@ function encodeJumpInstruction(bytes[] memory instructions)
     returns (bytes memory)
 {
     uint8 totalInstructions = uint8(instructions.length);
+
+    if (totalInstructions > 255) revert TooManyInstructions();
+
     bytes memory payload =
         bytes.concat(INSTRUCTION_JUMP, bytes1(totalInstructions));
 
