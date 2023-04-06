@@ -15,7 +15,7 @@ contract TestPortfolioDeallocate is Setup {
         uint128 liquidity = 1 ether;
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, liquidity, 0, 0
+                true, uint8(0), ghost().poolId, liquidity, type(uint128).max, type(uint128).max
             )
         );
 
@@ -44,7 +44,7 @@ contract TestPortfolioDeallocate is Setup {
         vm.assume(liquidity > 0);
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, liquidity, 0, 0
+                true, uint8(0), ghost().poolId, liquidity, type(uint128).max, type(uint128).max
             )
         );
         _simple_deallocate(liquidity);
@@ -64,7 +64,7 @@ contract TestPortfolioDeallocate is Setup {
         vm.assume(liquidity > 0);
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, liquidity, 0, 0
+                true, uint8(0), ghost().poolId, liquidity, type(uint128).max, type(uint128).max
             )
         );
         _simple_deallocate(liquidity);
@@ -84,7 +84,7 @@ contract TestPortfolioDeallocate is Setup {
         vm.assume(liquidity > 0);
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, liquidity, 0, 0
+                true, uint8(0), ghost().poolId, liquidity, type(uint128).max, type(uint128).max
             )
         );
         _simple_deallocate(liquidity);
@@ -102,7 +102,7 @@ contract TestPortfolioDeallocate is Setup {
         vm.deal(actor(), 250 ether);
         subject().multiprocess{value: 250 ether}(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, liquidity, 0, 0
+                true, uint8(0), ghost().poolId, liquidity, type(uint128).max, type(uint128).max
             )
         );
         _simple_deallocate(liquidity);
@@ -115,7 +115,7 @@ contract TestPortfolioDeallocate is Setup {
         vm.assume(liquidity > 0);
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, liquidity, 0, 0
+                true, uint8(0), ghost().poolId, liquidity, type(uint128).max, type(uint128).max
             )
         );
         vm.warp(block.timestamp + timestep);

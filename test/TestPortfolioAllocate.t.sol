@@ -24,8 +24,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         // Fetch the variable changed.
@@ -57,8 +57,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(1),
                 poolId: ghost().poolId,
                 deltaLiquidity: 1,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         assertEq(
@@ -85,8 +85,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post = ghost().pool().lastTimestamp;
@@ -115,8 +115,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
@@ -152,8 +152,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
@@ -188,8 +188,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post_asset =
@@ -214,8 +214,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: failureArg,
                 deltaLiquidity: 1 ether,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
     }
@@ -234,8 +234,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: ghost().poolId,
                 deltaLiquidity: uint128(failureArg),
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
     }
@@ -254,8 +254,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: ghost().poolId,
                 deltaLiquidity: uint128(failureArg),
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
     }
@@ -288,8 +288,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
 
@@ -409,8 +409,8 @@ contract TestPortfolioAllocate is Setup {
                 useMax: uint8(0),
                 poolId: xid,
                 deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: 0
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
 

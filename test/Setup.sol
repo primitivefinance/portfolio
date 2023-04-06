@@ -287,7 +287,7 @@ contract Setup is Test {
     modifier allocateSome(uint128 amt) {
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, amt, 0, 0
+                true, uint8(0), ghost().poolId, amt, type(uint128).max, type(uint128).max
             )
         );
         _;

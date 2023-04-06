@@ -410,8 +410,8 @@ contract HandlerPortfolio is HandlerBase {
                 uint8(0),
                 ctx.ghost().poolId,
                 deltaLiquidity.safeCastTo128(),
-                0,
-                0
+                type(uint128).max,
+                type(uint128).max
             )
         );
         post = fetchAccountingState();

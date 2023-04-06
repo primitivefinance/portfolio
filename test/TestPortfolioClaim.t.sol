@@ -171,7 +171,7 @@ contract TestPortfolioClaim is Setup {
         // eve provides minimal liquidity to the pool
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, uint128(startLiquidity / 5), 0, 0
+                true, uint8(0), ghost().poolId, uint128(startLiquidity / 5), type(uint128).max, type(uint128).max
             )
         ); // 20%
             // of pool, eve = 2000, total = 2000 + 10000
@@ -228,7 +228,7 @@ contract TestPortfolioClaim is Setup {
         uint128 delLiquidity = 100_000 wei; // with the pool params, asset reserves will be about 300 wei.
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                true, uint8(0), ghost().poolId, delLiquidity, 0, 0
+                true, uint8(0), ghost().poolId, delLiquidity, type(uint128).max, type(uint128).max
             )
         );
 
