@@ -297,7 +297,7 @@ abstract contract PortfolioVirtual is Objective {
         (deltaAsset, deltaQuote) =
             getLiquidityDeltas(poolId, AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
-        if (deltaAsset > maxDeltaAsset || deltaQuote > maxDeltaQuote) revert();
+        if (deltaAsset > maxDeltaAsset || deltaQuote > maxDeltaQuote) revert MaxDeltaReached();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
