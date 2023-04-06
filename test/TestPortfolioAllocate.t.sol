@@ -128,6 +128,62 @@ contract TestPortfolioAllocate is Setup {
         assertEq(post_quote, prev_quote + delta1, "pool.getReserve(quote)");
     }
 
+    function test_allocate_reverts_when_max_quote_reached()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+
+        vm.expectRevert();
+
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: type(uint128).max
+            })
+        );
+    }
+
+    function test_allocate_reverts_when_max_delta_reached()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+
+        vm.expectRevert();
+
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: 0
+            })
+        );
+    }
+
     /// todo: This is identical logic, only thing that changed was the config modifier.
     /// A better design might be to make the config modifer take a parameter
     /// that chooses the config?
