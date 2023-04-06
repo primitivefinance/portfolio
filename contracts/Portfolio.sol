@@ -338,7 +338,7 @@ abstract contract PortfolioVirtual is Objective {
         if (deltaLiquidity == 0) revert ZeroLiquidity();
         (deltaAsset, deltaQuote) =
             getLiquidityDeltas(poolId, -AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds down.
-        if (deltaAsset < minDeltaAsset || deltaQuote < minDeltaQuote) revert();
+        if (deltaAsset < minDeltaAsset || deltaQuote < minDeltaQuote) revert MinDeltaUnmatched();
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
             poolId: poolId,
