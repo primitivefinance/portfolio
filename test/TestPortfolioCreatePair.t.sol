@@ -11,6 +11,15 @@ contract TestPortfolioCreatePair is Setup {
         subject().multiprocess(data);
     }
 
+    function test_createPair_result() public {
+        address token0 = address(new MockERC20("tkn", "tkn", 18));
+        address token1 = address(new MockERC20("tkn", "tkn", 18));
+        bytes memory data = FVMLib.encodeCreatePair(token0, token1);
+        bytes[] memory result = subject().multiprocess(data);
+        uint24 pairId = abi.decode(result[0], (uint24));
+        assertEq(pairId, 1);
+    }
+
     function test_revert_createPair_same_token() public {
         address token0 = address(new MockERC20("tkn", "tkn", 18));
         bytes memory data = FVMLib.encodeCreatePair(token0, token0);
