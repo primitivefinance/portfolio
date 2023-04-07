@@ -337,7 +337,7 @@ interface IPortfolioActions {
      *
      * todo: Update multiprocess to return data, or information that can help debugging.
      */
-    function multiprocess(bytes calldata data) external payable;
+    function multiprocess(bytes calldata data) external payable returns (bytes[] memory output);
 
     /**
      * @notice Assigns `amount` of `token` to `msg.sender` internal balance.

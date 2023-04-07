@@ -95,9 +95,11 @@ error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
  * | bytes[ptr[0] + 1]          | ptr[1] := Length of instruction[1] |
  * | ...                        | Repeats in a loop for each instruction. |
  */
-function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
+function _jumpProcess(bytes calldata data, function(bytes calldata) returns (bytes memory) _process) returns (bytes[] memory results) {
     // Encoded `data`:| 0x | opcode | amount instructions | instruction length | instruction |
     uint8 totalInstructions = uint8(data[1]);
+    results = new bytes[](totalInstructions);
+
     // The "pointer" is pointing to the first byte of an instruction,
     // which holds the data for the instruction's length in bytes.
     uint256 idxPtr = JUMP_PROCESS_START_POINTER;
@@ -125,7 +127,7 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
         idxPtr = idxInstructionEnd;
         // Process the instruction after removing the instruction length,
         // so only instruction data is passed to `_process`.
-        _process(instruction[1:]);
+        results[i] = _process(instruction[1:]);
     }
 }
 

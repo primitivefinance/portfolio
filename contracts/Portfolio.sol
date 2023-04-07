@@ -145,13 +145,18 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /// @inheritdoc IPortfolioActions
-    function multiprocess(bytes calldata data) external payable lock {
+    function multiprocess(bytes calldata data) external payable lock returns (bytes[] memory results) {
         // Wraps msg.value.
         _deposit();
 
         // Effects
-        if (data[0] != FVM.INSTRUCTION_JUMP) _process(data);
-        else FVM._jumpProcess(data, _process);
+        if (data[0] != FVM.INSTRUCTION_JUMP) {
+            results = new bytes[](1);
+            results[0] = _process(data);
+        }
+        else {
+            results = FVM._jumpProcess(data, _process);
+        }
 
         // Interactions
         _settlement();
@@ -802,24 +807,28 @@ abstract contract PortfolioVirtual is Objective {
      * @dev Use `multiprocess` to enter this function to process instructions.
      * @param data Custom encoded FVM data. First byte must be an FVM instruction.
      */
-    function _process(bytes calldata data) internal {
+    function _process(bytes calldata data) internal returns (bytes memory result) {
         (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == FVM.ALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
                 FVM.decodeAllocateOrDeallocate(data);
-            _allocate(useMax == 1, poolId, deltaLiquidity);
+
+            (uint256 deltaAsset, uint256 deltaQuote) = _allocate(useMax == 1, poolId, deltaLiquidity);
+            result = abi.encode(deltaAsset, deltaQuote);
         } else if (instruction == FVM.DEALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
                 FVM.decodeAllocateOrDeallocate(data);
-            _deallocate(useMax == 1, poolId, deltaLiquidity);
+            (uint256 deltaAsset, uint256 deltaQuote) = _deallocate(useMax == 1, poolId, deltaLiquidity);
+            result = abi.encode(deltaAsset, deltaQuote);
         } else if (
             instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
         ) {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
             = FVM.decodeSwap(data);
-            _swap(args);
+            (uint64 poolId, uint256 input, uint256 output) = _swap(args);
+            result = abi.encode(poolId, input, output);
         } else if (instruction == FVM.CREATE_POOL) {
             (
                 uint24 pairId,
@@ -832,7 +841,7 @@ abstract contract PortfolioVirtual is Objective {
                 uint128 maxPrice,
                 uint128 price
             ) = FVM.decodeCreatePool(data);
-            _createPool(
+            uint64 poolId = _createPool(
                 pairId,
                 controller,
                 priorityFee,
@@ -843,9 +852,11 @@ abstract contract PortfolioVirtual is Objective {
                 maxPrice,
                 price
             );
+            result = abi.encode(poolId);
         } else if (instruction == FVM.CREATE_PAIR) {
             (address asset, address quote) = FVM.decodeCreatePair(data);
-            _createPair(asset, quote);
+            uint24 pairId = _createPair(asset, quote);
+            result = abi.encode(pairId);
         } else if (instruction == FVM.CLAIM) {
             (uint64 poolId, uint128 deltaAsset, uint128 deltaQuote) =
                 FVM.decodeClaim(data);
