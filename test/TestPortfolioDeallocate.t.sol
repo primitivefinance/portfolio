@@ -122,6 +122,76 @@ contract TestPortfolioDeallocate is Setup {
         _simple_deallocate(liquidity);
     }
 
+    function test_deallocate_reverts_when_min_asset_unmatched()
+        public
+        noJit
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
+            })
+        );
+
+        vm.expectRevert();
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate(
+                false,
+                uint8(1),
+                ghost().poolId,
+                amount,
+                type(uint128).max,
+                0
+            )
+        );
+    }
+
+    function test_deallocate_reverts_when_min_quote_unmatched()
+        public
+        noJit
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
+            })
+        );
+
+        vm.expectRevert();
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate(
+                false,
+                uint8(1),
+                ghost().poolId,
+                amount,
+                0,
+                type(uint128).max
+            )
+        );
+    }
+
     function _simple_deallocate(uint128 amount) internal {
         uint256 prev = ghost().position(actor()).freeLiquidity;
         subject().multiprocess(
