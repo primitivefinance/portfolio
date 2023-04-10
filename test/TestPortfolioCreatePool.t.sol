@@ -154,4 +154,42 @@ contract TestPortfolioCreatePool is Setup {
             "lastTau != year"
         );
     }
+
+    function testFuzz_createPool_returned_results(
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 jit,
+        uint16 duration,
+        uint16 volatility,
+        uint128 maxPrice,
+        uint128 price
+    ) public {
+        uint24 pairId = uint24(1);
+        fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
+        priorityFee = uint16(bound(priorityFee, 1, fee));
+        jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
+        duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
+        volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
+        vm.assume(price > 0);
+        vm.assume(maxPrice > 0);
+
+        bytes memory data = FVM.encodeCreatePool(
+            pairId,
+            address(this),
+            priorityFee,
+            fee,
+            volatility,
+            duration,
+            jit,
+            maxPrice,
+            price
+        );
+
+        bytes[] memory results = subject().multiprocess(data);
+
+        uint64 poolId =
+            FVM.encodePoolId(pairId, true, subject().getPoolNonce(pairId));
+
+        assertEq(abi.decode(results[0], (uint64)), poolId);
+    }
 }
