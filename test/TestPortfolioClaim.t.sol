@@ -110,9 +110,16 @@ contract TestPortfolioClaim is Setup {
         deallocateSome(1 ether) // remove all liquidity from actor
         isArmed
     {
+        address[] memory tokens = new address[](2);
+        tokens[0] = ghost().asset().to_addr();
+        tokens[1] = ghost().quote().to_addr();
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = type(uint256).max;
+        amounts[1] = type(uint256).max;
+
         // Draw all the tokens from our account.
-        subject().draw(ghost().asset().to_addr(), type(uint256).max, actor());
-        subject().draw(ghost().quote().to_addr(), type(uint256).max, actor());
+        subject().draw(tokens, amounts, actor());
 
         PortfolioPosition memory pos = ghost().position(actor());
         PortfolioPool memory pool = ghost().pool();
@@ -136,8 +143,7 @@ contract TestPortfolioClaim is Setup {
         assertTrue(nextReserve >= nextBalance, "invalid-virtual-reserve-state");
 
         // Clear reserves by drawing tokens out again.
-        subject().draw(ghost().asset().to_addr(), type(uint256).max, actor());
-        subject().draw(ghost().quote().to_addr(), type(uint256).max, actor());
+        subject().draw(tokens, amounts, actor());
 
         pos = ghost().position(actor());
         (fee0,) = (uint128(pos.tokensOwedAsset), pos.tokensOwedQuote);
@@ -254,8 +260,16 @@ contract TestPortfolioClaim is Setup {
         // withdraw all internal balances
         uint256 bal0 = ghost().balance(actor(), ghost().asset().to_addr());
         uint256 bal1 = ghost().balance(actor(), ghost().quote().to_addr());
-        subject().draw(ghost().asset().to_addr(), bal0, actor());
-        subject().draw(ghost().quote().to_addr(), bal1, actor());
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = ghost().asset().to_addr();
+        tokens[1] = ghost().quote().to_addr();
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = bal0;
+        amounts[1] = bal1;
+
+        subject().draw(tokens, amounts, actor());
 
         // finally, do the claim and check the differences in reserves
         uint256 prev = ghost().balance(actor(), ghost().asset().to_addr());

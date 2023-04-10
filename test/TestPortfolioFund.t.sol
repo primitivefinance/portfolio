@@ -86,10 +86,14 @@ contract TestPortfolioFund is Setup {
             "subj-actual-balance-post"
         );
 
+        address[] memory tokens = new address[](1);
+        tokens[0] = ghost().asset().to_addr();
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = type(uint256).max;
+
         // Max draw tokens.
-        subject().draw(
-            ghost().asset().to_addr(), type(uint256).max, address(this)
-        );
+        subject().draw(tokens, amounts, address(this));
 
         // Get final variables.
         FundGhostVariables memory ghost_state_final = FundGhostVariables({

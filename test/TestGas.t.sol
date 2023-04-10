@@ -841,7 +841,14 @@ contract TestGas is Setup {
 
         _subject.fund(token, 1 ether);
         vm.resumeGasMetering();
-        _subject.draw(token, 1 ether, actor());
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = token;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1 ether;
+
+        _subject.draw(tokens, amounts, actor());
     }
 
     function test_gas_chain_allocate_deallocate_from_portfolio_balance()
@@ -883,8 +890,16 @@ contract TestGas is Setup {
         address to = actor();
         vm.resumeGasMetering();
         _subject.multiprocess(data);
-        _subject.draw(token0, type(uint256).max, to);
-        _subject.draw(token1, type(uint256).max, to);
+
+        address[] memory tokens = new address[](2);
+        tokens[0] = token0;
+        tokens[1] = token1;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = type(uint256).max;
+        amounts[1] = type(uint256).max;
+
+        _subject.draw(tokens, amounts, to);
     }
 
     function test_gas_single_swap_from_wallet()
@@ -916,6 +931,12 @@ contract TestGas is Setup {
         bytes memory data = _swapInstruction(true, ghost().poolId);
         vm.resumeGasMetering();
         _subject.multiprocess(data);
-        _subject.draw(token, type(uint256).max, to);
+        address[] memory tokens = new address[](1);
+        tokens[0] = token;
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = type(uint256).max;
+
+        _subject.draw(tokens, amounts, to);
     }
 }

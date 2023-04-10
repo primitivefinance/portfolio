@@ -18,7 +18,14 @@ contract TestPortfolioDraw is Setup {
         isArmed
     {
         uint256 prev = ghost().balance(address(this), ghost().asset().to_addr());
-        subject().draw(ghost().asset().to_addr(), 1 ether, address(this));
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = ghost().asset().to_addr();
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = 1 ether;
+
+        subject().draw(tokens, amounts, address(this));
         uint256 post = ghost().balance(address(this), ghost().asset().to_addr());
         assertTrue(post < prev, "non-decreasing-balance");
         assertEq(post, prev - 1 ether, "post-balance");
@@ -32,14 +39,27 @@ contract TestPortfolioDraw is Setup {
     {
         address tkn = ghost().asset().to_addr();
         vm.expectRevert(DrawBalance.selector);
-        subject().draw(tkn, 1 ether, address(this));
+
+        address[] memory tkns = new address[](1);
+        tkns[0] = tkn;
+
+        uint256[] memory amts = new uint256[](1);
+        amts[0] = 1 ether;
+        subject().draw(tkns, amts, address(this));
     }
 
     function test_draw_weth_transfers_ether() public useActor {
         uint256 amt = 1 ether;
         subject().deposit{value: amt}();
         uint256 prev = address(this).balance;
-        subject().draw(subject().WETH(), amt, address(this));
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = subject().WETH();
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = amt;
+
+        subject().draw(tokens, amounts, address(this));
         uint256 post = address(this).balance;
         assertEq(post, prev + amt, "post-balance");
         assertTrue(post > prev, "draw-did-not-increase-balance");
@@ -53,9 +73,14 @@ contract TestPortfolioDraw is Setup {
         isArmed
     {
         uint256 prev = ghost().balance(address(this), ghost().asset().to_addr());
-        subject().draw(
-            ghost().asset().to_addr(), type(uint256).max, address(this)
-        );
+
+        address[] memory tokens = new address[](1);
+        tokens[0] = ghost().asset().to_addr();
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = type(uint256).max;
+
+        subject().draw(tokens, amounts,  address(this));
         uint256 post = ghost().balance(address(this), ghost().asset().to_addr());
         assertEq(post, prev - 1 ether, "did-not-draw-max");
     }
