@@ -159,27 +159,36 @@ abstract contract PortfolioVirtual is Objective {
 
     /// @inheritdoc IPortfolioActions
     function draw(
-        address token,
-        uint256 amount,
+        address[] calldata tokens,
+        uint256[] calldata amounts,
         address to
     ) external override lock {
         // Checks
         if (to == address(this)) revert InvalidTransfer();
 
-        uint256 balance = getBalance(msg.sender, token);
-        if (amount == type(uint256).max) amount = balance;
-        if (amount > balance) revert DrawBalance();
+        uint256 length = tokens.length;
 
-        // Effects
-        _applyDebit(token, amount);
-        _decreaseReserves(token, amount);
+        for (uint256 i = 0; i != length;) {
+            uint256 amount = amounts[i];
+            address token = tokens[i];
 
-        if (token == WETH) {
-            Account.__dangerousUnwrapEther__(WETH, to, amount);
-        } else {
-            Account.SafeTransferLib.safeTransfer(
-                Account.ERC20(token), to, amount
-            );
+            uint256 balance = getBalance(msg.sender, token);
+            if (amount == type(uint256).max) amount = balance;
+            if (amount > balance) revert DrawBalance();
+
+            // Effects
+            _applyDebit(token, amount);
+            _decreaseReserves(token, amount);
+
+            if (token == WETH) {
+                Account.__dangerousUnwrapEther__(WETH, to, amount);
+            } else {
+                Account.SafeTransferLib.safeTransfer(
+                    Account.ERC20(token), to, amount
+                );
+            }
+
+            unchecked { ++i; }
         }
 
         // Interactions

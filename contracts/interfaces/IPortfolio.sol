@@ -349,7 +349,11 @@ interface IPortfolioActions {
      * @notice Unassigns `amount` of `token` from `msg.sender` and transfers it to the `to` address.
      * @dev Uses `IERC20.transfer`.
      */
-    function draw(address token, uint256 amount, address to) external;
+    function draw(
+        address[] calldata tokens,
+        uint256[] calldata amounts,
+        address to
+    ) external;
 
     /**
      * @notice Deposits ether into the `WETH` contract and credits `msg.sender` the received WETH.
