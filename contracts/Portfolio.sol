@@ -434,11 +434,15 @@ abstract contract PortfolioVirtual is Objective {
             (bool success, int256 invariant) = _beforeSwapEffects(args.poolId);
             if (!success) revert PoolExpired();
 
-            uint256 internalBalance = getBalance(
-                msg.sender,
-                _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
-            );
-            input = args.useMax == 1 ? internalBalance : args.input;
+            if (args.useMax == 1) {
+                input = getBalance(
+                    msg.sender,
+                    _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
+                );
+            } else {
+                input = args.input;
+            }
+
             input = input.scaleToWad(
                 _state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote
             );
