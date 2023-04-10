@@ -134,4 +134,37 @@ contract TestPortfolioDeallocate is Setup {
         // Deallocating liquidity can round down.
         assertApproxEqAbs(post, prev - amount, 1, "liquidity-did-not-decrease");
     }
+
+    function test_deallocate_returned_results()
+        public
+        noJit
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 liquidity = 1 ether;
+
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate(
+                true, uint8(0), ghost().poolId, liquidity
+            )
+        );
+
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(liquidity)
+        });
+
+        bytes[] memory results = subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate(
+                false, uint8(1), ghost().poolId, liquidity
+            )
+        );
+
+        (uint128 deltaAsset, uint128 deltaQuote)
+            = abi.decode(results[0], (uint128, uint128));
+
+        assertEq(deltaAsset, uint128(delta0));
+        assertEq(deltaQuote, uint128(delta1));
+    }
 }
