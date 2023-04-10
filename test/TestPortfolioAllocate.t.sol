@@ -414,4 +414,35 @@ contract TestPortfolioAllocate is Setup {
             "position.freeLiquidity != pool.liquidity"
         );
     }
+
+    function test_allocate_returned_results()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+        bytes[] memory results = subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount
+            })
+        );
+
+        (uint128 deltaAsset, uint128 deltaQuote) = abi.decode(
+            results[0],
+            (uint128, uint128)
+        );
+
+        assertEq(deltaAsset, delta0, "deltaAsset");
+        assertEq(deltaQuote, delta1, "deltaQuote");
+    }
 }
