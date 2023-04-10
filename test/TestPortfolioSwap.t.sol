@@ -103,4 +103,38 @@ contract TestPortfolioSwap is Setup {
         uint256 postBal = ghost().asset().to_token().balanceOf(address(this));
         assertTrue(postBal > preBal, "nothing claimed");
     }
+
+    function test_swap_returned_results()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+        isArmed
+    {
+        // Estimate amount out.
+        bool sellAsset = true;
+        uint128 amtIn = 0.1 ether;
+        uint128 amtOut =
+            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn));
+
+        bytes[] memory results = subject().multiprocess(
+            FVMLib.encodeSwap(
+                uint8(0),
+                ghost().poolId,
+                amtIn,
+                amtOut,
+                uint8(sellAsset ? 1 : 0)
+            )
+        );
+
+        (uint64 poolId, uint256 input, uint256 output) = abi.decode(
+            results[0],
+            (uint64, uint256, uint256)
+        );
+
+        assertEq(poolId, ghost().poolId);
+        assertEq(input, amtIn);
+        assertEq(output, amtOut);
+    }
 }
