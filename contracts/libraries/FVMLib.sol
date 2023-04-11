@@ -37,6 +37,7 @@ bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
 bytes1 constant DEALLOCATE = 0x03;
+bytes1 constant UNSET04 = 0x04;
 bytes1 constant SWAP_QUOTE = 0x05;
 bytes1 constant SWAP_ASSET = 0x06;
 bytes1 constant UNSET07 = 0x07;
