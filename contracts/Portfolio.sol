@@ -482,8 +482,6 @@ abstract contract PortfolioVirtual is Objective {
 
         // -=- Apply Fee Saving Method -=- //
         {
-            // If the fees are not saved,
-            // apply the full next independent amount with fee amount included.
             // Fees were not saved in the claimable balances,
             // so this will re-invest the fees into the pool.
             if (_state.sell) {
