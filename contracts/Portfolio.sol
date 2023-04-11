@@ -348,9 +348,6 @@ abstract contract PortfolioVirtual is Objective {
         internal
         returns (uint64 poolId, uint256 input, uint256 output)
     {
-        // =---= Checks =---= //
-        if (args.input == 0) revert ZeroInput();
-
         PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
@@ -374,16 +371,19 @@ abstract contract PortfolioVirtual is Objective {
             (bool success, int256 invariant) = _beforeSwapEffects(args.poolId);
             if (!success) revert PoolExpired();
 
-            uint256 internalBalance = getBalance(
-                msg.sender,
-                _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
-            );
-            input = args.useMax == 1 ? internalBalance : args.input;
+            if (args.useMax == 1) {
+                input = getBalance(
+                    msg.sender,
+                    _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
+                );
+            } else {
+                input = args.input;
+            }
+
             input = input.scaleToWad(
                 _state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote
             );
-            output = args.output;
-            output = output.scaleToWad(
+            output = uint256(args.output).scaleToWad(
                 _state.sell ? pool.pair.decimalsQuote : pool.pair.decimalsAsset
             );
 
@@ -727,7 +727,14 @@ abstract contract PortfolioVirtual is Objective {
     function _process(bytes calldata data) internal {
         (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
-        if (instruction == FVM.ALLOCATE) {
+        if (
+            instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
+        ) {
+            Order memory args;
+            (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
+            = FVM.decodeSwap(data);
+            _swap(args);
+        } else if (instruction == FVM.ALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
                 FVM.decodeAllocateOrDeallocate(data);
             _allocate(useMax == 1, poolId, deltaLiquidity);
@@ -735,13 +742,6 @@ abstract contract PortfolioVirtual is Objective {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity) =
                 FVM.decodeAllocateOrDeallocate(data);
             _deallocate(useMax == 1, poolId, deltaLiquidity);
-        } else if (
-            instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
-        ) {
-            Order memory args;
-            (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
-            = FVM.decodeSwap(data);
-            _swap(args);
         } else if (instruction == FVM.CREATE_POOL) {
             (
                 uint24 pairId,
