@@ -65,9 +65,7 @@ library AssemblyLib {
     }
 
     /**
-     * @dev Adds a signed `delta` to an unsigned `input` by using the sign-agnostic 256-bit type used in yul.
-     * Checks for overflow manually and reverts with `InvalidLiquidity()`, because this function is used to
-     * change liquidity in a position or pool.
+     * @dev Adds a signed `delta` to an unsigned `input`.
      * @custom:example
      * ```
      * uint128 output = addSignedDelta(uint128(15), -int128(5));
@@ -78,14 +76,10 @@ library AssemblyLib {
         uint128 input,
         int128 delta
     ) internal pure returns (uint128 output) {
-        bytes memory revertData =
-            abi.encodeWithSelector(InvalidLiquidity.selector);
-        assembly {
-            output := add(input, delta)
-            // Reverts on overflow.
-            if gt(output, 0xffffffffffffffffffffffffffffffff) {
-                revert(add(32, revertData), mload(revertData))
-            } // 0x1fff9681
+        if (delta > 0) {
+            output = input + uint128(delta);
+        } else {
+            output = input - uint128(-delta);
         }
     }
 

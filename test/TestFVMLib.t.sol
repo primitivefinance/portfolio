@@ -32,14 +32,6 @@ contract FVMLibTarget is Test {
         return decodeSwap(data);
     }
 
-    function decodeClaim_(bytes calldata data)
-        external
-        pure
-        returns (uint64 poolId, uint128 fee0, uint128 fee1)
-    {
-        return decodeClaim(data);
-    }
-
     function decodePoolId_(bytes calldata data)
         external
         pure
@@ -150,29 +142,6 @@ contract TestFVMLib is Test {
         assertEq(input, 1 ether);
         assertEq(output, 2000 * 10 ** 6);
         assertEq(sellAsset, 1);
-    }
-
-    function testFuzz_encodeClaim(
-        uint64 poolId,
-        uint128 fee0,
-        uint128 fee1
-    ) public {
-        bytes memory data = encodeClaim(poolId, fee0, fee1);
-
-        (uint64 poolId_, uint128 fee0_, uint128 fee1_) =
-            target.decodeClaim_(data);
-
-        assertEq(poolId, poolId_);
-        assertEq(fee0, fee0_);
-        assertEq(fee1, fee1_);
-    }
-
-    function test_decodeClaim() public {
-        bytes memory data = hex"10ffffffffffffffff0c062a1201";
-        (uint64 poolId, uint128 fee0, uint128 fee1) = target.decodeClaim_(data);
-        assertEq(poolId, uint64(0xffffffffffffffff));
-        assertEq(fee0, 42 * 10 ** 6);
-        assertEq(fee1, 1 * 10 ** 18);
     }
 
     function testFuzz_decodeCreatePair(address token0, address token1) public {
