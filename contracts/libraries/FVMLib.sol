@@ -37,7 +37,7 @@ bytes1 constant UNKNOWN = 0x00;
 bytes1 constant ALLOCATE = 0x01;
 bytes1 constant UNSET02 = 0x02;
 bytes1 constant DEALLOCATE = 0x03;
-bytes1 constant CLAIM = 0x04;
+bytes1 constant UNSET04 = 0x04;
 bytes1 constant SWAP_QUOTE = 0x05;
 bytes1 constant SWAP_ASSET = 0x06;
 bytes1 constant UNSET07 = 0x07;
@@ -287,69 +287,6 @@ function decodeCreatePair(bytes calldata data)
     assembly {
         tokenAsset := shr(96, calldataload(add(1, data.offset)))
         tokenQuote := shr(96, calldataload(add(21, data.offset)))
-    }
-}
-
-/**
- * @dev Encodes a `CLAIM` operation.
- * FIXME: This function is not optimized! Using `encodePacked` is not ideal
- * because it preserves all the leading zeros for each type. An improved version
- * should be made to reduce the calldata size by removing the extra zeros.
- */
-function encodeClaim(
-    uint64 poolId,
-    uint128 fee0,
-    uint128 fee1
-) pure returns (bytes memory data) {
-    (uint8 powerFee0, uint128 baseFee0) = AssemblyLib.fromAmount(fee0);
-    (uint8 powerFee1, uint128 baseFee1) = AssemblyLib.fromAmount(fee1);
-
-    return abi.encodePacked(
-        CLAIM,
-        poolId,
-        uint8(27), // Static pointer due to the current fixed encoding
-        powerFee0,
-        baseFee0,
-        powerFee1,
-        baseFee1
-    );
-}
-
-/**
- * @dev Decodes a `CLAIM` operation.
- * The data is expected to be encoded using the following format:\
- * `0x | CLAIM (1 byte) | poolId (8 bytes) | pointerPowerFee1 (1 byte) | powerFee0 (1 byte) | baseFee0 (? bytes) | powerFee1 (1 byte) | baseFee1 (? bytes)`\
- * @param data Encoded `CLAIM` operation following the format above
- * @return poolId Id of the pool
- * @return fee0 Fee of the asset token
- * @return fee1 Fee of the quote token
- */
-function decodeClaim(bytes calldata data)
-    pure
-    returns (uint64 poolId, uint128 fee0, uint128 fee1)
-{
-    assembly {
-        let value := calldataload(data.offset)
-        poolId := shr(192, shl(8, value))
-        let pointer := byte(9, value)
-        let power := byte(10, value)
-        let length := sub(pointer, 11)
-        fee0 :=
-            mul(
-                shr(sub(256, mul(8, length)), calldataload(add(data.offset, 11))),
-                exp(10, power)
-            )
-
-        power := byte(pointer, value)
-        length := sub(data.length, add(1, pointer))
-        fee1 :=
-            mul(
-                shr(
-                    sub(256, mul(8, length)),
-                    calldataload(add(data.offset, add(1, pointer)))
-                ),
-                exp(10, power)
-            )
     }
 }
 
