@@ -50,6 +50,7 @@ error DrawBalance();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
+error InvalidPriorityFee(uint16 priorityFee);
 error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
 error InvalidJit(uint16);
@@ -370,7 +371,7 @@ function checkParameters(PortfolioCurve memory self)
     // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
     if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
         return (
-            false, abi.encodeWithSelector(InvalidFee.selector, self.priorityFee)
+            false, abi.encodeWithSelector(InvalidPriorityFee.selector, self.priorityFee)
         );
     }
 
