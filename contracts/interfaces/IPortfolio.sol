@@ -111,10 +111,17 @@ interface IPortfolioEvents {
      */
     event CreatePool(
         uint64 indexed poolId,
-        bool isMutable,
         address indexed asset,
         address indexed quote,
-        uint256 price
+        bool isMutable,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        uint128 maxPrice,
+        uint128 price
     );
 
     /**

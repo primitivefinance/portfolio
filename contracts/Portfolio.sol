@@ -591,7 +591,13 @@ abstract contract PortfolioVirtual is Objective {
     /**
      * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
      * @param controller An address that can change the `fee`, `priorityFee`, and `jit` parameters of the created pool.
-     * @param duration Sets the quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
+     * @param priorityFee Priority fee for the pool (10,000 being 100%). This is a percentage of fees paid by the controller when swapping.
+     * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
+     * @param volatility Expected volatility of the pool.
+     * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
+     * @param jit Just In Time policy (expressed in seconds).
+     * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token).
+     * @param price Initial price of the pool (expressed in the quote token).
      */
     function _createPool(
         uint24 pairId,
@@ -640,11 +646,18 @@ abstract contract PortfolioVirtual is Objective {
 
         emit CreatePool(
             poolId,
-            hasController,
             pool.pair.tokenAsset,
             pool.pair.tokenQuote,
+            hasController,
+            controller,
+            priorityFee,
+            fee,
+            volatility,
+            duration,
+            jit,
+            maxPrice,
             price
-            );
+        );
     }
 
     // ===== Accounting System ===== //
