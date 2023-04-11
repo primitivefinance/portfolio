@@ -811,13 +811,13 @@ abstract contract PortfolioVirtual is Objective {
         (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
 
         if (instruction == FVM.ALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 deltaAsset, uint128 deltaQuote) =
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 maxDeltaAsset, uint128 maxDeltaQuote) =
                 FVM.decodeAllocateOrDeallocate(data);
-            _allocate(useMax == 1, poolId, deltaLiquidity, deltaAsset, deltaQuote);
+            _allocate(useMax == 1, poolId, deltaLiquidity, maxDeltaAsset, maxDeltaQuote);
         } else if (instruction == FVM.DEALLOCATE) {
-            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 deltaAsset, uint128 deltaQuote) =
+            (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 minDeltaAsset, uint128 minDeltaQuote) =
                 FVM.decodeAllocateOrDeallocate(data);
-            _deallocate(useMax == 1, poolId, deltaLiquidity, deltaAsset, deltaQuote);
+            _deallocate(useMax == 1, poolId, deltaLiquidity, minDeltaAsset, minDeltaQuote);
         } else if (
             instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE
         ) {
