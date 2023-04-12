@@ -102,14 +102,7 @@ contract RMM01Portfolio is PortfolioVirtual {
             R_y: reserveY,
             timeRemainingSec: tau
         });
-
-        // Invariant for RMM01 is denominated in the `quote` token.
-        int256 liveInvariantWad =
-            invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
-        int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(
-            pools[poolId].pair.decimalsQuote
-        );
-        return (nextInvariantWad >= liveInvariantWad, nextInvariant);
+        return (nextInvariant >= invariant, nextInvariant);
     }
 
     /// @inheritdoc Objective
