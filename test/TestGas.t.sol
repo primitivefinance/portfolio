@@ -71,7 +71,7 @@ contract TestGas is Setup {
         bool sellAsset = true;
         uint128 amountIn = uint128(0.01 ether);
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn) * 95
+            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, address(this)) * 95
                 / 100
         );
         bytes memory data = FVM.encodeSwap(
@@ -408,7 +408,7 @@ contract TestGas is Setup {
                 liquidity: pool.liquidity
             }).scaleFromWadDown(pool.pair.decimalsQuote).safeCastTo128() / 20;
             uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(poolId, sellAsset, amountIn) * 95 / 100
+                _subject.getAmountOut(poolId, sellAsset, amountIn, address(this)) * 95 / 100
             );
 
             instructions[i] = FVM.encodeSwap(
@@ -607,7 +607,7 @@ contract TestGas is Setup {
                     .liquidity
             }).safeCastTo128() / 10;
             uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(poolId, sellAsset, amountIn) * 95 / 100
+                _subject.getAmountOut(poolId, sellAsset, amountIn, address(this)) * 95 / 100
             );
 
             instructions[i] = FVM.encodeSwap(
@@ -657,7 +657,7 @@ contract TestGas is Setup {
     ) internal returns (bytes memory) {
         uint128 amountIn = uint128(0.05 ether);
         uint128 amountOut =
-            subject().getAmountOut(poolId, direction, amountIn).safeCastTo128();
+            subject().getAmountOut(poolId, direction, amountIn, address(this)).safeCastTo128();
         bytes memory swap = FVM.encodeSwap(
             uint8(0), poolId, amountIn, amountOut, uint8(direction ? 1 : 0)
         );
