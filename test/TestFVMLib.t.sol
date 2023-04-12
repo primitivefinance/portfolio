@@ -141,6 +141,8 @@ contract TestFVMLib is Test {
         bytes memory data =
             encodeSwap(1, 0xaaffffffffffffbb, 1 ether, 2000 * 10 ** 6, 1);
 
+        console.logBytes(data);
+
         (
             uint8 useMax,
             uint64 poolId,
@@ -156,8 +158,20 @@ contract TestFVMLib is Test {
         assertEq(sellAsset, 1);
     }
 
+    function test_decodeSwap_RevertIfPower0Overflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b4e000000000000000000000000000000010900000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
+    }
+
+    function test_decodeSwap_RevertIfPower1Overflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b4e000000000000000000000000000000014e00000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
+    }
+
     function test_decodeSwap_RevertIfInputOverflows() public {
-        bytes memory data = hex"16aaffffffffffffbb1b12ffffffffffffffffffffffffffffffff0901";
+        bytes memory data = hex"16aaffffffffffffbb1b4effffffffffffffffffffffffffffffff0901";
         vm.expectRevert(Overflow.selector);
         target.decodeSwap_(data);
     }
