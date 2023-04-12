@@ -619,21 +619,36 @@ function decodeSwap(bytes calldata data)
         sellAsset := eq(6, and(0x0F, byte(0, value)))
         poolId := shr(192, calldataload(add(1, data.offset)))
         let pointer := byte(0, calldataload(add(9, data.offset)))
+
         let power0 := byte(0, calldataload(add(10, data.offset)))
+        if gt(power0, 79) { revert(0, 0) }
+        let decimals0 := exp(10, power0)
+
         let length0 := sub(pointer, 11)
         let base0 :=
             shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 11)))
-        input := mul(base0, exp(10, power0))
+        input := mul(base0, decimals0)
+        if iszero(eq(base0, div(input, decimals0))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
+
         let power1 := byte(0, calldataload(add(pointer, data.offset)))
+        if gt(power1, 79) { revert(0, 0) }
+        let decimals1 := exp(10, power1)
+
         let length1 := sub(data.length, add(1, pointer))
         let base1 :=
             shr(
                 sub(256, mul(8, length1)),
                 calldataload(add(data.offset, add(1, pointer)))
             )
-        output := mul(base1, exp(10, power1))
+        output := mul(base1, decimals1)
+        if iszero(eq(base1, div(output, decimals1))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
 
-        // Checks if one of these variables overflows
         if or(
             gt(input, 0xffffffffffffffffffffffffffffffff),
             gt(output, 0xffffffffffffffffffffffffffffffff)
@@ -642,4 +657,6 @@ function decodeSwap(bytes calldata data)
             revert(0, 4)
         }
     }
+
+    // 18,001 gas
 }
