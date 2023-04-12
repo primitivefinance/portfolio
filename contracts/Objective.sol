@@ -13,18 +13,6 @@ import "./interfaces/IPortfolioRegistry.sol";
  */
 abstract contract Objective is IPortfolio {
     /**
-     * @dev
-     * Uses swap information provided by `iteration` to conditionally alter
-     * fee accumulators.
-     *
-     * @return bool True if the fees were saved in position's owed tokens instead of re-invested.
-     */
-    function _feeSavingEffects(
-        uint64 poolId,
-        Iteration memory iteration
-    ) internal virtual returns (bool);
-
-    /**
      * @dev Used to apply changes to a `pool`, like it's timestamp, before a swap occurs.
      * @return success True if pool can be swapped in.
      * @return invariant Current invariant value of the pool in WAD units.

@@ -4,7 +4,6 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 import "./TestPortfolioAllocate.t.sol";
 import "./TestPortfolioChangeParameters.t.sol";
-import "./TestPortfolioClaim.t.sol";
 import "./TestPortfolioCreatePair.t.sol";
 import "./TestPortfolioCreatePool.t.sol";
 import "./TestPortfolioDeposit.t.sol";
@@ -16,7 +15,6 @@ import "./TestPortfolioDeallocate.t.sol";
 contract TestRMM01 is
     TestPortfolioAllocate,
     TestPortfolioChangeParameters,
-    TestPortfolioClaim,
     TestPortfolioCreatePair,
     TestPortfolioCreatePool,
     TestPortfolioDeposit,
