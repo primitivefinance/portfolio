@@ -621,7 +621,11 @@ function decodeSwap(bytes calldata data)
         let pointer := byte(0, calldataload(add(9, data.offset)))
 
         let power0 := byte(0, calldataload(add(10, data.offset)))
-        if gt(power0, 79) { revert(0, 0) }
+        if gt(power0, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+
         let decimals0 := exp(10, power0)
 
         let length0 := sub(pointer, 11)
@@ -634,7 +638,11 @@ function decodeSwap(bytes calldata data)
          }
 
         let power1 := byte(0, calldataload(add(pointer, data.offset)))
-        if gt(power1, 79) { revert(0, 0) }
+        if gt(power1, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+
         let decimals1 := exp(10, power1)
 
         let length1 := sub(data.length, add(1, pointer))
@@ -657,6 +665,4 @@ function decodeSwap(bytes calldata data)
             revert(0, 4)
         }
     }
-
-    // 18,001 gas
 }
