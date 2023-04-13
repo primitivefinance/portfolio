@@ -129,7 +129,7 @@ contract TestGas is Setup {
             else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
 
             instructions[i] =
-                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether);
+                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether, type(uint128).max, type(uint128).max);
         }
 
         bytes memory data = FVM.encodeJumpInstruction(instructions);
@@ -248,11 +248,11 @@ contract TestGas is Setup {
             else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
 
             subject().multiprocess(
-                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether)
+                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether, type(uint128).max, type(uint128).max)
             );
 
             instructions[i] =
-                FVM.encodeAllocateOrDeallocate(false, uint8(0), poolId, 1 ether);
+                FVM.encodeAllocateOrDeallocate(false, uint8(0), poolId, 1 ether, 0, 0);
         }
 
         bytes memory data = FVM.encodeJumpInstruction(instructions);
@@ -394,7 +394,7 @@ contract TestGas is Setup {
             if (i == 0) poolId = ghost().poolId;
             else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
             subject().multiprocess(
-                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 5 ether)
+                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 5 ether, type(uint128).max, type(uint128).max)
             );
 
             bool sellAsset = i % 2 == 0;
@@ -573,7 +573,7 @@ contract TestGas is Setup {
             uint64 poolId = uint64(ghost().poolId + i);
 
             instructions[i] =
-                FVM.encodeAllocateOrDeallocate(false, uint8(0), poolId, 1 ether);
+                FVM.encodeAllocateOrDeallocate(false, uint8(0), poolId, 1 ether, 0, 0);
         }
 
         bytes memory data = FVM.encodeJumpInstruction(instructions);
@@ -647,7 +647,7 @@ contract TestGas is Setup {
         returns (bytes memory)
     {
         bytes memory allocate =
-            FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether);
+            FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether, type(uint128).max, type(uint128).max);
         return allocate;
     }
 
@@ -669,7 +669,7 @@ contract TestGas is Setup {
         returns (bytes memory)
     {
         bytes memory deallocate =
-            FVM.encodeAllocateOrDeallocate(false, uint8(0), poolId, 1 ether);
+            FVM.encodeAllocateOrDeallocate(false, uint8(0), poolId, 1 ether, 0, 0);
         return deallocate;
     }
 
@@ -723,7 +723,7 @@ contract TestGas is Setup {
         // Allocate to first pool
         uint64 poolId = ghost().poolId;
         subject().multiprocess(
-            FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 10 ether)
+            FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 10 ether, type(uint128).max, type(uint128).max)
         );
 
         bytes[] memory instructions = new bytes[](2);
@@ -752,7 +752,7 @@ contract TestGas is Setup {
         uint24 pairId = 1;
         uint64 poolId = ghost().poolId;
         subject().multiprocess(
-            FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 25 ether)
+            FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 25 ether, type(uint128).max, type(uint128).max)
         );
 
         bytes[] memory instructions = new bytes[](4);
