@@ -65,6 +65,7 @@ error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
 error NonExistentPosition(address owner, uint64 poolId);
+error NotPerpetualPool();
 error PairExists(uint24 pairId);
 error PoolExpired();
 error SameTokenError();
@@ -325,7 +326,7 @@ function maturity(PortfolioCurve memory self)
     pure
     returns (uint32 endTimestamp)
 {
-    if (self.perpetual) return type(uint32).max;
+    if (self.perpetual) revert NotPerpetualPool();
 
     unchecked {
         // Portfolio duration is limited such that this addition will never overflow 256 bits.
