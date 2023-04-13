@@ -318,10 +318,15 @@ function computeTau(
     }
 }
 
+/**
+ * @dev Computes the time in seconds until the pool matures. Returns 2**32 if the pool is perpetual.
+ */
 function maturity(PortfolioCurve memory self)
     pure
     returns (uint32 endTimestamp)
 {
+    if (self.perpetual) return type(uint32).max;
+
     unchecked {
         // Portfolio duration is limited such that this addition will never overflow 256 bits.
         endTimestamp = (
@@ -373,7 +378,10 @@ function checkParameters(PortfolioCurve memory self)
     // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
     if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
         return (
-            false, abi.encodeWithSelector(InvalidPriorityFee.selector, self.priorityFee)
+            false,
+            abi.encodeWithSelector(
+                InvalidPriorityFee.selector, self.priorityFee
+                )
         );
     }
 
