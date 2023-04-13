@@ -36,7 +36,7 @@ contract TestGas is Setup {
         isArmed
     {
         bytes memory data = FVM.encodeAllocateOrDeallocate(
-            true, uint8(0), ghost().poolId, 1 ether
+            true, uint8(0), ghost().poolId, 1 ether, type(uint128).max, type(uint128).max
         );
         vm.resumeGasMetering();
         _subject.multiprocess(data);
@@ -53,7 +53,7 @@ contract TestGas is Setup {
         isArmed
     {
         bytes memory data = FVM.encodeAllocateOrDeallocate(
-            false, uint8(0), ghost().poolId, 1 ether
+            false, uint8(0), ghost().poolId, 1 ether, 0, 0
         );
         vm.resumeGasMetering();
         _subject.multiprocess(data);
@@ -553,7 +553,7 @@ contract TestGas is Setup {
             uint64 poolId = uint64(ghost().poolId + i);
 
             instructions[i] =
-                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether);
+                FVM.encodeAllocateOrDeallocate(true, uint8(0), poolId, 1 ether, type(uint128).max, type(uint128).max);
         }
 
         bytes memory data = FVM.encodeJumpInstruction(instructions);

@@ -50,6 +50,7 @@ bytes1 constant INSTRUCTION_JUMP = 0xAA;
 
 error InvalidJump(uint256 pointer); // 0x80f63bd1
 error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
+error Overflow(); // 0x35278d12
 
 /**
  * @dev Expects a serialized encoding of instructions.
@@ -364,6 +365,8 @@ function decodeCreatePool(bytes calldata data)
         uint128 price
     )
 {
+    bytes4 overflowErrorSelector = Overflow.selector;
+
     assembly {
         pairId := shr(232, calldataload(add(1, data.offset)))
         controller := shr(96, calldataload(add(4, data.offset)))
@@ -374,18 +377,48 @@ function decodeCreatePool(bytes calldata data)
         jit := shr(240, calldataload(add(32, data.offset)))
         let pointer := byte(0, calldataload(add(34, data.offset)))
         let power0 := byte(0, calldataload(add(35, data.offset)))
+        if gt(power0, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        let decimals0 := exp(10, power0)
+
         let length0 := sub(pointer, 36)
         let base0 :=
             shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 36)))
-        maxPrice := mul(base0, exp(10, power0))
+        maxPrice := mul(base0, decimals0)
+        if iszero(eq(base0, div(maxPrice, decimals0))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
+
         let power1 := byte(0, calldataload(add(pointer, data.offset)))
+        if gt(power1, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        let decimals1 := exp(10, power1)
+
         let length1 := sub(data.length, add(1, pointer))
         let base1 :=
             shr(
                 sub(256, mul(8, length1)),
                 calldataload(add(data.offset, add(1, pointer)))
             )
-        price := mul(base1, exp(10, power1))
+        price := mul(base1, decimals1)
+        if iszero(eq(base1, div(price, decimals1))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+
+        // Checks if one of these variables overflows
+        if or(
+            gt(maxPrice, 0xffffffffffffffffffffffffffffffff),
+            gt(price, 0xffffffffffffffffffffffffffffffff)
+        ) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
     }
 }
 
@@ -397,21 +430,32 @@ function encodeAllocateOrDeallocate(
     bool shouldAllocate,
     uint8 useMax,
     uint64 poolId,
-    uint128 deltaLiquidity
+    uint128 deltaLiquidity,
+    uint128 deltaAsset,
+    uint128 deltaQuote
 ) pure returns (bytes memory data) {
-    (uint8 power, uint128 base) = AssemblyLib.fromAmount(deltaLiquidity);
+    (uint8 powerDeltaLiquidity, uint128 baseDeltaLiquidity) = AssemblyLib.fromAmount(deltaLiquidity);
+    (uint8 powerDeltaAsset, uint128 baseDeltaAsset) = AssemblyLib.fromAmount(deltaAsset);
+    (uint8 powerDeltaQuote, uint128 baseDeltaQuote) = AssemblyLib.fromAmount(deltaQuote);
+
     data = abi.encodePacked(
         AssemblyLib.pack(bytes1(useMax), shouldAllocate ? ALLOCATE : DEALLOCATE),
         poolId,
-        power,
-        base
+        uint8(28), // Pointing to powerDeltaAsset
+        uint8(45), // Pointing to powerDeltaQuote
+        powerDeltaLiquidity,
+        baseDeltaLiquidity,
+        powerDeltaAsset,
+        baseDeltaAsset,
+        powerDeltaQuote,
+        baseDeltaQuote
     );
 }
 
 /**
  * Decodes a `ALLOCATE` or `DEALLOCATE` operation.
  * The data is expected to be encoded using the following format:\
- * `0x | ALLOCATE or DEALLOCATE (1 byte) | useMax (1 byte) | poolId (8 bytes) | power (1 byte) | base (? bytes)`
+ * `0x | ALLOCATE or DEALLOCATE (1 byte) | useMax (1 byte) | poolId (8 bytes) | pointerPowerDeltaAsset | pointerDeltaQuote | powerDeltaLiquidity (1 byte) | baseDeltaLiquidity (? bytes) | powerDeltaAsset (1 byte) | baseDeltaAsset (? bytes) | powerDeltaQuote (1 byte) | baseDeltaQuote (? bytes)`\
  * @param data Encoded `ALLOCATE` or `DEALLOCATE` operation
  * @return useMax 1 if the maximum amount should be used
  * @return poolId Pool id of the pool
@@ -419,18 +463,75 @@ function encodeAllocateOrDeallocate(
  */
 function decodeAllocateOrDeallocate(bytes calldata data)
     pure
-    returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
+    returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 deltaAsset, uint128 deltaQuote)
 {
     // Looks like using Solidity or Assembly is the same in terms of gas cost.
     if (data.length < 11) revert InvalidBytesLength(11, data.length);
+    bytes4 overflowErrorSelector = Overflow.selector;
 
     assembly {
         let value := calldataload(data.offset)
         useMax := shr(252, value)
         poolId := shr(192, shl(8, value))
-        let power := shr(248, shl(72, value))
-        let base := shr(sub(256, mul(8, sub(data.length, 10))), shl(80, value))
-        deltaLiquidity := mul(base, exp(10, power))
+
+        let pointer1 := byte(0, calldataload(add(9, data.offset)))
+        let pointer2 := byte(0, calldataload(add(10, data.offset)))
+        let power := byte(0, calldataload(add(11, data.offset)))
+        if gt(power, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        let decimals := exp(10, power)
+
+        let length := sub(pointer1, 12)
+        let base := shr(sub(256, mul(8, length)), calldataload(add(12, data.offset)))
+        deltaLiquidity := mul(base, decimals)
+        if iszero(eq(base, div(deltaLiquidity, decimals))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+
+        power := byte(0, calldataload(add(pointer1, data.offset)))
+        if gt(power, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        decimals := exp(10, power)
+
+        length := sub(pointer2, add(1, pointer1))
+        base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer1), data.offset)))
+        deltaAsset := mul(base, decimals)
+        if iszero(eq(base, div(deltaAsset, decimals))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
+
+        power := byte(0, calldataload(add(pointer2, data.offset)))
+        if gt(power, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        decimals := exp(10, power)
+
+        length := sub(data.length, add(1, pointer2))
+        base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer2), data.offset)))
+        deltaQuote := mul(base, decimals)
+        if iszero(eq(base, div(deltaQuote, decimals))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
+
+        // Checks if one of these variables overflows
+        if or(
+            gt(deltaLiquidity, 0xffffffffffffffffffffffffffffffff),
+            or(
+                gt(deltaAsset, 0xffffffffffffffffffffffffffffffff),
+                gt(deltaQuote, 0xffffffffffffffffffffffffffffffff)
+            )
+        ) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
     }
 }
 
@@ -487,6 +588,8 @@ function decodeSwap(bytes calldata data)
         uint8 sellAsset
     )
 {
+    bytes4 overflowErrorSelector = Overflow.selector;
+
     assembly {
         let value := calldataload(data.offset)
         useMax := shr(4, byte(0, value))
@@ -495,18 +598,50 @@ function decodeSwap(bytes calldata data)
         sellAsset := eq(6, and(0x0F, byte(0, value)))
         poolId := shr(192, calldataload(add(1, data.offset)))
         let pointer := byte(0, calldataload(add(9, data.offset)))
+
         let power0 := byte(0, calldataload(add(10, data.offset)))
+        if gt(power0, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+
+        let decimals0 := exp(10, power0)
+
         let length0 := sub(pointer, 11)
         let base0 :=
             shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 11)))
-        input := mul(base0, exp(10, power0))
+        input := mul(base0, decimals0)
+        if iszero(eq(base0, div(input, decimals0))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
+
         let power1 := byte(0, calldataload(add(pointer, data.offset)))
+        if gt(power1, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+
+        let decimals1 := exp(10, power1)
+
         let length1 := sub(data.length, add(1, pointer))
         let base1 :=
             shr(
                 sub(256, mul(8, length1)),
                 calldataload(add(data.offset, add(1, pointer)))
             )
-        output := mul(base1, exp(10, power1))
+        output := mul(base1, decimals1)
+        if iszero(eq(base1, div(output, decimals1))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
+
+        if or(
+            gt(input, 0xffffffffffffffffffffffffffffffff),
+            gt(output, 0xffffffffffffffffffffffffffffffff)
+        ) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
     }
 }

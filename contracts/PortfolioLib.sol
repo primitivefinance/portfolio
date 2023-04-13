@@ -75,6 +75,8 @@ error ZeroLiquidity();
 error ZeroOutput();
 error ZeroPrice();
 error ZeroValue();
+error MaxDeltaReached();
+error MinDeltaUnmatched();
 
 struct PortfolioPair {
     address tokenAsset; // Base asset, referred to as "X" reserve.

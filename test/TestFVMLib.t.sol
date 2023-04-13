@@ -84,7 +84,13 @@ contract FVMLibTarget is Test {
     function decodeAllocateOrDeallocate_(bytes calldata data)
         external
         pure
-        returns (uint8 useMax, uint64 poolId, uint128 deltaLiquidity)
+        returns (
+            uint8 useMax,
+            uint64 poolId,
+            uint128 deltaLiquidity,
+            uint128 deltaAsset,
+            uint128 deltaQuote
+        )
     {
         return decodeAllocateOrDeallocate(data);
     }
@@ -127,8 +133,6 @@ contract TestFVMLib is Test {
         bytes memory data =
             encodeSwap(1, 0xaaffffffffffffbb, 1 ether, 2000 * 10 ** 6, 1);
 
-        console.logBytes(data);
-
         (
             uint8 useMax,
             uint64 poolId,
@@ -142,6 +146,30 @@ contract TestFVMLib is Test {
         assertEq(input, 1 ether);
         assertEq(output, 2000 * 10 ** 6);
         assertEq(sellAsset, 1);
+    }
+
+    function test_decodeSwap_RevertIfPower0Overflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b4e000000000000000000000000000000010900000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
+    }
+
+    function test_decodeSwap_RevertIfPower1Overflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b4e000000000000000000000000000000014e00000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
+    }
+
+    function test_decodeSwap_RevertIfInputOverflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b4effffffffffffffffffffffffffffffff0901";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
+    }
+
+    function test_decodeSwap_RevertIfOuputOverflows() public {
+        bytes memory data = hex"16aaffffffffffffbb1b120000000000000000000000000000000109ffffffffffffffffffffffffffffffff";
+        vm.expectRevert(Overflow.selector);
+        target.decodeSwap_(data);
     }
 
     function testFuzz_decodeCreatePair(address token0, address token1) public {
@@ -242,56 +270,124 @@ contract TestFVMLib is Test {
         assertEq(decoded.price, 3 * 10 ** 18);
     }
 
+    function test_decodeCreatePool_RevertIfMaxPriceOverflows () public {
+        vm.expectRevert(Overflow.selector);
+        target.decodeCreatePool_(
+            hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff3409ffffffffffffffffffffffffffffffff0101"
+        );
+    }
+
+    function test_decodeCreatePool_RevertIfPriceOverflows () public {
+        vm.expectRevert(Overflow.selector);
+        target.decodeCreatePool_(
+            hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff25090201ffffffffffffffffffffffffffffffff"
+        );
+    }
+
     function testFuzz_encodeAllocate(
         bool useMax,
         uint64 poolId,
-        uint128 deltaLiquidity
+        uint128 deltaLiquidity,
+        uint128 deltaAsset,
+        uint128 deltaQuote
     ) public {
         bytes memory data = encodeAllocateOrDeallocate(
-            true, useMax ? uint8(1) : uint8(0), poolId, deltaLiquidity
+            true,
+            useMax ? uint8(1) : uint8(0),
+            poolId,
+            deltaLiquidity,
+            deltaAsset,
+            deltaQuote
         );
 
-        (uint8 useMax_, uint64 poolId_, uint128 deltaLiquidity_) =
-            target.decodeAllocateOrDeallocate_(data);
+        (
+            uint8 useMax_,
+            uint64 poolId_,
+            uint128 deltaLiquidity_,
+            uint128 deltaAsset_,
+            uint128 deltaQuote_
+        ) = target.decodeAllocateOrDeallocate_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_);
         assertEq(poolId, poolId_);
         assertEq(deltaLiquidity, deltaLiquidity_);
+        assertEq(deltaAsset, deltaAsset_);
+        assertEq(deltaQuote, deltaQuote_);
     }
 
     function testFuzz_encodeDeallocate(
         bool useMax,
         uint64 poolId,
-        uint128 deltaLiquidity
+        uint128 deltaLiquidity,
+        uint128 deltaAsset,
+        uint128 deltaQuote
     ) public {
         bytes memory data = encodeAllocateOrDeallocate(
-            false, useMax ? uint8(1) : uint8(0), poolId, deltaLiquidity
+            false,
+            useMax ? uint8(1) : uint8(0),
+            poolId,
+            deltaLiquidity,
+            deltaAsset,
+            deltaQuote
         );
 
-        (uint8 useMax_, uint64 poolId_, uint128 deltaLiquidity_) =
-            target.decodeAllocateOrDeallocate_(data);
+        (
+            uint8 useMax_,
+            uint64 poolId_,
+            uint128 deltaLiquidity_,
+            uint128 deltaAsset_,
+            uint128 deltaQuote_
+        ) = target.decodeAllocateOrDeallocate_(data);
 
         assertEq(useMax ? uint8(1) : uint8(0), useMax_);
         assertEq(poolId, poolId_);
         assertEq(deltaLiquidity, deltaLiquidity_);
+        assertEq(deltaAsset, deltaAsset_);
+        assertEq(deltaQuote, deltaQuote_);
     }
 
     function test_decodeAllocateOrDeallocate() public {
-        bytes memory data = hex"11aaffffffffffffbb0e016b";
-        (uint8 useMax, uint64 poolId, uint128 amount) =
-            target.decodeAllocateOrDeallocate_(data);
-        assertEq(useMax, 1);
-        assertEq(poolId, uint64(0xaaffffffffffffbb));
-        assertEq(amount, uint128(0.0363 ether));
+        bytes memory data = hex"01aaaaaaaaaaaaaaaa0d0f1202102a0906";
+
+        (
+            uint8 useMax,
+            uint64 poolId,
+            uint128 amount,
+            uint128 deltaAsset,
+            uint128 deltaQuote
+        ) = target.decodeAllocateOrDeallocate_(data);
+        assertEq(useMax, 0);
+        assertEq(poolId, uint64(0xaaaaaaaaaaaaaaaa));
+        assertEq(amount, uint128(2000000000000000000));
+        assertEq(deltaAsset, uint128(420000000000000000));
+        assertEq(deltaQuote, uint128(6000000000));
     }
 
-    function test_decodeAllocateOrDeallocate_RevertsBadLength() public {
+    function test_decodeAllocateOrDeallocate_RevertBadLength() public {
         bytes memory data = hex"11aaffffffffffffbb0e";
         vm.expectRevert(
             abi.encodePacked(
                 InvalidBytesLength.selector, uint256(11), uint256(10)
             )
         );
+        target.decodeAllocateOrDeallocate_(data);
+    }
+
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaLiquidityOverflows() public {
+        bytes memory data = hex"1100000000aabbccdd1c2d01ffffffffffffffffffffffffffffffff03000000000000000000000000000000010300000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeAllocateOrDeallocate_(data);
+    }
+
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaAssetOverflows() public {
+        bytes memory data = hex"1100000000aabbccdd1c2d010000000000000000000000000000000103ffffffffffffffffffffffffffffffff0300000000000000000000000000000002";
+        vm.expectRevert(Overflow.selector);
+        target.decodeAllocateOrDeallocate_(data);
+    }
+
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaQuoteOverflows() public {
+        bytes memory data = hex"1100000000aabbccdd1c2d0100000000000000000000000000000001030000000000000000000000000000000103ffffffffffffffffffffffffffffffff";
+        vm.expectRevert(Overflow.selector);
         target.decodeAllocateOrDeallocate_(data);
     }
 
