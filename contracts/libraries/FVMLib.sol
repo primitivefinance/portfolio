@@ -451,18 +451,39 @@ function decodeCreatePool(bytes calldata data)
         jit := shr(240, calldataload(add(32, data.offset)))
         let pointer := byte(0, calldataload(add(34, data.offset)))
         let power0 := byte(0, calldataload(add(35, data.offset)))
+        if gt(power0, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        let decimals0 := exp(10, power0)
+
         let length0 := sub(pointer, 36)
         let base0 :=
             shr(sub(256, mul(8, length0)), calldataload(add(data.offset, 36)))
-        maxPrice := mul(base0, exp(10, power0))
+        maxPrice := mul(base0, decimals0)
+        if iszero(eq(base0, div(maxPrice, decimals0))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
+
         let power1 := byte(0, calldataload(add(pointer, data.offset)))
+        if gt(power1, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        let decimals1 := exp(10, power1)
+
         let length1 := sub(data.length, add(1, pointer))
         let base1 :=
             shr(
                 sub(256, mul(8, length1)),
                 calldataload(add(data.offset, add(1, pointer)))
             )
-        price := mul(base1, exp(10, power1))
+        price := mul(base1, decimals1)
+        if iszero(eq(base1, div(price, decimals1))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
 
         // Checks if one of these variables overflows
         if or(
@@ -530,19 +551,49 @@ function decodeAllocateOrDeallocate(bytes calldata data)
         let pointer1 := byte(0, calldataload(add(9, data.offset)))
         let pointer2 := byte(0, calldataload(add(10, data.offset)))
         let power := byte(0, calldataload(add(11, data.offset)))
+        if gt(power, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        let decimals := exp(10, power)
+
         let length := sub(pointer1, 12)
         let base := shr(sub(256, mul(8, length)), calldataload(add(12, data.offset)))
-        deltaLiquidity := mul(base, exp(10, power))
+        deltaLiquidity := mul(base, decimals)
+        if iszero(eq(base, div(deltaLiquidity, decimals))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
 
         power := byte(0, calldataload(add(pointer1, data.offset)))
+        if gt(power, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        decimals := exp(10, power)
+
         length := sub(pointer2, add(1, pointer1))
         base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer1), data.offset)))
-        deltaAsset := mul(base, exp(10, power))
+        deltaAsset := mul(base, decimals)
+        if iszero(eq(base, div(deltaAsset, decimals))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
 
         power := byte(0, calldataload(add(pointer2, data.offset)))
+        if gt(power, 77) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+        }
+        decimals := exp(10, power)
+
         length := sub(data.length, add(1, pointer2))
         base := shr(sub(256, mul(8, length)), calldataload(add(add(1, pointer2), data.offset)))
-        deltaQuote := mul(base, exp(10, power))
+        deltaQuote := mul(base, decimals)
+        if iszero(eq(base, div(deltaQuote, decimals))) {
+            mstore(0, overflowErrorSelector)
+            revert(0, 4)
+         }
 
         // Checks if one of these variables overflows
         if or(
