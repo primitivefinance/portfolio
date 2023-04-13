@@ -189,9 +189,11 @@ library RMM01Lib {
             optimizeDependentReserve
         );
 
-        // Round down in all cases.
-        if (nextDep > 0) {
-            nextDep--;
+        // Round up the next dependent reserve.
+        // Ouput amount is previous - next dependent reserve,
+        // so if next is rounded up, output is consequentially rounded down.
+        if (nextDep != 0) {
+            nextDep++;
         }
     }
 
