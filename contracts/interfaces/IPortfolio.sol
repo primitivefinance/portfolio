@@ -107,21 +107,19 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @param price Estimated price of the initialized pool in WAD units.
+     * @dev Emitted on pool creation.
      */
     event CreatePool(
         uint64 indexed poolId,
         address indexed asset,
         address indexed quote,
-        bool isMutable,
         address controller,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint16 jit,
         uint128 maxPrice,
-        uint128 price
+        uint16 jit,
+        uint16 fee,
+        uint16 duration,
+        uint16 volatility,
+        uint16 priorityFee
     );
 
     /**

@@ -648,15 +648,13 @@ abstract contract PortfolioVirtual is Objective {
             poolId,
             pool.pair.tokenAsset,
             pool.pair.tokenQuote,
-            hasController,
-            controller,
-            priorityFee,
-            fee,
-            volatility,
-            duration,
-            jit,
-            maxPrice,
-            price
+            pool.controller,
+            pool.params.maxPrice,
+            pool.params.jit,
+            pool.params.fee,
+            pool.params.duration,
+            pool.params.volatility,
+            pool.params.priorityFee
         );
     }
 
