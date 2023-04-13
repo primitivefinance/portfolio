@@ -17,6 +17,12 @@ optimizer_runs = 0
 optimizer = true
 out = 'optimized-out'
 
+[profile.optimizedcalls]
+via_ir = true
+optimizer = true
+optimizer_runs = 10000
+out = 'optimized-out'
+
 [profile.test] # does not use optimizer
 src = 'test/'  # not default
 gas_reports = ["*"]

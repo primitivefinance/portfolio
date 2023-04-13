@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 error InvalidLiquidity();
 error InvalidDays();
+error DataTooLong();
 
 uint256 constant SECONDS_PER_YEAR = 31556953 seconds;
 uint256 constant SECONDS_PER_DAY = 86_400 seconds;
@@ -64,9 +65,7 @@ library AssemblyLib {
     }
 
     /**
-     * @dev Adds a signed `delta` to an unsigned `input` by using the sign-agnostic 256-bit type used in yul.
-     * Checks for overflow manually and reverts with `InvalidLiquidity()`, because this function is used to
-     * change liquidity in a position or pool.
+     * @dev Adds a signed `delta` to an unsigned `input`.
      * @custom:example
      * ```
      * uint128 output = addSignedDelta(uint128(15), -int128(5));
@@ -77,14 +76,10 @@ library AssemblyLib {
         uint128 input,
         int128 delta
     ) internal pure returns (uint128 output) {
-        bytes memory revertData =
-            abi.encodeWithSelector(InvalidLiquidity.selector);
-        assembly {
-            output := add(input, delta)
-            // Reverts on overflow.
-            if gt(output, 0xffffffffffffffffffffffffffffffff) {
-                revert(add(32, revertData), mload(revertData))
-            } // 0x1fff9681
+        if (delta > 0) {
+            output = input + uint128(delta);
+        } else {
+            output = input - uint128(-delta);
         }
     }
 
@@ -154,7 +149,14 @@ library AssemblyLib {
      * handles it for us.
      */
     function toBytes16(bytes memory raw) internal pure returns (bytes16 data) {
+        bytes4 errorSelector = DataTooLong.selector;
+
         assembly {
+            if gt(mload(raw), 16) {
+                mstore(0, errorSelector)
+                revert(0, 4)
+            }
+
             data := mload(add(raw, 32))
             let shift := mul(sub(16, mload(raw)), 8)
             data := shr(shift, data)
@@ -166,7 +168,14 @@ library AssemblyLib {
      * handles it for us.
      */
     function toBytes8(bytes memory raw) internal pure returns (bytes8 data) {
+        bytes4 errorSelector = DataTooLong.selector;
+
         assembly {
+            if gt(mload(raw), 8) {
+                mstore(0, errorSelector)
+                revert(0, 4)
+            }
+
             data := mload(add(raw, 32))
             let shift := mul(sub(8, mload(raw)), 8)
             data := shr(shift, data)
@@ -219,7 +228,7 @@ library AssemblyLib {
         bytes1 upper,
         bytes1 lower
     ) internal pure returns (bytes1 data) {
-        data = (upper << 4) | lower;
+        data = upper << 4 | (lower & 0x0F);
     }
 
     /**

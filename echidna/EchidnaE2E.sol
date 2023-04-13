@@ -173,29 +173,6 @@ contract EchidnaE2E is GlobalInvariants {
 
     using SafeCastLib for uint256;
 
-    // ******************** Claim ********************
-    function claim_should_succeed_with_correct_preconditions(
-        uint256 id,
-        uint128 deltaAsset,
-        uint128 deltaQuote
-    ) public {
-        (, uint64 poolId,,) = retrieve_random_pool_and_tokens(id);
-        emit LogUint256("pool id:", uint256(poolId));
-
-        PortfolioPosition memory preClaimPosition =
-            getPosition(address(_portfolio), address(this), poolId);
-        require(preClaimPosition.lastTimestamp != 0);
-
-        try _portfolio.multiprocess(
-            FVMLib.encodeClaim(poolId, deltaAsset, deltaQuote)
-        ) {
-            // if tokens were owned, decrement from position
-            // if tokens were owed, getBalance of tokens increased for the caller
-        } catch {
-            emit AssertionFailed("BUG: claim function should have succeeded");
-        }
-    }
-
     function create_special_pool() public {
         require(!specialPoolCreated, "Special Pool already created");
         uint24 pairId = create_special_pair();

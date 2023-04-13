@@ -303,7 +303,7 @@ contract Setup is Test {
     }
 
     modifier swapSome(uint128 amt, bool sellAsset) {
-        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt)
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt, address(this))
             .safeCastTo128();
         subject().multiprocess(
             FVM.encodeSwap(
@@ -314,7 +314,7 @@ contract Setup is Test {
     }
 
     modifier swapSomeGetOut(uint128 amt, int256 amtOutDelta, bool sellAsset) {
-        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt)
+        uint128 amtOut = subject().getAmountOut(ghost().poolId, sellAsset, amt, address(this))
             .safeCastTo128();
         amtOut = amtOutDelta > 0
             ? amtOut + uint256(amtOutDelta).safeCastTo128()
