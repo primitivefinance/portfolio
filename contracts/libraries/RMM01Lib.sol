@@ -188,6 +188,11 @@ library RMM01Lib {
             256, // todo: potentially expose the max iteration parameter to the Portfolio `getAmountOut` function.
             optimizeDependentReserve
         );
+
+        // Round down in all cases.
+        if (nextDep > 0) {
+            nextDep--;
+        }
     }
 
     function optimizeDependentReserve(

@@ -18,8 +18,11 @@ contract TestPortfolioSwap is Setup {
         // Estimate amount out.
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
-        uint128 amtOut =
-            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn, address(this)));
+        uint128 amtOut = uint128(
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, amtIn, address(this)
+            )
+        );
 
         uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
         subject().multiprocess(
@@ -46,8 +49,11 @@ contract TestPortfolioSwap is Setup {
     {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
-        uint128 amtOut =
-            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn, address(this)));
+        uint128 amtOut = uint128(
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, amtIn, address(this)
+            )
+        );
 
         uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
 
@@ -83,8 +89,11 @@ contract TestPortfolioSwap is Setup {
         // Do swap
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
-        uint128 amtOut =
-            uint128(subject().getAmountOut(ghost().poolId, sellAsset, amtIn, address(this)));
+        uint128 amtOut = uint128(
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, amtIn, address(this)
+            )
+        );
 
         subject().multiprocess(
             FVMLib.encodeSwap(
@@ -129,7 +138,9 @@ contract TestPortfolioSwap is Setup {
         vm.assume(maxIn > amountIn);
 
         uint128 amountOut = uint128(
-            subject().getAmountOut(ghost().poolId, sellAsset, uint128(amountIn))
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, uint128(amountIn), actor()
+            )
         );
         vm.assume(amountOut > 0);
         subject().multiprocess(
@@ -141,6 +152,11 @@ contract TestPortfolioSwap is Setup {
                 uint8(sellAsset ? 1 : 0)
             )
         );
+
+        uint256 profits = subject().getAmountOut(
+            ghost().poolId, !sellAsset, amountOut, actor()
+        );
+        console.log("profits", profits);
 
         try subject().multiprocess(
             FVMLib.encodeSwap(
@@ -181,7 +197,7 @@ contract TestPortfolioSwap is Setup {
             ghost().quote().to_token().decimals()
         );
         uint256 amountOut =
-            subject().getAmountOut(ghost().poolId, sellAsset, amountIn);
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
         subject().multiprocess(
             FVMLib.encodeSwap(
