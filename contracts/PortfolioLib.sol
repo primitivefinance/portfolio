@@ -320,7 +320,8 @@ function computeTau(
 }
 
 /**
- * @dev Computes the time in seconds until the pool matures. Returns 2**32 if the pool is perpetual.
+ * @dev Computes the time in seconds until the pool matures.
+ * @custom:reverts If pool is perpetual.
  */
 function maturity(PortfolioCurve memory self)
     pure
