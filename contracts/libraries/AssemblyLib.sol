@@ -283,16 +283,6 @@ library AssemblyLib {
         }
     }
 
-    function scaleFromWadUp(
-        uint256 amountWad,
-        uint256 decimals
-    ) internal pure returns (uint256 outputDec) {
-        uint256 factor = computeScalar(decimals);
-        assembly {
-            outputDec := add(div(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
-        }
-    }
-
     function scaleFromWadDown(
         uint256 amountWad,
         uint256 decimals
@@ -303,13 +293,13 @@ library AssemblyLib {
         }
     }
 
-    function scaleFromWadUpSigned(
+    function scaleFromWadDownSigned(
         int256 amountWad,
         uint256 decimals
     ) internal pure returns (int256 outputDec) {
         int256 factor = int256(computeScalar(decimals));
         assembly {
-            outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
+            outputDec := sdiv(amountWad, factor)
         }
     }
 
