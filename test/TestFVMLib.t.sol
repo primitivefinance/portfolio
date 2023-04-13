@@ -141,8 +141,6 @@ contract TestFVMLib is Test {
         bytes memory data =
             encodeSwap(1, 0xaaffffffffffffbb, 1 ether, 2000 * 10 ** 6, 1);
 
-        console.logBytes(data);
-
         (
             uint8 useMax,
             uint64 poolId,
