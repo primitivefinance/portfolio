@@ -744,7 +744,7 @@ abstract contract PortfolioVirtual is Objective {
         } else if (instruction == FVM.DEALLOCATE) {
             (uint8 useMax, uint64 poolId, uint128 deltaLiquidity, uint128 minDeltaAsset, uint128 minDeltaQuote) =
                 FVM.decodeAllocateOrDeallocate(data);
-            _deallocate(useMax == 1, poolId, deltaLiquidity);
+            _deallocate(useMax == 1, poolId, deltaLiquidity, minDeltaAsset, minDeltaQuote);
         } else if (instruction == FVM.CREATE_POOL) {
             (
                 uint24 pairId,
