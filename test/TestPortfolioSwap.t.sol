@@ -413,7 +413,66 @@ contract TestPortfolioSwap is Setup {
         );
     }
 
-    function test_swap_price_decreases()
+    function testFuzz_swap_check_invariant(uint128 amountIn)
+        public
+        defaultConfig
+        useActor
+        usePairTokens(1000 ether)
+        allocateSome(25 ether)
+        isArmed
+    {
+        bool sellAsset = true;
+        vm.assume(amountIn > 100);
+        PortfolioPool memory pool = ghost().pool();
+        uint256 maxIn = Objective(address(subject())).computeMaxInput(
+            ghost().poolId,
+            sellAsset,
+            sellAsset ? pool.virtualX : pool.virtualY,
+            pool.liquidity
+        );
+        vm.assume(maxIn > amountIn);
+
+        uint128 amountOut = uint128(
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, uint128(amountIn), actor()
+            )
+        );
+        vm.assume(amountOut > 0);
+
+        (, int256 prevInvariant) = RMM01Portfolio(payable(address(subject())))
+            .checkInvariant(
+            ghost().poolId,
+            int256(0),
+            pool.virtualX,
+            pool.virtualY,
+            block.timestamp
+        );
+        subject().multiprocess(
+            FVMLib.encodeSwap(
+                uint8(0),
+                ghost().poolId,
+                amountIn,
+                amountOut,
+                uint8(sellAsset ? 1 : 0)
+            )
+        );
+
+        pool = ghost().pool();
+        (, int256 invariant) = RMM01Portfolio(payable(address(subject())))
+            .checkInvariant(
+            ghost().poolId,
+            prevInvariant,
+            pool.virtualX,
+            pool.virtualY,
+            block.timestamp
+        );
+
+        console.logInt(prevInvariant);
+        console.logInt(invariant);
+        assertTrue(invariant >= prevInvariant, "invalid invariant condition");
+    }
+
+    function test_swap_quote_in()
         public
         defaultConfig
         useActor
