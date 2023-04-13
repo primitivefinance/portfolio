@@ -373,7 +373,10 @@ function checkParameters(PortfolioCurve memory self)
     // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
     if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
         return (
-            false, abi.encodeWithSelector(InvalidPriorityFee.selector, self.priorityFee)
+            false,
+            abi.encodeWithSelector(
+                InvalidPriorityFee.selector, self.priorityFee
+                )
         );
     }
 

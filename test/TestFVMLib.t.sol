@@ -149,25 +149,29 @@ contract TestFVMLib is Test {
     }
 
     function test_decodeSwap_RevertIfPower0Overflows() public {
-        bytes memory data = hex"16aaffffffffffffbb1b4e000000000000000000000000000000010900000000000000000000000000000002";
+        bytes memory data =
+            hex"16aaffffffffffffbb1b4e000000000000000000000000000000010900000000000000000000000000000002";
         vm.expectRevert(Overflow.selector);
         target.decodeSwap_(data);
     }
 
     function test_decodeSwap_RevertIfPower1Overflows() public {
-        bytes memory data = hex"16aaffffffffffffbb1b4e000000000000000000000000000000014e00000000000000000000000000000002";
+        bytes memory data =
+            hex"16aaffffffffffffbb1b4e000000000000000000000000000000014e00000000000000000000000000000002";
         vm.expectRevert(Overflow.selector);
         target.decodeSwap_(data);
     }
 
     function test_decodeSwap_RevertIfInputOverflows() public {
-        bytes memory data = hex"16aaffffffffffffbb1b4effffffffffffffffffffffffffffffff0901";
+        bytes memory data =
+            hex"16aaffffffffffffbb1b4effffffffffffffffffffffffffffffff0901";
         vm.expectRevert(Overflow.selector);
         target.decodeSwap_(data);
     }
 
     function test_decodeSwap_RevertIfOuputOverflows() public {
-        bytes memory data = hex"16aaffffffffffffbb1b120000000000000000000000000000000109ffffffffffffffffffffffffffffffff";
+        bytes memory data =
+            hex"16aaffffffffffffbb1b120000000000000000000000000000000109ffffffffffffffffffffffffffffffff";
         vm.expectRevert(Overflow.selector);
         target.decodeSwap_(data);
     }
@@ -270,14 +274,14 @@ contract TestFVMLib is Test {
         assertEq(decoded.price, 3 * 10 ** 18);
     }
 
-    function test_decodeCreatePool_RevertIfMaxPriceOverflows () public {
+    function test_decodeCreatePool_RevertIfMaxPriceOverflows() public {
         vm.expectRevert(Overflow.selector);
         target.decodeCreatePool_(
             hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff3409ffffffffffffffffffffffffffffffff0101"
         );
     }
 
-    function test_decodeCreatePool_RevertIfPriceOverflows () public {
+    function test_decodeCreatePool_RevertIfPriceOverflows() public {
         vm.expectRevert(Overflow.selector);
         target.decodeCreatePool_(
             hex"0baaaaaaffffffffffffffffffffffffffffffffffffffffbbbbccccddddeeeeffff25090201ffffffffffffffffffffffffffffffff"
@@ -373,20 +377,29 @@ contract TestFVMLib is Test {
         target.decodeAllocateOrDeallocate_(data);
     }
 
-    function test_decodeAllocateOrDeallocate_RevertWhenDeltaLiquidityOverflows() public {
-        bytes memory data = hex"1100000000aabbccdd1c2d01ffffffffffffffffffffffffffffffff03000000000000000000000000000000010300000000000000000000000000000002";
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaLiquidityOverflows()
+        public
+    {
+        bytes memory data =
+            hex"1100000000aabbccdd1c2d01ffffffffffffffffffffffffffffffff03000000000000000000000000000000010300000000000000000000000000000002";
         vm.expectRevert(Overflow.selector);
         target.decodeAllocateOrDeallocate_(data);
     }
 
-    function test_decodeAllocateOrDeallocate_RevertWhenDeltaAssetOverflows() public {
-        bytes memory data = hex"1100000000aabbccdd1c2d010000000000000000000000000000000103ffffffffffffffffffffffffffffffff0300000000000000000000000000000002";
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaAssetOverflows()
+        public
+    {
+        bytes memory data =
+            hex"1100000000aabbccdd1c2d010000000000000000000000000000000103ffffffffffffffffffffffffffffffff0300000000000000000000000000000002";
         vm.expectRevert(Overflow.selector);
         target.decodeAllocateOrDeallocate_(data);
     }
 
-    function test_decodeAllocateOrDeallocate_RevertWhenDeltaQuoteOverflows() public {
-        bytes memory data = hex"1100000000aabbccdd1c2d0100000000000000000000000000000001030000000000000000000000000000000103ffffffffffffffffffffffffffffffff";
+    function test_decodeAllocateOrDeallocate_RevertWhenDeltaQuoteOverflows()
+        public
+    {
+        bytes memory data =
+            hex"1100000000aabbccdd1c2d0100000000000000000000000000000001030000000000000000000000000000000103ffffffffffffffffffffffffffffffff";
         vm.expectRevert(Overflow.selector);
         target.decodeAllocateOrDeallocate_(data);
     }

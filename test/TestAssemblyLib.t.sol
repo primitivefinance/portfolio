@@ -14,7 +14,11 @@ contract TestAssemblyLib is Test {
         }
     }
 
-    function testFuzz_isBetween(uint256 value, uint256 lower, uint256 upper) public {
+    function testFuzz_isBetween(
+        uint256 value,
+        uint256 lower,
+        uint256 upper
+    ) public {
         vm.assume(lower <= upper);
         bool valid = AssemblyLib.isBetween(value, lower, upper);
 
@@ -28,7 +32,10 @@ contract TestAssemblyLib is Test {
     function testFuzz_addSignedDelta(uint128 input, int128 delta) public {
         // If delta is positive but the sum of input and delta is greater than
         // the maximum value of uint128, we revert.
-        if (delta >= 0 && (uint256(input) + uint256(uint128(delta))) > type(uint128).max) {
+        if (
+            delta >= 0
+                && (uint256(input) + uint256(uint128(delta))) > type(uint128).max
+        ) {
             vm.expectRevert();
         }
 
@@ -36,7 +43,7 @@ contract TestAssemblyLib is Test {
         // we revert.
         if (
             delta == -170141183460469231731687303715884105728
-            || delta < 0 && uint128(-delta) > input
+                || delta < 0 && uint128(-delta) > input
         ) {
             vm.expectRevert();
         }
@@ -44,8 +51,7 @@ contract TestAssemblyLib is Test {
         uint128 output = AssemblyLib.addSignedDelta(input, delta);
 
         assertEq(
-            output,
-            delta < 0 ? input - uint128(-delta) : input + uint128(delta)
+            output, delta < 0 ? input - uint128(-delta) : input + uint128(delta)
         );
     }
 
