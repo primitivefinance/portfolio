@@ -134,15 +134,16 @@ struct Order {
 }
 
 struct Iteration {
-    int256 prevInvariant;
-    int256 nextInvariant;
-    uint256 virtualX;
-    uint256 virtualY;
-    uint256 remainder;
-    uint256 feeAmount;
-    uint256 liquidity;
-    uint256 input;
-    uint256 output;
+    int256 prevInvariant; // WAD
+    int256 nextInvariant; // WAD
+    uint256 virtualX; // WAD
+    uint256 virtualY; // WAD
+    uint256 remainder; // WAD
+    uint256 feeAmount; // WAD
+    uint256 protocolFeeAmount; // WAD
+    uint256 liquidity; // WAD
+    uint256 input; // DEC -> WAD -> DEC
+    uint256 output; // DEC -> WAD -> DEC
 }
 
 struct SwapState {
