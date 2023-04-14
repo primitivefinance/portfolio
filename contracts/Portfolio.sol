@@ -322,6 +322,15 @@ abstract contract PortfolioVirtual is Objective {
             checkPosition(args.poolId, args.owner, args.deltaLiquidity);
         if (!canUpdate) revert JitLiquidity(pool.params.jit);
 
+        if (pool.liquidity == 0) {
+            // If the pool is empty, we need to set the initial virtual reserves with the
+            // actual amounts added to the pool in this allocate call.
+            pool.virtualX = args.deltaAsset.scaleToWad(pool.pair.decimalsAsset)
+                .safeCastTo128();
+            pool.virtualY = args.deltaQuote.scaleToWad(pool.pair.decimalsQuote)
+                .safeCastTo128();
+        }
+
         position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
@@ -399,19 +408,18 @@ abstract contract PortfolioVirtual is Objective {
             iteration.liquidity = pool.liquidity;
             iteration.output = output;
             (iteration.virtualX, iteration.virtualY) =
-                (pool.virtualX, pool.virtualY);
+                pool.getVirtualReservesWad();
         }
 
         if (iteration.output == 0) revert ZeroOutput();
         if (iteration.input == 0) revert ZeroInput();
         if (iteration.liquidity == 0) revert ZeroLiquidity();
 
-        // These are WAD values per WAD of liquidity.
-        uint256 liveIndependent;
-        uint256 nextIndependent;
-        uint256 nextIndependentLessFee;
-        uint256 liveDependent;
-        uint256 nextDependent;
+        uint256 liveIndependentWad; // total reserve of input token in WAD
+        uint256 nextIndependentWad;
+        uint256 nextIndependentWadLessFee;
+        uint256 liveDependentWad; // total reserve of output token in WAD
+        uint256 nextDependentWad;
 
         //  -=- Compute New Reserves -=- //
         {
@@ -421,10 +429,10 @@ abstract contract PortfolioVirtual is Objective {
 
             // Virtual reserves
             if (_state.sell) {
-                (liveIndependent, liveDependent) =
+                (liveIndependentWad, liveDependentWad) =
                     (iteration.virtualX, iteration.virtualY);
             } else {
-                (liveDependent, liveIndependent) =
+                (liveDependentWad, liveIndependentWad) =
                     (iteration.virtualX, iteration.virtualY);
             }
 
@@ -444,23 +452,22 @@ abstract contract PortfolioVirtual is Objective {
             }
 
             deltaInputLessFee = deltaInput - iteration.feeAmount;
-
-            // This value should be used in `syncPool` if fees are re-invested into the pool.
-            nextIndependent =
-                liveIndependent + deltaInput.divWadDown(iteration.liquidity);
+            nextIndependentWad = liveIndependentWad + deltaInput;
 
             // This is a very critical piece of code!
-            // This value should be used in `syncPool` if fees are not re-invested.
+            // nextIndependentWadLessFee:
+            // This value should be used in `syncPool`.
             // The next independent amount is computed with the fee amount applied.
             // This means the lesser next independent reserve and dependent reserve
             // will pass the invariant.
+            //
+            // nextIndependent:
             // The fee amount has to be added to the reserve to re-invest it in the pool.
+            // So the next reserve should include the fee amount, since it was added to the reserves.
             // This will mean the independent reserve has more tokens than expected,
             // leading to a larger invariant.
-            nextIndependentLessFee = liveIndependent
-                + deltaInputLessFee.divWadDown(iteration.liquidity);
-            nextDependent =
-                liveDependent - deltaOutput.divWadDown(iteration.liquidity);
+            nextIndependentWadLessFee = liveIndependentWad + deltaInputLessFee;
+            nextDependentWad = liveDependentWad - deltaOutput;
         }
 
         // -=- Assert Invariant Passes -=- //
@@ -468,20 +475,19 @@ abstract contract PortfolioVirtual is Objective {
             bool validInvariant;
             int256 nextInvariantWad;
 
-            // This is revisited depending on if fees are saved in claimable balances.
             if (_state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextIndependentLessFee, nextDependent);
+                    (nextIndependentWadLessFee, nextDependentWad);
             } else {
                 (iteration.virtualX, iteration.virtualY) =
-                    (nextDependent, nextIndependentLessFee);
+                    (nextDependentWad, nextIndependentWadLessFee);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
                 args.poolId,
                 iteration.prevInvariant,
-                iteration.virtualX,
-                iteration.virtualY,
+                iteration.virtualX.divWadDown(iteration.liquidity), // Expects X per liquidity.
+                iteration.virtualY.divWadDown(iteration.liquidity), // Expects Y per liquidity.
                 block.timestamp
             );
 
@@ -493,15 +499,10 @@ abstract contract PortfolioVirtual is Objective {
             iteration.nextInvariant = int128(nextInvariantWad);
         }
 
-        // -=- Apply Fee Saving Method -=- //
-        {
-            // Fees were not saved in the claimable balances,
-            // so this will re-invest the fees into the pool.
-            if (_state.sell) {
-                iteration.virtualX = nextIndependent;
-            } else {
-                iteration.virtualY = nextIndependent;
-            }
+        if (_state.sell) {
+            iteration.virtualX = nextIndependentWad;
+        } else {
+            iteration.virtualY = nextIndependentWad;
         }
 
         // =---= Effects =---= //
@@ -942,12 +943,12 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /// @inheritdoc IPortfolioGetters
-    function getVirtualReservesPerLiquidity(uint64 poolId)
+    function getVirtualReservesDec(uint64 poolId)
         public
         view
         override
         returns (uint128 deltaAsset, uint128 deltaQuote)
     {
-        return pools[poolId].getVirtualReservesPerLiquidity();
+        return pools[poolId].getVirtualReservesDec();
     }
 }

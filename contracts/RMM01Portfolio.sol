@@ -14,6 +14,7 @@ contract RMM01Portfolio is PortfolioVirtual {
     using AssemblyLib for uint256;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
+    using FixedPointMathLib for uint128;
     using FixedPointMathLib for uint256;
 
     constructor(
@@ -36,13 +37,19 @@ contract RMM01Portfolio is PortfolioVirtual {
         PortfolioPool storage pool = pools[poolId];
         updatedTau = pool.computeTau(block.timestamp);
 
-        (uint256 x, uint256 y) = pool.getVirtualPoolReservesPerLiquidityInWad();
+        uint256 reserveXPerLiquidity = pool.virtualX.divWadDown(pool.liquidity);
+        uint256 reserveYPerLiquidity = pool.virtualY.divWadDown(pool.liquidity);
+
         invariant = int128(
-            pool.invariantOf({R_x: x, R_y: y, timeRemainingSec: updatedTau})
+            pool.invariantOf({
+                R_x: reserveXPerLiquidity,
+                R_y: reserveYPerLiquidity,
+                timeRemainingSec: updatedTau
+            })
         );
 
         price = RMM01Lib.getPriceWithX({
-            R_x: x,
+            R_x: reserveXPerLiquidity,
             stk: pool.params.maxPrice,
             vol: pool.params.volatility,
             tau: updatedTau
