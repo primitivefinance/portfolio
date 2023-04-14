@@ -78,8 +78,10 @@ function __balanceOf__(address token, address account) view returns (uint256) {
  * @dev Must validate `weth` is real weth.
  */
 function __wrapEther__(AccountSystem storage self, address weth) {
-    self.touch(weth);
-    IWETH(weth).deposit{value: msg.value}();
+    if (msg.value > 0) {
+        self.touch(weth);
+        IWETH(weth).deposit{value: msg.value}();
+    }
 }
 
 /**
@@ -229,6 +231,9 @@ function getNetBalance(
     // Before casting `internalBalance` into an `int256`,
     // we must ensure it fits within. If it does not, we revert.
     if (internalBalance > uint256(type(int256).max)) revert();
+
+    // Also checking the physical balance.
+    if (physicalBalance > uint256(type(int256).max)) revert();
 
     net = int256(physicalBalance) - int256(internalBalance);
 }
