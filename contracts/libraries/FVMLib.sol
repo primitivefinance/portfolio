@@ -168,9 +168,8 @@ function encodeJumpInstruction(bytes[] memory instructions)
     pure
     returns (bytes memory)
 {
+    if (instructions.length > 255) revert TooManyInstructions();
     uint8 totalInstructions = uint8(instructions.length);
-
-    if (totalInstructions > 255) revert TooManyInstructions();
 
     bytes memory payload =
         bytes.concat(INSTRUCTION_JUMP, bytes1(totalInstructions));
