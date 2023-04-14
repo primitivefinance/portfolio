@@ -81,7 +81,7 @@ function __balanceOf__(address token, address account) view returns (uint256) {
 function __wrapEther__(AccountSystem storage self, address weth) {
     if (msg.value > 0) {
         self.touch(weth);
-        IWETH(weth).deposit{value: msg.value}();
+        IWETH(weth).deposit{ value: msg.value }();
     }
 }
 
@@ -90,7 +90,7 @@ function __wrapEther__(AccountSystem storage self, address weth) {
  */
 function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
-    (bool success,) = to.call{value: amount}(new bytes(0));
+    (bool success,) = to.call{ value: amount }(new bytes(0));
     if (!success) revert EtherTransferFail();
 }
 
@@ -232,6 +232,9 @@ function getNetBalance(
     // Before casting `internalBalance` into an `int256`,
     // we must ensure it fits within. If it does not, we revert.
     if (internalBalance > uint256(type(int256).max)) revert();
+
+    // Also checking the physical balance.
+    if (physicalBalance > uint256(type(int256).max)) revert();
 
     net = int256(physicalBalance) - int256(internalBalance);
 }
