@@ -75,6 +75,7 @@ error ZeroLiquidity();
 error ZeroOutput();
 error ZeroPrice();
 error ZeroValue();
+error InvalidNegativeLiquidity();
 
 struct PortfolioPair {
     address tokenAsset; // Base asset, referred to as "X" reserve.
@@ -251,7 +252,7 @@ function getPoolReserves(PortfolioPool memory self)
 {
     // Check if -`self.liquidity` fits within an int128 by checking if it's
     // greater than the minimum negative value of an int128.
-    if (self.liquidity > 170141183460469231731687303715884105728) revert();
+    if (self.liquidity > 2 ** 127 - 1) revert InvalidNegativeLiquidity();
     return self.getPoolLiquidityDeltas(-int128(self.liquidity)); // Rounds down.
 }
 
