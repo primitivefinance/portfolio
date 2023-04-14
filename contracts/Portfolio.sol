@@ -432,9 +432,15 @@ abstract contract PortfolioVirtual is Objective {
 
             iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
             if (_protocolFee != 0) {
-                uint256 protocolFeeAmount = iteration.feeAmount / _protocolFee;
-                iteration.feeAmount -= protocolFeeAmount;
-                _applyCredit(REGISTRY, _state.tokenInput, protocolFeeAmount);
+                uint256 protocolFeeAmountWad =
+                    iteration.feeAmount / _protocolFee;
+
+                // Reduce both the input amount and fee amount by the protocol fee.
+                // The protocol fee is not applied to the reserve, so it is not included in deltaInput.
+                // The feeAmount pays for the protocolFeeAmount, so it is not included in feeAmount.
+                deltaInput -= protocolFeeAmountWad;
+                iteration.feeAmount -= protocolFeeAmountWad;
+                iteration.protocolFeeAmount = protocolFeeAmountWad;
             }
 
             deltaInputLessFee = deltaInput - iteration.feeAmount;
@@ -523,6 +529,12 @@ abstract contract PortfolioVirtual is Objective {
             // But all the token related amounts must be in their native token decimals.
             iteration.input = iteration.input.scaleFromWadDown(inputDec);
             iteration.output = iteration.output.scaleFromWadDown(outputDec);
+
+            if (iteration.protocolFeeAmount != 0) {
+                uint256 protocolFeeAmountDec =
+                    iteration.protocolFeeAmount.scaleFromWadDown(inputDec);
+                _applyCredit(REGISTRY, _state.tokenInput, protocolFeeAmountDec);
+            }
         }
 
         // Increasing reserves expects a debit from `msg.sender`,
