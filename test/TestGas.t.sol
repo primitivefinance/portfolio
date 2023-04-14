@@ -6,6 +6,7 @@ import "./Setup.sol";
 contract TestGas is Setup {
     using SafeCastLib for uint256;
     using AssemblyLib for uint256;
+    using FixedPointMathLib for uint128;
 
     // helpers
     modifier usePools(uint256 amount) {
@@ -76,9 +77,8 @@ contract TestGas is Setup {
         bool sellAsset = true;
         uint128 amountIn = uint128(0.01 ether);
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(
-                ghost().poolId, sellAsset, amountIn, address(this)
-            ) * 95 / 100
+            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, actor())
+                * 95 / 100
         );
         bytes memory data = FVM.encodeSwap(
             uint8(0),
@@ -431,13 +431,14 @@ contract TestGas is Setup {
                 .computeMaxInput({
                 poolId: poolId,
                 sellAsset: sellAsset,
-                reserveIn: sellAsset ? pool.virtualX : pool.virtualY,
+                reserveIn: sellAsset
+                    ? pool.virtualX.divWadDown(pool.liquidity)
+                    : pool.virtualY.divWadDown(pool.liquidity),
                 liquidity: pool.liquidity
             }).scaleFromWadDown(pool.pair.decimalsQuote).safeCastTo128() / 20;
             uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(
-                    poolId, sellAsset, amountIn, address(this)
-                ) * 95 / 100
+                _subject.getAmountOut(poolId, sellAsset, amountIn, actor()) * 95
+                    / 100
             );
 
             instructions[i] = FVM.encodeSwap(
@@ -643,9 +644,8 @@ contract TestGas is Setup {
                     .liquidity
             }).safeCastTo128() / 10;
             uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(
-                    poolId, sellAsset, amountIn, address(this)
-                ) * 95 / 100
+                _subject.getAmountOut(poolId, sellAsset, amountIn, actor()) * 95
+                    / 100
             );
 
             instructions[i] = FVM.encodeSwap(
@@ -701,7 +701,7 @@ contract TestGas is Setup {
     ) internal returns (bytes memory) {
         uint128 amountIn = uint128(0.05 ether);
         uint128 amountOut = subject().getAmountOut(
-            poolId, direction, amountIn, address(this)
+            poolId, direction, amountIn, actor()
         ).safeCastTo128();
         bytes memory swap = FVM.encodeSwap(
             uint8(0), poolId, amountIn, amountOut, uint8(direction ? 1 : 0)

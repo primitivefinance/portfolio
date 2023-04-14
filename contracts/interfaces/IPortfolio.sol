@@ -263,11 +263,11 @@ interface IPortfolioGetters {
         returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
-     * @dev Amount of tokens in native token decimals per WAD liquidity.
+     * @dev Amount of tokens in native token decimals.
      * @return deltaAsset Quantity of `asset` tokens in wad units.
      * @return deltaQuote Quantity of `quote` tokens in wad units.
      */
-    function getVirtualReservesPerLiquidity(uint64 poolId)
+    function getVirtualReservesDec(uint64 poolId)
         external
         view
         returns (uint128 deltaAsset, uint128 deltaQuote);
