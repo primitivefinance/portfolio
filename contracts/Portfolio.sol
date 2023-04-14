@@ -554,7 +554,11 @@ abstract contract PortfolioVirtual is Objective {
 
         pool.virtualX = nextVirtualX.safeCastTo128();
         pool.virtualY = nextVirtualY.safeCastTo128();
-        pool.syncPoolTimestamp(block.timestamp);
+
+        // If not updated in the other swap hooks, update the timestamp.
+        if (pool.lastTimestamp != block.timestamp) {
+            pool.syncPoolTimestamp(block.timestamp);
+        }
     }
 
     function _createPair(
