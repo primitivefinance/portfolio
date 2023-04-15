@@ -500,12 +500,7 @@ abstract contract PortfolioVirtual is Objective {
 
         // =---= Effects =---= //
 
-        _syncPool(
-            args.poolId,
-            iteration.virtualX,
-            iteration.virtualY,
-            iteration.liquidity
-        );
+        _syncPool(args.poolId, iteration.virtualX, iteration.virtualY);
 
         // -=- Scale Amounts to Native Token Decimals -=- //
         {
@@ -553,15 +548,17 @@ abstract contract PortfolioVirtual is Objective {
     function _syncPool(
         uint64 poolId,
         uint256 nextVirtualX,
-        uint256 nextVirtualY,
-        uint256 liquidity
+        uint256 nextVirtualY
     ) internal {
         PortfolioPool storage pool = pools[poolId];
 
         pool.virtualX = nextVirtualX.safeCastTo128();
         pool.virtualY = nextVirtualY.safeCastTo128();
-        pool.liquidity = liquidity.safeCastTo128();
-        pool.syncPoolTimestamp(block.timestamp);
+
+        // If not updated in the other swap hooks, update the timestamp.
+        if (pool.lastTimestamp != block.timestamp) {
+            pool.syncPoolTimestamp(block.timestamp);
+        }
     }
 
     function _createPair(
