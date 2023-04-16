@@ -165,13 +165,20 @@ abstract contract PortfolioVirtual is Objective {
         // Checks
         if (to == address(this)) revert InvalidTransfer();
 
-        uint256 balance = getBalance(msg.sender, token);
-        if (amount == type(uint256).max) amount = balance;
-        if (amount > balance) revert DrawBalance();
+        uint8 decimals = IERC20(token).decimals();
+        uint256 amountWad = amount.scaleToWad(decimals);
+        uint256 balanceWad = getBalance(msg.sender, token);
+        if (amountWad == type(uint256).max) amountWad = balanceWad;
+        if (amountWad > balanceWad) revert DrawBalance();
 
         // Effects
-        _applyDebit(token, amount);
-        _decreaseReserves(token, amount);
+        _applyDebit(token, amountWad);
+        _decreaseReserves(token, amountWad);
+
+        // If we are using the full balance, we need to scale it from WAD.
+        if (amountWad == balanceWad) {
+            amount = amountWad.scaleFromWadDown(decimals);
+        }
 
         if (token == WETH) {
             Account.__dangerousUnwrapEther__(WETH, to, amount);
@@ -222,6 +229,11 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Increases virtual reserves and liquidity. Debits `msg.sender`.
+     * @param deltaLiquidity Quantity of liquidity to mint in WAD units.
+     * @param maxDeltaAsset Maximum quantity of asset tokens paid in WAD units.
+     * @param maxDeltaQuote Maximum quantity of quote tokens paid in WAD units.
+     * @return deltaAsset Real quantity of `asset` tokens paid to pool, in native token decimals.
+     * @return deltaQuote Real quantity of `quote` tokens paid to pool, in native token decimals.
      */
     function _allocate(
         bool useMax,
@@ -232,20 +244,19 @@ abstract contract PortfolioVirtual is Objective {
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
-        (address asset, address quote) =
-            (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
+        PortfolioPair memory pair = pools[poolId].pair;
 
         if (useMax) {
-            deltaLiquidity = getMaxLiquidity({
-                poolId: poolId,
-                amount0: getBalance(msg.sender, asset),
-                amount1: getBalance(msg.sender, quote)
+            deltaLiquidity = pools[poolId].getPoolMaxLiquidity({
+                deltaAsset: getBalance(msg.sender, pair.tokenAsset),
+                deltaQuote: getBalance(msg.sender, pair.tokenQuote)
             });
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) =
-            getLiquidityDeltas(poolId, AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds up.
+        (deltaAsset, deltaQuote) = pools[poolId].getPoolLiquidityDeltas(
+            AssemblyLib.toInt128(deltaLiquidity)
+        ); // note: Rounds up.
         if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
         if (deltaAsset > maxDeltaAsset || deltaQuote > maxDeltaQuote) {
             revert MaxDeltaReached();
@@ -257,15 +268,26 @@ abstract contract PortfolioVirtual is Objective {
             timestamp: block.timestamp,
             deltaAsset: deltaAsset,
             deltaQuote: deltaQuote,
-            tokenAsset: asset,
-            tokenQuote: quote,
+            tokenAsset: pair.tokenAsset,
+            tokenQuote: pair.tokenQuote,
             deltaLiquidity: AssemblyLib.toInt128(deltaLiquidity)
         });
 
         _changeLiquidity(args);
 
+        // Scale WAD -> Decimals.
+        (deltaAsset, deltaQuote) = (
+            deltaAsset.scaleFromWadDown(pair.decimalsAsset),
+            deltaQuote.scaleFromWadDown(pair.decimalsQuote)
+        );
+
         emit Allocate(
-            poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
+            poolId,
+            pair.tokenAsset,
+            pair.tokenQuote,
+            deltaAsset,
+            deltaQuote,
+            deltaLiquidity
             );
     }
 
@@ -280,16 +302,19 @@ abstract contract PortfolioVirtual is Objective {
         uint128 minDeltaQuote
     ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
-        (address asset, address quote) =
-            (pools[poolId].pair.tokenAsset, pools[poolId].pair.tokenQuote);
+
+        PortfolioPair memory pair = pools[poolId].pair;
+        (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
 
         if (useMax) {
             deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
-        (deltaAsset, deltaQuote) =
-            getLiquidityDeltas(poolId, -AssemblyLib.toInt128(deltaLiquidity)); // note: Rounds down.
+        (deltaAsset, deltaQuote) = pools[poolId].getPoolLiquidityDeltas(
+            -AssemblyLib.toInt128(deltaLiquidity)
+        ); // note: Rounds down.
+
         if (deltaAsset < minDeltaAsset || deltaQuote < minDeltaQuote) {
             revert MinDeltaUnmatched();
         }
@@ -305,6 +330,12 @@ abstract contract PortfolioVirtual is Objective {
         });
 
         _changeLiquidity(args);
+
+        // Scale WAD -> Decimals.
+        (deltaAsset, deltaQuote) = (
+            deltaAsset.scaleFromWadDown(pair.decimalsAsset),
+            deltaQuote.scaleFromWadDown(pair.decimalsQuote)
+        );
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
@@ -322,13 +353,18 @@ abstract contract PortfolioVirtual is Objective {
             checkPosition(args.poolId, args.owner, args.deltaLiquidity);
         if (!canUpdate) revert JitLiquidity(pool.params.jit);
 
+        (uint128 deltaAssetWad, uint128 deltaQuoteWad) =
+            (args.deltaAsset.safeCastTo128(), args.deltaQuote.safeCastTo128());
+
+        // Can only be in the case of an allocation,
+        // because pool.liquidity cannot be 0 on deallocation.
         if (pool.liquidity == 0) {
-            // If the pool is empty, we need to set the initial virtual reserves with the
-            // actual amounts added to the pool in this allocate call.
-            pool.virtualX = args.deltaAsset.scaleToWad(pool.pair.decimalsAsset)
-                .safeCastTo128();
-            pool.virtualY = args.deltaQuote.scaleToWad(pool.pair.decimalsQuote)
-                .safeCastTo128();
+            // On create, virtualX and virtualY are set to initial
+            // liquidity of 1E18 and its corresponding reserves.
+            // Therefore, reset the virtual reserves since they are being allocated to
+            // for the first time in this transaction.
+            pool.virtualX = 0;
+            pool.virtualY = 0;
         }
 
         position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
@@ -336,11 +372,15 @@ abstract contract PortfolioVirtual is Objective {
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
         if (args.deltaLiquidity < 0) {
-            _decreaseReserves(asset, args.deltaAsset);
-            _decreaseReserves(quote, args.deltaQuote);
+            _decreaseReserves(asset, deltaAssetWad);
+            _decreaseReserves(quote, deltaQuoteWad);
+            pool.virtualX -= deltaAssetWad;
+            pool.virtualY -= deltaQuoteWad;
         } else {
-            _increaseReserves(asset, args.deltaAsset);
-            _increaseReserves(quote, args.deltaQuote);
+            _increaseReserves(asset, deltaAssetWad);
+            _increaseReserves(quote, deltaQuoteWad);
+            pool.virtualX += deltaAssetWad;
+            pool.virtualY += deltaQuoteWad;
         }
     }
 
@@ -396,13 +436,7 @@ abstract contract PortfolioVirtual is Objective {
                 input = args.input;
             }
 
-            input = input.scaleToWad(
-                _state.sell ? pool.pair.decimalsAsset : pool.pair.decimalsQuote
-            );
-            output = uint256(args.output).scaleToWad(
-                _state.sell ? pool.pair.decimalsQuote : pool.pair.decimalsAsset
-            );
-
+            output = args.output;
             iteration.prevInvariant = invariant;
             iteration.input = input;
             iteration.liquidity = pool.liquidity;
@@ -509,6 +543,9 @@ abstract contract PortfolioVirtual is Objective {
 
         _syncPool(args.poolId, iteration.virtualX, iteration.virtualY);
 
+        _increaseReserves(_state.tokenInput, iteration.input); // Increasing reserves creates a debit that must be paid from `msg.sender`.
+        _decreaseReserves(_state.tokenOutput, iteration.output); // Decreasing reserves creates a surplus that can be used in following instructions.
+
         // -=- Scale Amounts to Native Token Decimals -=- //
         {
             uint256 inputDec;
@@ -532,13 +569,6 @@ abstract contract PortfolioVirtual is Objective {
                 _applyCredit(REGISTRY, _state.tokenInput, protocolFeeAmountDec);
             }
         }
-
-        // Increasing reserves expects a debit from `msg.sender`,
-        // a gifted surplus of tokens that is not synced (e.g. tokens transferred to Portfolio),
-        // or tokens sent into Portfolio via `transferFrom` in the `_settlement` function.
-        // Decreasing reserves credits the `msg.sender`'s account.
-        _increaseReserves(_state.tokenInput, iteration.input);
-        _decreaseReserves(_state.tokenOutput, iteration.output);
 
         emit Swap(
             args.poolId,
@@ -736,6 +766,29 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
+     * @dev Used on every entry point to scale user-provided arguments from decimals to WAD.
+     */
+    function _scaleAmountsToWad(
+        uint64 poolId,
+        uint256 amountAssetDec,
+        uint256 amountQuoteDec
+    ) internal view returns (uint128 amountAssetWad, uint128 amountQuoteWad) {
+        PortfolioPair memory pair = pools[poolId].pair;
+
+        amountAssetWad = amountAssetDec.safeCastTo128();
+        if (amountAssetDec != type(uint128).max) {
+            amountAssetWad =
+                amountAssetDec.scaleToWad(pair.decimalsAsset).safeCastTo128();
+        }
+
+        amountQuoteWad = amountQuoteDec.safeCastTo128();
+        if (amountQuoteDec != type(uint128).max) {
+            amountQuoteWad =
+                amountQuoteDec.scaleToWad(pair.decimalsQuote).safeCastTo128();
+        }
+    }
+
+    /**
      * @dev Use `multiprocess` to enter this function to process instructions.
      * @param data Custom encoded FVM data. First byte must be an FVM instruction.
      */
@@ -746,6 +799,21 @@ abstract contract PortfolioVirtual is Objective {
             Order memory args;
             (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
             = FVM.decodeSwap(data);
+
+            if (args.sellAsset == 1) {
+                (args.input, args.output) = _scaleAmountsToWad({
+                    poolId: args.poolId,
+                    amountAssetDec: args.input,
+                    amountQuoteDec: args.output
+                });
+            } else {
+                (args.output, args.input) = _scaleAmountsToWad({
+                    poolId: args.poolId,
+                    amountAssetDec: args.output,
+                    amountQuoteDec: args.input
+                });
+            }
+
             _swap(args);
         } else if (instruction == FVM.ALLOCATE) {
             (
@@ -755,6 +823,13 @@ abstract contract PortfolioVirtual is Objective {
                 uint128 maxDeltaAsset,
                 uint128 maxDeltaQuote
             ) = FVM.decodeAllocateOrDeallocate(data);
+
+            (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
+                poolId: poolId,
+                amountAssetDec: maxDeltaAsset,
+                amountQuoteDec: maxDeltaQuote
+            });
+
             _allocate(
                 useMax == 1,
                 poolId,
@@ -770,6 +845,12 @@ abstract contract PortfolioVirtual is Objective {
                 uint128 minDeltaAsset,
                 uint128 minDeltaQuote
             ) = FVM.decodeAllocateOrDeallocate(data);
+
+            (minDeltaAsset, minDeltaQuote) = _scaleAmountsToWad({
+                poolId: poolId,
+                amountAssetDec: minDeltaAsset,
+                amountQuoteDec: minDeltaQuote
+            });
             _deallocate(
                 useMax == 1,
                 poolId,
@@ -829,34 +910,31 @@ abstract contract PortfolioVirtual is Objective {
         do {
             // Loop backwards to pop tokens off.
             address token = tokens[i - 1];
+
             // Apply credits or debits to net balance.
+            // If credited, these are extra tokens that will be transferred to `msg.sender`.
+            // If debited, some tokens were paid via `msg.sender`'s internal balance.
+            // If remainder, not enough tokens were paid. Must be transferred in from `msg.sender`.
             (uint256 credited, uint256 debited, uint256 remainder) =
                 __account__.settle(token, address(this));
 
-            // Reserves were not tracking some tokens, increase the reserves to account for them.
-            if (credited > 0) {
-                emit IncreaseUserBalance(msg.sender, token, credited);
-                emit IncreaseReserveBalance(token, credited);
-            } else {
-                // Users are never simultaneously credited and debited so we must only check this when not credited.
-
-                // Reserves were increased, we paid a debit, therefore need to decrease reserves by `debited` amount.
-                if (debited > 0) {
-                    emit DecreaseUserBalance(msg.sender, token, debited);
-                    emit DecreaseReserveBalance(token, debited);
-                }
-
-                // Outstanding amount must be transferred in.
-                if (remainder > 0) {
-                    _payments.push(
-                        Payment({
-                            token: token,
-                            amount: remainder,
-                            balance: Account.__balanceOf__(token, address(this))
-                        })
-                    );
-                }
+            // Reserves were increased, we paid a debit, therefore need to decrease reserves by `debited` amount.
+            if (debited > 0) {
+                emit DecreaseUserBalance(msg.sender, token, debited);
+                emit DecreaseReserveBalance(token, debited);
             }
+
+            // Only `credited` or `remainder` can be non-zero.
+            // Outstanding amount must be transferred in to `address(this)`.
+            // Untracked credits must be transferred out to `msg.sender`.
+            _payments.push(
+                Payment({
+                    token: token,
+                    amountTransferTo: credited, // Reserves are not tracking some tokens.
+                    amountTransferFrom: remainder, // Reserves need more tokens.
+                    balance: Account.__balanceOf__(token, address(this))
+                })
+            );
 
             // Token considered fully accounted for.
             __account__.warm.pop();
@@ -865,31 +943,62 @@ abstract contract PortfolioVirtual is Objective {
             }
         } while (i != 0);
 
-        // Uses `token.transferFrom(msg.sender, amount)` to pay for the outstanding debits.
+        // Uses `token.transferFrom(msg.sender, address(this), amount)` to pay for the outstanding debits.
+        // Uses `token.transfer(msg.sender, amount)` to pay out the untracked credits.
         Payment[] memory payments = _payments;
         uint256 px = payments.length;
         while (px != 0) {
             uint256 index = px - 1;
-            Account.__dangerousTransferFrom__(
-                payments[index].token, address(this), payments[index].amount
-            );
-            unchecked {
-                --px; // Cannot underflow because loop exits at 0!
-            }
-        }
-
-        // Sanity check the payment amounts.
-        px = payments.length;
-        while (px != 0) {
-            uint256 index = px - 1;
             address token = payments[index].token;
-            uint256 prevBalance = payments[index].balance;
-            uint256 nextBalance = Account.__balanceOf__(token, address(this));
-            uint256 expectedBalance = payments[index].amount + prevBalance;
-            if (nextBalance < expectedBalance) {
-                revert NegativeBalance(
-                    token, int256(nextBalance) - int256(expectedBalance)
+            uint8 decimals = IERC20(token).decimals();
+
+            (uint256 amountTransferTo, uint256 amountTransferFrom) = (
+                payments[index].amountTransferTo,
+                payments[index].amountTransferFrom
+            );
+
+            // Scale WAD -> Decimals.
+            amountTransferTo = amountTransferTo.scaleFromWadDown(decimals);
+            amountTransferFrom = amountTransferFrom.scaleFromWadDown(decimals);
+
+            if (amountTransferTo > 0) {
+                uint256 prev = payments[index].balance;
+
+                // Interaction
+                if (token == WETH) {
+                    Account.__dangerousUnwrapEther__(
+                        WETH, msg.sender, amountTransferTo
+                    );
+                } else {
+                    Account.SafeTransferLib.safeTransfer(
+                        Account.ERC20(token), msg.sender, amountTransferTo
+                    );
+                }
+
+                uint256 post = Account.__balanceOf__(token, address(this));
+                uint256 expected = prev - amountTransferTo;
+                if (post < expected) {
+                    revert NegativeBalance(
+                        token, int256(post) - int256(expected)
+                    );
+                }
+            }
+
+            if (amountTransferFrom > 0) {
+                uint256 prev = payments[index].balance;
+
+                // Interaction
+                Account.__dangerousTransferFrom__(
+                    token, address(this), amountTransferFrom
                 );
+
+                uint256 post = Account.__balanceOf__(token, address(this));
+                uint256 expected = prev + amountTransferFrom;
+                if (post < expected) {
+                    revert NegativeBalance(
+                        token, int256(post) - int256(expected)
+                    );
+                }
             }
 
             unchecked {
@@ -920,7 +1029,14 @@ abstract contract PortfolioVirtual is Objective {
         uint64 poolId,
         int128 deltaLiquidity
     ) public view returns (uint128 deltaAsset, uint128 deltaQuote) {
-        return pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
+        (uint256 deltaAssetWad, uint256 deltaQuoteWad) =
+            pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
+
+        PortfolioPair memory pair = pools[poolId].pair;
+        deltaAsset =
+            deltaAssetWad.scaleFromWadDown(pair.decimalsAsset).safeCastTo128();
+        deltaQuote =
+            deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
     }
 
     /// @inheritdoc IPortfolioGetters
@@ -929,6 +1045,13 @@ abstract contract PortfolioVirtual is Objective {
         uint256 amount0,
         uint256 amount1
     ) public view returns (uint128 deltaLiquidity) {
+        PortfolioPair memory pair = pools[poolId].pair;
+
+        (amount0, amount1) = (
+            amount0.scaleToWad(pair.decimalsAsset),
+            amount1.scaleToWad(pair.decimalsQuote)
+        );
+
         return pools[poolId].getPoolMaxLiquidity(amount0, amount1);
     }
 
@@ -939,7 +1062,13 @@ abstract contract PortfolioVirtual is Objective {
         override
         returns (uint256 deltaAsset, uint256 deltaQuote)
     {
-        return pools[poolId].getPoolReserves();
+        (uint256 deltaAssetWad, uint256 deltaQuoteWad) =
+            pools[poolId].getPoolReserves();
+
+        deltaAsset =
+            deltaAssetWad.scaleFromWadDown(pools[poolId].pair.decimalsAsset);
+        deltaQuote =
+            deltaQuoteWad.scaleFromWadDown(pools[poolId].pair.decimalsQuote);
     }
 
     /// @inheritdoc IPortfolioGetters

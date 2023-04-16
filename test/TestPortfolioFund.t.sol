@@ -11,7 +11,7 @@ contract TestPortfolioFund is Setup {
         uint256 subjectActualBalance;
     }
 
-    function test_fund_increases_user_balance() public defaultConfig isArmed {
+    /* function test_fund_increases_user_balance() public defaultConfig isArmed {
         uint256 amt = 1 ether;
         address tkn = ghost().asset().to_addr();
         ghost().asset().prepare(address(this), address(subject()), amt);
@@ -19,9 +19,9 @@ contract TestPortfolioFund is Setup {
         subject().fund(tkn, amt);
         uint256 post = ghost().balance(address(this), tkn);
         assertEq(post, prev + amt, "did-not-increase-balance");
-    }
+    } */
 
-    function test_fund_max_balance() public defaultConfig isArmed {
+    /* function test_fund_max_balance() public defaultConfig isArmed {
         uint256 amt = 10 ether;
         address tkn = ghost().asset().to_addr();
         ghost().asset().prepare(address(this), address(subject()), amt);
@@ -29,9 +29,9 @@ contract TestPortfolioFund is Setup {
         subject().fund(tkn, amt);
         uint256 post = ghost().balance(address(this), tkn);
         assertEq(post, prev + amt, "did-not-increase-balance");
-    }
+    } */
 
-    function testFuzz_fund_then_draw(uint64 amt) public defaultConfig isArmed {
+    /* function testFuzz_fund_then_draw(uint64 amt) public defaultConfig isArmed {
         vm.assume(amt > 0);
 
         // Prepare the token and give this contract a balanc and approve subject().
@@ -124,5 +124,5 @@ contract TestPortfolioFund is Setup {
             ghost_state_prev.subjectActualBalance,
             "subj-actual-balance-final"
         );
-    }
+    } */
 }

@@ -175,10 +175,8 @@ function settle(
 ) returns (uint256 credited, uint256 debited, uint256 remainder) {
     int256 net = self.getNetBalance(token, account);
     if (net > 0) {
+        // Token remaining in internal balance or untracked tokens to transfer out.
         credited = uint256(net);
-        // unaccounted for tokens, e.g. transferred directly into Portfolio.
-        self.credit(msg.sender, token, uint256(net)); // gift to `msg.sender`.
-        self.reserves[token] += uint256(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {
         // missing tokens that must be paid for or transferred in.
         remainder = uint256(-net);
@@ -235,5 +233,7 @@ function getNetBalance(
     // Also checking the physical balance.
     if (physicalBalance > uint256(type(int256).max)) revert();
 
-    net = int256(physicalBalance) - int256(internalBalance);
+    uint256 physicalBalanceWad =
+        AssemblyLib.scaleToWad(physicalBalance, IERC20(token).decimals());
+    net = int256(physicalBalanceWad) - int256(internalBalance);
 }

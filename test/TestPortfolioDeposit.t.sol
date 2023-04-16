@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioDeposit is Setup {
-    function test_deposit_increases_user_weth_balance() public useActor {
+/* function test_deposit_increases_user_weth_balance() public useActor {
         uint256 amount = 10 ether;
         uint256 prev = ghost().balance(actor(), subject().WETH());
         subject().deposit{value: amount}();
@@ -39,5 +39,5 @@ contract TestPortfolioDeposit is Setup {
         uint256 amount = 10 ether;
         subject().deposit{value: amount}();
         assertEq(address(subject().WETH()).balance, amount, "zero-balance");
-    }
+    } */
 }

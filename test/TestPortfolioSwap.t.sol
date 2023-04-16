@@ -24,7 +24,7 @@ contract TestPortfolioSwap is Setup {
             )
         );
 
-        uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
+        uint256 prev = ghost().quote().to_token().balanceOf(actor());
         subject().multiprocess(
             FVMLib.encodeSwap(
                 uint8(0),
@@ -34,7 +34,7 @@ contract TestPortfolioSwap is Setup {
                 uint8(sellAsset ? 1 : 0)
             )
         );
-        uint256 post = ghost().balance(address(this), ghost().quote().to_addr());
+        uint256 post = ghost().quote().to_token().balanceOf(actor());
 
         assertTrue(post > prev, "balance-did-not-increase");
     }
@@ -50,12 +50,10 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
-            subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, address(this)
-            )
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
         );
 
-        uint256 prev = ghost().balance(address(this), ghost().quote().to_addr());
+        uint256 prev = ghost().quote().to_token().balanceOf(actor());
 
         vm.warp(
             block.timestamp
@@ -70,9 +68,9 @@ contract TestPortfolioSwap is Setup {
                 uint8(sellAsset ? 1 : 0)
             )
         );
-        uint256 post = ghost().balance(address(this), ghost().quote().to_addr());
+        uint256 post = ghost().quote().to_token().balanceOf(actor());
 
-        assertTrue(post > prev, "balance-did-not-increase");
+        assertTrue(post > prev, "physical-balance-did-not-increase");
     }
 
     function test_swap_protocol_fee()
