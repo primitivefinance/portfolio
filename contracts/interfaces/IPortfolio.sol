@@ -131,8 +131,8 @@ interface IPortfolioEvents {
 interface IPortfolioGetters {
     // ===== Account Getters ===== //
     /**
-     * @dev Internally owned balance of `token` of `owner`.
-     * @return Balance held, in native `token` decimal units.
+     * @dev Transiently owned internal balance of `token` of `owner`.
+     * @return Balance held in WAD units.
      */
     function getBalance(
         address owner,
@@ -141,14 +141,15 @@ interface IPortfolioGetters {
 
     /**
      * @dev Internally tracked global balance of all `token`s assigned to an address or a pool.
-     * @return Global balance held, in native `token` decimal units.
+     * @return Global balance held in WAD units.
      */
     function getReserve(address token) external view returns (uint256);
 
     /**
      * @notice Difference of `token.balanceOf(this)` and internally tracked reserve balance.
      * @dev Critical system invariant. Must always return greater than or equal to zero.
-     * @custom:example
+     * @return Net balance held in WAD units.
+     * @custom:example Assumes token is 18 decimals.
      * ```
      * uint256 previousReserve = getReserve(token);
      * uint256 previousBalance = token.balanceOf(portfolio);
@@ -233,6 +234,8 @@ interface IPortfolioGetters {
     /**
      * @dev Computes amount of `deltaAsset` and `deltaQuote` that must be paid for to
      * mint `deltaLiquidity`.
+     * @return deltaAsset Real quantity of `asset` tokens underlying `deltaLiquidity`, in native decimal units.
+     * @return deltaQuote Real quantity of `quote` tokens underlying `deltaLiquidity`, in native decimal units.
      */
     function getLiquidityDeltas(
         uint64 poolId,
@@ -264,8 +267,8 @@ interface IPortfolioGetters {
 
     /**
      * @dev Amount of tokens in native token decimals.
-     * @return deltaAsset Quantity of `asset` tokens in wad units.
-     * @return deltaQuote Quantity of `quote` tokens in wad units.
+     * @return deltaAsset Quantity of `asset` tokens in native decimal units.
+     * @return deltaQuote Quantity of `quote` tokens in native decimal units.
      */
     function getVirtualReservesDec(uint64 poolId)
         external

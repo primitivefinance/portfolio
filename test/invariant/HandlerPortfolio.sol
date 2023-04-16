@@ -6,6 +6,7 @@ import "solmate/utils/SafeCastLib.sol";
 
 contract HandlerPortfolio is HandlerBase {
     using SafeCastLib for uint256;
+    using AssemblyLib for uint256;
 
     function callSummary() external view {
         console.log("deposit", calls["deposit"]);
@@ -553,6 +554,14 @@ contract HandlerPortfolio is HandlerBase {
         // TODO: Breaks when we call this function on a pool with zero liquidity...
         (uint256 dAsset, uint256 dQuote) =
             ctx.subject().getPoolReserves(ctx.ghost().poolId);
+        emit log("dAssetWad", dAsset);
+        emit log("dQuoteWad", dQuote);
+
+        dAsset =
+            dAsset.scaleFromWadDown(ctx.ghost().asset().to_token().decimals());
+        dQuote =
+            dQuote.scaleFromWadDown(ctx.ghost().quote().to_token().decimals());
+
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 
@@ -569,8 +578,12 @@ contract HandlerPortfolio is HandlerBase {
         emit log("diffAsset", diffAsset);
         emit log("diffQuote", diffQuote);
 
-        assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
-        assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
+        assertTrue(
+            bAsset >= dAsset, "invariant-virtual-reserves-asset-check-invariant"
+        );
+        assertTrue(
+            bQuote >= dQuote, "invariant-virtual-reserves-quote-check-invariant"
+        );
 
         emit FinishedCall("Check Virtual Invariant");
     }

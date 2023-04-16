@@ -4,6 +4,8 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioAllocate is Setup {
+    using AssemblyLib for uint256;
+
     function test_allocate_modifies_liquidity()
         public
         defaultConfig
@@ -40,7 +42,8 @@ contract TestPortfolioAllocate is Setup {
         );
     }
 
-    function test_allocate_use_max()
+    // todo: Use max now only uses entire transient balances, which need to be increased from a swap output or deallocatye.
+    /* function test_allocate_use_max()
         public
         defaultConfig
         useActor
@@ -66,7 +69,7 @@ contract TestPortfolioAllocate is Setup {
             ghost().position(actor()).freeLiquidity,
             "position.freeLiquidity != pool.liquidity"
         );
-    }
+    } */
 
     function test_allocate_does_not_modify_timestamp()
         public
@@ -480,6 +483,11 @@ contract TestPortfolioAllocate is Setup {
             ghost().reserve(ghost().asset().to_addr()),
             ghost().reserve(ghost().quote().to_addr())
         );
+
+        postR_A =
+            postR_A.scaleFromWadDown(ghost().asset().to_token().decimals());
+        postR_Q =
+            postR_Q.scaleFromWadDown(ghost().quote().to_token().decimals());
 
         assertEq(postA, expectedA, "pool asset balance");
         assertEq(postQ, expectedQ, "pool quote balance");

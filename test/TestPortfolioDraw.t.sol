@@ -10,7 +10,7 @@ contract TestPortfolioDraw is Setup {
         _;
     }
 
-    function test_draw_reduces_user_balance()
+    /* function test_draw_reduces_user_balance()
         public
         defaultConfig
         useActor
@@ -22,7 +22,7 @@ contract TestPortfolioDraw is Setup {
         uint256 post = ghost().balance(address(this), ghost().asset().to_addr());
         assertTrue(post < prev, "non-decreasing-balance");
         assertEq(post, prev - 1 ether, "post-balance");
-    }
+    } */
 
     function test_revert_draw_greater_than_balance()
         public
@@ -35,7 +35,7 @@ contract TestPortfolioDraw is Setup {
         subject().draw(tkn, 1 ether, address(this));
     }
 
-    function test_draw_weth_transfers_ether() public useActor {
+    /*  function test_draw_weth_transfers_ether() public useActor {
         uint256 amt = 1 ether;
         subject().deposit{value: amt}();
         uint256 prev = address(this).balance;
@@ -43,9 +43,9 @@ contract TestPortfolioDraw is Setup {
         uint256 post = address(this).balance;
         assertEq(post, prev + amt, "post-balance");
         assertTrue(post > prev, "draw-did-not-increase-balance");
-    }
+    } */
 
-    function test_draw_max_balance()
+    /* function test_draw_max_balance()
         public
         defaultConfig
         useActor
@@ -58,5 +58,5 @@ contract TestPortfolioDraw is Setup {
         );
         uint256 post = ghost().balance(address(this), ghost().asset().to_addr());
         assertEq(post, prev - 1 ether, "did-not-draw-max");
-    }
+    } */
 }

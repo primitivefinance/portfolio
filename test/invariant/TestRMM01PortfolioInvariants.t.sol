@@ -24,9 +24,11 @@ interface AccountLike {
  * pools.
  */
 contract TestRMM01PortfolioInvariants is Setup {
+    using AssemblyLib for uint256;
     /**
      * @dev Helper to manage the pools that are being interacted with via the handlers.
      */
+
     InvariantGhostState private _ghostInvariant;
 
     HandlerPortfolio internal _portfolio;
@@ -76,12 +78,16 @@ contract TestRMM01PortfolioInvariants is Setup {
     function invariant_asset_balance_gte_reserves() public {
         (uint256 reserve, uint256 physical,) =
             getBalances(ghost().asset().to_addr());
+        reserve =
+            reserve.scaleFromWadDown(ghost().asset().to_token().decimals());
         assertTrue(physical >= reserve, "invariant-asset-physical-balance");
     }
 
     function invariant_quote_balance_gte_reserves() public {
         (uint256 reserve, uint256 physical,) =
             getBalances(ghost().quote().to_addr());
+        reserve =
+            reserve.scaleFromWadDown(ghost().quote().to_token().decimals());
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
     }
 
@@ -96,6 +102,8 @@ contract TestRMM01PortfolioInvariants is Setup {
         if (pool.liquidity > 0) {
             (uint256 dAsset,) = subject().getPoolReserves(ghost().poolId);
             uint256 bAsset = ghost().physicalBalance(ghost().asset().to_addr());
+            dAsset =
+                dAsset.scaleFromWadDown(ghost().asset().to_token().decimals());
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }
     }
@@ -106,6 +114,8 @@ contract TestRMM01PortfolioInvariants is Setup {
         if (pool.liquidity > 0) {
             (, uint256 dQuote) = subject().getPoolReserves(ghost().poolId);
             uint256 bQuote = ghost().physicalBalance(ghost().quote().to_addr());
+            dQuote =
+                dQuote.scaleFromWadDown(ghost().quote().to_token().decimals());
             assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
         }
     }
