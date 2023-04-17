@@ -102,14 +102,13 @@ contract TestPortfolioSwap is Setup {
             )
         );
 
-        uint256 preBal = ghost().asset().to_token().balanceOf(address(this));
+        uint256 preBal =
+            ghost().asset().to_token().balanceOf(subjects().registry);
         SimpleRegistry(subjects().registry).claimFee(
-            address(subject()),
-            ghost().asset().to_addr(),
-            type(uint256).max,
-            address(this)
+            address(subject()), ghost().asset().to_addr(), type(uint256).max
         );
-        uint256 postBal = ghost().asset().to_token().balanceOf(address(this));
+        uint256 postBal =
+            ghost().asset().to_token().balanceOf(subjects().registry);
         assertTrue(postBal > preBal, "nothing claimed");
     }
 
