@@ -121,13 +121,14 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
             revert InvalidJump(idxInstructionEnd);
         }
         // Calldata slicing EXCLUDES the `idxInstructionEnd` byte.
-        bytes calldata instruction = data[idxInstructionStart:idxInstructionEnd];
+        bytes calldata instruction =
+            data[idxInstructionStart + 1:idxInstructionEnd];
         // Move the pointer to the EXCLUDED `idxInstructionEnd` byte.
         // This byte holds the data for the index of byte with the next instruction's length.
         idxPtr = idxInstructionEnd;
         // Process the instruction after removing the instruction length,
         // so only instruction data is passed to `_process`.
-        _process(instruction[1:]);
+        _process(instruction);
     }
 }
 
