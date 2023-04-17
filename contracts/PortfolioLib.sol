@@ -65,6 +65,7 @@ error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
 error NonExistentPosition(address owner, uint64 poolId);
+error NotExpiringPool();
 error PairExists(uint24 pairId);
 error PoolExpired();
 error SameTokenError();
@@ -318,10 +319,16 @@ function computeTau(
     }
 }
 
+/**
+ * @dev Computes the time in seconds until the pool matures.
+ * @custom:reverts If pool is perpetual.
+ */
 function maturity(PortfolioCurve memory self)
     pure
     returns (uint32 endTimestamp)
 {
+    if (self.perpetual) revert NotExpiringPool();
+
     unchecked {
         // Portfolio duration is limited such that this addition will never overflow 256 bits.
         endTimestamp = (
@@ -373,7 +380,10 @@ function checkParameters(PortfolioCurve memory self)
     // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
     if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
         return (
-            false, abi.encodeWithSelector(InvalidPriorityFee.selector, self.priorityFee)
+            false,
+            abi.encodeWithSelector(
+                InvalidPriorityFee.selector, self.priorityFee
+                )
         );
     }
 
