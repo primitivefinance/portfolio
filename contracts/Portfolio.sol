@@ -181,9 +181,13 @@ abstract contract PortfolioVirtual is Objective {
 
         if (useMax) {
             // A positive net balance is a surplus of tokens in the accounting state that can be used to mint liquidity.
+            int256 surplusAsset = getNetBalance(pair.tokenAsset);
+            int256 surplusQuote = getNetBalance(pair.tokenQuote);
+            if (surplusAsset < 0) surplusAsset = 0;
+            if (surplusQuote < 0) surplusQuote = 0;
             deltaLiquidity = pools[poolId].getPoolMaxLiquidity({
-                deltaAsset: uint256(getNetBalance(pair.tokenAsset)), // If negative, will be zero.
-                deltaQuote: uint256(getNetBalance(pair.tokenQuote)) // If negative, will be zero.
+                deltaAsset: uint256(surplusAsset),
+                deltaQuote: uint256(surplusQuote)
             });
         }
 
@@ -378,7 +382,8 @@ abstract contract PortfolioVirtual is Objective {
                 int256 netBalance = getNetBalance(
                     _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
                 );
-                input = uint256(netBalance); // If netBalance is negative, this will be 0.
+                if (netBalance < 0) netBalance = 0;
+                input = uint256(netBalance);
             } else {
                 input = args.input;
             }
