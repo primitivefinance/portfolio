@@ -295,11 +295,7 @@ contract HandlerPortfolio is HandlerBase {
             ctx.getBalanceSum(quote),
             ctx.getPositionsLiquiditySum(),
             position.freeLiquidity,
-            pool.liquidity,
-            pool.feeGrowthGlobalAsset,
-            pool.feeGrowthGlobalQuote,
-            position.feeGrowthAssetLast,
-            position.feeGrowthQuoteLast
+            pool.liquidity
         );
 
         return state;
@@ -409,7 +405,9 @@ contract HandlerPortfolio is HandlerBase {
                 true,
                 uint8(0),
                 ctx.ghost().poolId,
-                deltaLiquidity.safeCastTo128()
+                deltaLiquidity.safeCastTo128(),
+                type(uint128).max,
+                type(uint128).max
             )
         );
         post = fetchAccountingState();
@@ -453,16 +451,6 @@ contract HandlerPortfolio is HandlerBase {
             prev.physicalBalanceQuote + physicalQuotePayment,
             "physical-quote"
         );
-
-        uint256 feeDelta0 =
-            post.feeGrowthAssetPosition - prev.feeGrowthAssetPosition;
-        uint256 feeDelta1 = post.feeGrowthAssetPool - prev.feeGrowthAssetPool;
-        assertTrue(feeDelta0 == feeDelta1, "asset-growth");
-
-        uint256 feeDelta2 =
-            post.feeGrowthQuotePosition - prev.feeGrowthQuotePosition;
-        uint256 feeDelta3 = post.feeGrowthQuotePool - prev.feeGrowthQuotePool;
-        assertTrue(feeDelta2 == feeDelta3, "quote-growth");
 
         emit FinishedCall("Allocate");
 
@@ -513,7 +501,9 @@ contract HandlerPortfolio is HandlerBase {
                     false,
                     uint8(0),
                     ctx.ghost().poolId,
-                    deltaLiquidity.safeCastTo128()
+                    deltaLiquidity.safeCastTo128(),
+                    0,
+                    0
                 )
             );
 
@@ -658,8 +648,4 @@ struct AccountingState {
     uint256 totalPositionLiquidity; // sum of all position liquidity
     uint256 callerPositionLiquidity; // position.freeLiquidity
     uint256 totalPoolLiquidity; // pool.liquidity
-    uint256 feeGrowthAssetPool; // getPool
-    uint256 feeGrowthQuotePool; // getPool
-    uint256 feeGrowthAssetPosition; // getPosition
-    uint256 feeGrowthQuotePosition; // getPosition
 }

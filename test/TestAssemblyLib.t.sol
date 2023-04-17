@@ -25,15 +25,29 @@ contract TestAssemblyLib is Test {
         }
     }
 
-    /*
-    FIXME: These tests are not working yet.
     function testFuzz_addSignedDelta(uint128 input, int128 delta) public {
+        // If delta is positive but the sum of input and delta is greater than
+        // the maximum value of uint128, we revert.
+        if (delta >= 0 && (uint256(input) + uint256(uint128(delta))) > type(uint128).max) {
+            vm.expectRevert();
+        }
+
+        // If delta is negative but its absolute value is greater than input,
+        // we revert.
+        if (
+            delta == -170141183460469231731687303715884105728
+            || delta < 0 && uint128(-delta) > input
+        ) {
+            vm.expectRevert();
+        }
+
+        uint128 output = AssemblyLib.addSignedDelta(input, delta);
+
         assertEq(
-            AssemblyLib.addSignedDelta(input, delta),
-            delta < 0 ? uint128(-delta) : uint128(delta)
+            output,
+            delta < 0 ? input - uint128(-delta) : input + uint128(delta)
         );
     }
-    */
 
     function testFuzz_separate(uint8 a, uint8 b) public {
         vm.assume(a <= 15);
@@ -90,7 +104,7 @@ contract TestAssemblyLib is Test {
         vm.expectRevert(DataTooLong.selector);
         AssemblyLib.toBytes8(input);
     }
-    
+
     function test_pack() public {
         bytes1 output = AssemblyLib.pack(bytes1(0x01), bytes1(0x02));
         assertEq(output, bytes1(0x12));

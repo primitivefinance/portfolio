@@ -96,18 +96,6 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @notice Reduces `feeAssetDec` amount of `asset` and `feeQuoteDec` amount of `quote` from the position's state.
-     */
-    event Collect(
-        uint64 poolId,
-        address indexed account,
-        uint256 feeAssetDec,
-        address indexed asset,
-        uint256 feeQuoteDec,
-        address indexed quote
-    );
-
-    /**
      * @notice Emitted on pair creation.
      */
     event CreatePair(
@@ -119,14 +107,19 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @param price Estimated price of the initialized pool in WAD units.
+     * @dev Emitted on pool creation.
      */
     event CreatePool(
         uint64 indexed poolId,
-        bool isMutable,
         address indexed asset,
         address indexed quote,
-        uint256 price
+        address controller,
+        uint128 maxPrice,
+        uint16 jit,
+        uint16 fee,
+        uint16 duration,
+        uint16 volatility,
+        uint16 priorityFee
     );
 
     /**
@@ -226,9 +219,6 @@ interface IPortfolioGetters {
             uint128 liquidity,
             uint32 lastTimestamp,
             address controller,
-            uint256 invariantGrowthGlobal,
-            uint256 feeGrowthGlobalAsset,
-            uint256 feeGrowthGlobalQuote,
             PortfolioCurve memory,
             PortfolioPair memory
         );
@@ -241,13 +231,7 @@ interface IPortfolioGetters {
         view
         returns (
             uint128 freeLiquidity,
-            uint32 lastTimestamp,
-            uint256 invariantGrowthLast,
-            uint256 feeGrowthAssetLast,
-            uint256 feeGrowthQuoteLast,
-            uint128 tokensOwedAsset,
-            uint128 tokensOwedQuote,
-            uint128 invariantOwed
+            uint32 lastTimestamp
         );
 
     // ===== Portfolio View ===== //
@@ -300,12 +284,14 @@ interface IPortfolioGetters {
      * @dev Computes an amount out of tokens given an `amountIn`.
      * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
+     * @param swapper Address that will execute the swap.
      * @return amountOut of tokens in native token decimal units.
      */
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
-        uint256 amountIn
+        uint256 amountIn,
+        address swapper
     ) external view returns (uint256);
 
     /**

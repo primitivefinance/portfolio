@@ -48,38 +48,6 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function _feeSavingEffects(
-        uint64 poolId,
-        Iteration memory iteration
-    ) internal override returns (bool) {
-        // =---= Swap Effects =---= //
-        if (msg.sender == pools[poolId].controller) {
-            int256 delta = iteration.nextInvariant - iteration.prevInvariant;
-            uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-
-            // Apply priority invariant growth if invariant changed positively.
-            if (deltaAbs != 0) {
-                _syncInvariantGrowthAccumulator(
-                    deltaAbs.divWadDown(iteration.liquidity)
-                );
-            }
-        }
-
-        // Do not re-invest fees if next invariant is positive.
-        if (iteration.nextInvariant > 0) {
-            _syncFeeGrowthAccumulator(
-                FixedPointMathLib.divWadDown(
-                    iteration.feeAmount, iteration.liquidity
-                )
-            );
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /// @inheritdoc Objective
     function _beforeSwapEffects(uint64 poolId)
         internal
         override
@@ -132,14 +100,7 @@ contract RMM01Portfolio is PortfolioVirtual {
             R_y: reserveY,
             timeRemainingSec: tau
         });
-
-        // Invariant for RMM01 is denominated in the `quote` token.
-        int256 liveInvariantWad =
-            invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
-        int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(
-            pools[poolId].pair.decimalsQuote
-        );
-        return (nextInvariantWad >= liveInvariantWad, nextInvariant);
+        return (nextInvariant >= invariant, nextInvariant);
     }
 
     /// @inheritdoc Objective
@@ -179,13 +140,15 @@ contract RMM01Portfolio is PortfolioVirtual {
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
-        uint256 amountIn
+        uint256 amountIn,
+        address swapper
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
+            swapper: swapper
         });
     }
 

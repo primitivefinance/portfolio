@@ -65,9 +65,7 @@ library AssemblyLib {
     }
 
     /**
-     * @dev Adds a signed `delta` to an unsigned `input` by using the sign-agnostic 256-bit type used in yul.
-     * Checks for overflow manually and reverts with `InvalidLiquidity()`, because this function is used to
-     * change liquidity in a position or pool.
+     * @dev Adds a signed `delta` to an unsigned `input`.
      * @custom:example
      * ```
      * uint128 output = addSignedDelta(uint128(15), -int128(5));
@@ -78,14 +76,10 @@ library AssemblyLib {
         uint128 input,
         int128 delta
     ) internal pure returns (uint128 output) {
-        bytes memory revertData =
-            abi.encodeWithSelector(InvalidLiquidity.selector);
-        assembly {
-            output := add(input, delta)
-            // Reverts on overflow.
-            if gt(output, 0xffffffffffffffffffffffffffffffff) {
-                revert(add(32, revertData), mload(revertData))
-            } // 0x1fff9681
+        if (delta > 0) {
+            output = input + uint128(delta);
+        } else {
+            output = input - uint128(-delta);
         }
     }
 
@@ -273,16 +267,6 @@ library AssemblyLib {
         }
     }
 
-    function scaleFromWadUp(
-        uint256 amountWad,
-        uint256 decimals
-    ) internal pure returns (uint256 outputDec) {
-        uint256 factor = computeScalar(decimals);
-        assembly {
-            outputDec := add(div(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
-        }
-    }
-
     function scaleFromWadDown(
         uint256 amountWad,
         uint256 decimals
@@ -290,16 +274,6 @@ library AssemblyLib {
         uint256 factor = computeScalar(decimals);
         assembly {
             outputDec := div(amountWad, factor)
-        }
-    }
-
-    function scaleFromWadUpSigned(
-        int256 amountWad,
-        uint256 decimals
-    ) internal pure returns (int256 outputDec) {
-        int256 factor = int256(computeScalar(decimals));
-        assembly {
-            outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
         }
     }
 

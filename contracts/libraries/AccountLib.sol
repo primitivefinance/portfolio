@@ -49,7 +49,6 @@ using {
 error EtherTransferFail(); // 0x75f42683
 error InsufficientReserve(uint256 amount, uint256 delta); // 0x315276c9
 error InvalidBalance(); // 0xc52e3eff
-error AlreadySettled();
 
 struct AccountSystem {
     // user -> token -> internal balance.
@@ -79,10 +78,8 @@ function __balanceOf__(address token, address account) view returns (uint256) {
  * @dev Must validate `weth` is real weth.
  */
 function __wrapEther__(AccountSystem storage self, address weth) {
-    if (msg.value > 0) {
-        self.touch(weth);
-        IWETH(weth).deposit{ value: msg.value }();
-    }
+    self.touch(weth);
+    IWETH(weth).deposit{value: msg.value}();
 }
 
 /**
@@ -212,7 +209,7 @@ function reset(AccountSystem storage self) {
 }
 
 /**
- * @dev Used to check if a token was already activated after being interacted with again.
+ * @dev Set the cache status of a token.
  */
 function cache(AccountSystem storage self, address token, bool status) {
     self.cached[token] = status;
