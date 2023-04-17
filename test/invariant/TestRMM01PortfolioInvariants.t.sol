@@ -40,10 +40,11 @@ contract TestRMM01PortfolioInvariants is Setup {
         _portfolio = new HandlerPortfolio();
 
         {
-            bytes4[] memory selectors = new bytes4[](3);
+            bytes4[] memory selectors = new bytes4[](4);
             selectors[0] = HandlerPortfolio.create_pool.selector;
             selectors[1] = HandlerPortfolio.allocate.selector;
             selectors[2] = HandlerPortfolio.deallocate.selector;
+            selectors[3] = HandlerPortfolio.swap.selector;
             targetSelector(
                 FuzzSelector({addr: address(_portfolio), selectors: selectors})
             );
@@ -113,6 +114,58 @@ contract TestRMM01PortfolioInvariants is Setup {
             dQuote =
                 dQuote.scaleFromWadDown(ghost().quote().to_token().decimals());
             assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
+        }
+    }
+
+    mapping(address => uint256) public ghostVirtualReserve;
+    mapping(address => uint256) public ghostPhysicalReserve;
+    mapping(address => bool) public ghostCached;
+    address[] public ghostReserveTokens;
+
+    function invariant_sum_reserves() public {
+        uint64[] memory poolIds = getPoolIds();
+        uint256 amount = poolIds.length;
+
+        // Get the sum of each reserve for each token.
+        for (uint256 i; i != amount; i++) {
+            uint64 poolId = poolIds[i];
+            PortfolioPool memory pool = ghost().poolOf(poolId);
+
+            (address asset, address quote) =
+                (pool.pair.tokenAsset, pool.pair.tokenQuote);
+
+            if (pool.liquidity > 0) {
+                (uint256 dAsset, uint256 dQuote) =
+                    subject().getPoolReserves(poolId);
+                uint256 bAsset = ghost().physicalBalance(asset);
+                uint256 bQuote = ghost().physicalBalance(quote);
+                dAsset = dAsset.scaleFromWadDown(pool.pair.decimalsAsset);
+                dQuote = dQuote.scaleFromWadDown(pool.pair.decimalsQuote);
+                ghostVirtualReserve[asset] += dAsset;
+                ghostVirtualReserve[quote] += dQuote;
+                ghostPhysicalReserve[asset] += bAsset;
+                ghostPhysicalReserve[quote] += bQuote;
+
+                if (!ghostCached[asset]) {
+                    ghostCached[asset] = true;
+                    ghostReserveTokens.push(asset);
+                }
+
+                if (!ghostCached[quote]) {
+                    ghostCached[quote] = true;
+                    ghostReserveTokens.push(quote);
+                }
+            }
+        }
+
+        // Check that the sum of each reserve is equal.
+        for (uint256 i; i != ghostReserveTokens.length; i++) {
+            address token = ghostReserveTokens[i];
+            uint256 virtualReserve = ghostVirtualReserve[token];
+            uint256 physicalReserve = ghostPhysicalReserve[token];
+            assertTrue(
+                virtualReserve <= physicalReserve, "invariant-sum-reserves"
+            );
         }
     }
 

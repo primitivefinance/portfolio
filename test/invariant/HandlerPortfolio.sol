@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import "./setup/HandlerBase.sol";
 import "solmate/utils/SafeCastLib.sol";
+import "solmate/utils/FixedPointMathLib.sol";
+import "contracts/RMM01Portfolio.sol";
+import "./setup/HandlerBase.sol";
 
 contract HandlerPortfolio is HandlerBase {
     using SafeCastLib for uint256;
     using AssemblyLib for uint256;
+    using FixedPointMathLib for uint256;
+    using FixedPointMathLib for uint128;
 
     function callSummary() external view {
         console.log("create", calls["create"]);
         console.log("allocate", calls["allocate"]);
         console.log("deallocate", calls["deallocate"]);
         console.log("random-processes", calls["random-processes"]);
+        console.log("swap", calls["swap"]);
     }
 
     function create_pool(
@@ -134,7 +139,6 @@ contract HandlerPortfolio is HandlerBase {
             pairId, isMutable, uint32(ctx.subject().getPoolNonce(pairId))
         );
         // Add the created pool to the list of pools.
-        // todo: fix assertTrue(getPool(address(subject()), poolId).lastPrice != 0, "pool-price-zero");
         ctx.addGhostPoolId(poolId);
 
         // Reset instructions so we don't use some old payload data...
@@ -158,8 +162,6 @@ contract HandlerPortfolio is HandlerBase {
             ctx.ghost().reserve(quote),
             ctx.ghost().asset().to_token().balanceOf(address(ctx.subject())),
             ctx.ghost().quote().to_token().balanceOf(address(ctx.subject())),
-            ctx.getBalanceSum(asset),
-            ctx.getBalanceSum(quote),
             ctx.getPositionsLiquiditySum(),
             position.freeLiquidity,
             pool.liquidity
@@ -172,7 +174,7 @@ contract HandlerPortfolio is HandlerBase {
         uint256 deltaLiquidity,
         uint256 seed
     ) public countCall("allocate") createActor useActor(seed) usePool(seed) {
-        deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
+        vm.assume(ctx.getPoolIds().length > 0);
         _assertAllocate(deltaLiquidity);
     }
 
@@ -203,7 +205,8 @@ contract HandlerPortfolio is HandlerBase {
             ? pool.pair.decimalsQuote
             : pool.pair.decimalsAsset;
         uint256 minLiquidity = 10 ** (18 - lowerDecimals);
-        vm.assume(deltaLiquidity > minLiquidity);
+        deltaLiquidity = bound(deltaLiquidity, minLiquidity, 2 ** 126);
+
         require(pool.lastTimestamp != 0, "Pool not initialized");
 
         // Amounts of tokens that will be allocated to pool.
@@ -248,7 +251,7 @@ contract HandlerPortfolio is HandlerBase {
         // Execution
         prev = fetchAccountingState();
         (deltaAsset, deltaQuote) = ctx.subject().getLiquidityDeltas(
-            ctx.ghost().poolId, int128(uint128(deltaLiquidity))
+            ctx.ghost().poolId, AssemblyLib.toInt128(uint128(deltaLiquidity))
         );
         ctx.subject().multiprocess(
             FVM.encodeAllocateOrDeallocate(
@@ -321,78 +324,121 @@ contract HandlerPortfolio is HandlerBase {
     {
         deltaLiquidity = bound(deltaLiquidity, 1, 2 ** 126);
 
-        _assertDeallocate(deltaLiquidity);
+        PortfolioPool memory pool = ctx.ghost().pool();
+        // Get some liquidity.
+        _handleDeallocatePreconditions(pool, deltaLiquidity);
+        // Do the deallocate.
+        _assertDeallocate(pool, deltaLiquidity);
     }
 
-    function _assertDeallocate(uint256 deltaLiquidity) internal {
-        // TODO: Add use max flag support.
+    function _handleDeallocatePreconditions(
+        PortfolioPool memory pool,
+        uint256 deltaLiquidity
+    ) internal {
+        // Make sure pool is initialized.
+        require(pool.lastTimestamp != 0, "pool-not-initialized");
 
-        // Get some liquidity.
+        // Make sure the actor has enough liquidity to deallocate.
         PortfolioPosition memory pos = ctx.ghost().position(ctx.actor());
-
-        if (pos.freeLiquidity >= deltaLiquidity) {
-            // Preconditions
-            PortfolioPool memory pool = ctx.ghost().pool();
-            assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
-            // todo: fix assertTrue(pool.lastPrice != 0, "Pool not created with a price");
-
-            // Deallocate
-            uint256 timestamp = block.timestamp + 4; // todo: fix default jit policy
-            vm.warp(timestamp);
+        if (deltaLiquidity > pos.freeLiquidity) {
+            // Mint enough liquidity to deallocate it.
+            uint256 liquidityToMint = (deltaLiquidity - pos.freeLiquidity);
 
             (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject()
                 .getLiquidityDeltas(
-                ctx.ghost().poolId, -int128(uint128(deltaLiquidity))
+                ctx.ghost().poolId, int128(uint128(liquidityToMint))
             );
-            prev = fetchAccountingState();
+
+            ctx.ghost().asset().prepare(
+                ctx.actor(), address(ctx.subject()), expectedDeltaAsset
+            );
+
+            ctx.ghost().quote().prepare(
+                ctx.actor(), address(ctx.subject()), expectedDeltaQuote
+            );
 
             ctx.subject().multiprocess(
                 FVM.encodeAllocateOrDeallocate(
-                    false,
+                    true,
                     uint8(0),
                     ctx.ghost().poolId,
-                    deltaLiquidity.safeCastTo128(),
-                    0,
-                    0
+                    liquidityToMint.safeCastTo128(),
+                    type(uint128).max,
+                    type(uint128).max
                 )
             );
 
-            AccountingState memory end = fetchAccountingState();
-
-            assertEq(
-                end.reserveAsset,
-                prev.reserveAsset - expectedDeltaAsset,
-                "reserve-asset"
-            );
-            assertEq(
-                end.reserveQuote,
-                prev.reserveQuote - expectedDeltaQuote,
-                "reserve-quote"
-            );
-            assertEq(
-                end.totalPoolLiquidity,
-                prev.totalPoolLiquidity - deltaLiquidity,
-                "total-liquidity"
-            );
-            assertTrue(
-                prev.totalPositionLiquidity >= deltaLiquidity,
-                "total-pos-liq-underflow"
-            );
-            assertTrue(
-                prev.callerPositionLiquidity >= deltaLiquidity,
-                "caller-pos-liq-underflow"
-            );
-            assertEq(
-                end.totalPositionLiquidity,
-                prev.totalPositionLiquidity - deltaLiquidity,
-                "total-position-liquidity"
-            );
-            assertEq(
-                end.callerPositionLiquidity,
-                prev.callerPositionLiquidity - deltaLiquidity,
-                "caller-position-liquidity"
-            );
+            // Warp forward in time to avoid the jit policy check.
+            uint256 jit = pool.params.jit;
+            vm.warp(block.timestamp + jit + 1);
         }
+    }
+
+    function _assertDeallocate(
+        PortfolioPool memory pool,
+        uint256 deltaLiquidity
+    ) internal {
+        // todo: Fix the min liquidity so not all liquidity can be deallocated.\
+
+        // Subtract 5% from liquidity being removed to avoid the case all liquidity is removed.
+        if (deltaLiquidity == pool.liquidity) {
+            deltaLiquidity = deltaLiquidity * 95 / 100;
+        }
+
+        // Deallocate
+        (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject()
+            .getLiquidityDeltas(
+            ctx.ghost().poolId, -int128(uint128(deltaLiquidity))
+        );
+        prev = fetchAccountingState();
+
+        ctx.subject().multiprocess(
+            FVM.encodeAllocateOrDeallocate(
+                false,
+                uint8(0),
+                ctx.ghost().poolId,
+                deltaLiquidity.safeCastTo128(),
+                0,
+                0
+            )
+        );
+
+        AccountingState memory end = fetchAccountingState();
+
+        assertEq(
+            end.reserveAsset,
+            prev.reserveAsset - expectedDeltaAsset,
+            "reserve-asset"
+        );
+        assertEq(
+            end.reserveQuote,
+            prev.reserveQuote - expectedDeltaQuote,
+            "reserve-quote"
+        );
+        assertEq(
+            end.totalPoolLiquidity,
+            prev.totalPoolLiquidity - deltaLiquidity,
+            "total-liquidity"
+        );
+        assertTrue(
+            prev.totalPositionLiquidity >= deltaLiquidity,
+            "total-pos-liq-underflow"
+        );
+        assertTrue(
+            prev.callerPositionLiquidity >= deltaLiquidity,
+            "caller-pos-liq-underflow"
+        );
+        assertEq(
+            end.totalPositionLiquidity,
+            prev.totalPositionLiquidity - deltaLiquidity,
+            "total-position-liquidity"
+        );
+        assertEq(
+            end.callerPositionLiquidity,
+            prev.callerPositionLiquidity - deltaLiquidity,
+            "caller-position-liquidity"
+        );
+
         emit FinishedCall("Deallocate");
 
         checkVirtualInvariant();
@@ -498,6 +544,206 @@ contract HandlerPortfolio is HandlerBase {
 
     event log(string, uint256);
     event log(string, int256);
+
+    function swap(
+        uint256 amountIn,
+        uint256 seed
+    ) external countCall("swap") createActor useActor(seed) usePool(seed) {
+        vm.assume(ctx.getPoolIds().length > 0);
+
+        PortfolioPool memory pool = ctx.ghost().pool();
+
+        bool sellAsset = seed % 2 == 0;
+        // Make sure enough liquidity is in the pool to perform the swap.
+        _handleSwapPreconditions(pool, sellAsset, amountIn);
+        // Update pool in memory.
+        pool = ctx.ghost().pool();
+        // Do the swap and check the invariants.
+        _assertSwap(pool, amountIn, sellAsset);
+    }
+
+    function _handleSwapPreconditions(
+        PortfolioPool memory pool,
+        bool sellAsset,
+        uint256 amountIn
+    ) internal returns (uint256 amountOut) {
+        vm.assume(pool.liquidity > 0);
+
+        uint256 liquidityToMint;
+
+        // First, check to make sure there's liquidity at all in the pool.
+        if (pool.liquidity == 0) {
+            // Reserves are not allocated to yet, so we need to mint the initial liquidity.
+            // This means the virtual reserves are equal to the amounts for 1e18 liquidity.
+            // amountIn / reserve per liquidity = liquidity to mint * 1.1 to add a 10% buffer
+            uint256 reserveIn = sellAsset ? pool.virtualX : pool.virtualY;
+            require(reserveIn > 0, "pool-not-created"); // note: possible to create pool with zero reserves?
+            liquidityToMint = amountIn.divWadDown(reserveIn);
+        } else {
+            // Second, check the pool has enough liquidity to perform the swap.
+            uint256 reserveIn;
+            if (sellAsset) {
+                reserveIn = pool.virtualX;
+            } else {
+                reserveIn = pool.virtualY;
+            }
+            reserveIn = reserveIn.divWadDown(pool.liquidity);
+
+            uint256 maxAmountIn = RMM01Portfolio(
+                payable(address(ctx.subject()))
+            ).computeMaxInput(
+                ctx.ghost().poolId,
+                sellAsset,
+                reserveIn,
+                ctx.ghost().pool().liquidity
+            );
+
+            // If not enough liquidity, mint enough to do the swap.
+            if (amountIn > maxAmountIn) {
+                uint256 reserveInPerLiquidity = (
+                    sellAsset ? pool.virtualX : pool.virtualY
+                ).divWadDown(pool.liquidity);
+                liquidityToMint = amountIn.divWadDown(reserveInPerLiquidity);
+            }
+        }
+
+        // Add 10% buffer to liquidity to mint to make sure swap will go through
+        liquidityToMint = liquidityToMint * 110 / 100;
+
+        // Mint the liquidity.
+        if (liquidityToMint > 0) {
+            // Amounts of tokens that will be allocated to pool.
+            (expectedDeltaAsset, expectedDeltaQuote) = ctx.subject()
+                .getLiquidityDeltas(
+                ctx.ghost().poolId, int128(uint128(liquidityToMint))
+            );
+
+            if (sellAsset) {
+                expectedDeltaAsset += amountIn;
+            } else {
+                expectedDeltaQuote += amountIn;
+            }
+
+            ctx.ghost().asset().prepare(
+                ctx.actor(), address(ctx.subject()), expectedDeltaAsset
+            );
+
+            ctx.ghost().quote().prepare(
+                ctx.actor(), address(ctx.subject()), expectedDeltaQuote
+            );
+
+            ctx.subject().multiprocess(
+                FVM.encodeAllocateOrDeallocate(
+                    true,
+                    uint8(0),
+                    ctx.ghost().poolId,
+                    liquidityToMint.safeCastTo128(),
+                    type(uint128).max,
+                    type(uint128).max
+                )
+            );
+            emit FinishedCall("Swap preconditions");
+        }
+    }
+
+    function _assertSwap(
+        PortfolioPool memory pool,
+        uint256 amountIn,
+        bool sellAsset
+    ) internal {
+        uint256 reserveIn;
+        if (sellAsset) {
+            reserveIn = pool.virtualX;
+        } else {
+            reserveIn = pool.virtualY;
+        }
+        reserveIn = reserveIn.divWadDown(pool.liquidity);
+        uint256 maxAmountIn = RMM01Portfolio(payable(address(ctx.subject())))
+            .computeMaxInput(
+            ctx.ghost().poolId,
+            sellAsset,
+            reserveIn,
+            ctx.ghost().pool().liquidity
+        );
+
+        amountIn = bound(amountIn, 100, maxAmountIn);
+
+        uint256 amountOut = ctx.subject().getAmountOut(
+            ctx.ghost().poolId,
+            sellAsset,
+            amountIn.safeCastTo128() * 95 / 100,
+            ctx.actor()
+        );
+
+        prev = fetchAccountingState();
+
+        ctx.subject().multiprocess(
+            FVM.encodeSwap(
+                uint8(0), // useMax
+                ctx.ghost().poolId,
+                amountIn.safeCastTo128(),
+                amountOut.safeCastTo128(),
+                sellAsset ? 1 : 0
+            )
+        );
+
+        post = fetchAccountingState();
+
+        if (sellAsset) {
+            assertEq(
+                post.reserveAsset, prev.reserveAsset + amountIn, "reserve-asset"
+            );
+            assertEq(
+                post.reserveQuote,
+                prev.reserveQuote - amountOut,
+                "reserve-quote"
+            );
+            assertEq(
+                post.physicalBalanceAsset,
+                prev.physicalBalanceAsset + amountIn,
+                "physical-balance-asset"
+            );
+            assertEq(
+                post.physicalBalanceQuote,
+                prev.physicalBalanceQuote - amountOut,
+                "physical-balance-quote"
+            );
+        } else {
+            assertEq(
+                post.reserveAsset,
+                prev.reserveAsset - amountOut,
+                "reserve-asset"
+            );
+            assertEq(
+                post.reserveQuote, prev.reserveQuote + amountIn, "reserve-quote"
+            );
+            assertEq(
+                post.physicalBalanceAsset,
+                prev.physicalBalanceAsset - amountOut,
+                "physical-balance-asset"
+            );
+            assertEq(
+                post.physicalBalanceQuote,
+                prev.physicalBalanceQuote + amountIn,
+                "physical-balance-quote"
+            );
+        }
+
+        assertEq(post.totalPoolLiquidity, prev.totalPoolLiquidity, "pool-liq");
+        assertEq(
+            post.totalPositionLiquidity, prev.totalPositionLiquidity, "pos-liq"
+        );
+        assertEq(
+            post.callerPositionLiquidity,
+            prev.callerPositionLiquidity,
+            "caller-pos-liq"
+        );
+
+        emit FinishedCall("Swap");
+
+        delete prev;
+        delete post;
+    }
 }
 
 struct AccountingState {
@@ -505,8 +751,6 @@ struct AccountingState {
     uint256 reserveQuote; // getReserve
     uint256 physicalBalanceAsset; // balanceOf
     uint256 physicalBalanceQuote; // balanceOf
-    uint256 totalBalanceAsset; // sum of all balances from getBalance
-    uint256 totalBalanceQuote; // sum of all balances from getBalance
     uint256 totalPositionLiquidity; // sum of all position liquidity
     uint256 callerPositionLiquidity; // position.freeLiquidity
     uint256 totalPoolLiquidity; // pool.liquidity
