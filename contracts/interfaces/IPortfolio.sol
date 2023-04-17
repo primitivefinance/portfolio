@@ -10,24 +10,6 @@ interface IPortfolioEvents {
     event Deposit(address indexed account, uint256 amount);
 
     /**
-     * @notice Assigns `amount` of `token` to `account`.
-     * @dev Emitted on `deallocate`, `swap`, or `fund`.
-     * @param amount Quantity of token in token's native decimal units.
-     */
-    event IncreaseUserBalance(
-        address indexed account, address indexed token, uint256 amount
-    );
-
-    /**
-     * @notice Unassigns `amount` of `token` from `account`.
-     * @dev Emitted on `allocate`, `swap`, or `draw`.
-     * @param amount Quantity of token in token's native decimal units.
-     */
-    event DecreaseUserBalance(
-        address indexed account, address indexed token, uint256 amount
-    );
-
-    /**
      * @notice Assigns an additional `amount` of `token` to Portfolio's internally tracked balance.
      * @dev Emitted on `swap`, `allocate`, and when a user is gifted surplus tokens that were sent to the contract.
      * @param amount Quantity of token in token's native decimal units.
@@ -126,18 +108,15 @@ interface IPortfolioEvents {
      * @dev Emitted on updating the `protocolFee` state value.
      */
     event UpdateProtocolFee(uint256 prevFee, uint256 nextFee);
+
+    /**
+     * @dev Emitted when the REGISTRY claims protocol fees.
+     */
+    event ClaimFees(address indexed token, uint256 amount);
 }
 
 interface IPortfolioGetters {
     // ===== Account Getters ===== //
-    /**
-     * @dev Transiently owned internal balance of `token` of `owner`.
-     * @return Balance held in WAD units.
-     */
-    function getBalance(
-        address owner,
-        address token
-    ) external view returns (uint256);
 
     /**
      * @dev Internally tracked global balance of all `token`s assigned to an address or a pool.
@@ -323,24 +302,6 @@ interface IPortfolioActions {
     function multiprocess(bytes calldata data) external payable;
 
     /**
-     * @notice Assigns `amount` of `token` to `msg.sender` internal balance.
-     * @dev Uses `IERC20.transferFrom`.
-     */
-    function fund(address token, uint256 amount) external;
-
-    /**
-     * @notice Unassigns `amount` of `token` from `msg.sender` and transfers it to the `to` address.
-     * @dev Uses `IERC20.transfer`.
-     */
-    function draw(address token, uint256 amount, address to) external;
-
-    /**
-     * @notice Deposits ether into the `WETH` contract and credits `msg.sender` the received WETH.
-     * @dev Amount of ether must be sent as `msg.value`, the ether will be wrapped.
-     */
-    function deposit() external payable;
-
-    /**
      * @notice Updates the parameters of the pool `poolId`.
      * @dev The sender must be the pool controller, leaving a function parameter
      * as '0' will not change the pool parameter.
@@ -360,6 +321,11 @@ interface IPortfolioActions {
      * @param fee Must be within the range: 4 <= x <= 20.
      */
     function setProtocolFee(uint256 fee) external;
+
+    /**
+     * @dev Transfers fees earned in `amount` of `token` to `REGISTRY` address.
+     */
+    function claimFee(address token, uint256 amount) external;
 }
 
 interface IPortfolio is

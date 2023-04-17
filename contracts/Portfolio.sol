@@ -43,6 +43,7 @@ abstract contract PortfolioVirtual is Objective {
     /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
 
+    mapping(address => uint256) public protocolFees;
     mapping(uint24 => uint32) public getPoolNonce;
     mapping(uint24 => PortfolioPair) public pairs;
     mapping(uint64 => PortfolioPool) public pools;
@@ -121,27 +122,7 @@ abstract contract PortfolioVirtual is Objective {
         return __account__.reserves[token];
     }
 
-    /// @inheritdoc IPortfolioGetters
-    function getBalance(
-        address owner,
-        address token
-    ) public view returns (uint256) {
-        return __account__.balances[owner][token];
-    }
-
     // ===== External Actions ===== //
-
-    /// @inheritdoc IPortfolioActions
-    function deposit() external payable override lock {
-        // Checks
-        if (msg.value == 0) revert ZeroValue();
-
-        // Wraps msg.value.
-        _deposit();
-
-        // Interactions
-        _settlement();
-    }
 
     /// @inheritdoc IPortfolioActions
     function multiprocess(bytes calldata data) external payable lock {
@@ -153,54 +134,6 @@ abstract contract PortfolioVirtual is Objective {
         else FVM._jumpProcess(data, _process);
 
         // Interactions
-        _settlement();
-    }
-
-    /// @inheritdoc IPortfolioActions
-    function draw(
-        address token,
-        uint256 amount,
-        address to
-    ) external override lock {
-        // Checks
-        if (to == address(this)) revert InvalidTransfer();
-
-        uint8 decimals = IERC20(token).decimals();
-        uint256 amountWad = amount.scaleToWad(decimals);
-        uint256 balanceWad = getBalance(msg.sender, token);
-        if (amountWad == type(uint256).max) amountWad = balanceWad;
-        if (amountWad > balanceWad) revert DrawBalance();
-
-        // Effects
-        _applyDebit(token, amountWad);
-        _decreaseReserves(token, amountWad);
-
-        // If we are using the full balance, we need to scale it from WAD.
-        if (amountWad == balanceWad) {
-            amount = amountWad.scaleFromWadDown(decimals);
-        }
-
-        if (token == WETH) {
-            Account.__dangerousUnwrapEther__(WETH, to, amount);
-        } else {
-            Account.SafeTransferLib.safeTransfer(
-                Account.ERC20(token), to, amount
-            );
-        }
-
-        // Interactions
-        _settlement();
-    }
-
-    /// @inheritdoc IPortfolioActions
-    function fund(address token, uint256 amount) external override lock {
-        // Checks
-        if (amount == type(uint256).max) {
-            amount = Account.__balanceOf__(token, msg.sender);
-        }
-
-        // Interactions
-        __account__.dangerousFund(token, address(this), amount); // Warning: external call to msg.sender.
         _settlement();
     }
 
@@ -247,9 +180,10 @@ abstract contract PortfolioVirtual is Objective {
         PortfolioPair memory pair = pools[poolId].pair;
 
         if (useMax) {
+            // A positive net balance is a surplus of tokens in the accounting state that can be used to mint liquidity.
             deltaLiquidity = pools[poolId].getPoolMaxLiquidity({
-                deltaAsset: getBalance(msg.sender, pair.tokenAsset),
-                deltaQuote: getBalance(msg.sender, pair.tokenQuote)
+                deltaAsset: uint256(getNetBalance(pair.tokenAsset)), // If negative, will be zero.
+                deltaQuote: uint256(getNetBalance(pair.tokenQuote)) // If negative, will be zero.
             });
         }
 
@@ -440,10 +374,11 @@ abstract contract PortfolioVirtual is Objective {
             if (!success) revert PoolExpired();
 
             if (args.useMax == 1) {
-                input = getBalance(
-                    msg.sender,
+                // Net balance is the surplus of tokens in the accounting state that can be spent.
+                int256 netBalance = getNetBalance(
                     _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
                 );
+                input = uint256(netBalance); // If netBalance is negative, this will be 0.
             } else {
                 input = args.input;
             }
@@ -576,9 +511,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.output = iteration.output.scaleFromWadDown(outputDec);
 
             if (iteration.protocolFeeAmount != 0) {
-                uint256 protocolFeeAmountDec =
-                    iteration.protocolFeeAmount.scaleFromWadDown(inputDec);
-                _applyCredit(REGISTRY, _state.tokenInput, protocolFeeAmountDec);
+                protocolFees[_state.tokenInput] += iteration.protocolFeeAmount;
             }
         }
 
@@ -754,30 +687,6 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
-     * @dev A positive credit is a receivable paid to the `msg.sender` internal balance.
-     *      Positive credits are only applied to the internal balance of the account.
-     *      Therefore, it does not require a state change for the global reserves.
-     *
-     * @custom:security Directly manipulates internal balances.
-     */
-    function _applyCredit(address to, address token, uint256 amount) internal {
-        __account__.credit(to, token, amount);
-        emit IncreaseUserBalance(to, token, amount);
-    }
-
-    /**
-     * @dev A positive debit is a cost that must be paid for a transaction to be processed.
-     *      If a balance exists for the token for the internal balance of `msg.sender`,
-     *      it will be used to pay the debit. Else, the contract expects tokens to be transferred in.
-     *
-     * @custom:security Directly manipulates internal balances.
-     */
-    function _applyDebit(address token, uint256 amount) internal {
-        __account__.debit(msg.sender, token, amount);
-        emit DecreaseUserBalance(msg.sender, token, amount);
-    }
-
-    /**
      * @dev Used on every entry point to scale user-provided arguments from decimals to WAD.
      */
     function _scaleAmountsToWad(
@@ -927,14 +836,8 @@ abstract contract PortfolioVirtual is Objective {
             // If credited, these are extra tokens that will be transferred to `msg.sender`.
             // If debited, some tokens were paid via `msg.sender`'s internal balance.
             // If remainder, not enough tokens were paid. Must be transferred in from `msg.sender`.
-            (uint256 credited, uint256 debited, uint256 remainder) =
+            (uint256 credited, uint256 remainder) =
                 __account__.settle(token, address(this));
-
-            // Reserves were increased, we paid a debit, therefore need to decrease reserves by `debited` amount.
-            if (debited > 0) {
-                emit DecreaseUserBalance(msg.sender, token, debited);
-                emit DecreaseReserveBalance(token, debited);
-            }
 
             // Only `credited` or `remainder` can be non-zero.
             // Outstanding amount must be transferred in to `address(this)`.
@@ -1015,6 +918,28 @@ abstract contract PortfolioVirtual is Objective {
 
         __account__.reset(); // Clears token cache and sets `settled` to `true`.
         delete _payments;
+    }
+
+    function claimFee(address token, uint256 amount) external override lock {
+        if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
+            revert NotController();
+        }
+
+        uint256 amountWad;
+        uint8 decimals = IERC20(token).decimals();
+        if (amount == type(uint256).max) {
+            amountWad = protocolFees[token];
+            amount = amountWad.scaleFromWadDown(decimals);
+        } else {
+            amountWad = amount.scaleToWad(decimals);
+        }
+
+        protocolFees[token] -= amountWad;
+        _decreaseReserves(token, amountWad);
+
+        _settlement();
+
+        emit ClaimFees(token, amount);
     }
 
     function setProtocolFee(uint256 fee) external override lock {
