@@ -86,14 +86,6 @@ library Ghost {
         return IPortfolioGetters(self.subject).getNetBalance(token);
     }
 
-    function balance(
-        GhostState memory self,
-        address account,
-        address token
-    ) internal view returns (uint256) {
-        return IPortfolioGetters(self.subject).getBalance(account, token);
-    }
-
     function physicalBalance(
         GhostState memory self,
         address token

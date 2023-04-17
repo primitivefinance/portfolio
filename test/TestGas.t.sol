@@ -107,10 +107,6 @@ contract TestGas is Setup {
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
 
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(address(token0), type(uint256).max);
-        subject().fund(address(token1), type(uint256).max);
-
         subject().multiprocess(
             FVM.encodeCreatePair(address(token0), address(token1))
         );
@@ -231,10 +227,6 @@ contract TestGas is Setup {
 
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
-
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(address(token0), type(uint256).max);
-        subject().fund(address(token1), type(uint256).max);
 
         subject().multiprocess(
             FVM.encodeCreatePair(address(token0), address(token1))
@@ -386,10 +378,6 @@ contract TestGas is Setup {
 
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
-
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(address(token0), type(uint256).max);
-        subject().fund(address(token1), type(uint256).max);
 
         subject().multiprocess(
             FVM.encodeCreatePair(address(token0), address(token1))
@@ -575,8 +563,6 @@ contract TestGas is Setup {
         PortfolioPool memory pool =
             IPortfolioStruct(address(_subject)).pools(ghost().poolId);
         (address a, address q) = (pool.pair.tokenAsset, pool.pair.tokenQuote);
-        _subject.fund(a, type(uint256).max);
-        _subject.fund(q, type(uint256).max);
 
         bytes[] memory instructions = new bytes[](amount);
         for (uint256 i; i != amount; ++i) {
@@ -627,8 +613,6 @@ contract TestGas is Setup {
         PortfolioPool memory pool =
             IPortfolioStruct(address(_subject)).pools(ghost().poolId);
         (address a, address q) = (pool.pair.tokenAsset, pool.pair.tokenQuote);
-        _subject.fund(a, type(uint256).max);
-        _subject.fund(q, type(uint256).max);
 
         bytes[] memory instructions = new bytes[](amount);
         for (uint256 i; i != amount; ++i) {
@@ -748,8 +732,6 @@ contract TestGas is Setup {
         // Fund account with tokens to pay from portfolio
         _approveMint(asset, 100 ether);
         _approveMint(quote, 100 ether);
-        subject().fund(asset, 100 ether);
-        subject().fund(quote, 100 ether);
 
         // Run the gas
         vm.resumeGasMetering();
@@ -763,10 +745,6 @@ contract TestGas is Setup {
         useActor
         usePairTokens(10 ether)
     {
-        // Fund accounts (already approved with modifier)
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(ghost().quote().to_addr(), type(uint256).max);
-
         // Allocate to first pool
         uint64 poolId = ghost().poolId;
         subject().multiprocess(
@@ -798,10 +776,6 @@ contract TestGas is Setup {
         usePairTokens(100 ether)
         isArmed
     {
-        // Fund accounts (already approved with modifier)
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(ghost().quote().to_addr(), type(uint256).max);
-
         // Allocate to first pool
         uint24 pairId = 1;
         uint64 poolId = ghost().poolId;
@@ -835,10 +809,6 @@ contract TestGas is Setup {
         usePairTokens(10 ether)
         isArmed
     {
-        // Fund accounts (already approved with modifier)
-        subject().fund(ghost().asset().to_addr(), 10 ether);
-        subject().fund(ghost().quote().to_addr(), 10 ether);
-
         bytes memory data = _allocateInstruction(ghost().poolId);
         vm.resumeGasMetering();
         _subject.multiprocess(data);
@@ -852,10 +822,6 @@ contract TestGas is Setup {
         usePairTokens(10 ether)
         isArmed
     {
-        // Fund accounts (already approved with modifier)
-        subject().fund(ghost().asset().to_addr(), 10 ether);
-        subject().fund(ghost().quote().to_addr(), 10 ether);
-
         subject().multiprocess(_allocateInstruction(ghost().poolId));
 
         bytes memory data = _swapInstruction(true, ghost().poolId);
@@ -888,24 +854,6 @@ contract TestGas is Setup {
         _subject.multiprocess(data);
     }
 
-    function test_gas_fund() public pauseGas {
-        (address token,) = _getTokens();
-        Coin.wrap(token).prepare(actor(), address(subject()), 1 ether);
-
-        vm.resumeGasMetering();
-        _subject.fund(token, 1 ether);
-    }
-
-    // todo: Cannot carry internal balances over between transactions, its only transient.
-    /* function test_gas_draw() public pauseGas useActor {
-        (address token,) = _getTokens();
-        Coin.wrap(token).prepare(actor(), address(subject()), 1 ether);
-
-        _subject.fund(token, 1 ether);
-        vm.resumeGasMetering();
-        _subject.draw(token, 1 ether, actor());
-    } */
-
     function test_gas_chain_allocate_deallocate_from_portfolio_balance()
         public
         pauseGas
@@ -916,9 +864,6 @@ contract TestGas is Setup {
         allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(ghost().quote().to_addr(), type(uint256).max);
-
         bytes[] memory instructions = new bytes[](2);
         instructions[0] = _allocateInstruction(ghost().poolId);
         instructions[1] = _deallocateInstruction(ghost().poolId);
@@ -926,29 +871,6 @@ contract TestGas is Setup {
 
         vm.resumeGasMetering();
         _subject.multiprocess(data);
-    }
-
-    function test_gas_chain_allocate_deallocate_draw_from_wallet()
-        public
-        pauseGas
-        noJit
-        usePools(1)
-        useActor
-        usePairTokens(10 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
-    {
-        bytes[] memory instructions = new bytes[](2);
-        instructions[0] = _allocateInstruction(ghost().poolId);
-        instructions[1] = _deallocateInstruction(ghost().poolId);
-        bytes memory data = FVM.encodeJumpInstruction(instructions);
-
-        (address token0, address token1) = _getTokens();
-        address to = actor();
-        vm.resumeGasMetering();
-        _subject.multiprocess(data);
-        _subject.draw(token0, type(uint256).max, to);
-        _subject.draw(token1, type(uint256).max, to);
     }
 
     function test_gas_single_swap_from_wallet()
@@ -963,23 +885,5 @@ contract TestGas is Setup {
         bytes memory data = _swapInstruction(true, ghost().poolId);
         vm.resumeGasMetering();
         _subject.multiprocess(data);
-    }
-
-    function test_gas_single_swap_from_wallet_draw_to_target()
-        public
-        pauseGas
-        usePools(1)
-        useActor
-        usePairTokens(10 ether)
-        isArmed
-    {
-        subject().multiprocess(_allocateInstruction(ghost().poolId));
-
-        address to = actor();
-        address token = ghost().quote().to_addr();
-        bytes memory data = _swapInstruction(true, ghost().poolId);
-        vm.resumeGasMetering();
-        _subject.multiprocess(data);
-        _subject.draw(token, type(uint256).max, to);
     }
 }
