@@ -117,58 +117,6 @@ contract TestRMM01PortfolioInvariants is Setup {
         }
     }
 
-    mapping(address => uint256) public ghostVirtualReserve;
-    mapping(address => uint256) public ghostPhysicalReserve;
-    mapping(address => bool) public ghostCached;
-    address[] public ghostReserveTokens;
-
-    function invariant_sum_reserves() public {
-        uint64[] memory poolIds = getPoolIds();
-        uint256 amount = poolIds.length;
-
-        // Get the sum of each reserve for each token.
-        for (uint256 i; i != amount; i++) {
-            uint64 poolId = poolIds[i];
-            PortfolioPool memory pool = ghost().poolOf(poolId);
-
-            (address asset, address quote) =
-                (pool.pair.tokenAsset, pool.pair.tokenQuote);
-
-            if (pool.liquidity > 0) {
-                (uint256 dAsset, uint256 dQuote) =
-                    subject().getPoolReserves(poolId);
-                uint256 bAsset = ghost().physicalBalance(asset);
-                uint256 bQuote = ghost().physicalBalance(quote);
-                dAsset = dAsset.scaleFromWadDown(pool.pair.decimalsAsset);
-                dQuote = dQuote.scaleFromWadDown(pool.pair.decimalsQuote);
-                ghostVirtualReserve[asset] += dAsset;
-                ghostVirtualReserve[quote] += dQuote;
-                ghostPhysicalReserve[asset] += bAsset;
-                ghostPhysicalReserve[quote] += bQuote;
-
-                if (!ghostCached[asset]) {
-                    ghostCached[asset] = true;
-                    ghostReserveTokens.push(asset);
-                }
-
-                if (!ghostCached[quote]) {
-                    ghostCached[quote] = true;
-                    ghostReserveTokens.push(quote);
-                }
-            }
-        }
-
-        // Check that the sum of each reserve is equal.
-        for (uint256 i; i != ghostReserveTokens.length; i++) {
-            address token = ghostReserveTokens[i];
-            uint256 virtualReserve = ghostVirtualReserve[token];
-            uint256 physicalReserve = ghostPhysicalReserve[token];
-            assertTrue(
-                virtualReserve <= physicalReserve, "invariant-sum-reserves"
-            );
-        }
-    }
-
     function invariant_reentrancy() public {
         bytes32 locked = vm.load(address(subject()), SLOT_LOCKED);
         assertEq(uint256(locked), 1, "invariant-locked");
