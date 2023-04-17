@@ -2,7 +2,7 @@ pragma solidity ^0.8.4;
 
 interface PortfolioLike {
     function setProtocolFee(uint256) external;
-    function draw(address, uint256, address) external;
+    function claimFee(address, uint256) external;
 }
 
 // Do not use! No protection!
@@ -30,9 +30,8 @@ contract SimpleRegistry {
     function claimFee(
         address portfolio,
         address token,
-        uint256 amount,
-        address to
+        uint256 amount
     ) public useSelfAsController {
-        PortfolioLike(portfolio).draw(token, amount, to);
+        PortfolioLike(portfolio).claimFee(token, amount);
     }
 }

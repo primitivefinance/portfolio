@@ -9,144 +9,10 @@ contract HandlerPortfolio is HandlerBase {
     using AssemblyLib for uint256;
 
     function callSummary() external view {
-        console.log("deposit", calls["deposit"]);
-        console.log("fund-asset", calls["fund-asset"]);
-        console.log("fund-quote", calls["fund-quote"]);
         console.log("create", calls["create"]);
         console.log("allocate", calls["allocate"]);
         console.log("deallocate", calls["deallocate"]);
         console.log("random-processes", calls["random-processes"]);
-    }
-
-    function deposit(
-        uint256 amount,
-        uint256 seed
-    ) external countCall("deposit") createActor useActor(seed) usePool(seed) {
-        amount = bound(amount, 1, 1e36);
-
-        vm.deal(ctx.actor(), amount);
-
-        address weth = ctx.subject().WETH();
-
-        uint256 preBal = ctx.ghost().balance(ctx.actor(), weth);
-        uint256 preRes = ctx.ghost().reserve(weth);
-
-        ctx.subject().deposit{value: amount}();
-
-        uint256 postRes = ctx.ghost().reserve(weth);
-        uint256 postBal = ctx.ghost().balance(ctx.actor(), weth);
-
-        assertEq(postRes, preRes + amount, "weth-reserve");
-        assertEq(postBal, preBal + amount, "weth-balance");
-        assertEq(address(ctx.subject()).balance, 0, "eth-balance");
-        assertEq(ctx.ghost().physicalBalance(weth), postRes, "weth-physical");
-    }
-
-    function fund_asset(
-        uint256 amount,
-        uint256 seed
-    ) public countCall("fund-asset") createActor useActor(seed) usePool(seed) {
-        amount = bound(amount, 1, 1e36);
-
-        // If net balance > 0, there are tokens in the contract which are not in a pool or balance.
-        // They will be credited to the msg.sender of the next call.
-        int256 netAssetBalance =
-            ctx.subject().getNetBalance(address(ctx.ghost().asset().to_token()));
-        int256 netQuoteBalance =
-            ctx.subject().getNetBalance(address(ctx.ghost().quote().to_token()));
-        assertTrue(netAssetBalance >= 0, "negative-net-asset-tokens");
-        assertTrue(netQuoteBalance >= 0, "negative-net-quote-tokens");
-
-        ctx.ghost().asset().to_token().approve(address(ctx.subject()), amount);
-        deal(address(ctx.ghost().asset().to_token()), ctx.actor(), amount);
-
-        uint256 prePhys =
-            ctx.ghost().asset().to_token().balanceOf(address(ctx.subject()));
-        uint256 preRes =
-            ctx.ghost().reserve(address(ctx.ghost().asset().to_token()));
-        uint256 preBal = ctx.ghost().balance(
-            ctx.actor(), address(ctx.ghost().asset().to_token())
-        );
-
-        ctx.subject().fund(address(ctx.ghost().asset().to_token()), amount);
-        uint256 postPhys =
-            ctx.ghost().asset().to_token().balanceOf(address(ctx.subject()));
-        uint256 postRes =
-            ctx.ghost().reserve(address(ctx.ghost().asset().to_token()));
-        uint256 postBal = ctx.ghost().balance(
-            ctx.actor(), address(ctx.ghost().asset().to_token())
-        );
-
-        // This assertion is a little more complicated because we want to handle the VALID scenario
-        // of balances changing with fee on transfer tokens.
-        // If we fund an `amount` of a fee on transfer token, Portfolio will only credit
-        // the user the amount transferred in, NOT the `amount`.
-        // However, this test file is not aware of that! So we do some math to compute
-        // the tokens sent in, and compare that to the updated user balance.
-
-        uint256 amountTransferredIn = postPhys - prePhys;
-        uint256 amountCredited = postBal - preBal;
-        uint256 amountCreditedReserve = postRes - preRes;
-
-        assertEq(
-            amountTransferredIn,
-            amountCredited,
-            "fund-delta-asset-physical-balance"
-        );
-        assertEq(
-            amountCreditedReserve,
-            amountTransferredIn,
-            "fund-delta-asset-reserve"
-        );
-    }
-
-    function fund_quote(
-        uint256 amount,
-        uint256 seed
-    ) public countCall("fund-quote") createActor useActor(seed) usePool(seed) {
-        amount = bound(amount, 1, 1e36);
-
-        ctx.ghost().quote().to_token().approve(address(ctx.subject()), amount);
-        deal(address(ctx.ghost().quote().to_token()), ctx.actor(), amount);
-
-        uint256 prePhys =
-            ctx.ghost().quote().to_token().balanceOf(address(ctx.subject()));
-        uint256 preRes =
-            ctx.ghost().reserve(address(ctx.ghost().quote().to_token()));
-        uint256 preBal = ctx.ghost().balance(
-            ctx.actor(), address(ctx.ghost().quote().to_token())
-        );
-
-        ctx.subject().fund(address(ctx.ghost().quote().to_token()), amount);
-        uint256 postPhys =
-            ctx.ghost().quote().to_token().balanceOf(address(ctx.subject()));
-        uint256 postRes =
-            ctx.ghost().reserve(address(ctx.ghost().quote().to_token()));
-        uint256 postBal = ctx.ghost().balance(
-            ctx.actor(), address(ctx.ghost().quote().to_token())
-        );
-
-        // This assertion is a little more complicated because we want to handle the VALID scenario
-        // of balances changing with fee on transfer tokens.
-        // If we fund an `amount` of a fee on transfer token, Portfolio will only credit
-        // the user the amount transferred in, NOT the `amount`.
-        // However, this test file is not aware of that! So we do some math to compute
-        // the tokens sent in, and compare that to the updated user balance.
-
-        uint256 amountTransferredIn = postPhys - prePhys;
-        uint256 amountCredited = postBal - preBal;
-        uint256 amountCreditedReserve = postRes - preRes;
-
-        assertEq(
-            amountTransferredIn,
-            amountCredited,
-            "fund-delta-quote-physical-balance"
-        );
-        assertEq(
-            amountCreditedReserve,
-            amountTransferredIn,
-            "fund-delta-quote-reserve"
-        );
     }
 
     function create_pool(
@@ -319,8 +185,6 @@ contract HandlerPortfolio is HandlerBase {
     int256 quoteCredit;
     uint256 deltaAsset;
     uint256 deltaQuote;
-    uint256 userAssetBalance;
-    uint256 userQuoteBalance;
     uint256 physicalAssetPayment;
     uint256 physicalQuotePayment;
 
@@ -355,14 +219,6 @@ contract HandlerPortfolio is HandlerBase {
         assertTrue(assetCredit >= 0, "negative-net-asset-tokens");
         assertTrue(quoteCredit >= 0, "negative-net-quote-tokens");
 
-        // Internal balance of tokens spendable by user.
-        userAssetBalance = ctx.ghost().balance(
-            address(ctx.actor()), ctx.ghost().asset().to_addr()
-        );
-        userQuoteBalance = ctx.ghost().balance(
-            address(ctx.actor()), ctx.ghost().quote().to_addr()
-        );
-
         // If there is a net balance, user can use it to pay their cost.
         // Total payment the user must make.
         physicalAssetPayment = uint256(assetCredit) > expectedDeltaAsset
@@ -371,13 +227,6 @@ contract HandlerPortfolio is HandlerBase {
         physicalQuotePayment = uint256(quoteCredit) > expectedDeltaQuote
             ? 0
             : expectedDeltaQuote - uint256(quoteCredit);
-
-        physicalAssetPayment = uint256(userAssetBalance) > physicalAssetPayment
-            ? 0
-            : physicalAssetPayment - uint256(userAssetBalance);
-        physicalQuotePayment = uint256(userQuoteBalance) > physicalQuotePayment
-            ? 0
-            : physicalQuotePayment - uint256(userQuoteBalance);
 
         // If user can pay for the allocate using their internal balance of tokens, don't need to transfer tokens in.
         // Won't need to transfer in tokens if user payment is zero.

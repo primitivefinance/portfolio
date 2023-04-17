@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioCreatePool is Setup {
-    uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 5;
+    uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 4;
     uint256 internal constant POOL_NONCE_STORAGE_SLOT = 6;
 
     function testFuzz_createPool(
