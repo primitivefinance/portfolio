@@ -36,7 +36,7 @@ contract TestPortfolioAllocate is Setup {
         assertEq(post, prev + amount, "pool.liquidity");
         // Direct assertions of pool state.
         assertEq(
-            ghost().pool().liquidity,
+            ghost().pool().liquidity - BURNED_LIQUIDITY,
             ghost().position(actor()).freeLiquidity,
             "position.freeLiquidity != pool.liquidity"
         );
@@ -363,6 +363,7 @@ contract TestPortfolioAllocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -377,6 +378,7 @@ contract TestPortfolioAllocate is Setup {
         durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -391,6 +393,7 @@ contract TestPortfolioAllocate is Setup {
         durationConfig(uint16(bound(duration, MIN_DURATION, MIN_DURATION + 100)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -405,6 +408,7 @@ contract TestPortfolioAllocate is Setup {
         durationConfig(uint16(bound(duration, MAX_DURATION - 100, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -419,6 +423,7 @@ contract TestPortfolioAllocate is Setup {
         volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -435,6 +440,7 @@ contract TestPortfolioAllocate is Setup {
         )
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -451,6 +457,7 @@ contract TestPortfolioAllocate is Setup {
         )
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -462,6 +469,11 @@ contract TestPortfolioAllocate is Setup {
         (uint128 expectedA, uint128 expectedQ) =
             subject().getLiquidityDeltas(ghost().poolId, int128(amount));
         uint256 prev = ghost().pool().liquidity;
+        (uint256 prevA, uint256 prevQ) = (
+            ghost().asset().to_token().balanceOf(address(subject())),
+            ghost().quote().to_token().balanceOf(address(subject()))
+        );
+
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate({
                 shouldAllocate: true,
@@ -489,13 +501,13 @@ contract TestPortfolioAllocate is Setup {
         postR_Q =
             postR_Q.scaleFromWadDown(ghost().quote().to_token().decimals());
 
-        assertEq(postA, expectedA, "pool asset balance");
-        assertEq(postQ, expectedQ, "pool quote balance");
+        assertEq(postA, prevA + expectedA, "pool asset balance");
+        assertEq(postQ, prevQ + expectedQ, "pool quote balance");
         assertEq(postR_A, postA, "pool asset reserve");
         assertEq(postR_Q, postQ, "pool quote reserve");
         assertEq(post, prev + amount, "pool.liquidity");
         assertEq(
-            ghost().pool().liquidity,
+            ghost().pool().liquidity - BURNED_LIQUIDITY,
             ghost().position(actor()).freeLiquidity,
             "position.freeLiquidity != pool.liquidity"
         );

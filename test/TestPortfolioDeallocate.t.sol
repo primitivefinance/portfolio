@@ -10,6 +10,7 @@ contract TestPortfolioDeallocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         uint128 liquidity = 1 ether;
@@ -26,9 +27,13 @@ contract TestPortfolioDeallocate is Setup {
 
         // Deallocating liquidity can round down.
         uint256 prev = ghost().position(actor()).freeLiquidity;
+        uint128 amount = liquidity;
+        if (amount > prev) {
+            amount = uint128(prev);
+        }
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                false, uint8(1), ghost().poolId, liquidity, 0, 0
+                false, uint8(1), ghost().poolId, amount, 0, 0
             )
         );
         uint256 post = ghost().position(actor()).freeLiquidity;
@@ -44,6 +49,7 @@ contract TestPortfolioDeallocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -69,6 +75,7 @@ contract TestPortfolioDeallocate is Setup {
         volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -94,6 +101,7 @@ contract TestPortfolioDeallocate is Setup {
         durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -118,7 +126,7 @@ contract TestPortfolioDeallocate is Setup {
         usePairTokens(500 ether)
         isArmed
     {
-        vm.assume(liquidity > 0);
+        vm.assume(liquidity > BURNED_LIQUIDITY);
         vm.deal(actor(), 250 ether);
         subject().multiprocess{value: 250 ether}(
             FVMLib.encodeAllocateOrDeallocate(
@@ -136,7 +144,15 @@ contract TestPortfolioDeallocate is Setup {
     function testFuzz_deallocate_over_time(
         uint64 liquidity,
         uint24 timestep
-    ) public noJit defaultConfig useActor usePairTokens(500 ether) isArmed {
+    )
+        public
+        noJit
+        defaultConfig
+        useActor
+        usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
+        isArmed
+    {
         vm.assume(liquidity > 0);
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
@@ -214,6 +230,11 @@ contract TestPortfolioDeallocate is Setup {
 
     function _simple_deallocate(uint128 amount) internal {
         uint256 prev = ghost().position(actor()).freeLiquidity;
+
+        if (amount > prev) {
+            amount = uint128(prev);
+        }
+
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
                 false, uint8(1), ghost().poolId, amount, 0, 0

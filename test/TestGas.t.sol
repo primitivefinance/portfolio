@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
+import "contracts/PortfolioLib.sol";
 
 contract TestGas is Setup {
     using SafeCastLib for uint256;
@@ -55,7 +56,7 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        allocateSome(1 ether)
+        allocateSome(1 ether + uint128(BURNED_LIQUIDITY))
         isArmed
     {
         bytes memory data = FVM.encodeAllocateOrDeallocate(
@@ -264,7 +265,7 @@ contract TestGas is Setup {
                     true,
                     uint8(0),
                     poolId,
-                    1 ether,
+                    1 ether + uint128(BURNED_LIQUIDITY),
                     type(uint128).max,
                     type(uint128).max
                 )
@@ -586,7 +587,7 @@ contract TestGas is Setup {
                 true,
                 uint8(0),
                 poolId,
-                1 ether,
+                1 ether + uint128(BURNED_LIQUIDITY),
                 type(uint128).max,
                 type(uint128).max
             );
@@ -912,6 +913,7 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         subject().fund(ghost().asset().to_addr(), type(uint256).max);
@@ -933,6 +935,7 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         bytes[] memory instructions = new bytes[](2);
