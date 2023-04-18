@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./setup/HandlerBase.sol";
+import "contracts/PortfolioLib.sol";
 import "solmate/utils/SafeCastLib.sol";
 
 contract HandlerPortfolio is HandlerBase {
@@ -419,7 +420,7 @@ contract HandlerPortfolio is HandlerBase {
         assertEq(deltaQuote, expectedDeltaQuote, "pool-delta-quote");
         assertEq(
             post.totalPoolLiquidity,
-            prev.totalPoolLiquidity + deltaLiquidity,
+            prev.totalPoolLiquidity + deltaLiquidity - BURNED_LIQUIDITY,
             "pool-total-liquidity"
         );
         assertTrue(
@@ -428,7 +429,7 @@ contract HandlerPortfolio is HandlerBase {
         );
         assertEq(
             post.callerPositionLiquidity,
-            prev.callerPositionLiquidity + deltaLiquidity,
+            prev.callerPositionLiquidity + deltaLiquidity - BURNED_LIQUIDITY,
             "position-liquidity-increases"
         );
 
