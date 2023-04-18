@@ -927,14 +927,16 @@ abstract contract PortfolioVirtual is Objective {
             // Only `credited` or `remainder` can be non-zero.
             // Outstanding amount must be transferred in to `address(this)`.
             // Untracked credits must be transferred out to `msg.sender`.
-            _payments.push(
-                Payment({
-                    token: token,
-                    amountTransferTo: credited, // Reserves are not tracking some tokens.
-                    amountTransferFrom: remainder, // Reserves need more tokens.
-                    balance: Account.__balanceOf__(token, address(this))
-                })
-            );
+            if (credited != 0 || remainder != 0) {
+                _payments.push(
+                    Payment({
+                        token: token,
+                        amountTransferTo: credited, // Reserves are not tracking some tokens.
+                        amountTransferFrom: remainder, // Reserves need more tokens.
+                        balance: Account.__balanceOf__(token, address(this))
+                    })
+                );
+            }
 
             // Token considered fully accounted for.
             __account__.warm.pop();
@@ -982,9 +984,7 @@ abstract contract PortfolioVirtual is Objective {
                         token, int256(post) - int256(expected)
                     );
                 }
-            }
-
-            if (amountTransferFrom > 0) {
+            } else if (amountTransferFrom > 0) {
                 uint256 prev = payments[index].balance;
 
                 // Interaction
