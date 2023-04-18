@@ -35,6 +35,7 @@ using {
     computeTau
 } for PortfolioPool global;
 
+uint256 constant BURNED_LIQUIDITY = 1e3;
 uint256 constant INIT_LIQUIDITY = 1e18;
 uint256 constant PERCENTAGE = 10_000;
 uint256 constant MIN_MAX_PRICE = 1;
@@ -49,6 +50,7 @@ uint256 constant JUST_IN_TIME_MAX = 600 seconds;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
 error DrawBalance();
+error InsufficientLiquidity();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);

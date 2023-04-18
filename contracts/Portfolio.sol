@@ -356,18 +356,28 @@ abstract contract PortfolioVirtual is Objective {
         (uint128 deltaAssetWad, uint128 deltaQuoteWad) =
             (args.deltaAsset.safeCastTo128(), args.deltaQuote.safeCastTo128());
 
-        // Can only be in the case of an allocation,
+        // Can only be in the case of the first allocation,
         // because pool.liquidity cannot be 0 on deallocation.
+        // And there is no way for the pool to get to zero liquidity
+        // since a small amount of liquidity is burned.
+        int128 positionLiquidity = args.deltaLiquidity;
         if (pool.liquidity == 0) {
-            // On create, virtualX and virtualY are set to initial
-            // liquidity of 1E18 and its corresponding reserves.
-            // Therefore, reset the virtual reserves since they are being allocated to
-            // for the first time in this transaction.
+            // When a pool is created, the virtual reserves are
+            // initialized to match the reported price as specified by the pool creator.
+            // These resereves are initialized based on 1E18 units of liquidity.
+            // Since no liquidity was actually provided yet, the first
+            // allocate will need to reset the virtual reserves before incrementing them.
             pool.virtualX = 0;
             pool.virtualY = 0;
+            // Small amount of liquidity is removed from initial position to permanently burn it.
+            // This prevents the pool from reaching 0 in both virtual reserves if all liquidity is removed.
+            if (positionLiquidity < int128(uint128(BURNED_LIQUIDITY))) {
+                revert InsufficientLiquidity();
+            }
+            positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
         }
 
-        position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
+        position.changePositionLiquidity(args.timestamp, positionLiquidity);
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
