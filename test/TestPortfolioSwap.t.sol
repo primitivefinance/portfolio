@@ -411,4 +411,97 @@ contract TestPortfolioSwap is Setup {
             "out-physical-not-eq"
         );
     }
+
+    function test_swap_price_decreases()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(1 ether)
+        isArmed
+    {
+        bool sellAsset = true;
+        uint256 amountIn = 0.01 ether;
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+
+        _swap_assert_price(sellAsset, amountIn, amountOut);
+    }
+
+    function test_swap_price_increases()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(1 ether)
+        isArmed
+    {
+        bool sellAsset = false;
+        uint256 amountIn = 0.01 ether;
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+
+        _swap_assert_price(sellAsset, amountIn, amountOut);
+    }
+
+    function test_swap_price_decreases_low_decimals()
+        public
+        sixDecimalQuoteConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(1 ether)
+        isArmed
+    {
+        bool sellAsset = true;
+        uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
+            ghost().asset().to_token().decimals()
+        );
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+
+        _swap_assert_price(sellAsset, amountIn, amountOut);
+    }
+
+    function test_swap_price_increases_low_decimals()
+        public
+        sixDecimalQuoteConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(1 ether)
+        isArmed
+    {
+        bool sellAsset = false;
+        uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
+            ghost().quote().to_token().decimals()
+        );
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+
+        _swap_assert_price(sellAsset, amountIn, amountOut);
+    }
+
+    function _swap_assert_price(
+        bool sellAsset,
+        uint256 amountIn,
+        uint256 amountOut
+    ) internal {
+        uint256 prevPrice = subject().getVirtualPrice(ghost().poolId);
+
+        subject().multiprocess(
+            FVM.encodeSwap(
+                uint8(0),
+                ghost().poolId,
+                amountIn.safeCastTo128(),
+                amountOut.safeCastTo128(),
+                uint8(sellAsset ? 1 : 0)
+            )
+        );
+
+        uint256 postPrice = subject().getVirtualPrice(ghost().poolId);
+        if (sellAsset) {
+            assertTrue(postPrice < prevPrice, "price-not-decreased");
+        } else {
+            assertTrue(postPrice > prevPrice, "price-not-increased");
+        }
+    }
 }
