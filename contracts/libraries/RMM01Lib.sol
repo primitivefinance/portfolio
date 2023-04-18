@@ -105,12 +105,19 @@ library RMM01Lib {
         data.liquidity = self.liquidity;
         (data.virtualX, data.virtualY) = self.getVirtualReservesWad();
         tau = self.computeTau(timestamp);
-        data.prevInvariant = invariantOf({
-            self: self,
-            R_x: data.virtualX.divWadDown(data.liquidity),
-            R_y: data.virtualY.divWadDown(data.liquidity),
-            timeRemainingSec: tau
-        });
+
+        uint256 R_x;
+        uint256 R_y;
+        if (sellAsset) {
+            R_x = data.virtualX.divWadDown(data.liquidity);
+            R_y = data.virtualY.divWadUp(data.liquidity);
+        } else {
+            R_x = data.virtualX.divWadUp(data.liquidity);
+            R_y = data.virtualY.divWadDown(data.liquidity);
+        }
+
+        data.prevInvariant =
+            invariantOf({self: self, R_x: R_x, R_y: R_y, timeRemainingSec: tau});
         data.remainder = amountIn.scaleToWad(
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
