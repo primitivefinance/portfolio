@@ -29,7 +29,10 @@ contract RMM01Portfolio is PortfolioVirtual {
      * movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _getLatestInvariantAndVirtualPrice(uint64 poolId)
+    function _getLatestInvariantAndVirtualPrice(
+        uint64 poolId,
+        bool sellAsset
+    )
         internal
         view
         returns (uint256 price, int256 invariant, uint256 updatedTau)
@@ -37,8 +40,23 @@ contract RMM01Portfolio is PortfolioVirtual {
         PortfolioPool storage pool = pools[poolId];
         updatedTau = pool.computeTau(block.timestamp);
 
-        uint256 reserveXPerLiquidity = pool.virtualX.divWadDown(pool.liquidity);
-        uint256 reserveYPerLiquidity = pool.virtualY.divWadDown(pool.liquidity);
+        uint256 reserveXPerLiquidity = pool.virtualX;
+        uint256 reserveYPerLiquidity = pool.virtualY;
+
+        // The reserve which sends tokens out in this swap must be rounded up
+        // to avoid the scenario that the remainder in a truncated output amount
+        // is not stolen in the swap.
+        if (sellAsset) {
+            // Swap X -> Y, Y is output, so round up Y.
+            reserveXPerLiquidity =
+                reserveXPerLiquidity.divWadDown(pool.liquidity);
+            reserveYPerLiquidity = reserveYPerLiquidity.divWadUp(pool.liquidity);
+        } else {
+            // Swap Y -> X, X is output, so round up X.
+            reserveXPerLiquidity = reserveXPerLiquidity.divWadUp(pool.liquidity);
+            reserveYPerLiquidity =
+                reserveYPerLiquidity.divWadDown(pool.liquidity);
+        }
 
         invariant = int128(
             pool.invariantOf({
@@ -57,12 +75,12 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function _beforeSwapEffects(uint64 poolId)
-        internal
-        override
-        returns (bool, int256)
-    {
-        (, int256 invariant,) = _getLatestInvariantAndVirtualPrice(poolId);
+    function _beforeSwapEffects(
+        uint64 poolId,
+        bool sellAsset
+    ) internal override returns (bool, int256) {
+        (, int256 invariant,) =
+            _getLatestInvariantAndVirtualPrice(poolId, sellAsset);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
         // Buffer for post-maturity swaps would go here.
@@ -169,6 +187,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         override
         returns (uint256 price)
     {
-        (price,,) = _getLatestInvariantAndVirtualPrice(poolId);
+        (price,,) = _getLatestInvariantAndVirtualPrice(poolId, true);
     }
 }
