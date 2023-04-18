@@ -14,13 +14,14 @@ import "./interfaces/IPortfolioRegistry.sol";
 abstract contract Objective is IPortfolio {
     /**
      * @dev Used to apply changes to a `pool`, like it's timestamp, before a swap occurs.
+     * @param sellAsset Determines rounding direction for reserves to compute invariant, round Y up (true) or round X up (false).
      * @return success True if pool can be swapped in.
      * @return invariant Current invariant value of the pool in WAD units.
      */
-    function _beforeSwapEffects(uint64 poolId)
-        internal
-        virtual
-        returns (bool success, int256 invariant);
+    function _beforeSwapEffects(
+        uint64 poolId,
+        bool sellAsset
+    ) internal virtual returns (bool success, int256 invariant);
 
     /**
      * @dev Conditional check made before changing `pool.liquidity` and `position.freeLiquidity`.

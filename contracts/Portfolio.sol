@@ -434,7 +434,8 @@ abstract contract PortfolioVirtual is Objective {
         // -=- Load Swap Info -=- //
         Iteration memory iteration;
         {
-            (bool success, int256 invariant) = _beforeSwapEffects(args.poolId);
+            (bool success, int256 invariant) =
+                _beforeSwapEffects(args.poolId, _state.sell);
             if (!success) revert PoolExpired();
 
             if (args.useMax == 1) {
