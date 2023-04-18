@@ -87,7 +87,7 @@ function __wrapEther__(AccountSystem storage self, address weth) {
  */
 function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
-    (bool success,) = to.call{value: amount}(new bytes(0));
+    (bool success,) = to.call{ value: amount }(new bytes(0));
     if (!success) revert EtherTransferFail();
 }
 
@@ -225,5 +225,13 @@ function getNetBalance(
 ) view returns (int256 net) {
     uint256 internalBalance = self.reserves[token];
     uint256 physicalBalance = __balanceOf__(token, account);
+
+    // Before casting `internalBalance` into an `int256`,
+    // we must ensure it fits within. If it does not, we revert.
+    if (internalBalance > uint256(type(int256).max)) revert();
+
+    // Also checking the physical balance.
+    if (physicalBalance > uint256(type(int256).max)) revert();
+
     net = int256(physicalBalance) - int256(internalBalance);
 }

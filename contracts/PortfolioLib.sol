@@ -76,6 +76,7 @@ error ZeroLiquidity();
 error ZeroOutput();
 error ZeroPrice();
 error ZeroValue();
+error InvalidNegativeLiquidity();
 error MaxDeltaReached();
 error MinDeltaUnmatched();
 
@@ -198,6 +199,8 @@ function getPoolReserves(PortfolioPool memory self)
     pure
     returns (uint128 reserveAsset, uint128 reserveQuote)
 {
+    // Check if -`self.liquidity` fits within an int128
+    if (self.liquidity > 2 ** 127 - 1) revert InvalidNegativeLiquidity();
     return self.getPoolLiquidityDeltas(-int128(self.liquidity)); // Rounds down.
 }
 
