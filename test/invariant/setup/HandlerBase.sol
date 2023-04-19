@@ -56,9 +56,6 @@ interface Context {
 
     function getRandomPoolId(uint256 index) external view returns (uint64);
 
-    // Subject Specific Getters
-    function getBalanceSum(address) external view returns (uint256);
-
     function getPositionsLiquiditySum() external view returns (uint256);
 }
 
