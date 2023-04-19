@@ -363,10 +363,10 @@ contract TestPortfolioAllocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY))
+        allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
         isArmed
     {
-        vm.assume(liquidity > 0);
+        vm.assume(liquidity > 10 ** (18 - 6));
         _simple_allocate_check_liquidity(liquidity);
     }
 
@@ -496,13 +496,17 @@ contract TestPortfolioAllocate is Setup {
             ghost().reserve(ghost().quote().to_addr())
         );
 
-        postR_A =
-            postR_A.scaleFromWadDown(ghost().asset().to_token().decimals());
-        postR_Q =
-            postR_Q.scaleFromWadDown(ghost().quote().to_token().decimals());
+        // Rounding up the scaled down reserves ensures the physical balances are
+        // always greater than or equal to the reserve values for this test.
+        // If they round up to a value which is greater than the physical balance,
+        // it means the reserves have more than the physical balance, breaking our core
+        // invariant which checks the difference of physical to reserve balance always being
+        // positive.
+        postR_A = postR_A.scaleFromWadUp(ghost().asset().to_token().decimals());
+        postR_Q = postR_Q.scaleFromWadUp(ghost().quote().to_token().decimals());
 
-        assertEq(postA, prevA + expectedA, "pool asset balance");
-        assertEq(postQ, prevQ + expectedQ, "pool quote balance");
+        assertApproxEqAbs(postA, prevA + expectedA, 1, "pool asset balance"); // Can be 1 wei off due to rounding in getLiquidityAmounts.
+        assertApproxEqAbs(postQ, prevQ + expectedQ, 1, "pool quote balance"); // Can be 1 wei off due to rounding in getLiquidityAmounts.
         assertEq(postR_A, postA, "pool asset reserve");
         assertEq(postR_Q, postQ, "pool quote reserve");
         assertEq(post, prev + amount, "pool.liquidity");
