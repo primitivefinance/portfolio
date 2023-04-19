@@ -49,10 +49,10 @@ contract TestPortfolioDeallocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY))
+        allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
         isArmed
     {
-        vm.assume(liquidity > 0);
+        vm.assume(liquidity > 10 ** (18 - 6));
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
                 true,
@@ -231,18 +231,28 @@ contract TestPortfolioDeallocate is Setup {
     function _simple_deallocate(uint128 amount) internal {
         uint256 prev = ghost().position(actor()).freeLiquidity;
 
+        uint128 amountToRemove = amount;
         if (amount > prev) {
-            amount = uint128(prev);
+            amountToRemove = uint128(prev);
         }
+
+        bool useMax = false;
 
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate(
-                false, uint8(1), ghost().poolId, amount, 0, 0
+                false,
+                uint8(useMax ? 1 : 0),
+                ghost().poolId,
+                amountToRemove,
+                0,
+                0
             )
         );
         uint256 post = ghost().position(actor()).freeLiquidity;
 
         // Deallocating liquidity can round down.
-        assertApproxEqAbs(post, prev - amount, 1, "liquidity-did-not-decrease");
+        assertApproxEqAbs(
+            post, prev - amountToRemove, 1, "liquidity-did-not-decrease"
+        );
     }
 }

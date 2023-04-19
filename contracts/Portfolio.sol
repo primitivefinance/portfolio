@@ -257,7 +257,7 @@ abstract contract PortfolioVirtual is Objective {
         (deltaAsset, deltaQuote) = pools[poolId].getPoolLiquidityDeltas(
             AssemblyLib.toInt128(deltaLiquidity)
         ); // note: Rounds up.
-        if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts();
+
         if (deltaAsset > maxDeltaAsset || deltaQuote > maxDeltaQuote) {
             revert MaxDeltaReached();
         }
@@ -281,6 +281,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaQuote.scaleFromWadDown(pair.decimalsQuote)
         );
 
+        if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts(); // Make sure to prevent allocates which provide fractional token amounts.
         emit Allocate(
             poolId,
             pair.tokenAsset,
@@ -963,16 +964,11 @@ abstract contract PortfolioVirtual is Objective {
         while (px != 0) {
             uint256 index = px - 1;
             address token = payments[index].token;
-            uint8 decimals = IERC20(token).decimals();
 
             (uint256 amountTransferTo, uint256 amountTransferFrom) = (
                 payments[index].amountTransferTo,
                 payments[index].amountTransferFrom
             );
-
-            // Scale WAD -> Decimals.
-            amountTransferTo = amountTransferTo.scaleFromWadDown(decimals);
-            amountTransferFrom = amountTransferFrom.scaleFromWadDown(decimals);
 
             if (amountTransferTo > 0) {
                 uint256 prev = payments[index].balance;
@@ -1044,10 +1040,20 @@ abstract contract PortfolioVirtual is Objective {
             pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
 
         PortfolioPair memory pair = pools[poolId].pair;
-        deltaAsset =
-            deltaAssetWad.scaleFromWadDown(pair.decimalsAsset).safeCastTo128();
-        deltaQuote =
-            deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
+
+        if (deltaLiquidity < 0) {
+            // If deallocating, round amounts down to ensure credits are not overestimated.
+            deltaAsset = deltaAssetWad.scaleFromWadDown(pair.decimalsAsset)
+                .safeCastTo128();
+            deltaQuote = deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote)
+                .safeCastTo128();
+        } else {
+            // If allocating, round amounts up to ensure payments are not underestimated.
+            deltaAsset =
+                deltaAssetWad.scaleFromWadUp(pair.decimalsAsset).safeCastTo128();
+            deltaQuote =
+                deltaQuoteWad.scaleFromWadUp(pair.decimalsQuote).safeCastTo128();
+        }
     }
 
     /// @inheritdoc IPortfolioGetters

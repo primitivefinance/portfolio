@@ -217,13 +217,16 @@ function cache(AccountSystem storage self, address token, bool status) {
 
 /**
  * @dev Computes surplus (positive) or deficit (negative) in actual tokens compared to tracked amounts.
+ * @return net Net balance of physical - virtual tokens in native token decimals.
  */
 function getNetBalance(
     AccountSystem storage self,
     address token,
     address account
 ) view returns (int256 net) {
-    uint256 internalBalance = self.reserves[token];
+    uint256 internalBalanceWad = self.reserves[token];
+    uint256 internalBalance =
+        AssemblyLib.scaleFromWadUp(internalBalanceWad, IERC20(token).decimals());
     uint256 physicalBalance = __balanceOf__(token, account);
 
     // Before casting `internalBalance` into an `int256`,
@@ -233,7 +236,5 @@ function getNetBalance(
     // Also checking the physical balance.
     if (physicalBalance > uint256(type(int256).max)) revert();
 
-    uint256 physicalBalanceWad =
-        AssemblyLib.scaleToWad(physicalBalance, IERC20(token).decimals());
-    net = int256(physicalBalanceWad) - int256(internalBalance);
+    net = int256(physicalBalance) - int256(internalBalance);
 }
