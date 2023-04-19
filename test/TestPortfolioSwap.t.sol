@@ -505,4 +505,108 @@ contract TestPortfolioSwap is Setup {
             assertTrue(postPrice > prevPrice, "price-not-increased");
         }
     }
+
+    function testFuzz_swap_invariant_gte_previous_invariant(
+        bool sellAsset,
+        uint256 amountIn,
+        uint256 amountOut
+    )
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(10 ether)
+        isArmed
+    {
+        PortfolioPool memory pool = ghost().pool();
+
+        uint256 reserveXPerL;
+        uint256 reserveYPerL;
+
+        if (sellAsset) {
+            reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
+            reserveYPerL = pool.virtualY.divWadUp(pool.liquidity);
+        } else {
+            reserveXPerL = pool.virtualX.divWadUp(pool.liquidity);
+            reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
+        }
+
+        {
+            // bound the amounts to be within the max amount in and max amount out
+            uint256 maxAmountIn = RMM01Portfolio(
+                payable(address(ghost().subject))
+            ).computeMaxInput(
+                ghost().poolId,
+                sellAsset,
+                sellAsset ? reserveXPerL : reserveYPerL,
+                pool.liquidity
+            );
+
+            amountIn = bound(amountIn, 1, maxAmountIn);
+            amountOut = bound(
+                amountOut, 1, ((sellAsset ? reserveYPerL : reserveXPerL) - 1)
+            );
+
+            amountIn = amountIn.scaleFromWadDown(
+                sellAsset ? pool.pair.decimalsAsset : pool.pair.decimalsQuote
+            );
+            amountOut = amountOut.scaleFromWadDown(
+                sellAsset ? pool.pair.decimalsQuote : pool.pair.decimalsAsset
+            );
+
+            _swap_check_invariant(
+                sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
+            );
+        }
+    }
+
+    function _swap_check_invariant(
+        bool sellAsset,
+        uint256 amountIn,
+        uint256 amountOut,
+        uint256 reserveXPerL,
+        uint256 reserveYPerL
+    ) internal {
+        (, int256 prev) = RMM01Portfolio(payable(address(ghost().subject)))
+            .checkInvariant({
+            poolId: ghost().poolId,
+            invariant: 0,
+            reserveX: reserveXPerL,
+            reserveY: reserveYPerL,
+            timestamp: block.timestamp
+        });
+
+        try subject().multiprocess(
+            FVM.encodeSwap(
+                uint8(0),
+                ghost().poolId,
+                amountIn.safeCastTo128(),
+                amountOut.safeCastTo128(),
+                uint8(sellAsset ? 1 : 0)
+            )
+        ) {
+            PortfolioPool memory pool = ghost().pool();
+
+            if (sellAsset) {
+                reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
+                reserveYPerL = pool.virtualY.divWadUp(pool.liquidity);
+            } else {
+                reserveXPerL = pool.virtualX.divWadUp(pool.liquidity);
+                reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
+            }
+
+            (, int256 post) = RMM01Portfolio(payable(address(ghost().subject)))
+                .checkInvariant({
+                poolId: ghost().poolId,
+                invariant: prev,
+                reserveX: reserveXPerL,
+                reserveY: reserveYPerL,
+                timestamp: block.timestamp
+            });
+
+            assertTrue(post >= prev, "post-invariant-not-gte-prev");
+        } catch {
+            // do nothing, since it failed.
+        }
+    }
 }
