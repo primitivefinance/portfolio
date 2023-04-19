@@ -159,8 +159,6 @@ contract HandlerPortfolio is HandlerBase {
             ctx.ghost().reserve(quote),
             ctx.ghost().asset().to_token().balanceOf(address(ctx.subject())),
             ctx.ghost().quote().to_token().balanceOf(address(ctx.subject())),
-            ctx.getBalanceSum(asset),
-            ctx.getBalanceSum(quote),
             ctx.getPositionsLiquiditySum(),
             position.freeLiquidity,
             pool.liquidity
@@ -412,6 +410,11 @@ contract HandlerPortfolio is HandlerBase {
         dQuote =
             dQuote.scaleFromWadDown(ctx.ghost().quote().to_token().decimals());
 
+        if (ctx.ghost().pool().liquidity == 0) {
+            dAsset = 0;
+            dQuote = 0;
+        }
+
         emit log("dAsset", dAsset);
         emit log("dQuote", dQuote);
 
@@ -506,8 +509,6 @@ struct AccountingState {
     uint256 reserveQuote; // getReserve
     uint256 physicalBalanceAsset; // balanceOf
     uint256 physicalBalanceQuote; // balanceOf
-    uint256 totalBalanceAsset; // sum of all balances from getBalance
-    uint256 totalBalanceQuote; // sum of all balances from getBalance
     uint256 totalPositionLiquidity; // sum of all position liquidity
     uint256 callerPositionLiquidity; // position.freeLiquidity
     uint256 totalPoolLiquidity; // pool.liquidity
