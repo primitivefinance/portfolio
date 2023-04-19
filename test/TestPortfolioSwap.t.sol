@@ -560,6 +560,48 @@ contract TestPortfolioSwap is Setup {
         }
     }
 
+    function testFuzz_swap_amountIn_invariant_does_not_decrease(
+        bool sellAsset,
+        uint256 amountIn
+    )
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(10 ether)
+        isArmed
+    {
+        vm.assume(amountIn > 100);
+
+        PortfolioPool memory pool = ghost().pool();
+
+        uint256 reserveXPerL;
+        uint256 reserveYPerL;
+
+        if (sellAsset) {
+            reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
+            reserveYPerL = pool.virtualY.divWadUp(pool.liquidity);
+        } else {
+            reserveXPerL = pool.virtualX.divWadUp(pool.liquidity);
+            reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
+        }
+
+        uint256 maxIn = Objective(address(subject())).computeMaxInput(
+            ghost().poolId,
+            sellAsset,
+            sellAsset ? reserveXPerL : reserveYPerL,
+            pool.liquidity
+        );
+        vm.assume(maxIn > amountIn);
+
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+
+        _swap_check_invariant(
+            sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
+        );
+    }
+
     function _swap_check_invariant(
         bool sellAsset,
         uint256 amountIn,
