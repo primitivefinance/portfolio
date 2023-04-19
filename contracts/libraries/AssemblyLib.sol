@@ -303,6 +303,16 @@ library AssemblyLib {
         }
     }
 
+    function scaleFromWadUp(
+        uint256 amountWad,
+        uint256 decimals
+    ) internal pure returns (uint256 outputDec) {
+        if (amountWad == 0) return 0;
+
+        uint256 factor = computeScalar(decimals);
+        outputDec = (amountWad - 1) / factor + 1; // ((a-1) / b) + 1
+    }
+
     /*
 
     /!\ Do not use this function, it's completely cursed:
