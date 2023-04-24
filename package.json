@@ -1,7 +1,7 @@
 {
   "name": "@primitivefi/portfolio",
   "license": "AGPL-3.0-only",
-  "version": "v1.0.0-beta",
+  "version": "v1.1.0-beta",
   "description": "Onchain portfolio protocol for risk and liquidity management.",
   "files": [
     "contracts/**/*.sol"
