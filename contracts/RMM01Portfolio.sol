@@ -93,7 +93,8 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint256 reserveY,
         uint256 timestamp
     ) public view override returns (bool, int256 nextInvariant) {
-        uint256 tau = pools[poolId].computeTau(timestamp); // Computes the time until `timestamp`.
+        // Computes the time until pool maturity or zero if expired.
+        uint256 tau = pools[poolId].computeTau(timestamp);
         nextInvariant = RMM01Lib.invariantOf({
             self: pools[poolId],
             R_x: reserveX,

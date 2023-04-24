@@ -93,8 +93,8 @@ error Overflow(); // 0x35278d12
  * | bytes[0]                   | 0xAA Instruction code     |
  * | bytes[1]                   | Amount of Instructions    |
  * | bytes[2]                   | ptr[0] := Length of instruction[0]
- * | bytes[2:ptr[0] + 1]        | Data of instruction[0]. Calldata slice does not include end index.   |
- * | bytes[ptr[0] + 1]          | ptr[1] := Length of instruction[1] |
+ * | bytes[3:3 + ptr[0]]        | Data of instruction[0]. Calldata slice does not include end index.   |
+ * | bytes[3 + ptr[0]]          | ptr[1] := Length of instruction[1] |
  * | ...                        | Repeats in a loop for each instruction. |
  */
 function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
@@ -121,13 +121,14 @@ function _jumpProcess(bytes calldata data, function(bytes calldata) _process) {
             revert InvalidJump(idxInstructionEnd);
         }
         // Calldata slicing EXCLUDES the `idxInstructionEnd` byte.
-        bytes calldata instruction = data[idxInstructionStart:idxInstructionEnd];
+        bytes calldata instruction =
+            data[idxInstructionStart + 1:idxInstructionEnd];
         // Move the pointer to the EXCLUDED `idxInstructionEnd` byte.
         // This byte holds the data for the index of byte with the next instruction's length.
         idxPtr = idxInstructionEnd;
         // Process the instruction after removing the instruction length,
         // so only instruction data is passed to `_process`.
-        _process(instruction[1:]);
+        _process(instruction);
     }
 }
 
