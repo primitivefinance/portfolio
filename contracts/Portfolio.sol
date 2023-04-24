@@ -596,7 +596,7 @@ abstract contract PortfolioVirtual is Objective {
      * @param controller An address that can change the `fee`, `priorityFee`, and `jit` parameters of the created pool.
      * @param priorityFee Priority fee for the pool (10,000 being 100%). This is a percentage of fees paid by the controller when swapping.
      * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
-     * @param volatility Expected volatility of the pool.
+     * @param volatility Expected volatility of the pool in basis points, minimum of 1 (0.01%) and maximum of 25,000 (250%).
      * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
      * @param jit Just In Time policy (expressed in seconds).
      * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
