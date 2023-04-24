@@ -5,35 +5,38 @@ import { PortfolioCurve, PortfolioPair } from "../PortfolioLib.sol";
 
 interface IPortfolioEvents {
     /**
-     * @dev Ether transfers into Portfolio via payable `deposit` function.
+     * @dev Ether transfers into Portfolio via payable `multiprocess` function.
      */
     event Deposit(address indexed account, uint256 amount);
 
     /**
-     * @notice Assigns an additional `amount` of `token` to Portfolio's internally tracked balance.
-     * @dev Emitted on `swap`, `allocate`, and when a user is gifted surplus tokens that were sent to the contract.
-     * @param amount Quantity of token in token's native decimal units.
+     * @notice Assigns an additional `amount` of `token` to Portfolio's internal accounting system.
+     * @dev Emitted on `swap` and `allocate`.
+     * @param amount Quantity of token in WAD units.
      */
     event IncreaseReserveBalance(address indexed token, uint256 amount);
 
     /**
-     * @notice Unassigns `amount` of `token` from Portfolio's internally tracked balance.
-     * @dev Emitted on `swap`, `deallocate`, and when paying with an internal balance.
-     * @param amount Quantity of token in token's native decimal units.
+     * @notice Unassigns `amount` of `token` from Portfolio's internal accounting system.
+     * @dev Emitted on `swap` and `deallocate`.
+     * @param amount Quantity of token in WAD units.
      */
     event DecreaseReserveBalance(address indexed token, uint256 amount);
 
     /**
-     * @dev Assigns `input` amount of `sellAsset` to Portfolio's reserves.
-     * Unassigns `output` amount of `tokenOut` from Portfolio's reserves.
+     * @dev Swaps `input` amount of `tokenIn` for `output` amount of `tokenOut` in pool with `poolId`.
      * @param price Post-swap approximated marginal price in wad units.
-     * @param feeAmountDec Amount of `sellAsset` tokens paid as a fee.
+     * @param tokenIn Token sold.
+     * @param input Quantity of input token sold in native token decimals.
+     * @param tokenOut Token bought.
+     * @param output Quantity of output token bought in native token decimals.
+     * @param feeAmountDec Amount of the sold tokens that are paid as a fee to LPs.
      * @param invariantWad Post-swap invariant in wad units.
      */
     event Swap(
         uint64 indexed poolId,
         uint256 price,
-        address indexed sellAsset,
+        address indexed tokenIn,
         uint256 input,
         address indexed tokenOut,
         uint256 output,
@@ -42,7 +45,7 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @dev Assigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId.
+     * @dev Assigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId`.
      * Units are in the respective tokens' native decimals. Units for `deltaLiquidity` are WAD.
      */
     event Allocate(
@@ -55,7 +58,7 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @dev Unassigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId.
+     * @dev Unassigns amount `deltaAsset` of `asset` and `deltaQuote` of `quote` tokens to `poolId`.
      * Units are in the respective tokens' native decimals. Units for `deltaLiquidity` are WAD.
      */
     event Deallocate(
@@ -69,6 +72,10 @@ interface IPortfolioEvents {
 
     /**
      * @dev Emits a `0` for unchanged parameters.
+     * @param poolId Unique identifier for the pool that is being updated.
+     * @param priorityFee Fee percentage paid by the pool controller (if any).
+     * @param fee Fee percentage paid by swappers.
+     * @param jit Just-in-time (JIT) seconds that must be eclipsed between allocate and deallocates.
      */
     event ChangeParameters(
         uint64 indexed poolId,
@@ -79,6 +86,11 @@ interface IPortfolioEvents {
 
     /**
      * @notice Emitted on pair creation.
+     * @param pairId Unique nonce for the pair that is being created.
+     * @param asset Token that is being paired.
+     * @param quote Token that is being paired.
+     * @param decimalsAsset Decimals of the asset token.
+     * @param decimalsQuote Decimals of the quote token.
      */
     event CreatePair(
         uint24 indexed pairId,
@@ -90,6 +102,16 @@ interface IPortfolioEvents {
 
     /**
      * @dev Emitted on pool creation.
+     * @param poolId Unique identifier for the pool that is being created.
+     * @param asset Token that is being paired.
+     * @param quote Token that is being paired.
+     * @param controller Address that can call `changeParameters` on the pool.
+     * @param maxPrice The terminal price reached upon the end of the duration.
+     * @param jit Just-in-time (JIT) seconds that must be eclipsed between allocate and deallocates.
+     * @param fee Fee percentage paid by swappers.
+     * @param duration Days until the pool cannot be swapped in anymore.
+     * @param volatility Volatility in basis points which determines price impact of swaps.
+     * @param priorityFee Fee percentage paid by the pool controller (if any).
      */
     event CreatePool(
         uint64 indexed poolId,
@@ -106,11 +128,15 @@ interface IPortfolioEvents {
 
     /**
      * @dev Emitted on updating the `protocolFee` state value.
+     * @param prevFee Previous protocol fee portion of the swap fee.
+     * @param nextFee Next protocol fee portion of the swap fee.
      */
     event UpdateProtocolFee(uint256 prevFee, uint256 nextFee);
 
     /**
      * @dev Emitted when the REGISTRY claims protocol fees.
+     * @param token Token that is being claimed.
+     * @param amount Amount of token claimed in native token decimals.
      */
     event ClaimFees(address indexed token, uint256 amount);
 }
@@ -127,7 +153,7 @@ interface IPortfolioGetters {
     /**
      * @notice Difference of `token.balanceOf(this)` and internally tracked reserve balance.
      * @dev Critical system invariant. Must always return greater than or equal to zero.
-     * @return Net balance held in WAD units.
+     * @return Net balance held in native token decimals.
      * @custom:example Assumes token is 18 decimals.
      * ```
      * uint256 previousReserve = getReserve(token);
@@ -296,8 +322,6 @@ interface IPortfolioActions {
      *
      * This means that token deficits can be carried over between calls
      * and paid by future ones (within the same multiprocess transaction)!
-     *
-     * todo: Update multiprocess to return data, or information that can help debugging.
      */
     function multiprocess(bytes calldata data) external payable;
 
