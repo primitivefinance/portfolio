@@ -62,8 +62,7 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev
-     * Manipulated in `_swap` to avoid stack too deep.
-     * Utilized in virtual function implementations to handle fee growth, if any.
+     * Manipulated in `_swap` to avoid stack too deep and contract size limit.
      *
      * @custom:invariant MUST be deleted after every transaction that uses it.
      */
@@ -232,6 +231,11 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Reduces virtual reserves and liquidity. Credits `msg.sender`.
+     * @param deltaLiquidity Quantity of liquidity to burn in WAD units.
+     * @param minDeltaAsset Minimum quantity of asset tokens to receive in WAD units.
+     * @param minDeltaQuote Minimum quantity of quote tokens to receive in WAD units.
+     * @return deltaAsset Real quantity of `asset` tokens received from pool, in native token decimals.
+     * @return deltaQuote Real quantity of `quote` tokens received from pool, in native token decimals.
      */
     function _deallocate(
         bool useMax,
@@ -338,16 +342,17 @@ abstract contract PortfolioVirtual is Objective {
      * Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote)
      * for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
      *
-     * Fees can be saved into two buckets:
-     * 1. Re-invested into the pool, increasing the value of liquidity.
-     * 2. Pro-rata distribution to all liquidity position's `owed` tokens, via fee growth accumulator.
+     * Fees are re-invested into the pool, increasing the value of liquidity.
      *
-     * These different fee buckets are applied using this logic:
-     * 1. Add the input swap amount, fee included, to the per liquidity reserves in `syncPool`.
-     * 2. Add the input swap amount less the fee, to the per liquidity reserves in `syncPool`
-     *    and increase the `feeGrowthGlobal` value by the `feeAmount` divided by `pool.liquidity`.
+     * This is done via the following logic:
+     * - Compute the new reserve that is being increased without the fee amount included.
+     * - Check the invariant condition passes using this new reserve without the fee amount included.
+     * - Update the new reserve with the fee amount included in `syncPool`.
      *
-     * @custom:invariant MUST not change liquidity of a pool.
+     * @param args Swap parameters, token amounts are expected to be in WAD units.
+     * @return poolId Pool which had the swap happen.
+     * @return input Real quantity of `input` tokens sent to pool, in native token decimals.
+     * @return output Real quantity of `output` tokens sent to swapper, in native token decimals.
      */
     function _swap(Order memory args)
         internal
@@ -514,6 +519,7 @@ abstract contract PortfolioVirtual is Objective {
             // But all the token related amounts must be in their native token decimals.
             iteration.input = iteration.input.scaleFromWadDown(inputDec);
             iteration.output = iteration.output.scaleFromWadDown(outputDec);
+            iteration.feeAmount = iteration.input.scaleFromWadDown(inputDec);
 
             if (iteration.protocolFeeAmount != 0) {
                 protocolFees[_state.tokenInput] += iteration.protocolFeeAmount;
@@ -593,8 +599,8 @@ abstract contract PortfolioVirtual is Objective {
      * @param volatility Expected volatility of the pool.
      * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
      * @param jit Just In Time policy (expressed in seconds).
-     * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token).
-     * @param price Initial price of the pool (expressed in the quote token).
+     * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
+     * @param price Initial price of the pool (expressed in the quote token), in WAD units.
      */
     function _createPool(
         uint24 pairId,
@@ -661,7 +667,7 @@ abstract contract PortfolioVirtual is Objective {
      * @dev Wraps address(this).balance of ether but does not credit to `msg.sender`.
      * Received WETH will remain in the contract as a surplus, i.e. `getNetBalance(WETH)` will be positive.
      * The `settlement` function handles how to apply the surplus,
-     * by either using it to pay a debit or by gifting the `msg.sender`.
+     * by either using it to pay a debit or transferring it to `msg.sender`.
      */
     function _deposit() internal {
         if (msg.value > 0) {
@@ -672,6 +678,8 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
+     * @param token Address of the token to increment the reserves of.
+     * @param amount Quantity of tokens to add to the reserves in WAD units.
      *
      * @custom:security Directly manipulates reserves.
      */
@@ -682,6 +690,8 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
+     * @param token Address of the token to decrement the reserves of.
+     * @param amount Quantity of tokens to subtract from the reserves in WAD units.
      *
      * @custom:security Directly manipulates reserves.
      * @custom:reverts With `InsufficientReserve` if current reserve balance for `token` iss less than `amount`.
@@ -693,6 +703,10 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Used on every entry point to scale user-provided arguments from decimals to WAD.
+     * @param amountAssetDec Quantity of asset tokens in native token decimals.
+     * @param amountQuoteDec Quantity of quote tokens in native token decimals.
+     * @return amountAssetWad Quantity of asset tokens in WAD units.
+     * @return amountQuoteWad Quantity of quote tokens in WAD units.
      */
     function _scaleAmountsToWad(
         uint64 poolId,
@@ -817,7 +831,7 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * Be aware of these settlement invariants:
-     * =
+     *
      *     Invariant 1. Every token that is interacted with is cached and exists.
      *     Invariant 2. Tokens are removed from cache and cache is empty by end of settlement.
      *     Invariant 3. Cached tokens cannot be carried over from previous transactions.
@@ -839,8 +853,9 @@ abstract contract PortfolioVirtual is Objective {
 
             // Apply credits or debits to net balance.
             // If credited, these are extra tokens that will be transferred to `msg.sender`.
-            // If debited, some tokens were paid via `msg.sender`'s internal balance.
             // If remainder, not enough tokens were paid. Must be transferred in from `msg.sender`.
+            // The `credited` amount is in native token decimals of `token`.
+            // The `remainder` amount is in native token decimals of `token`.
             (uint256 credited, uint256 remainder) =
                 __account__.settle(token, address(this));
 
@@ -925,6 +940,7 @@ abstract contract PortfolioVirtual is Objective {
         delete _payments;
     }
 
+    /// @inheritdoc IPortfolioActions
     function claimFee(address token, uint256 amount) external override lock {
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
@@ -947,6 +963,7 @@ abstract contract PortfolioVirtual is Objective {
         emit ClaimFees(token, amount);
     }
 
+    /// @inheritdoc IPortfolioActions
     function setProtocolFee(uint256 fee) external override lock {
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
