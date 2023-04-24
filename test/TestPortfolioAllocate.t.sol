@@ -4,6 +4,8 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioAllocate is Setup {
+    using AssemblyLib for uint256;
+
     function test_allocate_modifies_liquidity()
         public
         defaultConfig
@@ -23,7 +25,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         // Fetch the variable changed.
@@ -32,13 +36,14 @@ contract TestPortfolioAllocate is Setup {
         assertEq(post, prev + amount, "pool.liquidity");
         // Direct assertions of pool state.
         assertEq(
-            ghost().pool().liquidity,
+            ghost().pool().liquidity - BURNED_LIQUIDITY,
             ghost().position(actor()).freeLiquidity,
             "position.freeLiquidity != pool.liquidity"
         );
     }
 
-    function test_allocate_use_max()
+    // todo: Use max now only uses entire transient balances, which need to be increased from a swap output or deallocatye.
+    /* function test_allocate_use_max()
         public
         defaultConfig
         useActor
@@ -54,7 +59,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(1),
                 poolId: ghost().poolId,
-                deltaLiquidity: 1
+                deltaLiquidity: 1,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         assertEq(
@@ -62,7 +69,7 @@ contract TestPortfolioAllocate is Setup {
             ghost().position(actor()).freeLiquidity,
             "position.freeLiquidity != pool.liquidity"
         );
-    }
+    } */
 
     function test_allocate_does_not_modify_timestamp()
         public
@@ -80,7 +87,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post = ghost().pool().lastTimestamp;
@@ -108,7 +117,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
@@ -118,6 +129,62 @@ contract TestPortfolioAllocate is Setup {
         assertTrue(post_quote != 0, "pool.getReserve(quote) == 0");
         assertEq(post_asset, prev_asset + delta0, "pool.getReserve(asset)");
         assertEq(post_quote, prev_quote + delta1, "pool.getReserve(quote)");
+    }
+
+    function test_allocate_reverts_when_max_quote_reached()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+
+        vm.expectRevert();
+
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount,
+                deltaQuote: 0,
+                deltaAsset: type(uint128).max
+            })
+        );
+    }
+
+    function test_allocate_reverts_when_max_delta_reached()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        uint128 amount = 0.1 ether;
+        uint64 xid = ghost().poolId;
+
+        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
+            deltaLiquidity: int128(amount)
+        });
+
+        vm.expectRevert();
+
+        subject().multiprocess(
+            FVMLib.encodeAllocateOrDeallocate({
+                shouldAllocate: true,
+                useMax: uint8(0),
+                poolId: xid,
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: 0
+            })
+        );
     }
 
     /// todo: This is identical logic, only thing that changed was the config modifier.
@@ -143,7 +210,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
@@ -177,7 +246,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
         uint256 post_asset =
@@ -201,7 +272,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: failureArg,
-                deltaLiquidity: 1 ether
+                deltaLiquidity: 1 ether,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
     }
@@ -219,7 +292,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: ghost().poolId,
-                deltaLiquidity: uint128(failureArg)
+                deltaLiquidity: uint128(failureArg),
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
     }
@@ -237,7 +312,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: ghost().poolId,
-                deltaLiquidity: uint128(failureArg)
+                deltaLiquidity: uint128(failureArg),
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
     }
@@ -269,7 +346,9 @@ contract TestPortfolioAllocate is Setup {
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
 
@@ -284,9 +363,10 @@ contract TestPortfolioAllocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
         isArmed
     {
-        vm.assume(liquidity > 0);
+        vm.assume(liquidity > 10 ** (18 - 6));
         _simple_allocate_check_liquidity(liquidity);
     }
 
@@ -298,6 +378,7 @@ contract TestPortfolioAllocate is Setup {
         durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -312,6 +393,7 @@ contract TestPortfolioAllocate is Setup {
         durationConfig(uint16(bound(duration, MIN_DURATION, MIN_DURATION + 100)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -326,6 +408,7 @@ contract TestPortfolioAllocate is Setup {
         durationConfig(uint16(bound(duration, MAX_DURATION - 100, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -340,6 +423,7 @@ contract TestPortfolioAllocate is Setup {
         volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -356,6 +440,7 @@ contract TestPortfolioAllocate is Setup {
         )
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -372,6 +457,7 @@ contract TestPortfolioAllocate is Setup {
         )
         useActor
         usePairTokens(500 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         vm.assume(liquidity > 0);
@@ -383,12 +469,19 @@ contract TestPortfolioAllocate is Setup {
         (uint128 expectedA, uint128 expectedQ) =
             subject().getLiquidityDeltas(ghost().poolId, int128(amount));
         uint256 prev = ghost().pool().liquidity;
+        (uint256 prevA, uint256 prevQ) = (
+            ghost().asset().to_token().balanceOf(address(subject())),
+            ghost().quote().to_token().balanceOf(address(subject()))
+        );
+
         subject().multiprocess(
             FVMLib.encodeAllocateOrDeallocate({
                 shouldAllocate: true,
                 useMax: uint8(0),
                 poolId: xid,
-                deltaLiquidity: amount
+                deltaLiquidity: amount,
+                deltaQuote: type(uint128).max,
+                deltaAsset: type(uint128).max
             })
         );
 
@@ -403,13 +496,22 @@ contract TestPortfolioAllocate is Setup {
             ghost().reserve(ghost().quote().to_addr())
         );
 
-        assertEq(postA, expectedA, "pool asset balance");
-        assertEq(postQ, expectedQ, "pool quote balance");
+        // Rounding up the scaled down reserves ensures the physical balances are
+        // always greater than or equal to the reserve values for this test.
+        // If they round up to a value which is greater than the physical balance,
+        // it means the reserves have more than the physical balance, breaking our core
+        // invariant which checks the difference of physical to reserve balance always being
+        // positive.
+        postR_A = postR_A.scaleFromWadUp(ghost().asset().to_token().decimals());
+        postR_Q = postR_Q.scaleFromWadUp(ghost().quote().to_token().decimals());
+
+        assertApproxEqAbs(postA, prevA + expectedA, 1, "pool asset balance"); // Can be 1 wei off due to rounding in getLiquidityAmounts.
+        assertApproxEqAbs(postQ, prevQ + expectedQ, 1, "pool quote balance"); // Can be 1 wei off due to rounding in getLiquidityAmounts.
         assertEq(postR_A, postA, "pool asset reserve");
         assertEq(postR_Q, postQ, "pool quote reserve");
         assertEq(post, prev + amount, "pool.liquidity");
         assertEq(
-            ghost().pool().liquidity,
+            ghost().pool().liquidity - BURNED_LIQUIDITY,
             ghost().position(actor()).freeLiquidity,
             "position.freeLiquidity != pool.liquidity"
         );

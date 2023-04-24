@@ -77,7 +77,7 @@ forge test --match-contract TestRMM01
 | ------------- | ----------- | --------- |
 | ChainSecurity | 8-weeks     | Completed |
 | Trail of Bits | 8-weeks     | Completed |
-| Spearbit      | 5-weeks     | Scheduled |
+| Spearbit      | 5-weeks     | Completed |
 
 
 ## Contributing

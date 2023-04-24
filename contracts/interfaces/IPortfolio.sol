@@ -10,24 +10,6 @@ interface IPortfolioEvents {
     event Deposit(address indexed account, uint256 amount);
 
     /**
-     * @notice Assigns `amount` of `token` to `account`.
-     * @dev Emitted on `deallocate`, `swap`, or `fund`.
-     * @param amount Quantity of token in token's native decimal units.
-     */
-    event IncreaseUserBalance(
-        address indexed account, address indexed token, uint256 amount
-    );
-
-    /**
-     * @notice Unassigns `amount` of `token` from `account`.
-     * @dev Emitted on `allocate`, `swap`, or `draw`.
-     * @param amount Quantity of token in token's native decimal units.
-     */
-    event DecreaseUserBalance(
-        address indexed account, address indexed token, uint256 amount
-    );
-
-    /**
      * @notice Assigns an additional `amount` of `token` to Portfolio's internally tracked balance.
      * @dev Emitted on `swap`, `allocate`, and when a user is gifted surplus tokens that were sent to the contract.
      * @param amount Quantity of token in token's native decimal units.
@@ -96,18 +78,6 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @notice Reduces `feeAssetDec` amount of `asset` and `feeQuoteDec` amount of `quote` from the position's state.
-     */
-    event Collect(
-        uint64 poolId,
-        address indexed account,
-        uint256 feeAssetDec,
-        address indexed asset,
-        uint256 feeQuoteDec,
-        address indexed quote
-    );
-
-    /**
      * @notice Emitted on pair creation.
      */
     event CreatePair(
@@ -119,43 +89,46 @@ interface IPortfolioEvents {
     );
 
     /**
-     * @param price Estimated price of the initialized pool in WAD units.
+     * @dev Emitted on pool creation.
      */
     event CreatePool(
         uint64 indexed poolId,
-        bool isMutable,
         address indexed asset,
         address indexed quote,
-        uint256 price
+        address controller,
+        uint128 maxPrice,
+        uint16 jit,
+        uint16 fee,
+        uint16 duration,
+        uint16 volatility,
+        uint16 priorityFee
     );
 
     /**
      * @dev Emitted on updating the `protocolFee` state value.
      */
     event UpdateProtocolFee(uint256 prevFee, uint256 nextFee);
+
+    /**
+     * @dev Emitted when the REGISTRY claims protocol fees.
+     */
+    event ClaimFees(address indexed token, uint256 amount);
 }
 
 interface IPortfolioGetters {
     // ===== Account Getters ===== //
-    /**
-     * @dev Internally owned balance of `token` of `owner`.
-     * @return Balance held, in native `token` decimal units.
-     */
-    function getBalance(
-        address owner,
-        address token
-    ) external view returns (uint256);
 
     /**
      * @dev Internally tracked global balance of all `token`s assigned to an address or a pool.
-     * @return Global balance held, in native `token` decimal units.
+     * @return Global balance held in WAD units.
      */
     function getReserve(address token) external view returns (uint256);
 
     /**
      * @notice Difference of `token.balanceOf(this)` and internally tracked reserve balance.
      * @dev Critical system invariant. Must always return greater than or equal to zero.
-     * @custom:example
+     * @return Net balance held in WAD units.
+     * @custom:example Assumes token is 18 decimals.
      * ```
      * uint256 previousReserve = getReserve(token);
      * uint256 previousBalance = token.balanceOf(portfolio);
@@ -226,9 +199,6 @@ interface IPortfolioGetters {
             uint128 liquidity,
             uint32 lastTimestamp,
             address controller,
-            uint256 invariantGrowthGlobal,
-            uint256 feeGrowthGlobalAsset,
-            uint256 feeGrowthGlobalQuote,
             PortfolioCurve memory,
             PortfolioPair memory
         );
@@ -236,25 +206,15 @@ interface IPortfolioGetters {
     function positions(
         address owner,
         uint64 poolId
-    )
-        external
-        view
-        returns (
-            uint128 freeLiquidity,
-            uint32 lastTimestamp,
-            uint256 invariantGrowthLast,
-            uint256 feeGrowthAssetLast,
-            uint256 feeGrowthQuoteLast,
-            uint128 tokensOwedAsset,
-            uint128 tokensOwedQuote,
-            uint128 invariantOwed
-        );
+    ) external view returns (uint128 freeLiquidity, uint32 lastTimestamp);
 
     // ===== Portfolio View ===== //
 
     /**
      * @dev Computes amount of `deltaAsset` and `deltaQuote` that must be paid for to
      * mint `deltaLiquidity`.
+     * @return deltaAsset Real quantity of `asset` tokens underlying `deltaLiquidity`, in native decimal units.
+     * @return deltaQuote Real quantity of `quote` tokens underlying `deltaLiquidity`, in native decimal units.
      */
     function getLiquidityDeltas(
         uint64 poolId,
@@ -285,11 +245,11 @@ interface IPortfolioGetters {
         returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
-     * @dev Amount of tokens in native token decimals per WAD liquidity.
-     * @return deltaAsset Quantity of `asset` tokens in wad units.
-     * @return deltaQuote Quantity of `quote` tokens in wad units.
+     * @dev Amount of tokens in native token decimals.
+     * @return deltaAsset Quantity of `asset` tokens in native decimal units.
+     * @return deltaQuote Quantity of `quote` tokens in native decimal units.
      */
-    function getVirtualReservesPerLiquidity(uint64 poolId)
+    function getVirtualReservesDec(uint64 poolId)
         external
         view
         returns (uint128 deltaAsset, uint128 deltaQuote);
@@ -300,12 +260,14 @@ interface IPortfolioGetters {
      * @dev Computes an amount out of tokens given an `amountIn`.
      * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
+     * @param swapper Address that will execute the swap.
      * @return amountOut of tokens in native token decimal units.
      */
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
-        uint256 amountIn
+        uint256 amountIn,
+        address swapper
     ) external view returns (uint256);
 
     /**
@@ -340,24 +302,6 @@ interface IPortfolioActions {
     function multiprocess(bytes calldata data) external payable;
 
     /**
-     * @notice Assigns `amount` of `token` to `msg.sender` internal balance.
-     * @dev Uses `IERC20.transferFrom`.
-     */
-    function fund(address token, uint256 amount) external;
-
-    /**
-     * @notice Unassigns `amount` of `token` from `msg.sender` and transfers it to the `to` address.
-     * @dev Uses `IERC20.transfer`.
-     */
-    function draw(address token, uint256 amount, address to) external;
-
-    /**
-     * @notice Deposits ether into the `WETH` contract and credits `msg.sender` the received WETH.
-     * @dev Amount of ether must be sent as `msg.value`, the ether will be wrapped.
-     */
-    function deposit() external payable;
-
-    /**
      * @notice Updates the parameters of the pool `poolId`.
      * @dev The sender must be the pool controller, leaving a function parameter
      * as '0' will not change the pool parameter.
@@ -377,6 +321,11 @@ interface IPortfolioActions {
      * @param fee Must be within the range: 4 <= x <= 20.
      */
     function setProtocolFee(uint256 fee) external;
+
+    /**
+     * @dev Transfers fees earned in `amount` of `token` to `REGISTRY` address.
+     */
+    function claimFee(address token, uint256 amount) external;
 }
 
 interface IPortfolio is

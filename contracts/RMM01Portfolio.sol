@@ -14,6 +14,7 @@ contract RMM01Portfolio is PortfolioVirtual {
     using AssemblyLib for uint256;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
+    using FixedPointMathLib for uint128;
     using FixedPointMathLib for uint256;
 
     constructor(
@@ -28,7 +29,10 @@ contract RMM01Portfolio is PortfolioVirtual {
      * movement.
      * @custom:reverts Underflows if current reserves of output token is less then next reserves.
      */
-    function _getLatestInvariantAndVirtualPrice(uint64 poolId)
+    function _getLatestInvariantAndVirtualPrice(
+        uint64 poolId,
+        bool sellAsset
+    )
         internal
         view
         returns (uint256 price, int256 invariant, uint256 updatedTau)
@@ -36,13 +40,34 @@ contract RMM01Portfolio is PortfolioVirtual {
         PortfolioPool storage pool = pools[poolId];
         updatedTau = pool.computeTau(block.timestamp);
 
-        (uint256 x, uint256 y) = pool.getVirtualPoolReservesPerLiquidityInWad();
+        uint256 reserveXPerLiquidity = pool.virtualX;
+        uint256 reserveYPerLiquidity = pool.virtualY;
+
+        // The reserve which sends tokens out in this swap must be rounded up
+        // to avoid the scenario that the remainder in a truncated output amount
+        // is not stolen in the swap.
+        if (sellAsset) {
+            // Swap X -> Y, Y is output, so round up Y.
+            reserveXPerLiquidity =
+                reserveXPerLiquidity.divWadDown(pool.liquidity);
+            reserveYPerLiquidity = reserveYPerLiquidity.divWadUp(pool.liquidity);
+        } else {
+            // Swap Y -> X, X is output, so round up X.
+            reserveXPerLiquidity = reserveXPerLiquidity.divWadUp(pool.liquidity);
+            reserveYPerLiquidity =
+                reserveYPerLiquidity.divWadDown(pool.liquidity);
+        }
+
         invariant = int128(
-            pool.invariantOf({R_x: x, R_y: y, timeRemainingSec: updatedTau})
+            pool.invariantOf({
+                R_x: reserveXPerLiquidity,
+                R_y: reserveYPerLiquidity,
+                timeRemainingSec: updatedTau
+            })
         );
 
         price = RMM01Lib.getPriceWithX({
-            R_x: x,
+            R_x: reserveXPerLiquidity,
             stk: pool.params.maxPrice,
             vol: pool.params.volatility,
             tau: updatedTau
@@ -50,44 +75,12 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function _feeSavingEffects(
+    function _beforeSwapEffects(
         uint64 poolId,
-        Iteration memory iteration
-    ) internal override returns (bool) {
-        // =---= Swap Effects =---= //
-        if (msg.sender == pools[poolId].controller) {
-            int256 delta = iteration.nextInvariant - iteration.prevInvariant;
-            uint256 deltaAbs = uint256(delta < 0 ? -delta : delta);
-
-            // Apply priority invariant growth if invariant changed positively.
-            if (deltaAbs != 0) {
-                _syncInvariantGrowthAccumulator(
-                    deltaAbs.divWadDown(iteration.liquidity)
-                );
-            }
-        }
-
-        // Do not re-invest fees if next invariant is positive.
-        if (iteration.nextInvariant > 0) {
-            _syncFeeGrowthAccumulator(
-                FixedPointMathLib.divWadDown(
-                    iteration.feeAmount, iteration.liquidity
-                )
-            );
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /// @inheritdoc Objective
-    function _beforeSwapEffects(uint64 poolId)
-        internal
-        override
-        returns (bool, int256)
-    {
-        (, int256 invariant,) = _getLatestInvariantAndVirtualPrice(poolId);
+        bool sellAsset
+    ) internal override returns (bool, int256) {
+        (, int256 invariant,) =
+            _getLatestInvariantAndVirtualPrice(poolId, sellAsset);
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
         // Buffer for post-maturity swaps would go here.
@@ -127,21 +120,15 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint256 reserveY,
         uint256 timestamp
     ) public view override returns (bool, int256 nextInvariant) {
-        uint256 tau = pools[poolId].computeTau(timestamp); // Computes the time until `timestamp`.
+        // Computes the time until pool maturity or zero if expired.
+        uint256 tau = pools[poolId].computeTau(timestamp);
         nextInvariant = RMM01Lib.invariantOf({
             self: pools[poolId],
             R_x: reserveX,
             R_y: reserveY,
             timeRemainingSec: tau
         });
-
-        // Invariant for RMM01 is denominated in the `quote` token.
-        int256 liveInvariantWad =
-            invariant.scaleFromWadDownSigned(pools[poolId].pair.decimalsQuote);
-        int256 nextInvariantWad = nextInvariant.scaleFromWadDownSigned(
-            pools[poolId].pair.decimalsQuote
-        );
-        return (nextInvariantWad >= liveInvariantWad, nextInvariant);
+        return (nextInvariant >= invariant, nextInvariant);
     }
 
     /// @inheritdoc Objective
@@ -181,13 +168,15 @@ contract RMM01Portfolio is PortfolioVirtual {
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
-        uint256 amountIn
+        uint256 amountIn,
+        address swapper
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
+            swapper: swapper
         });
     }
 
@@ -198,6 +187,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         override
         returns (uint256 price)
     {
-        (price,,) = _getLatestInvariantAndVirtualPrice(poolId);
+        (price,,) = _getLatestInvariantAndVirtualPrice(poolId, true);
     }
 }

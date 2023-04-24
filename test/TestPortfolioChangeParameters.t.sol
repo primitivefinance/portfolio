@@ -80,7 +80,9 @@ contract TestPortfolioChangeParameters is Setup {
         (, bytes memory revertData) = curve.checkParameters();
         assertEq(
             revertData,
-            abi.encodeWithSelector(InvalidFee.selector, curve.priorityFee)
+            abi.encodeWithSelector(
+                InvalidPriorityFee.selector, curve.priorityFee
+            )
         );
         vm.expectRevert(revertData);
         subject().changeParameters(

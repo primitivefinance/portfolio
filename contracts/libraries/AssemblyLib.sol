@@ -3,6 +3,7 @@ pragma solidity 0.8.13;
 
 error InvalidLiquidity();
 error InvalidDays();
+error DataTooLong();
 
 uint256 constant SECONDS_PER_YEAR = 31556953 seconds;
 uint256 constant SECONDS_PER_DAY = 86_400 seconds;
@@ -64,9 +65,7 @@ library AssemblyLib {
     }
 
     /**
-     * @dev Adds a signed `delta` to an unsigned `input` by using the sign-agnostic 256-bit type used in yul.
-     * Checks for overflow manually and reverts with `InvalidLiquidity()`, because this function is used to
-     * change liquidity in a position or pool.
+     * @dev Adds a signed `delta` to an unsigned `input`.
      * @custom:example
      * ```
      * uint128 output = addSignedDelta(uint128(15), -int128(5));
@@ -77,14 +76,10 @@ library AssemblyLib {
         uint128 input,
         int128 delta
     ) internal pure returns (uint128 output) {
-        bytes memory revertData =
-            abi.encodeWithSelector(InvalidLiquidity.selector);
-        assembly {
-            output := add(input, delta)
-            // Reverts on overflow.
-            if gt(output, 0xffffffffffffffffffffffffffffffff) {
-                revert(add(32, revertData), mload(revertData))
-            } // 0x1fff9681
+        if (delta > 0) {
+            output = input + uint128(delta);
+        } else {
+            output = input - uint128(-delta);
         }
     }
 
@@ -154,7 +149,14 @@ library AssemblyLib {
      * handles it for us.
      */
     function toBytes16(bytes memory raw) internal pure returns (bytes16 data) {
+        bytes4 errorSelector = DataTooLong.selector;
+
         assembly {
+            if gt(mload(raw), 16) {
+                mstore(0, errorSelector)
+                revert(0, 4)
+            }
+
             data := mload(add(raw, 32))
             let shift := mul(sub(16, mload(raw)), 8)
             data := shr(shift, data)
@@ -166,7 +168,14 @@ library AssemblyLib {
      * handles it for us.
      */
     function toBytes8(bytes memory raw) internal pure returns (bytes8 data) {
+        bytes4 errorSelector = DataTooLong.selector;
+
         assembly {
+            if gt(mload(raw), 8) {
+                mstore(0, errorSelector)
+                revert(0, 4)
+            }
+
             data := mload(add(raw, 32))
             let shift := mul(sub(8, mload(raw)), 8)
             data := shr(shift, data)
@@ -219,23 +228,7 @@ library AssemblyLib {
         bytes1 upper,
         bytes1 lower
     ) internal pure returns (bytes1 data) {
-        data = (upper << 4) | lower;
-    }
-
-    /**
-     * @dev Converts an array of bytes into an uint128, the array must adhere
-     * to the the following format:
-     * - First byte: Amount of trailing zeros.
-     * - Rest of the array: A hexadecimal number.
-     */
-    function toAmount(bytes calldata raw)
-        internal
-        pure
-        returns (uint128 amount)
-    {
-        uint8 power = uint8(raw[0]);
-        amount = uint128(toBytes16(raw[1:raw.length]));
-        if (power != 0) amount = amount * uint128(10 ** power);
+        data = upper << 4 | (lower & 0x0F);
     }
 
     function fromAmount(uint128 amount)
@@ -274,16 +267,6 @@ library AssemblyLib {
         }
     }
 
-    function scaleFromWadUp(
-        uint256 amountWad,
-        uint256 decimals
-    ) internal pure returns (uint256 outputDec) {
-        uint256 factor = computeScalar(decimals);
-        assembly {
-            outputDec := add(div(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
-        }
-    }
-
     function scaleFromWadDown(
         uint256 amountWad,
         uint256 decimals
@@ -291,16 +274,6 @@ library AssemblyLib {
         uint256 factor = computeScalar(decimals);
         assembly {
             outputDec := div(amountWad, factor)
-        }
-    }
-
-    function scaleFromWadUpSigned(
-        int256 amountWad,
-        uint256 decimals
-    ) internal pure returns (int256 outputDec) {
-        int256 factor = int256(computeScalar(decimals));
-        assembly {
-            outputDec := add(sdiv(sub(amountWad, 1), factor), 1) // ((a-1) / b) + 1
         }
     }
 
@@ -312,6 +285,16 @@ library AssemblyLib {
         assembly {
             outputDec := sdiv(amountWad, factor)
         }
+    }
+
+    function scaleFromWadUp(
+        uint256 amountWad,
+        uint256 decimals
+    ) internal pure returns (uint256 outputDec) {
+        if (amountWad == 0) return 0;
+
+        uint256 factor = computeScalar(decimals);
+        outputDec = (amountWad - 1) / factor + 1; // ((a-1) / b) + 1
     }
 
     /*

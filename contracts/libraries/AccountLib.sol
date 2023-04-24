@@ -36,8 +36,6 @@ using {
     __wrapEther__,
     dangerousFund,
     cache,
-    credit,
-    debit,
     decrease,
     increase,
     reset,
@@ -49,11 +47,8 @@ using {
 error EtherTransferFail(); // 0x75f42683
 error InsufficientReserve(uint256 amount, uint256 delta); // 0x315276c9
 error InvalidBalance(); // 0xc52e3eff
-error AlreadySettled();
 
 struct AccountSystem {
-    // user -> token -> internal balance.
-    mapping(address => mapping(address => uint256)) balances;
     // token -> virtual reserve.
     mapping(address => uint256) reserves;
     // token -> cached status.
@@ -79,10 +74,8 @@ function __balanceOf__(address token, address account) view returns (uint256) {
  * @dev Must validate `weth` is real weth.
  */
 function __wrapEther__(AccountSystem storage self, address weth) {
-    if (msg.value > 0) {
-        self.touch(weth);
-        IWETH(weth).deposit{value: msg.value}();
-    }
+    self.touch(weth);
+    IWETH(weth).deposit{value: msg.value}();
 }
 
 /**
@@ -115,39 +108,6 @@ function dangerousFund(
 }
 
 /**
- * @dev Increases an `owner`'s spendable balance.
- */
-function credit(
-    AccountSystem storage self,
-    address owner,
-    address token,
-    uint256 amount
-) {
-    self.touch(token);
-    self.balances[owner][token] += amount;
-}
-
-/**
- * @dev Decreases an `owner`'s spendable balance.
- */
-function debit(
-    AccountSystem storage self,
-    address owner,
-    address token,
-    uint256 owed
-) returns (uint256 paid, uint256 remainder) {
-    self.touch(token);
-    uint256 balance = self.balances[owner][token];
-    paid = AssemblyLib.min(balance, owed);
-
-    unchecked {
-        // Cannot underflow as `paid` is enforced to be the smaller of `balance` or `paid`
-        self.balances[owner][token] -= paid;
-        remainder = owed - paid;
-    }
-}
-
-/**
  * @dev Actives a token and increases the reserves. Settlement will pick up this activated token.
  */
 function increase(AccountSystem storage self, address token, uint256 amount) {
@@ -173,18 +133,14 @@ function settle(
     AccountSystem storage self,
     address token,
     address account
-) returns (uint256 credited, uint256 debited, uint256 remainder) {
+) returns (uint256 credited, uint256 remainder) {
     int256 net = self.getNetBalance(token, account);
     if (net > 0) {
+        // Token remaining in internal balance or untracked tokens to transfer out.
         credited = uint256(net);
-        // unaccounted for tokens, e.g. transferred directly into Portfolio.
-        self.credit(msg.sender, token, uint256(net)); // gift to `msg.sender`.
-        self.reserves[token] += uint256(net); // add the difference back to reserves, so net is zero.
     } else if (net < 0) {
         // missing tokens that must be paid for or transferred in.
         remainder = uint256(-net);
-        (debited, remainder) = self.debit(msg.sender, token, remainder);
-        if (debited > 0) self.reserves[token] -= debited; // using a balance means tokens are in contract already.
     }
 
     delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of the transaction.
@@ -212,7 +168,7 @@ function reset(AccountSystem storage self) {
 }
 
 /**
- * @dev Used to check if a token was already activated after being interacted with again.
+ * @dev Set the cache status of a token.
  */
 function cache(AccountSystem storage self, address token, bool status) {
     self.cached[token] = status;
@@ -220,13 +176,24 @@ function cache(AccountSystem storage self, address token, bool status) {
 
 /**
  * @dev Computes surplus (positive) or deficit (negative) in actual tokens compared to tracked amounts.
+ * @return net Net balance of physical - virtual tokens in native token decimals.
  */
 function getNetBalance(
     AccountSystem storage self,
     address token,
     address account
 ) view returns (int256 net) {
-    uint256 internalBalance = self.reserves[token];
+    uint256 internalBalanceWad = self.reserves[token];
+    uint256 internalBalance =
+        AssemblyLib.scaleFromWadUp(internalBalanceWad, IERC20(token).decimals());
     uint256 physicalBalance = __balanceOf__(token, account);
+
+    // Before casting `internalBalance` into an `int256`,
+    // we must ensure it fits within. If it does not, we revert.
+    if (internalBalance > uint256(type(int256).max)) revert();
+
+    // Also checking the physical balance.
+    if (physicalBalance > uint256(type(int256).max)) revert();
+
     net = int256(physicalBalance) - int256(internalBalance);
 }
