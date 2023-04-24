@@ -9,6 +9,7 @@ import "./libraries/AccountLib.sol" as Account;
 
 using AssemblyLib for uint256;
 using FixedPointMathLib for uint256;
+using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
 using SafeCastLib for uint256;
 
@@ -23,8 +24,8 @@ using {
     changePoolLiquidity,
     changePoolParameters,
     exists,
-    getVirtualReservesPerLiquidity,
-    getVirtualPoolReservesPerLiquidityInWad,
+    getVirtualReservesDec,
+    getVirtualReservesWad,
     getPoolLiquidityDeltas,
     getPoolMaxLiquidity,
     getPoolReserves,
@@ -34,6 +35,8 @@ using {
     computeTau
 } for PortfolioPool global;
 
+uint256 constant BURNED_LIQUIDITY = 1e9;
+uint256 constant INIT_LIQUIDITY = 1e18;
 uint256 constant PERCENTAGE = 10_000;
 uint256 constant MIN_MAX_PRICE = 1;
 uint256 constant MAX_MAX_PRICE = type(uint128).max;
@@ -47,6 +50,7 @@ uint256 constant JUST_IN_TIME_MAX = 600 seconds;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
 error DrawBalance();
+error InsufficientLiquidity();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
@@ -100,8 +104,8 @@ struct PortfolioCurve {
 }
 
 struct PortfolioPool {
-    uint128 virtualX; // WAD x per WAD liquidity.
-    uint128 virtualY; // WAD y per WAD liquidity.
+    uint128 virtualX; // Total X reserves in WAD units for all liquidity.
+    uint128 virtualY; // Total Y reserves in WAD units for all liquidity.
     uint128 liquidity; // Total supply of liquidity.
     uint32 lastTimestamp; // The block.timestamp of the last swap.
     address controller; // Address that can change fee, priorityFee, or jit params.
@@ -110,37 +114,38 @@ struct PortfolioPool {
 }
 
 struct PortfolioPosition {
-    uint128 freeLiquidity;
-    uint32 lastTimestamp;
+    uint128 freeLiquidity; // Liquidity owned by the position owner in WAD units.
+    uint32 lastTimestamp; // The block.timestamp of the last position update.
 }
 
 struct ChangeLiquidityParams {
     address owner;
     uint64 poolId;
     uint256 timestamp;
-    uint256 deltaAsset;
-    uint256 deltaQuote;
-    address tokenAsset;
-    address tokenQuote;
-    int128 deltaLiquidity;
+    uint256 deltaAsset; // Quantity of asset tokens in WAD units to add or remove.
+    uint256 deltaQuote; // Quantity of quote tokens in WAD units to add or remove.
+    address tokenAsset; // Address of the asset token.
+    address tokenQuote; // Address of the quote token.
+    int128 deltaLiquidity; // Quantity of liquidity tokens in WAD units to add or remove.
 }
 
 struct Order {
-    uint8 useMax;
+    uint8 useMax; // Use the transiently stored `balance` for the `input`.
     uint64 poolId;
-    uint128 input;
-    uint128 output;
-    uint8 sellAsset;
+    uint128 input; // Quantity of asset tokens in WAD units to swap in, adding to reserves.
+    uint128 output; // Quantity of quote tokens in WAD units to swap out, removing from reserves.
+    uint8 sellAsset; // 0 = quote -> asset, 1 = asset -> quote.
 }
 
 struct Iteration {
-    int256 prevInvariant;
-    int256 nextInvariant;
-    uint256 virtualX;
-    uint256 virtualY;
-    uint256 remainder;
-    uint256 feeAmount;
-    uint256 liquidity;
+    int256 prevInvariant; // Invariant of the pool before the swap, after timestamp update.
+    int256 nextInvariant; // Invariant of the pool after the swap.
+    uint256 virtualX; // Virtual X reserves in WAD units for all liquidity.
+    uint256 virtualY; // Virtual Y reserves in WAD units for all liquidity.
+    uint256 remainder; // Remainder of input tokens to swap in, in WAD units.
+    uint256 feeAmount; // Fee amount in WAD units.
+    uint256 protocolFeeAmount; // WAD
+    uint256 liquidity; // Total supply of liquidity in WAD units.
     uint256 input;
     uint256 output;
 }
@@ -154,8 +159,9 @@ struct SwapState {
 
 struct Payment {
     address token;
-    uint256 amount;
-    uint256 balance;
+    uint256 amountTransferTo; // Amount to transfer to the `msg.sender` in `settlement`, in WAD.
+    uint256 amountTransferFrom; // Amount to transfer from the `msg.sender` in `settlement`, in WAD.
+    uint256 balance; // Current `token.balanceOf(address(this))` in `settlement`, in native token decimals.
 }
 
 // ===== Effects ===== //
@@ -193,7 +199,9 @@ function changePositionLiquidity(
 // ===== View ===== //
 
 /**
- * @dev Quantity of tokens in units of their native decimals deallocated if all liquidity was removed.
+ * @dev Quantity of tokens in WAD units if all liquidity was removed.
+ * @return reserveAsset Real `asset` tokens removed from pool, denominated in WAD.
+ * @return reserveQuote Real `quote` tokens removed from pool, denominated in WAD.
  */
 function getPoolReserves(PortfolioPool memory self)
     pure
@@ -201,31 +209,35 @@ function getPoolReserves(PortfolioPool memory self)
 {
     // Check if -`self.liquidity` fits within an int128
     if (self.liquidity > 2 ** 127 - 1) revert InvalidNegativeLiquidity();
-    return self.getPoolLiquidityDeltas(-int128(self.liquidity)); // Rounds down.
+    return self.getPoolLiquidityDeltas(
+        -int128(self.liquidity == 0 ? uint128(INIT_LIQUIDITY) : self.liquidity)
+    ); // Rounds down.
 }
 
 /**
  * @dev Maximum amount of liquidity minted given amounts of each token.
- * @param deltaAsset Quantity of `asset` tokens denominated in their native decimals.
- * @param deltaQuote Quantity of `quote` tokens denominated in their native decimals.
+ * @param deltaAsset Up to quantity of `asset` tokens used to mint liquidity, denominated in WAD.
+ * @param deltaQuote Up to quantity of `quote` tokens used to mint liquidity, denominated in WAD.
  */
 function getPoolMaxLiquidity(
     PortfolioPool memory self,
     uint256 deltaAsset,
     uint256 deltaQuote
 ) pure returns (uint128 deltaLiquidity) {
-    deltaAsset = deltaAsset.scaleToWad(self.pair.decimalsAsset).safeCastTo128();
-    deltaQuote = deltaQuote.scaleToWad(self.pair.decimalsQuote).safeCastTo128();
+    uint256 totalLiquidity = self.liquidity;
+    if (totalLiquidity == 0) totalLiquidity = INIT_LIQUIDITY; // use 1E18 of liquidity
 
     (uint256 amountAssetWad, uint256 amountQuoteWad) =
-        self.getVirtualPoolReservesPerLiquidityInWad();
-    uint256 liquidity0 = deltaAsset.divWadDown(amountAssetWad); // L_0 = X / (X / L)
-    uint256 liquidity1 = deltaQuote.divWadDown(amountQuoteWad); // L_1 = Y / (Y / L)
+        self.getVirtualReservesWad();
+    uint256 liquidity0 = deltaAsset.mulDivDown(totalLiquidity, amountAssetWad); // L_0 = dX * L / X
+    uint256 liquidity1 = deltaQuote.mulDivDown(totalLiquidity, amountQuoteWad); // L_1 = dY * L / Y
     deltaLiquidity = AssemblyLib.min(liquidity0, liquidity1).safeCastTo128();
 }
 
 /**
  * @dev Rounds positive deltas up. Rounds negative deltas down.
+ * @return deltaAsset Real `asset` tokens underlying `deltaLiquidity`, denominated in WAD.
+ * @return deltaQuote Real `quote` tokens underlying `deltaLiquidity`, denominated in WAD.
  */
 function getPoolLiquidityDeltas(
     PortfolioPool memory self,
@@ -233,42 +245,45 @@ function getPoolLiquidityDeltas(
 ) pure returns (uint128 deltaAsset, uint128 deltaQuote) {
     if (deltaLiquidity == 0) return (deltaAsset, deltaQuote);
 
-    (uint256 amountAssetWad, uint256 amountQuoteWad) =
-        self.getVirtualPoolReservesPerLiquidityInWad();
-    uint256 scaleDownFactorAsset = AssemblyLib.computeScalar(
-        self.pair.decimalsAsset
-    ) * FixedPointMathLib.WAD;
-    uint256 scaleDownFactorQuote = AssemblyLib.computeScalar(
-        self.pair.decimalsQuote
-    ) * FixedPointMathLib.WAD;
-
     uint256 delta;
+    uint256 totalLiquidity = self.liquidity;
+    (uint256 amountAssetWad, uint256 amountQuoteWad) =
+        self.getVirtualReservesWad();
+
+    // Pre-allocate pools initialize reserves to 1E18 of liquidity to
+    // compute the first allocate quantities.
+    if (self.liquidity == 0) {
+        totalLiquidity = 1e18;
+    }
+
     if (deltaLiquidity > 0) {
+        // If allocating liquidity, round token amounts up.
         delta = uint128(deltaLiquidity);
         deltaAsset =
-            amountAssetWad.mulDivUp(delta, scaleDownFactorAsset).safeCastTo128();
+            delta.mulDivUp(amountAssetWad, totalLiquidity).safeCastTo128();
         deltaQuote =
-            amountQuoteWad.mulDivUp(delta, scaleDownFactorQuote).safeCastTo128();
+            delta.mulDivUp(amountQuoteWad, totalLiquidity).safeCastTo128();
     } else {
+        // If deallocating liquidity, round token amounts down.
         delta = uint128(-deltaLiquidity);
-        deltaAsset = amountAssetWad.mulDivDown(delta, scaleDownFactorAsset)
-            .safeCastTo128();
-        deltaQuote = amountQuoteWad.mulDivDown(delta, scaleDownFactorQuote)
-            .safeCastTo128();
+        deltaAsset =
+            delta.mulDivDown(amountAssetWad, totalLiquidity).safeCastTo128();
+        deltaQuote =
+            delta.mulDivDown(amountQuoteWad, totalLiquidity).safeCastTo128();
     }
 }
 
 /**
- * @dev Scales virtual reserves per liquidity from WAD to native token decimal units.
- * @return amountAssetDec Quantity of `asset` tokens in native decimal units per WAD unit of liquidity.
- * @return amountQuoteDec Quantity of `quote` tokens in native decimal units per WAD unit of liquidity.
+ * @dev Scales virtual reserves from WAD to native token decimal units.
+ * @return amountAssetDec Virtual `asset` tokens tracked, scaled to native decimal units.
+ * @return amountQuoteDec Virtual `quote` tokens tracked, scaled to native decimal units.
  */
-function getVirtualReservesPerLiquidity(PortfolioPool memory self)
+function getVirtualReservesDec(PortfolioPool memory self)
     pure
     returns (uint128 amountAssetDec, uint128 amountQuoteDec)
 {
     (uint256 amountAssetWad, uint256 amountQuoteWad) =
-        self.getVirtualPoolReservesPerLiquidityInWad();
+        self.getVirtualReservesWad();
     amountAssetDec =
         amountAssetWad.scaleFromWadDown(self.pair.decimalsAsset).safeCastTo128();
     amountQuoteDec =
@@ -276,11 +291,11 @@ function getVirtualReservesPerLiquidity(PortfolioPool memory self)
 }
 
 /**
- * @dev Virtual reserves of tokens in WAD units per WAD units of liquidity.
- * @return amountAssetWad Quantity of `asset` tokens in WAD units per WAD of liquidity.
- * @return amountQuoteWad Quantity of `quote` tokens in WAD units per WAD of liquidity.
+ * @dev Virtual reserves of tokens in WAD units.
+ * @return amountAssetWad Virtual `asset` tokens tracked, in WAD units.
+ * @return amountQuoteWad Virtual `quote` tokens tracked, in WAD units.
  */
-function getVirtualPoolReservesPerLiquidityInWad(PortfolioPool memory self)
+function getVirtualReservesWad(PortfolioPool memory self)
     pure
     returns (uint128 amountAssetWad, uint128 amountQuoteWad)
 {

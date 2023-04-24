@@ -24,9 +24,11 @@ interface AccountLike {
  * pools.
  */
 contract TestRMM01PortfolioInvariants is Setup {
+    using AssemblyLib for uint256;
     /**
      * @dev Helper to manage the pools that are being interacted with via the handlers.
      */
+
     InvariantGhostState private _ghostInvariant;
 
     HandlerPortfolio internal _portfolio;
@@ -38,14 +40,10 @@ contract TestRMM01PortfolioInvariants is Setup {
         _portfolio = new HandlerPortfolio();
 
         {
-            bytes4[] memory selectors = new bytes4[](6);
-            selectors[0] = HandlerPortfolio.deposit.selector;
-            selectors[1] = HandlerPortfolio.fund_asset.selector;
-            selectors[2] = HandlerPortfolio.fund_quote.selector;
-            selectors[3] = HandlerPortfolio.create_pool.selector;
-            selectors[4] = HandlerPortfolio.allocate.selector;
-            selectors[5] = HandlerPortfolio.deallocate.selector;
-            //selectors[6] = HandlerPortfolio.random_processes.selector;
+            bytes4[] memory selectors = new bytes4[](3);
+            selectors[0] = HandlerPortfolio.create_pool.selector;
+            selectors[1] = HandlerPortfolio.allocate.selector;
+            selectors[2] = HandlerPortfolio.deallocate.selector;
             targetSelector(
                 FuzzSelector({addr: address(_portfolio), selectors: selectors})
             );
@@ -74,14 +72,18 @@ contract TestRMM01PortfolioInvariants is Setup {
     // ===== Invariants ===== //
 
     function invariant_asset_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical,) =
+        (uint256 reserve, uint256 physical) =
             getBalances(ghost().asset().to_addr());
+        reserve =
+            reserve.scaleFromWadDown(ghost().asset().to_token().decimals());
         assertTrue(physical >= reserve, "invariant-asset-physical-balance");
     }
 
     function invariant_quote_balance_gte_reserves() public {
-        (uint256 reserve, uint256 physical,) =
+        (uint256 reserve, uint256 physical) =
             getBalances(ghost().quote().to_addr());
+        reserve =
+            reserve.scaleFromWadDown(ghost().quote().to_token().decimals());
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
     }
 
@@ -96,6 +98,8 @@ contract TestRMM01PortfolioInvariants is Setup {
         if (pool.liquidity > 0) {
             (uint256 dAsset,) = subject().getPoolReserves(ghost().poolId);
             uint256 bAsset = ghost().physicalBalance(ghost().asset().to_addr());
+            dAsset =
+                dAsset.scaleFromWadDown(ghost().asset().to_token().decimals());
             assertTrue(bAsset >= dAsset, "invariant-virtual-reserves-asset");
         }
     }
@@ -106,6 +110,8 @@ contract TestRMM01PortfolioInvariants is Setup {
         if (pool.liquidity > 0) {
             (, uint256 dQuote) = subject().getPoolReserves(ghost().poolId);
             uint256 bQuote = ghost().physicalBalance(ghost().quote().to_addr());
+            dQuote =
+                dQuote.scaleFromWadDown(ghost().quote().to_token().decimals());
             assertTrue(bQuote >= dQuote, "invariant-virtual-reserves-quote");
         }
     }
@@ -155,28 +161,12 @@ contract TestRMM01PortfolioInvariants is Setup {
     function getBalances(address token)
         internal
         view
-        returns (uint256 reserve, uint256 physical, uint256 balances)
+        returns (uint256 reserve, uint256 physical)
     {
         if (ghost().subject != address(0)) {
             reserve = ghost().reserve(token);
             physical = ghost().physicalBalance(token);
-            balances = getBalanceSum(token);
         }
-    }
-
-    function getBalanceSum(address token)
-        public
-        view
-        virtual
-        returns (uint256)
-    {
-        address[] memory actors = getActors();
-        uint256 sum;
-        for (uint256 x; x != actors.length; ++x) {
-            sum += ghost().balance(actors[x], token);
-        }
-
-        return sum;
     }
 
     function getPositionsLiquiditySum() public view virtual returns (uint256) {

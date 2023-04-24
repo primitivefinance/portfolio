@@ -6,9 +6,6 @@ import "./TestPortfolioAllocate.t.sol";
 import "./TestPortfolioChangeParameters.t.sol";
 import "./TestPortfolioCreatePair.t.sol";
 import "./TestPortfolioCreatePool.t.sol";
-import "./TestPortfolioDeposit.t.sol";
-import "./TestPortfolioDraw.t.sol";
-import "./TestPortfolioFund.t.sol";
 import "./TestPortfolioSwap.t.sol";
 import "./TestPortfolioDeallocate.t.sol";
 
@@ -17,9 +14,6 @@ contract TestRMM01 is
     TestPortfolioChangeParameters,
     TestPortfolioCreatePair,
     TestPortfolioCreatePool,
-    TestPortfolioDeposit,
-    TestPortfolioDraw,
-    TestPortfolioFund,
     TestPortfolioSwap,
     TestPortfolioDeallocate
 {

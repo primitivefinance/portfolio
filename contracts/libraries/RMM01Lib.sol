@@ -72,12 +72,12 @@ library RMM01Lib {
 
         // Uses data.invariant, data.liquidity, and data.remainder to compute next input reserve.
         // Uses next input reserve to compute output reserve.
-        (uint256 prevDep, uint256 nextDep) =
+        (uint256 prevDepTotalWad, uint256 nextDepTotalWad) =
             computeSwapStep(self, data, sellAsset, tau);
 
         // Checks to make sure next reserve decreases and computes the difference in WAD.
-        if (nextDep > prevDep) revert SwapInputTooSmall();
-        data.output += (prevDep - nextDep).mulWadDown(data.liquidity);
+        if (nextDepTotalWad > prevDepTotalWad) revert SwapInputTooSmall();
+        data.output += prevDepTotalWad - nextDepTotalWad;
 
         // Scale down amounts from WAD.
         uint256 outputDec =
@@ -100,19 +100,25 @@ library RMM01Lib {
             ? self.params.priorityFee
             : self.params.fee;
 
-        (data.virtualX, data.virtualY) =
-            self.getVirtualPoolReservesPerLiquidityInWad();
+        data.liquidity = self.liquidity;
+        (data.virtualX, data.virtualY) = self.getVirtualReservesWad();
         tau = self.computeTau(timestamp);
-        data.prevInvariant = invariantOf({
-            self: self,
-            R_x: data.virtualX,
-            R_y: data.virtualY,
-            timeRemainingSec: tau
-        });
+
+        uint256 R_x;
+        uint256 R_y;
+        if (sellAsset) {
+            R_x = data.virtualX.divWadDown(data.liquidity);
+            R_y = data.virtualY.divWadUp(data.liquidity);
+        } else {
+            R_x = data.virtualX.divWadUp(data.liquidity);
+            R_y = data.virtualY.divWadDown(data.liquidity);
+        }
+
+        data.prevInvariant =
+            invariantOf({self: self, R_x: R_x, R_y: R_y, timeRemainingSec: tau});
         data.remainder = amountIn.scaleToWad(
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
-        data.liquidity = self.liquidity;
         data.feeAmount = (data.remainder * fee) / PERCENTAGE;
 
         return (data, tau);
@@ -128,37 +134,45 @@ library RMM01Lib {
         uint256 tau
     ) internal pure returns (uint256 prevDep, uint256 nextDep) {
         uint256 prevInd;
-        uint256 nextInd;
+        uint256 nextIndWadPerLiquidity;
+        uint256 nextDepWadPerLiquidity;
         uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
 
-        // if sellAsset, ind = x && dep = y, else ind = y && dep = x
+        // If sellAsset, ind = x && dep = y, else ind = y && dep = x
+        // These are the total reserves of tokens in the pool scaled to WAD decimals.
         if (sellAsset) {
             (prevInd, prevDep) = (data.virtualX, data.virtualY);
         } else {
             (prevDep, prevInd) = (data.virtualX, data.virtualY);
         }
 
-        nextInd = prevInd
-            + (data.remainder - data.feeAmount).divWadDown(data.liquidity);
+        uint256 deltaInLessFee = data.remainder - data.feeAmount;
+        nextIndWadPerLiquidity = prevInd + deltaInLessFee;
+        nextIndWadPerLiquidity =
+            nextIndWadPerLiquidity.divWadDown(data.liquidity);
 
         // Compute the output of the swap by computing the difference between the dependent reserves.
+        // Uses the next independent reserve in WAD units per 1 WAD of liquidity.
         if (sellAsset) {
-            nextDep = Invariant.getY({
-                R_x: nextInd,
+            nextDepWadPerLiquidity = Invariant.getY({
+                R_x: nextIndWadPerLiquidity,
                 stk: self.params.maxPrice,
                 vol: volatilityWad,
                 tau: tau,
                 inv: data.prevInvariant
             });
         } else {
-            nextDep = Invariant.getX({
-                R_y: nextInd,
+            nextDepWadPerLiquidity = Invariant.getX({
+                R_y: nextIndWadPerLiquidity,
                 stk: self.params.maxPrice,
                 vol: volatilityWad,
                 tau: tau,
                 inv: data.prevInvariant
             });
         }
+
+        // Scales the next dependent per liquidity to total dependent reserves, in WAD units.
+        nextDep = nextDepWadPerLiquidity.mulWadDown(data.liquidity);
     }
 
     /**
@@ -193,7 +207,7 @@ library RMM01Lib {
     // ===== Raw Functions ===== //
 
     /**
-     * @dev Used in `getVirtualPoolReservesPerLiquidityInWad` to compute the virtual amount of assets at the self's price.
+     * @dev Used in `getVirtualReservesWad` to compute the virtual amount of assets at the self's price.
      * @param prc WAD
      * @param stk WAD
      * @param vol percentage

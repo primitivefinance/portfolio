@@ -250,7 +250,7 @@ contract GlobalInvariants is
     }
 
     function pool_get_amounts_wad_returns_safe_bounds() public {
-        // The `getVirtualPoolReservesPerLiquidityInWad` method always returns less than `1e18` for `amountAssetWad` and `pool.params.strike()` for `amountQuoteWad`.
+        // The `getVirtualReservesWad` method always returns less than `1e18` for `amountAssetWad` and `pool.params.strike()` for `amountQuoteWad`.
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
@@ -258,7 +258,7 @@ contract GlobalInvariants is
             PortfolioCurve memory curve = pool.params;
 
             (uint256 amountAssetWad, uint256 amountQuoteWad) =
-                pool.getVirtualPoolReservesPerLiquidityInWad();
+                pool.getVirtualReservesWad();
 
             if (amountAssetWad > 1e18) {
                 emit LogUint256("amountAssetWad", amountAssetWad);
@@ -275,7 +275,7 @@ contract GlobalInvariants is
     }
 
     function pool_get_amounts_returns_less_than_get_amounts_wad() public {
-        // The `getAmounts` method always returns values less than or equal to `getVirtualPoolReservesPerLiquidityInWad`.
+        // The `getAmounts` method always returns values less than or equal to `getVirtualReservesWad`.
 
         for (uint8 i = 0; i < poolIds.length; i++) {
             uint64 poolId = poolIds[i];
@@ -285,14 +285,14 @@ contract GlobalInvariants is
                 pool.getPoolAmountsPerLiquidity();
 
             (uint256 amountAssetWad, uint256 amountQuoteWad) =
-                pool.getVirtualPoolReservesPerLiquidityInWad();
+                pool.getVirtualReservesWad();
 
             // Assumes inclusivity of bounds (i.e: equivalence is okay)
             if (amountAssetDec > amountAssetWad) {
                 emit LogUint256("amountAssetDec", amountAssetDec);
                 emit LogUint256("amountAssetWad", amountAssetWad);
                 emit AssertionFailed(
-                    "BUG (asset): getAmounts returned more than getVirtualPoolReservesPerLiquidityInWad"
+                    "BUG (asset): getAmounts returned more than getVirtualReservesWad"
                     );
             }
             // Assumes inclusivity of bounds (i.e: equivalence is okay)
@@ -300,7 +300,7 @@ contract GlobalInvariants is
                 emit LogUint256("amountQuoteDec", amountQuoteDec);
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
                 emit AssertionFailed(
-                    "BUG (quote): getAmounts returned more than getVirtualPoolReservesPerLiquidityInWad"
+                    "BUG (quote): getAmounts returned more than getVirtualReservesWad"
                     );
             }
         }
