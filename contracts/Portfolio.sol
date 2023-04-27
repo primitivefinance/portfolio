@@ -204,7 +204,7 @@ abstract contract PortfolioVirtual is Objective {
         uint128 deltaLiquidity,
         uint128 maxDeltaAsset,
         uint128 maxDeltaQuote
-    ) public lock returns (uint256 deltaAsset, uint256 deltaQuote) {
+    ) external lock returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (msg.sender != address(this)) _deposit();
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
@@ -277,7 +277,7 @@ abstract contract PortfolioVirtual is Objective {
         uint128 deltaLiquidity,
         uint128 minDeltaAsset,
         uint128 minDeltaQuote
-    ) public lock returns (uint256 deltaAsset, uint256 deltaQuote) {
+    ) external lock returns (uint256 deltaAsset, uint256 deltaQuote) {
         if (msg.sender != address(this)) _deposit();
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
@@ -391,7 +391,7 @@ abstract contract PortfolioVirtual is Objective {
      * @return output Real quantity of `output` tokens sent to swapper, in native token decimals.
      */
     function swap(Order memory args)
-        public
+        external
         lock
         returns (uint64 poolId, uint256 input, uint256 output)
     {
@@ -602,7 +602,7 @@ abstract contract PortfolioVirtual is Objective {
     function createPair(
         address asset,
         address quote
-    ) public lock returns (uint24 pairId) {
+    ) external lock returns (uint24 pairId) {
         if (asset == quote) revert SameTokenError();
 
         pairId = getPairId[asset][quote];
@@ -651,7 +651,7 @@ abstract contract PortfolioVirtual is Objective {
         uint16 jit,
         uint128 maxPrice,
         uint128 price
-    ) public lock returns (uint64 poolId) {
+    ) external lock returns (uint64 poolId) {
         if (price == 0) revert ZeroPrice();
         uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable
         if (pairNonce == 0) revert InvalidPair();

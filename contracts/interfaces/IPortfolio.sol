@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import { PortfolioCurve, PortfolioPair } from "../PortfolioLib.sol";
+import { PortfolioCurve, PortfolioPair, Order } from "../PortfolioLib.sol";
 
 interface IPortfolioEvents {
     /**
@@ -350,6 +350,43 @@ interface IPortfolioActions {
      * @dev Transfers fees earned in `amount` of `token` to `REGISTRY` address.
      */
     function claimFee(address token, uint256 amount) external;
+
+    function allocate(
+        bool useMax,
+        uint64 poolId,
+        uint128 deltaLiquidity,
+        uint128 maxDeltaAsset,
+        uint128 maxDeltaQuote
+    ) external returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    function deallocate(
+        bool useMax,
+        uint64 poolId,
+        uint128 deltaLiquidity,
+        uint128 minDeltaAsset,
+        uint128 minDeltaQuote
+    ) external returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    function swap(Order memory args)
+        external
+        returns (uint64 poolId, uint256 input, uint256 output);
+
+    function createPair(
+        address asset,
+        address quote
+    ) external returns (uint24 pairId);
+
+    function createPool(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        uint128 maxPrice,
+        uint128 price
+    ) external returns (uint64 poolId);
 }
 
 interface IPortfolio is
