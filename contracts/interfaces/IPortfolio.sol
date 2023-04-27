@@ -323,7 +323,7 @@ interface IPortfolioActions {
      * This means that token deficits can be carried over between calls
      * and paid by future ones (within the same multiprocess transaction)!
      */
-    function multiprocess(bytes calldata data) external payable;
+    // function multiprocess(bytes calldata data) external payable;
 
     /**
      * @notice Updates the parameters of the pool `poolId`.
