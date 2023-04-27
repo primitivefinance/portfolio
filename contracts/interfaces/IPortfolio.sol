@@ -387,6 +387,11 @@ interface IPortfolioActions {
         uint128 maxPrice,
         uint128 price
     ) external returns (uint64 poolId);
+
+    function multicall(bytes[] calldata data)
+        external
+        payable
+        returns (bytes[] memory results);
 }
 
 interface IPortfolio is
