@@ -2,9 +2,13 @@
   "name": "@primitivefi/portfolio",
   "license": "AGPL-3.0-only",
   "version": "v1.1.1-beta",
-  "description": "Onchain portfolio protocol for risk and liquidity management.",
+  "description": "Onchain protocol for low cost portfolio management using automated market making strategies.",
   "files": [
-    "contracts/**/*.sol"
+    "contracts/**/*.sol",
+    "optimized-out/Portfolio.sol/Portfolio.json",
+    "optimized-out/RMM01Portfolio.sol/RMM01Portfolio.json",
+    "optimized-out/IPortfolio.sol/IPortfolio.json",
+    "optimized-out/IPortfolioRegistry.sol/IPortfolioRegistry.json"
   ],
   "scripts": {
     "lcov": "FOUNDRY_PROFILE=test forge coverage --report lcov",
