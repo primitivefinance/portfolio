@@ -23,11 +23,11 @@ abstract contract PortfolioVirtual is Objective {
             mstore(0x00, 0x20)
 
             // Then we load both the length of our string (11 bytes, 0x0b in hex) and its
-            // actual hex value (0x76312e312e302d62657461) using the offset 0x2b. Using this
+            // actual hex value (0x76312e312e312d62657461) using the offset 0x2b. Using this
             // particular offset value will right pad the length at the end of the slot
             // and left pad the string at the beginning of the next slot, assuring the
             // right ABI format to return a string.
-            mstore(0x2b, 0x0b76312e312e302d62657461) // "v1.1.0-beta"
+            mstore(0x2b, 0x0b76312e312e312d62657461) // "v1.1.1-beta"
 
             // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
@@ -519,7 +519,7 @@ abstract contract PortfolioVirtual is Objective {
             // But all the token related amounts must be in their native token decimals.
             iteration.input = iteration.input.scaleFromWadDown(inputDec);
             iteration.output = iteration.output.scaleFromWadDown(outputDec);
-            iteration.feeAmount = iteration.input.scaleFromWadDown(inputDec);
+            iteration.feeAmount = iteration.feeAmount.scaleFromWadDown(inputDec);
 
             if (iteration.protocolFeeAmount != 0) {
                 protocolFees[_state.tokenInput] += iteration.protocolFeeAmount;
