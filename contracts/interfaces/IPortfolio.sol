@@ -357,7 +357,7 @@ interface IPortfolioActions {
         uint128 deltaLiquidity,
         uint128 maxDeltaAsset,
         uint128 maxDeltaQuote
-    ) external returns (uint256 deltaAsset, uint256 deltaQuote);
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
 
     function deallocate(
         bool useMax,
@@ -365,16 +365,17 @@ interface IPortfolioActions {
         uint128 deltaLiquidity,
         uint128 minDeltaAsset,
         uint128 minDeltaQuote
-    ) external returns (uint256 deltaAsset, uint256 deltaQuote);
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
 
     function swap(Order memory args)
         external
+        payable
         returns (uint64 poolId, uint256 input, uint256 output);
 
     function createPair(
         address asset,
         address quote
-    ) external returns (uint24 pairId);
+    ) external payable returns (uint24 pairId);
 
     function createPool(
         uint24 pairId,
@@ -386,7 +387,7 @@ interface IPortfolioActions {
         uint16 jit,
         uint128 maxPrice,
         uint128 price
-    ) external returns (uint64 poolId);
+    ) external payable returns (uint64 poolId);
 
     function multicall(bytes[] calldata data)
         external
