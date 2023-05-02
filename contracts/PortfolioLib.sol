@@ -130,11 +130,11 @@ struct ChangeLiquidityParams {
 }
 
 struct Order {
-    uint8 useMax; // Use the transiently stored `balance` for the `input`.
+    bool useMax; // Use the transiently stored `balance` for the `input`.
     uint64 poolId;
     uint128 input; // Quantity of asset tokens in WAD units to swap in, adding to reserves.
     uint128 output; // Quantity of quote tokens in WAD units to swap out, removing from reserves.
-    uint8 sellAsset; // 0 = quote -> asset, 1 = asset -> quote.
+    bool sellAsset; // 0 = quote -> asset, 1 = asset -> quote.
 }
 
 struct Iteration {

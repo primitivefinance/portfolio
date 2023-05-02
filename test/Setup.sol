@@ -285,25 +285,21 @@ contract Setup is Test {
     }
 
     modifier allocateSome(uint128 amt) {
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate(
-                true,
-                uint8(0),
-                ghost().poolId,
-                amt,
-                type(uint128).max,
-                type(uint128).max
-            )
+        bytes[] memory data = new bytes[](1);
+        data[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, ghost().poolId, amt, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(data);
         _;
     }
 
     modifier deallocateSome(uint128 amt) {
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate(
-                false, uint8(0), ghost().poolId, amt, 0, 0
-            )
+        bytes[] memory data = new bytes[](1);
+        data[0] = abi.encodeCall(
+            IPortfolioActions.deallocate, (false, ghost().poolId, amt, 0, 0)
         );
+        subject().multicall(data);
         _;
     }
 
@@ -311,11 +307,18 @@ contract Setup is Test {
         uint128 amtOut = subject().getAmountOut(
             ghost().poolId, sellAsset, amt, address(this)
         ).safeCastTo128();
-        subject().multiprocess(
-            FVM.encodeSwap(
-                uint8(0), ghost().poolId, amt, amtOut, uint8(sellAsset ? 1 : 0)
-            )
-        );
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amt,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+
+        bytes[] memory data = new bytes[](1);
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+        subject().multicall(data);
         _;
     }
 
@@ -327,11 +330,17 @@ contract Setup is Test {
             ? amtOut + uint256(amtOutDelta).safeCastTo128()
             : amtOut - uint256(-amtOutDelta).safeCastTo128();
 
-        subject().multiprocess(
-            FVM.encodeSwap(
-                uint8(0), ghost().poolId, amt, amtOut, uint8(sellAsset ? 1 : 0)
-            )
-        );
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amt,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+
+        bytes[] memory data = new bytes[](1);
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+        subject().multicall(data);
         _;
     }
 

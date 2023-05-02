@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import { PortfolioCurve, PortfolioPair } from "../PortfolioLib.sol";
+import { PortfolioCurve, PortfolioPair, Order } from "../PortfolioLib.sol";
 
 interface IPortfolioEvents {
     /**
@@ -323,7 +323,7 @@ interface IPortfolioActions {
      * This means that token deficits can be carried over between calls
      * and paid by future ones (within the same multiprocess transaction)!
      */
-    function multiprocess(bytes calldata data) external payable;
+    // function multiprocess(bytes calldata data) external payable;
 
     /**
      * @notice Updates the parameters of the pool `poolId`.
@@ -350,6 +350,49 @@ interface IPortfolioActions {
      * @dev Transfers fees earned in `amount` of `token` to `REGISTRY` address.
      */
     function claimFee(address token, uint256 amount) external;
+
+    function allocate(
+        bool useMax,
+        uint64 poolId,
+        uint128 deltaLiquidity,
+        uint128 maxDeltaAsset,
+        uint128 maxDeltaQuote
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    function deallocate(
+        bool useMax,
+        uint64 poolId,
+        uint128 deltaLiquidity,
+        uint128 minDeltaAsset,
+        uint128 minDeltaQuote
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
+
+    function swap(Order memory args)
+        external
+        payable
+        returns (uint64 poolId, uint256 input, uint256 output);
+
+    function createPair(
+        address asset,
+        address quote
+    ) external payable returns (uint24 pairId);
+
+    function createPool(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint16 jit,
+        uint128 maxPrice,
+        uint128 price
+    ) external payable returns (uint64 poolId);
+
+    function multicall(bytes[] calldata data)
+        external
+        payable
+        returns (bytes[] memory results);
 }
 
 interface IPortfolio is

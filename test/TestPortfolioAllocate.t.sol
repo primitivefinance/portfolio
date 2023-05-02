@@ -6,6 +6,31 @@ import "./Setup.sol";
 contract TestPortfolioAllocate is Setup {
     using AssemblyLib for uint256;
 
+    function test_allocate_weth()
+        public
+        noJit
+        wethConfig
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.deal(actor(), 250 ether);
+
+        bytes[] memory data = new bytes[](1);
+        data[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (
+                false,
+                ghost().poolId,
+                1 ether,
+                type(uint128).max,
+                type(uint128).max
+            )
+        );
+
+        subject().multicall{ value: 250 ether }(data);
+    }
+
     function test_allocate_modifies_liquidity()
         public
         defaultConfig
@@ -20,16 +45,14 @@ contract TestPortfolioAllocate is Setup {
         // Fetch the variable we are changing (pool.liquidity).
         uint256 prev = ghost().pool().liquidity;
         // Trigger the function being tested.
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
+
         // Fetch the variable changed.
         uint256 post = ghost().pool().liquidity;
         // Ghost assertions comparing the actual and expected deltas.
@@ -82,16 +105,14 @@ contract TestPortfolioAllocate is Setup {
         uint64 xid = ghost().poolId;
 
         uint256 prev = ghost().pool().lastTimestamp;
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
+
         uint256 post = ghost().pool().lastTimestamp;
 
         assertEq(post, prev, "pool.lastTimestamp");
@@ -112,16 +133,13 @@ contract TestPortfolioAllocate is Setup {
         (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
             deltaLiquidity: int128(amount)
         });
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
+
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
 
@@ -147,16 +165,12 @@ contract TestPortfolioAllocate is Setup {
 
         vm.expectRevert();
 
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: 0,
-                deltaAsset: type(uint128).max
-            })
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, 0, type(uint128).max)
         );
+        subject().multicall(instructions);
     }
 
     function test_allocate_reverts_when_max_delta_reached()
@@ -175,16 +189,12 @@ contract TestPortfolioAllocate is Setup {
 
         vm.expectRevert();
 
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: 0
-            })
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, 0)
         );
+        subject().multicall(instructions);
     }
 
     /// todo: This is identical logic, only thing that changed was the config modifier.
@@ -205,16 +215,14 @@ contract TestPortfolioAllocate is Setup {
         (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
             deltaLiquidity: int128(amount)
         });
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
+
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
 
@@ -241,16 +249,14 @@ contract TestPortfolioAllocate is Setup {
         (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
             deltaLiquidity: int128(amount)
         });
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
+
         uint256 post_asset =
             ghost().asset().to_token().balanceOf(address(subject()));
         uint256 post_quote =
@@ -267,16 +273,13 @@ contract TestPortfolioAllocate is Setup {
         vm.expectRevert(
             abi.encodeWithSelector(NonExistentPool.selector, failureArg)
         );
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: failureArg,
-                deltaLiquidity: 1 ether,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, failureArg, 1 ether, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
     }
 
     function test_allocate_zero_liquidity_reverts()
@@ -287,16 +290,19 @@ contract TestPortfolioAllocate is Setup {
     {
         uint256 failureArg = 0;
         vm.expectRevert(ZeroLiquidity.selector);
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: ghost().poolId,
-                deltaLiquidity: uint128(failureArg),
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (
+                false,
+                ghost().poolId,
+                uint128(failureArg),
+                type(uint128).max,
+                type(uint128).max
+            )
         );
+        subject().multicall(instructions);
     }
 
     function test_allocate_liquidity_overflow_reverts()
@@ -307,16 +313,19 @@ contract TestPortfolioAllocate is Setup {
     {
         uint256 failureArg = uint256(type(uint128).max) + 1;
         vm.expectRevert(); // safeCastTo128 reverts with no message, so it's just an "Evm Error".
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: ghost().poolId,
-                deltaLiquidity: uint128(failureArg),
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (
+                false,
+                ghost().poolId,
+                uint128(failureArg),
+                type(uint128).max,
+                type(uint128).max
+            )
         );
+        subject().multicall(instructions);
     }
 
     function test_allocate_fee_on_transfer_token()
@@ -341,16 +350,13 @@ contract TestPortfolioAllocate is Setup {
                 -int256(fee0)
             )
         );
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
 
         int256 net = ghost().net(ghost().asset().to_addr());
 
@@ -474,16 +480,12 @@ contract TestPortfolioAllocate is Setup {
             ghost().quote().to_token().balanceOf(address(subject()))
         );
 
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(0),
-                poolId: xid,
-                deltaLiquidity: amount,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
         );
+        subject().multicall(instructions);
 
         uint256 post = ghost().pool().liquidity;
         (uint256 postA, uint256 postQ) = (
