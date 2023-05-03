@@ -60,14 +60,6 @@ abstract contract PortfolioVirtual is Objective {
      */
     Payment[] private _payments;
 
-    /**
-     * @dev
-     * Manipulated in `_swap` to avoid stack too deep and contract size limit.
-     *
-     * @custom:invariant MUST be deleted after every transaction that uses it.
-     */
-    SwapState private _state;
-
     bool private _currentMulticall;
 
     /**
@@ -411,11 +403,7 @@ abstract contract PortfolioVirtual is Objective {
     function swap(Order memory args)
         external
         payable
-        returns (
-            uint64 poolId,
-            uint256 input,
-            uint256 output
-        )
+        returns (uint64 poolId, uint256 input, uint256 output)
     {
         _preLock();
         if (_currentMulticall == false) _deposit();
@@ -437,31 +425,33 @@ abstract contract PortfolioVirtual is Objective {
         PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
+        SwapState memory state;
+
         // -=- Load Fee & Token Info -=- //
-        _state.sell = args.sellAsset == true;
-        _state.fee = msg.sender == pool.controller
+        state.sell = args.sellAsset == true;
+        state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
             : pool.params.fee;
 
-        if (_state.sell) {
-            _state.tokenInput = pool.pair.tokenAsset;
-            _state.tokenOutput = pool.pair.tokenQuote;
+        if (state.sell) {
+            state.tokenInput = pool.pair.tokenAsset;
+            state.tokenOutput = pool.pair.tokenQuote;
         } else {
-            _state.tokenInput = pool.pair.tokenQuote;
-            _state.tokenOutput = pool.pair.tokenAsset;
+            state.tokenInput = pool.pair.tokenQuote;
+            state.tokenOutput = pool.pair.tokenAsset;
         }
 
         // -=- Load Swap Info -=- //
         Iteration memory iteration;
         {
             (bool success, int256 invariant) =
-                _beforeSwapEffects(args.poolId, _state.sell);
+                _beforeSwapEffects(args.poolId, state.sell);
             if (!success) revert PoolExpired();
 
             if (args.useMax == true) {
                 // Net balance is the surplus of tokens in the accounting state that can be spent.
                 int256 netBalance = getNetBalance(
-                    _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
+                    state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
                 );
                 if (netBalance < 0) netBalance = 0;
                 input = uint256(netBalance);
@@ -495,7 +485,7 @@ abstract contract PortfolioVirtual is Objective {
             uint256 deltaOutput = iteration.output;
 
             // Virtual reserves
-            if (_state.sell) {
+            if (state.sell) {
                 (liveIndependentWad, liveDependentWad) =
                     (iteration.virtualX, iteration.virtualY);
             } else {
@@ -505,7 +495,7 @@ abstract contract PortfolioVirtual is Objective {
 
             deltaInput = iteration.input;
 
-            iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
+            iteration.feeAmount = (deltaInput * state.fee) / PERCENTAGE;
             if (_protocolFee != 0) {
                 uint256 protocolFeeAmountWad =
                     iteration.feeAmount / _protocolFee;
@@ -542,7 +532,7 @@ abstract contract PortfolioVirtual is Objective {
             bool validInvariant;
             int256 nextInvariantWad;
 
-            if (_state.sell) {
+            if (state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
                     (nextIndependentWadLessFee, nextDependentWad);
             } else {
@@ -566,7 +556,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.nextInvariant = nextInvariantWad;
         }
 
-        if (_state.sell) {
+        if (state.sell) {
             iteration.virtualX = nextIndependentWad;
         } else {
             iteration.virtualY = nextIndependentWad;
@@ -576,14 +566,14 @@ abstract contract PortfolioVirtual is Objective {
 
         _syncPool(args.poolId, iteration.virtualX, iteration.virtualY);
 
-        _increaseReserves(_state.tokenInput, iteration.input); // Increasing reserves creates a debit that must be paid from `msg.sender`.
-        _decreaseReserves(_state.tokenOutput, iteration.output); // Decreasing reserves creates a surplus that can be used in following instructions.
+        _increaseReserves(state.tokenInput, iteration.input); // Increasing reserves creates a debit that must be paid from `msg.sender`.
+        _decreaseReserves(state.tokenOutput, iteration.output); // Decreasing reserves creates a surplus that can be used in following instructions.
 
         // -=- Scale Amounts to Native Token Decimals -=- //
         {
             uint256 inputDec;
             uint256 outputDec;
-            if (_state.sell) {
+            if (state.sell) {
                 inputDec = pool.pair.decimalsAsset;
                 outputDec = pool.pair.decimalsQuote;
             } else {
@@ -598,22 +588,20 @@ abstract contract PortfolioVirtual is Objective {
             iteration.feeAmount = iteration.feeAmount.scaleFromWadDown(inputDec);
 
             if (iteration.protocolFeeAmount != 0) {
-                protocolFees[_state.tokenInput] += iteration.protocolFeeAmount;
+                protocolFees[state.tokenInput] += iteration.protocolFeeAmount;
             }
         }
 
         emit Swap(
             args.poolId,
             getVirtualPrice(args.poolId),
-            _state.tokenInput,
+            state.tokenInput,
             iteration.input,
-            _state.tokenOutput,
+            state.tokenOutput,
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
         );
-
-        delete _state;
 
         if (_currentMulticall == false) _settlement();
         _postLock();
