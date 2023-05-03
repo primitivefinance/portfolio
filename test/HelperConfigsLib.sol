@@ -131,24 +131,25 @@ library Configs {
             IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
         if (pairId == 0) {
             bytes[] memory data = new bytes[](2);
-            data[0] = (FVMLib.encodeCreatePair(self.asset, self.quote));
-            data[1] = (
-                FVMLib.encodeCreatePool({
-                    pairId: pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
-                    controller: self.controller,
-                    priorityFee: self.priorityFeeBps,
-                    fee: self.feeBps,
-                    dur: self.durationDays,
-                    vol: self.volatilityBps,
-                    jit: self.justInTimeSec,
-                    maxPrice: self.terminalPriceWad,
-                    price: self.reportedPriceWad
-                })
+            data[0] = abi.encodeCall(
+                IPortfolioActions.createPair, (self.asset, self.quote)
+            );
+            data[1] = abi.encodeCall(
+                IPortfolioActions.createPool,
+                (
+                    pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
+                    self.controller,
+                    self.priorityFeeBps,
+                    self.feeBps,
+                    self.volatilityBps,
+                    self.durationDays,
+                    self.justInTimeSec,
+                    self.terminalPriceWad,
+                    self.reportedPriceWad
+                )
             );
 
-            bytes memory payload = FVMLib.encodeJumpInstruction(data);
-
-            IPortfolio(Portfolio).multiprocess(payload);
+            IPortfolio(Portfolio).multicall(data);
 
             bool controlled = self.controller != address(0);
             uint24 pairNonce = IPortfolioGetters(Portfolio).getPairNonce();
@@ -159,18 +160,24 @@ library Configs {
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {
-            bytes memory payload = FVMLib.encodeCreatePool({
-                pairId: pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
-                controller: self.controller,
-                priorityFee: self.priorityFeeBps,
-                fee: self.feeBps,
-                dur: self.durationDays,
-                vol: self.volatilityBps,
-                jit: self.justInTimeSec,
-                maxPrice: self.terminalPriceWad,
-                price: self.reportedPriceWad
-            });
-            IPortfolio(Portfolio).multiprocess(payload);
+            bytes[] memory data = new bytes[](1);
+
+            data[0] = abi.encodeCall(
+                IPortfolioActions.createPool,
+                (
+                    pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
+                    self.controller,
+                    self.priorityFeeBps,
+                    self.feeBps,
+                    self.durationDays,
+                    self.volatilityBps,
+                    self.justInTimeSec,
+                    self.terminalPriceWad,
+                    self.reportedPriceWad
+                )
+            );
+
+            IPortfolio(Portfolio).multicall(data);
             bool controlled = self.controller != address(0);
             poolId = FVMLib.encodePoolId(
                 pairId,
