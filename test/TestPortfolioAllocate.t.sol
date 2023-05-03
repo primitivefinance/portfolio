@@ -31,7 +31,7 @@ contract TestPortfolioAllocate is Setup {
         subject().multicall{ value: 250 ether }(data);
     }
 
-    function test_allocate_modifies_liquidity()
+    function test_allocate_multicall_modifies_liquidity()
         public
         defaultConfig
         useActor
@@ -52,6 +52,37 @@ contract TestPortfolioAllocate is Setup {
             (false, xid, amount, type(uint128).max, type(uint128).max)
         );
         subject().multicall(instructions);
+
+        // Fetch the variable changed.
+        uint256 post = ghost().pool().liquidity;
+        // Ghost assertions comparing the actual and expected deltas.
+        assertEq(post, prev + amount, "pool.liquidity");
+        // Direct assertions of pool state.
+        assertEq(
+            ghost().pool().liquidity - BURNED_LIQUIDITY,
+            ghost().position(actor()).freeLiquidity,
+            "position.freeLiquidity != pool.liquidity"
+        );
+    }
+
+    function test_allocate_modifies_liquidity()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        // Arguments for test.
+        uint128 amount = 0.1 ether;
+        // Fetch the ghost variables to interact with the target pool.
+        uint64 xid = ghost().poolId;
+        // Fetch the variable we are changing (pool.liquidity).
+        uint256 prev = ghost().pool().liquidity;
+        // Trigger the function being tested.
+
+        subject().allocate(
+            false, xid, amount, type(uint128).max, type(uint128).max
+        );
 
         // Fetch the variable changed.
         uint256 post = ghost().pool().liquidity;
