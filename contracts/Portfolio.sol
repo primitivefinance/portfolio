@@ -83,13 +83,15 @@ abstract contract PortfolioVirtual is Objective {
      * Step 8. Validate Portfolio's account system was settled.
      * Step 10. Exit `_locked` re-entrancy guard.
      */
-    modifier lock() {
+    function _preLock() private {
         if (_locked != 1 && !_currentMulticall) {
             revert InvalidReentrancy();
         }
 
         _locked = 2;
-        _;
+    }
+
+    function _postLock() private {
         _locked = 1;
 
         if (!__account__.settled && !_currentMulticall) {
@@ -132,9 +134,9 @@ abstract contract PortfolioVirtual is Objective {
     function multicall(bytes[] calldata data)
         public
         payable
-        lock
         returns (bytes[] memory results)
     {
+        _preLock();
         _currentMulticall = true;
 
         // Wraps msg.value.
@@ -156,9 +158,9 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         _currentMulticall = false;
-
         // Interactions
         _settlement();
+        _postLock();
     }
 
     /// @inheritdoc IPortfolioActions
@@ -167,7 +169,8 @@ abstract contract PortfolioVirtual is Objective {
         uint16 priorityFee,
         uint16 fee,
         uint16 jit
-    ) external lock {
+    ) external {
+        _preLock();
         PortfolioPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
@@ -180,6 +183,7 @@ abstract contract PortfolioVirtual is Objective {
         pool.changePoolParameters(modified);
 
         emit ChangeParameters(poolId, priorityFee, fee, jit);
+        _postLock();
     }
 
     // ===== Internal ===== //
@@ -198,7 +202,8 @@ abstract contract PortfolioVirtual is Objective {
         uint128 deltaLiquidity,
         uint128 maxDeltaAsset,
         uint128 maxDeltaQuote
-    ) external payable lock returns (uint256 deltaAsset, uint256 deltaQuote) {
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote) {
+        _preLock();
         if (_currentMulticall == false) _deposit();
 
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
@@ -262,6 +267,7 @@ abstract contract PortfolioVirtual is Objective {
         );
 
         if (_currentMulticall == false) _settlement();
+        _postLock();
     }
 
     /**
@@ -278,7 +284,9 @@ abstract contract PortfolioVirtual is Objective {
         uint128 deltaLiquidity,
         uint128 minDeltaAsset,
         uint128 minDeltaQuote
-    ) external payable lock returns (uint256 deltaAsset, uint256 deltaQuote) {
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote) {
+        _preLock();
+
         if (_currentMulticall == false) _deposit();
 
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
@@ -328,6 +336,7 @@ abstract contract PortfolioVirtual is Objective {
         );
 
         if (_currentMulticall == false) _settlement();
+        _postLock();
     }
 
     /**
@@ -402,14 +411,13 @@ abstract contract PortfolioVirtual is Objective {
     function swap(Order memory args)
         external
         payable
-        lock
         returns (
-            // lock
             uint64 poolId,
             uint256 input,
             uint256 output
         )
     {
+        _preLock();
         if (_currentMulticall == false) _deposit();
 
         if (args.sellAsset) {
@@ -608,6 +616,7 @@ abstract contract PortfolioVirtual is Objective {
         delete _state;
 
         if (_currentMulticall == false) _settlement();
+        _postLock();
 
         return (args.poolId, iteration.input, iteration.output);
     }
@@ -634,7 +643,9 @@ abstract contract PortfolioVirtual is Objective {
     function createPair(
         address asset,
         address quote
-    ) external payable lock returns (uint24 pairId) {
+    ) external payable returns (uint24 pairId) {
+        _preLock();
+
         if (asset == quote) revert SameTokenError();
 
         pairId = getPairId[asset][quote];
@@ -660,6 +671,8 @@ abstract contract PortfolioVirtual is Objective {
         });
 
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
+
+        _postLock();
     }
 
     /**
@@ -683,7 +696,9 @@ abstract contract PortfolioVirtual is Objective {
         uint16 jit,
         uint128 maxPrice,
         uint128 price
-    ) external payable lock returns (uint64 poolId) {
+    ) external payable returns (uint64 poolId) {
+        _preLock();
+
         if (price == 0) revert ZeroPrice();
         uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable
         if (pairNonce == 0) revert InvalidPair();
@@ -730,6 +745,8 @@ abstract contract PortfolioVirtual is Objective {
             pool.params.volatility,
             pool.params.priorityFee
         );
+
+        _postLock();
     }
 
     // ===== Accounting System ===== //
@@ -911,7 +928,7 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /// @inheritdoc IPortfolioActions
-    function claimFee(address token, uint256 amount) external override lock {
+    function claimFee(address token, uint256 amount) external override {
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
         }
@@ -934,7 +951,7 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /// @inheritdoc IPortfolioActions
-    function setProtocolFee(uint256 fee) external override lock {
+    function setProtocolFee(uint256 fee) external override {
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
         }
