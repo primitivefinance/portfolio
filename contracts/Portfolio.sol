@@ -203,6 +203,12 @@ abstract contract PortfolioVirtual is Objective {
 
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
+        (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
+            poolId: poolId,
+            amountAssetDec: maxDeltaAsset,
+            amountQuoteDec: maxDeltaQuote
+        });
+
         PortfolioPair memory pair = pools[poolId].pair;
 
         if (useMax) {
@@ -276,6 +282,12 @@ abstract contract PortfolioVirtual is Objective {
         if (_currentMulticall == false) _deposit();
 
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
+
+        (minDeltaAsset, minDeltaQuote) = _scaleAmountsToWad({
+            poolId: poolId,
+            amountAssetDec: minDeltaAsset,
+            amountQuoteDec: minDeltaQuote
+        });
 
         PortfolioPair memory pair = pools[poolId].pair;
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
@@ -399,6 +411,20 @@ abstract contract PortfolioVirtual is Objective {
         )
     {
         if (_currentMulticall == false) _deposit();
+
+        if (args.sellAsset) {
+            (args.input, args.output) = _scaleAmountsToWad({
+                poolId: args.poolId,
+                amountAssetDec: args.input,
+                amountQuoteDec: args.output
+            });
+        } else {
+            (args.output, args.input) = _scaleAmountsToWad({
+                poolId: args.poolId,
+                amountAssetDec: args.output,
+                amountQuoteDec: args.input
+            });
+        }
 
         PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
