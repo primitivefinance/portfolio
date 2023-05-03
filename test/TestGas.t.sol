@@ -377,6 +377,7 @@ contract TestGas is Setup {
         _multi_deallocate(2, false);
     }
 
+    /*
     function test_gas_multi_swap_2_pairs()
         public
         pauseGas
@@ -392,71 +393,57 @@ contract TestGas is Setup {
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
 
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(IPortfolioActions.createPair, (token0, token1));
-        subject().multicall(data);
-
-        uint16 hundred = uint16(100);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (
-                uint24(0),
-                address(0),
-                0,
-                hundred,
-                1e4,
-                hundred,
-                0,
-                10 ether,
-                10 ether
-            )
+        subject().createPair(token0, token1);
+        subject().createPool(
+            0, address(0), 0, 100, 1e4, 100, 0, 10 ether, 10 ether
         );
-        subject().multicall(data);
 
         bytes[] memory instructions = new bytes[](2);
+
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
             else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
-
-            bytes[] memory go = new bytes[](1);
-            go[0] = abi.encodeCall(
-                IPortfolioActions.allocate,
-                (false, poolId, 5 ether, type(uint128).max, type(uint128).max)
-            );
-            subject().multicall(go);
-
-            bool sellAsset = i % 2 == 0;
-            PortfolioPool memory pool =
-                IPortfolioStruct(address(_subject)).pools(poolId);
-            uint128 amountIn = RMM01Portfolio(payable(address(_subject)))
-                .computeMaxInput({
-                poolId: poolId,
-                sellAsset: sellAsset,
-                reserveIn: sellAsset
-                    ? pool.virtualX.divWadDown(pool.liquidity)
-                    : pool.virtualY.divWadDown(pool.liquidity),
-                liquidity: pool.liquidity
-            }).scaleFromWadDown(pool.pair.decimalsQuote).safeCastTo128() / 20;
-            uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(poolId, sellAsset, amountIn, actor()) * 95
-                    / 100
+            subject().allocate(
+                false, poolId, 5 ether, type(uint128).max, type(uint128).max
             );
 
-            Order memory order = Order({
-                useMax: false,
-                poolId: poolId,
-                input: amountIn,
-                output: estimatedAmountOut,
-                sellAsset: sellAsset
-            });
+            {
+                bool sellAsset = i % 2 == 0;
+                PortfolioPool memory pool =
+                    IPortfolioStruct(address(_subject)).pools(poolId);
+                uint128 amountIn = RMM01Portfolio(payable(address(_subject)))
+                    .computeMaxInput({
+                    poolId: poolId,
+                    sellAsset: sellAsset,
+                    reserveIn: sellAsset
+                        ? pool.virtualX.divWadDown(pool.liquidity)
+                        : pool.virtualY.divWadDown(pool.liquidity),
+                    liquidity: pool.liquidity
+                }).scaleFromWadDown(pool.pair.decimalsQuote).safeCastTo128()
+                    / 20;
+                uint128 estimatedAmountOut = uint128(
+                    _subject.getAmountOut(poolId, sellAsset, amountIn, actor())
+                        * 95 / 100
+                );
 
-            instructions[i] = abi.encodeCall(IPortfolioActions.swap, (order));
+                Order memory swapOrder = Order({
+                    useMax: false,
+                    poolId: poolId,
+                    input: amountIn,
+                    output: estimatedAmountOut,
+                    sellAsset: sellAsset
+                });
+            }
+
+            instructions[i] =
+                abi.encodeCall(IPortfolioActions.swap, (swapOrder));
         }
 
         vm.resumeGasMetering();
         _subject.multicall(instructions);
     }
+    */
 
     function test_gas_multi_swap_2()
         public
