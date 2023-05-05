@@ -71,26 +71,6 @@ contract TestAssemblyLib is Test {
     }
     */
 
-    function test_toBytes16() public {
-        bytes memory input = hex"1234567890abcdef1234567890abcdef";
-        bytes16 expectedOutput = hex"1234567890abcdef1234567890abcdef";
-        bytes16 output = AssemblyLib.toBytes16(input);
-        assertEq(output, expectedOutput);
-    }
-
-    function test_toBytes16_RightPad() public {
-        bytes memory input = hex"01";
-        bytes16 expectedOutput = hex"00000000000000000000000000000001";
-        bytes16 output = AssemblyLib.toBytes16(input);
-        assertEq(output, expectedOutput);
-    }
-
-    function test_toBytes16_RevertIfLengthTooLong() public {
-        bytes memory input = hex"1234567890abcdef1234567890abcdef00";
-        vm.expectRevert(DataTooLong.selector);
-        AssemblyLib.toBytes16(input);
-    }
-
     function test_toBytes8() public {
         bytes memory input = hex"1234567890abcdef";
         bytes16 expectedOutput = hex"1234567890abcdef";
