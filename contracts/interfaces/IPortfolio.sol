@@ -287,6 +287,7 @@ interface IPortfolioGetters {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
+        int256 liquidityDelta,
         address swapper
     ) external view returns (uint256);
 
