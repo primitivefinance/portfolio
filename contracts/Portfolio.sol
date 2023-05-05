@@ -411,11 +411,7 @@ abstract contract PortfolioVirtual is Objective {
     function swap(Order memory args)
         external
         payable
-        returns (
-            uint64 poolId,
-            uint256 input,
-            uint256 output
-        )
+        returns (uint64 poolId, uint256 input, uint256 output)
     {
         _preLock();
         if (_currentMulticall == false) _deposit();
@@ -706,7 +702,8 @@ abstract contract PortfolioVirtual is Objective {
         bool hasController = controller != address(0);
         {
             uint32 poolNonce = ++getPoolNonce[pairNonce];
-            poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
+            poolId =
+                AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
         }
 
         PortfolioPool storage pool = pools[poolId];
