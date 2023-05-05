@@ -116,7 +116,6 @@ contract HandlerPortfolio is HandlerBase {
                         args.fee, // fee
                         args.volatility, // vol
                         args.duration, // dur
-                        4, // jit
                         args.terminalPrice,
                         args.price
                     )

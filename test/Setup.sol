@@ -38,7 +38,6 @@ import "./HelperUtils.sol" as Utils;
 contract Setup is Test {
     using SafeCastLib for uint256;
 
-    uint256 internal constant JIT_LIQUIDITY_POLICY_STORAGE_SLOT = 12; // UPDATE IF STORAGE CHANGES.
     /**
      * @dev Manages the addresses calling the subjects in the environment.
      */
@@ -269,18 +268,6 @@ contract Setup is Test {
 
     modifier pauseGas() {
         vm.pauseGasMetering();
-        _;
-    }
-
-    /**
-     * @dev Sets internal default jit protection seconds value to 0.
-     */
-    modifier noJit() {
-        vm.store(
-            address(subject()),
-            bytes32(JIT_LIQUIDITY_POLICY_STORAGE_SLOT),
-            bytes32(0)
-        );
         _;
     }
 
