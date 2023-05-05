@@ -75,13 +75,9 @@ interface IPortfolioEvents {
      * @param poolId Unique identifier for the pool that is being updated.
      * @param priorityFee Fee percentage paid by the pool controller (if any).
      * @param fee Fee percentage paid by swappers.
-     * @param jit Just-in-time (JIT) seconds that must be eclipsed between allocate and deallocates.
      */
     event ChangeParameters(
-        uint64 indexed poolId,
-        uint16 indexed priorityFee,
-        uint16 indexed fee,
-        uint16 jit
+        uint64 indexed poolId, uint16 indexed priorityFee, uint16 indexed fee
     );
 
     /**
@@ -107,7 +103,6 @@ interface IPortfolioEvents {
      * @param quote Token that is being paired.
      * @param controller Address that can call `changeParameters` on the pool.
      * @param maxPrice The terminal price reached upon the end of the duration.
-     * @param jit Just-in-time (JIT) seconds that must be eclipsed between allocate and deallocates.
      * @param fee Fee percentage paid by swappers.
      * @param duration Days until the pool cannot be swapped in anymore.
      * @param volatility Volatility in basis points which determines price impact of swaps.
@@ -119,7 +114,6 @@ interface IPortfolioEvents {
         address indexed quote,
         address controller,
         uint128 maxPrice,
-        uint16 jit,
         uint16 fee,
         uint16 duration,
         uint16 volatility,
@@ -331,13 +325,11 @@ interface IPortfolioActions {
      * as '0' will not change the pool parameter.
      * @param priorityFee New priority fee of the pool in basis points (1 = 0.01%).
      * @param fee New fee of the pool in basis points (1 = 0.01%).
-     * @param jit New JIT policy of the pool in seconds (1 = 1 second).
      */
     function changeParameters(
         uint64 poolId,
         uint16 priorityFee,
-        uint16 fee,
-        uint16 jit
+        uint16 fee
     ) external;
 
     /**
@@ -384,7 +376,6 @@ interface IPortfolioActions {
         uint16 fee,
         uint16 volatility,
         uint16 duration,
-        uint16 jit,
         uint128 maxPrice,
         uint128 price
     ) external payable returns (uint64 poolId);

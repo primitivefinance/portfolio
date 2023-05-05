@@ -97,13 +97,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         address owner,
         int256 delta
     ) public view override returns (bool) {
-        // Just in time liquidity protection.
-        if (delta < 0) {
-            uint256 distance =
-                positions[owner][poolId].getTimeSinceChanged(block.timestamp);
-            return (pools[poolId].params.jit <= distance);
-        }
-
         return true;
     }
 
