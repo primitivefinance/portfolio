@@ -81,8 +81,9 @@ contract TestGas is Setup {
         bool sellAsset = true;
         uint128 amountIn = uint128(0.01 ether);
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, actor())
-                * 95 / 100
+            _subject.getAmountOut(
+                ghost().poolId, sellAsset, amountIn, 0, actor()
+            ) * 95 / 100
         );
         bytes[] memory data = new bytes[](1);
 
@@ -623,8 +624,8 @@ contract TestGas is Setup {
                     .liquidity
             }).safeCastTo128() / 10;
             uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(poolId, sellAsset, amountIn, actor()) * 95
-                    / 100
+                _subject.getAmountOut(poolId, sellAsset, amountIn, 0, actor())
+                    * 95 / 100
             );
 
             Order memory order = Order({
@@ -677,7 +678,7 @@ contract TestGas is Setup {
     ) internal returns (bytes memory) {
         uint128 amountIn = uint128(0.05 ether);
         uint128 amountOut = subject().getAmountOut(
-            poolId, direction, amountIn, actor()
+            poolId, direction, amountIn, 0, actor()
         ).safeCastTo128();
 
         Order memory order = Order({
