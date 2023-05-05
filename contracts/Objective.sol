@@ -96,7 +96,7 @@ abstract contract Objective is IPortfolio {
      * Estimates the `price` of a pool with `poolId` given the pool's reserves.
      * @return price Estimated quantity of "Quote" tokens per "Asset" tokens in WAD units.
      */
-    function getVirtualPrice(uint64 poolId)
+    function getSpotPrice(uint64 poolId)
         public
         view
         virtual

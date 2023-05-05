@@ -295,7 +295,7 @@ interface IPortfolioGetters {
      * @custom:mev Vulnerable to manipulation, do not rely on this function on-chain.
      * @return price Estimated price in wad units of `quote` tokens per `asset` token.
      */
-    function getVirtualPrice(uint64 poolId)
+    function getSpotPrice(uint64 poolId)
         external
         view
         returns (uint256 price);

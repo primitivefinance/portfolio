@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "solmate/utils/SafeCastLib.sol";
 import "contracts/interfaces/IPortfolio.sol";
-import "contracts/libraries/FVMLib.sol" as FVMLib;
+import "contracts/libraries/AssemblyLib.sol";
 
 using Configs for ConfigState global;
 
@@ -147,7 +147,7 @@ library Configs {
 
             bool controlled = self.controller != address(0);
             uint24 pairNonce = IPortfolioGetters(Portfolio).getPairNonce();
-            poolId = FVMLib.encodePoolId(
+            poolId = AssemblyLib.encodePoolId(
                 pairNonce,
                 controlled,
                 IPortfolioGetters(Portfolio).getPoolNonce(pairNonce)
@@ -172,7 +172,7 @@ library Configs {
 
             IPortfolio(Portfolio).multicall(data);
             bool controlled = self.controller != address(0);
-            poolId = FVMLib.encodePoolId(
+            poolId = AssemblyLib.encodePoolId(
                 pairId,
                 controlled,
                 IPortfolioGetters(Portfolio).getPoolNonce(pairId)

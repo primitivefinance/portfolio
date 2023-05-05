@@ -594,7 +594,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Swap(
             args.poolId,
-            getVirtualPrice(args.poolId),
+            getSpotPrice(args.poolId),
             _state.tokenInput,
             iteration.input,
             _state.tokenOutput,
@@ -694,7 +694,8 @@ abstract contract PortfolioVirtual is Objective {
         bool hasController = controller != address(0);
         {
             uint32 poolNonce = ++getPoolNonce[pairNonce];
-            poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
+            poolId =
+                AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
         }
 
         PortfolioPool storage pool = pools[poolId];

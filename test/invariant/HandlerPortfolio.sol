@@ -134,7 +134,7 @@ contract HandlerPortfolio is HandlerBase {
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = FVM.encodePoolId(
+        uint64 poolId = AssemblyLib.encodePoolId(
             pairId, isMutable, uint32(ctx.subject().getPoolNonce(pairId))
         );
         // Add the created pool to the list of pools.
