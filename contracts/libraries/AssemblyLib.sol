@@ -170,16 +170,6 @@ library AssemblyLib {
         }
     }
 
-    function scaleFromWadDownSigned(
-        int256 amountWad,
-        uint256 decimals
-    ) internal pure returns (int256 outputDec) {
-        int256 factor = int256(computeScalar(decimals));
-        assembly {
-            outputDec := sdiv(amountWad, factor)
-        }
-    }
-
     function scaleFromWadUp(
         uint256 amountWad,
         uint256 decimals
