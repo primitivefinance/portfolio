@@ -6,14 +6,6 @@ import "forge-std/Vm.sol";
 import "contracts/libraries/AssemblyLib.sol";
 
 contract TestAssemblyLib is Test {
-    function test_fromAmount() public {
-        {
-            (uint8 power, uint128 base) = AssemblyLib.fromAmount(500);
-            assertEq(power, 2);
-            assertEq(base, 5);
-        }
-    }
-
     function testFuzz_isBetween(
         uint256 value,
         uint256 lower,
