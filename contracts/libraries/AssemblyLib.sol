@@ -157,4 +157,26 @@ library AssemblyLib {
         uint256 factor = computeScalar(decimals);
         outputDec = (amountWad - 1) / factor + 1; // ((a-1) / b) + 1
     }
+
+    /**
+     * @dev Returns an encoded pool id given specific pool parameters.
+     * The encoding is simply packing the different parameters together.
+     * @param pairId Id of the pair of asset / quote tokens
+     * @param isMutable True if the pool is mutable
+     * @param poolNonce Current pool nonce of the Portfolio contract
+     * @return poolId Corresponding encoded pool id
+     * @custom:example
+     * ```
+     * uint64 poolId = encodePoolId(7, true, 42);
+     * ```
+     */
+    function encodePoolId(
+        uint24 pairId,
+        bool isMutable,
+        uint32 poolNonce
+    ) internal pure returns (uint64 poolId) {
+        assembly {
+            poolId := or(or(shl(40, pairId), shl(32, isMutable)), poolNonce)
+        }
+    }
 }
