@@ -84,28 +84,6 @@ library AssemblyLib {
     }
 
     /**
-     * @dev Adds a `delta` to a cumulative value and returns the result. Each result is used as a
-     * fee `checkpoint`. Positions compute fees earned using checkpoints by measuring the difference between
-     * when positions were entered and when they were exited. Since these are cumulative values,
-     * computing the difference with a checkpoint that overflows is no different from computing the difference
-     * between checkpoints that have not overflowed.
-     * @custom:example
-     * ```
-     * uint256 checkpoint = computeCheckpoint(100, 22);
-     * assertEq(checkpoint, 122);
-     * ```
-     */
-    function computeCheckpoint(
-        uint256 present,
-        uint256 delta
-    ) internal pure returns (uint256 checkpoint) {
-        // Overflow by design, as these are checkpoints, which can measure the distance even if overflowed.
-        assembly {
-            checkpoint := add(present, delta)
-        }
-    }
-
-    /**
      * @notice Days units are used in Portfolio because they fit into an unsigned 16-bit integer and they
      * are human readable.
      * @dev Reverts on overflow.
