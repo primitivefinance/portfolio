@@ -9,3 +9,6 @@
 	path = lib/solstat
 	url = https://github.com/primitivefinance/solstat
 	branch = main
+[submodule "lib/create3-factory"]
+	path = lib/create3-factory
+	url = https://github.com/zeframlou/create3-factory
