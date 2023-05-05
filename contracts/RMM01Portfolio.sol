@@ -162,12 +162,14 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
+        int256 liquidityDelta,
         address swapper
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
+            liquidityDelta: liquidityDelta,
             timestamp: block.timestamp,
             swapper: swapper
         });

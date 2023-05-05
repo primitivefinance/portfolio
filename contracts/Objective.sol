@@ -82,6 +82,7 @@ abstract contract Objective is IPortfolio {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
+        int256 liquidityDelta,
         address swapper
     )
         public
