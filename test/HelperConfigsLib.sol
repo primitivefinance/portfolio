@@ -15,7 +15,6 @@ struct ConfigState {
     uint16 priorityFeeBps;
     uint16 durationDays;
     uint16 volatilityBps;
-    uint16 justInTimeSec;
     uint128 terminalPriceWad;
     uint128 reportedPriceWad;
 }
@@ -24,7 +23,6 @@ uint16 constant DEFAULT_PRIORITY_FEE = 10;
 uint16 constant DEFAULT_FEE = 100; // 100 bps = 1%
 uint16 constant DEFAULT_VOLATILITY = 10_000;
 uint16 constant DEFAULT_DURATION = 365;
-uint16 constant DEFAULT_JIT = 4;
 uint128 constant DEFAULT_STRIKE = 10 ether;
 uint128 constant DEFAULT_PRICE = 10 ether;
 uint128 constant DEFAULT_LIQUIDITY = 1 ether;
@@ -68,7 +66,6 @@ library Configs {
             priorityFeeBps: DEFAULT_PRIORITY_FEE,
             durationDays: DEFAULT_DURATION,
             volatilityBps: DEFAULT_VOLATILITY,
-            justInTimeSec: DEFAULT_JIT,
             terminalPriceWad: DEFAULT_STRIKE,
             reportedPriceWad: DEFAULT_PRICE
         });
@@ -103,8 +100,6 @@ library Configs {
             self.priorityFeeBps = abi.decode(data, (uint16));
         } else if (what == "fee") {
             self.feeBps = abi.decode(data, (uint16));
-        } else if (what == "jit") {
-            self.justInTimeSec = abi.decode(data, (uint16));
         }
         return self;
     }
@@ -143,7 +138,6 @@ library Configs {
                     self.feeBps,
                     self.volatilityBps,
                     self.durationDays,
-                    self.justInTimeSec,
                     self.terminalPriceWad,
                     self.reportedPriceWad
                 )
@@ -171,7 +165,6 @@ library Configs {
                     self.feeBps,
                     self.durationDays,
                     self.volatilityBps,
-                    self.justInTimeSec,
                     self.terminalPriceWad,
                     self.reportedPriceWad
                 )

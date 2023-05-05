@@ -56,14 +56,12 @@ error InvalidFee(uint16 fee);
 error InvalidPriorityFee(uint16 priorityFee);
 error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
-error InvalidJit(uint16);
 error InvalidPair();
 error InvalidReentrancy();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
 error InvalidTransfer();
 error InvalidVolatility(uint16 sigma);
-error JitLiquidity(uint256 distance);
 error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
@@ -93,7 +91,6 @@ struct PortfolioPair {
 struct PortfolioCurve {
     // single slot
     uint128 maxPrice; // Can be used as a terminal price (max price that can be reached by maturity).
-    uint16 jit; // Set to a default value in seconds for non-controlled pools.
     uint16 fee; // Can be manipulated by a controller of a pool, if there is one.
     uint16 duration; // Set to max duration for perpetual pools.
     uint16 volatility; // Effects the pool like an amplification factor, increasing price impact of swaps.
@@ -107,7 +104,7 @@ struct PortfolioPool {
     uint128 virtualY; // Total Y reserves in WAD units for all liquidity.
     uint128 liquidity; // Total supply of liquidity.
     uint32 lastTimestamp; // The block.timestamp of the last swap.
-    address controller; // Address that can change fee, priorityFee, or jit params.
+    address controller; // Address that can change fee, priorityFee params.
     PortfolioCurve params; // Parameters of the objective's trading function.
     PortfolioPair pair; // Token pair data.
 }
@@ -370,9 +367,6 @@ function checkParameters(PortfolioCurve memory self)
     pure
     returns (bool, bytes memory)
 {
-    if (self.jit > JUST_IN_TIME_MAX) {
-        return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
-    }
     if (!AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
     {
         return (

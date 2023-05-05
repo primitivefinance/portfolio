@@ -55,7 +55,6 @@ contract TestGas is Setup {
     function test_gas_single_deallocate()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(10 ether)
@@ -129,7 +128,6 @@ contract TestGas is Setup {
                 hundred,
                 1e4,
                 hundred,
-                0,
                 10 ether,
                 10 ether
             )
@@ -223,7 +221,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_2_pool_2_pair()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
@@ -250,7 +247,6 @@ contract TestGas is Setup {
                 hundred,
                 1e4,
                 hundred,
-                0,
                 10 ether,
                 10 ether
             )
@@ -289,7 +285,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_2()
         public
         pauseGas
-        noJit
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
@@ -302,7 +297,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_5()
         public
         pauseGas
-        noJit
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
@@ -315,7 +309,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_10()
         public
         pauseGas
-        noJit
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
@@ -328,7 +321,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_25()
         public
         pauseGas
-        noJit
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
@@ -341,7 +333,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_50()
         public
         pauseGas
-        noJit
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
@@ -354,7 +345,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_100()
         public
         pauseGas
-        noJit
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
@@ -367,7 +357,6 @@ contract TestGas is Setup {
     function test_gas_multi_create_pool_100()
         public
         pauseGas
-        noJit
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
@@ -537,7 +526,6 @@ contract TestGas is Setup {
                         uint16(100 + 100 / i),
                         uint16(1000 + 1000 / i),
                         uint16(1 + 100 / i),
-                        0,
                         uint128(1 ether * i),
                         uint128(1 ether * i)
                     )
@@ -667,7 +655,6 @@ contract TestGas is Setup {
                 uint16(100),
                 uint16(1000),
                 uint16(100),
-                uint16(4),
                 uint128(1 ether),
                 uint128(1 ether)
             )
@@ -782,7 +769,6 @@ contract TestGas is Setup {
     function test_gas_chain_swap_deallocate_create_allocate_from_portfolio()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(100 ether)
@@ -874,7 +860,6 @@ contract TestGas is Setup {
     function test_gas_chain_allocate_deallocate_from_portfolio_balance()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(10 ether)

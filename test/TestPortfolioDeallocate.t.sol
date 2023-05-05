@@ -6,7 +6,6 @@ import "./Setup.sol";
 contract TestPortfolioDeallocate is Setup {
     function test_deallocate_max()
         public
-        noJit
         defaultConfig
         useActor
         usePairTokens(10 ether)
@@ -47,7 +46,6 @@ contract TestPortfolioDeallocate is Setup {
 
     function test_deallocate_low_decimals(uint64 liquidity)
         public
-        noJit
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
@@ -75,7 +73,6 @@ contract TestPortfolioDeallocate is Setup {
         uint16 volatility
     )
         public
-        noJit
         volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
         useActor
         usePairTokens(500 ether)
@@ -103,7 +100,6 @@ contract TestPortfolioDeallocate is Setup {
         uint16 duration
     )
         public
-        noJit
         durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
@@ -128,7 +124,6 @@ contract TestPortfolioDeallocate is Setup {
 
     function testFuzz_deallocate_weth(uint64 liquidity)
         public
-        noJit
         wethConfig
         useActor
         usePairTokens(500 ether)
@@ -157,7 +152,6 @@ contract TestPortfolioDeallocate is Setup {
         uint24 timestep
     )
         public
-        noJit
         defaultConfig
         useActor
         usePairTokens(500 ether)
@@ -183,7 +177,6 @@ contract TestPortfolioDeallocate is Setup {
 
     function test_deallocate_reverts_when_min_asset_unmatched()
         public
-        noJit
         defaultConfig
         useActor
         usePairTokens(10 ether)
@@ -209,7 +202,6 @@ contract TestPortfolioDeallocate is Setup {
 
     function test_deallocate_reverts_when_min_quote_unmatched()
         public
-        noJit
         defaultConfig
         useActor
         usePairTokens(10 ether)

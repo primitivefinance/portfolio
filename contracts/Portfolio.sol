@@ -167,8 +167,7 @@ abstract contract PortfolioVirtual is Objective {
     function changeParameters(
         uint64 poolId,
         uint16 priorityFee,
-        uint16 fee,
-        uint16 jit
+        uint16 fee
     ) external {
         _preLock();
         PortfolioPool storage pool = pools[poolId];
@@ -176,13 +175,12 @@ abstract contract PortfolioVirtual is Objective {
 
         PortfolioCurve memory modified;
         modified = pool.params;
-        if (jit != 0) modified.jit = jit;
         if (fee != 0) modified.fee = fee;
         if (priorityFee != 0) modified.priorityFee = priorityFee;
 
         pool.changePoolParameters(modified);
 
-        emit ChangeParameters(poolId, priorityFee, fee, jit);
+        emit ChangeParameters(poolId, priorityFee, fee);
         _postLock();
     }
 
@@ -345,10 +343,6 @@ abstract contract PortfolioVirtual is Objective {
     function _changeLiquidity(ChangeLiquidityParams memory args) internal {
         (PortfolioPool storage pool, PortfolioPosition storage position) =
             (pools[args.poolId], positions[args.owner][args.poolId]);
-
-        bool canUpdate =
-            checkPosition(args.poolId, args.owner, args.deltaLiquidity);
-        if (!canUpdate) revert JitLiquidity(pool.params.jit);
 
         (uint128 deltaAssetWad, uint128 deltaQuoteWad) =
             (args.deltaAsset.safeCastTo128(), args.deltaQuote.safeCastTo128());
@@ -673,12 +667,11 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
-     * @param controller An address that can change the `fee`, `priorityFee`, and `jit` parameters of the created pool.
+     * @param controller An address that can change the `fee`, `priorityFee` parameters of the created pool.
      * @param priorityFee Priority fee for the pool (10,000 being 100%). This is a percentage of fees paid by the controller when swapping.
      * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
      * @param volatility Expected volatility of the pool in basis points, minimum of 1 (0.01%) and maximum of 25,000 (250%).
      * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
-     * @param jit Just In Time policy (expressed in seconds).
      * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
      * @param price Initial price of the pool (expressed in the quote token), in WAD units.
      */
@@ -689,7 +682,6 @@ abstract contract PortfolioVirtual is Objective {
         uint16 fee,
         uint16 volatility,
         uint16 duration,
-        uint16 jit,
         uint128 maxPrice,
         uint128 price
     ) external payable returns (uint64 poolId) {
@@ -717,7 +709,6 @@ abstract contract PortfolioVirtual is Objective {
         bool isPerpetual = duration == type(uint16).max ? true : false; // type(uint16).max is a magic variable
         PortfolioCurve memory params = PortfolioCurve({
             maxPrice: maxPrice,
-            jit: hasController ? jit : uint16(_liquidityPolicy),
             fee: fee,
             duration: isPerpetual ? uint16(MAX_DURATION) : duration, // Set duration to the max if perpetual.
             volatility: volatility,
@@ -736,7 +727,6 @@ abstract contract PortfolioVirtual is Objective {
             pool.pair.tokenQuote,
             pool.controller,
             pool.params.maxPrice,
-            pool.params.jit,
             pool.params.fee,
             pool.params.duration,
             pool.params.volatility,
