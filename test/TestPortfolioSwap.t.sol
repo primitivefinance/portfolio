@@ -499,7 +499,7 @@ contract TestPortfolioSwap is Setup {
         uint256 amountIn,
         uint256 amountOut
     ) internal {
-        uint256 prevPrice = subject().getVirtualPrice(ghost().poolId);
+        uint256 prevPrice = subject().getSpotPrice(ghost().poolId);
 
         bytes[] memory data = new bytes[](1);
         Order memory order = Order({
@@ -512,7 +512,7 @@ contract TestPortfolioSwap is Setup {
         data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
         subject().multicall(data);
 
-        uint256 postPrice = subject().getVirtualPrice(ghost().poolId);
+        uint256 postPrice = subject().getSpotPrice(ghost().poolId);
         if (sellAsset) {
             assertTrue(postPrice < prevPrice, "price-not-decreased");
         } else {
