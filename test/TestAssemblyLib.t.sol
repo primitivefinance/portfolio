@@ -54,11 +54,4 @@ contract TestAssemblyLib is Test {
             output, delta < 0 ? input - uint128(-delta) : input + uint128(delta)
         );
     }
-
-    /*
-    function test_trimBytes() public {
-        bytes memory output = AssemblyLib.trimBytes(abi.encode(2));
-        assertEq(output, hex"02");
-    }
-    */
 }
