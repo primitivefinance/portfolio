@@ -129,25 +129,6 @@ library AssemblyLib {
      * @dev There's no explict casting from dynamic to fixed sized bytes, this function
      * handles it for us.
      */
-    function toBytes16(bytes memory raw) internal pure returns (bytes16 data) {
-        bytes4 errorSelector = DataTooLong.selector;
-
-        assembly {
-            if gt(mload(raw), 16) {
-                mstore(0, errorSelector)
-                revert(0, 4)
-            }
-
-            data := mload(add(raw, 32))
-            let shift := mul(sub(16, mload(raw)), 8)
-            data := shr(shift, data)
-        }
-    }
-
-    /**
-     * @dev There's no explict casting from dynamic to fixed sized bytes, this function
-     * handles it for us.
-     */
     function toBytes8(bytes memory raw) internal pure returns (bytes8 data) {
         bytes4 errorSelector = DataTooLong.selector;
 
