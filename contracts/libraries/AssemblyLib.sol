@@ -139,37 +139,6 @@ library AssemblyLib {
     }
 
     /**
-     * @dev Packs the upper and lower bits of a byte.
-     * @param upper Upper bit of the byte.
-     * @param lower Lower bit of the byte.
-     * @return data Packed byte.
-     * @custom:example
-     * ```
-     * bytes1 0x21 = pack(0x20, 0x01);
-     * ```
-     */
-    function pack(
-        bytes1 upper,
-        bytes1 lower
-    ) internal pure returns (bytes1 data) {
-        data = upper << 4 | (lower & 0x0F);
-    }
-
-    function fromAmount(uint128 amount)
-        internal
-        pure
-        returns (uint8 power, uint128 base)
-    {
-        if (amount == 0) return (0, 0);
-        base = amount;
-
-        while (base % 10 == 0) {
-            ++power;
-            base /= 10;
-        }
-    }
-
-    /**
      * @dev Scalars are used to convert token amounts between the token's decimal units
      * and WAD (10^18) units.
      */
