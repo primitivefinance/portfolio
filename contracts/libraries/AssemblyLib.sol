@@ -106,25 +106,6 @@ library AssemblyLib {
     }
 
     /**
-     * @notice Computes the difference between two checkpoints.
-     * @dev Underflows.
-     * @custom:example
-     * ```
-     * uint256 distance = computeCheckpointDistance(50, 25);
-     * assertEq(distance, 25);
-     * ```
-     */
-    function computeCheckpointDistance(
-        uint256 present,
-        uint256 past
-    ) internal pure returns (uint256 distance) {
-        // Underflow by design, as these are checkpoints which can measure the distance even if underflowed.
-        assembly {
-            distance := sub(present, past)
-        }
-    }
-
-    /**
      * @notice Days units are used in Portfolio because they fit into an unsigned 16-bit integer and they
      * are human readable.
      * @dev Reverts on overflow.
