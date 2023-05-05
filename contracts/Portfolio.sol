@@ -600,7 +600,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Swap(
             args.poolId,
-            getVirtualPrice(args.poolId),
+            getSpotPrice(args.poolId),
             _state.tokenInput,
             iteration.input,
             _state.tokenOutput,
