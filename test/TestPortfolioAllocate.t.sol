@@ -6,6 +6,47 @@ import "./Setup.sol";
 contract TestPortfolioAllocate is Setup {
     using AssemblyLib for uint256;
 
+    function test_multicall_create_pair_pool_allocate() public noJit useActor {
+        MockERC20 tokenA = new MockERC20("TokenA", "AAA", 18);
+        MockERC20 tokenB = new MockERC20("TokenB", "BBB", 18);
+
+        tokenA.mint(actor(), 100 ether);
+        tokenB.mint(actor(), 100 ether);
+
+        tokenA.approve(address(subject()), type(uint256).max);
+        tokenB.approve(address(subject()), type(uint256).max);
+
+        bytes[] memory data = new bytes[](3);
+        data[0] = abi.encodeCall(
+            IPortfolioActions.createPair, (address(tokenA), address(tokenB))
+        );
+
+        data[1] = abi.encodeCall(
+            IPortfolioActions.createPool,
+            (0, address(0), 1, 100, 100, 100, 100, 1 ether, 1 ether)
+        );
+
+        uint64 poolId = FVM.encodePoolId(1, false, 1);
+
+        data[2] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, poolId, 1 ether, type(uint128).max, type(uint128).max)
+        );
+
+        subject().multicall(data);
+
+        (
+            uint128 virtualX,
+            uint128 virtualY,
+            uint128 liquidity,
+            uint32 lastTimestamp,
+            address controller,
+            ,
+        ) = subject().pools(poolId);
+
+        assertEq(liquidity, 1 ether, "liquidity");
+    }
+
     function test_allocate_weth()
         public
         noJit
