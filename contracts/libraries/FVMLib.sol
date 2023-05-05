@@ -32,8 +32,6 @@ pragma solidity 0.8.13;
 
 import "./AssemblyLib.sol";
 
-error InvalidBytesLength(uint256 expected, uint256 length); // 0xe19dc95e
-
 /**
  * @dev Returns an encoded pool id given specific pool parameters.
  * The encoding is simply packing the different parameters together.
