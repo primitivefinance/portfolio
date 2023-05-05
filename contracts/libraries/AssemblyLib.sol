@@ -179,32 +179,4 @@ library AssemblyLib {
         uint256 factor = computeScalar(decimals);
         outputDec = (amountWad - 1) / factor + 1; // ((a-1) / b) + 1
     }
-
-    /*
-
-    /!\ Do not use this function, it's completely cursed:
-    Using this function twice in a row will result in the first output being
-    assigned the value of the second output...
-
-    function trimBytes(bytes memory input) internal pure returns (bytes memory output) {
-        assembly {
-            let length := mload(input)
-            let value := mload(add(0x20, input))
-
-            for {} 1 {} {
-                let s := byte(0, value)
-
-                switch iszero(s)
-                    case 0 { break }
-                    case 1 {
-                        value := shl(8, value)
-                        length := sub(length, 1)
-                    }
-            }
-
-            mstore(output, length)
-            mstore(add(0x20, output), value)
-        }
-    }
-    */
 }
