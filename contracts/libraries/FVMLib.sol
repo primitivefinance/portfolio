@@ -55,37 +55,3 @@ function encodePoolId(
         poolId := or(or(shl(40, pairId), shl(32, isMutable)), poolNonce)
     }
 }
-
-/**
- * @dev Decodes the parameters of a pool given its id.
- * The pool id is expected to be encoded using the following format:\
- * `0x | pairId (3 bytes) | isMutable (1 byte) | poolNonce (4 bytes)`
- * @param data Encoded pool id
- * @return poolId Pool id converted from bytes to uint64
- * @return pairId Pair id of the pool
- * @return isMutable True if the pool is mutable
- * @return poolNonce Pool nonce of the pool
- * @custom:example
- * ```
- * (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
- *     = decodePoolId(0x000007010000002a);
- * ```
- */
-function decodePoolId(bytes calldata data)
-    pure
-    returns (uint64 poolId, uint24 pairId, uint8 isMutable, uint32 poolNonce)
-{
-    // Using Solidity here doesn't impact the gas cost.
-    if (data.length != 8) revert InvalidBytesLength(8, data.length);
-
-    assembly {
-        // For some reason not using calldataload all the time helps reducing
-        // the gas cost. I think it might be linked to going too deep into the
-        // stack.
-        let value := calldataload(data.offset)
-        poolId := shr(192, calldataload(data.offset))
-        pairId := shr(232, calldataload(data.offset))
-        isMutable := shr(248, calldataload(add(3, data.offset)))
-        poolNonce := shr(224, shl(32, value))
-    }
-}
