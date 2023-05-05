@@ -43,8 +43,9 @@ contract TestPortfolioCreatePool is Setup {
 
         subject().multicall(data);
 
-        uint64 poolId =
-            FVM.encodePoolId(pairId, true, subject().getPoolNonce(pairId));
+        uint64 poolId = AssemblyLib.encodePoolId(
+            pairId, true, subject().getPoolNonce(pairId)
+        );
         setGhostPoolId(poolId);
 
         PortfolioPool memory pool = ghost().pool();
@@ -69,7 +70,7 @@ contract TestPortfolioCreatePool is Setup {
         );
         subject().multicall(data);
 
-        uint64 poolId = FVM.encodePoolId(
+        uint64 poolId = AssemblyLib.encodePoolId(
             pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
         );
         assertEq(
@@ -157,7 +158,7 @@ contract TestPortfolioCreatePool is Setup {
         );
 
         subject().multicall(data);
-        uint64 poolId = FVM.encodePoolId(
+        uint64 poolId = AssemblyLib.encodePoolId(
             pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
         );
         assertEq(

@@ -142,7 +142,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
 
             instructions[i] = abi.encodeCall(
                 IPortfolioActions.allocate,
@@ -262,7 +262,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
 
             bytes[] memory go = new bytes[](1);
             go[0] = abi.encodeCall(
@@ -403,7 +403,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
             subject().allocate(
                 false, poolId, 5 ether, type(uint128).max, type(uint128).max
             );
@@ -546,8 +546,9 @@ contract TestGas is Setup {
         }
 
         // Super important
-        uint64 poolId =
-            FVM.encodePoolId(uint24(1), controller != address(0), uint32(1));
+        uint64 poolId = AssemblyLib.encodePoolId(
+            uint24(1), controller != address(0), uint32(1)
+        );
         // By setting this poolId all the modifiers that rely on the tokens asset and quote
         // can use this set poolId's pair. Since we created all the pools with the same pair,
         // all the test modifiers work, even though we don't use a config modifier in the beginning of them.
@@ -734,8 +735,9 @@ contract TestGas is Setup {
         }
 
         uint24 pairId = 1;
-        uint64 poolId =
-            FVM.encodePoolId(pairId, false, subject().getPoolNonce(pairId) + 1);
+        uint64 poolId = AssemblyLib.encodePoolId(
+            pairId, false, subject().getPoolNonce(pairId) + 1
+        );
 
         bytes[] memory instructions = new bytes[](2);
         instructions[0] = _createInstruction(pairId);
@@ -854,8 +856,9 @@ contract TestGas is Setup {
         }
 
         uint24 pairId = 1;
-        uint64 poolId =
-            FVM.encodePoolId(pairId, false, subject().getPoolNonce(pairId) + 1);
+        uint64 poolId = AssemblyLib.encodePoolId(
+            pairId, false, subject().getPoolNonce(pairId) + 1
+        );
 
         bytes[] memory instructions = new bytes[](2);
         instructions[0] = _createInstruction(pairId);

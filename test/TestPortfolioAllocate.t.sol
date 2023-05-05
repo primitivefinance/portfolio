@@ -26,7 +26,7 @@ contract TestPortfolioAllocate is Setup {
             (0, address(0), 1, 100, 100, 100, 100, 1 ether, 1 ether)
         );
 
-        uint64 poolId = FVM.encodePoolId(1, false, 1);
+        uint64 poolId = AssemblyLib.encodePoolId(1, false, 1);
 
         data[2] = abi.encodeCall(
             IPortfolioActions.allocate,
