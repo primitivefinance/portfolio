@@ -23,11 +23,11 @@ abstract contract PortfolioVirtual is Objective {
             mstore(0x00, 0x20)
 
             // Then we load both the length of our string (11 bytes, 0x0b in hex) and its
-            // actual hex value (0x76312e302e302d62657461) using the offset 0x2b. Using this
+            // actual hex value (0x76312e312e312d62657461) using the offset 0x2b. Using this
             // particular offset value will right pad the length at the end of the slot
             // and left pad the string at the beginning of the next slot, assuring the
             // right ABI format to return a string.
-            mstore(0x2b, 0x0b76312e302e302d62657461) // "v1.0.0-beta"
+            mstore(0x2b, 0x0b76312e312e312d62657461) // "v1.1.1-beta"
 
             // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
@@ -62,12 +62,13 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev
-     * Manipulated in `_swap` to avoid stack too deep.
-     * Utilized in virtual function implementations to handle fee growth, if any.
+     * Manipulated in `_swap` to avoid stack too deep and contract size limit.
      *
      * @custom:invariant MUST be deleted after every transaction that uses it.
      */
     SwapState private _state;
+
+    bool private _currentMulticall;
 
     /**
      * @dev
@@ -82,14 +83,20 @@ abstract contract PortfolioVirtual is Objective {
      * Step 8. Validate Portfolio's account system was settled.
      * Step 10. Exit `_locked` re-entrancy guard.
      */
-    modifier lock() {
-        if (_locked != 1) revert InvalidReentrancy();
+    function _preLock() private {
+        if (_locked != 1 && !_currentMulticall) {
+            revert InvalidReentrancy();
+        }
 
         _locked = 2;
-        _;
+    }
+
+    function _postLock() private {
         _locked = 1;
 
-        if (!__account__.settled) revert InvalidSettlement();
+        if (!__account__.settled && !_currentMulticall) {
+            revert InvalidSettlement();
+        }
     }
 
     /**
@@ -124,38 +131,57 @@ abstract contract PortfolioVirtual is Objective {
 
     // ===== External Actions ===== //
 
-    /// @inheritdoc IPortfolioActions
-    function multiprocess(bytes calldata data) external payable lock {
+    function multicall(bytes[] calldata data)
+        public
+        payable
+        returns (bytes[] memory results)
+    {
+        _preLock();
+        _currentMulticall = true;
+
         // Wraps msg.value.
         _deposit();
 
-        // Effects
-        if (data[0] != FVM.INSTRUCTION_JUMP) _process(data);
-        else FVM._jumpProcess(data, _process);
+        results = new bytes[](data.length);
 
+        for (uint256 i = 0; i < data.length; i++) {
+            (bool success, bytes memory result) =
+                address(this).delegatecall(data[i]);
+
+            if (!success) {
+                assembly {
+                    revert(add(32, result), mload(result))
+                }
+            }
+
+            results[i] = result;
+        }
+
+        _currentMulticall = false;
         // Interactions
         _settlement();
+        _postLock();
     }
 
     /// @inheritdoc IPortfolioActions
     function changeParameters(
         uint64 poolId,
         uint16 priorityFee,
-        uint16 fee,
-        uint16 jit
-    ) external lock {
+        uint16 fee
+    ) external {
+        _preLock();
         PortfolioPool storage pool = pools[poolId];
         if (pool.controller != msg.sender) revert NotController();
 
         PortfolioCurve memory modified;
         modified = pool.params;
-        if (jit != 0) modified.jit = jit;
         if (fee != 0) modified.fee = fee;
         if (priorityFee != 0) modified.priorityFee = priorityFee;
 
         pool.changePoolParameters(modified);
 
-        emit ChangeParameters(poolId, priorityFee, fee, jit);
+        emit ChangeParameters(poolId, priorityFee, fee);
+        _postLock();
     }
 
     // ===== Internal ===== //
@@ -168,14 +194,23 @@ abstract contract PortfolioVirtual is Objective {
      * @return deltaAsset Real quantity of `asset` tokens paid to pool, in native token decimals.
      * @return deltaQuote Real quantity of `quote` tokens paid to pool, in native token decimals.
      */
-    function _allocate(
+    function allocate(
         bool useMax,
         uint64 poolId,
         uint128 deltaLiquidity,
         uint128 maxDeltaAsset,
         uint128 maxDeltaQuote
-    ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote) {
+        _preLock();
+        if (_currentMulticall == false) _deposit();
+
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
+
+        (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
+            poolId: poolId,
+            amountAssetDec: maxDeltaAsset,
+            amountQuoteDec: maxDeltaQuote
+        });
 
         PortfolioPair memory pair = pools[poolId].pair;
 
@@ -228,19 +263,37 @@ abstract contract PortfolioVirtual is Objective {
             deltaQuote,
             deltaLiquidity
             );
+
+        if (_currentMulticall == false) _settlement();
+        _postLock();
     }
 
     /**
      * @dev Reduces virtual reserves and liquidity. Credits `msg.sender`.
+     * @param deltaLiquidity Quantity of liquidity to burn in WAD units.
+     * @param minDeltaAsset Minimum quantity of asset tokens to receive in WAD units.
+     * @param minDeltaQuote Minimum quantity of quote tokens to receive in WAD units.
+     * @return deltaAsset Real quantity of `asset` tokens received from pool, in native token decimals.
+     * @return deltaQuote Real quantity of `quote` tokens received from pool, in native token decimals.
      */
-    function _deallocate(
+    function deallocate(
         bool useMax,
         uint64 poolId,
         uint128 deltaLiquidity,
         uint128 minDeltaAsset,
         uint128 minDeltaQuote
-    ) internal returns (uint256 deltaAsset, uint256 deltaQuote) {
+    ) external payable returns (uint256 deltaAsset, uint256 deltaQuote) {
+        _preLock();
+
+        if (_currentMulticall == false) _deposit();
+
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
+
+        (minDeltaAsset, minDeltaQuote) = _scaleAmountsToWad({
+            poolId: poolId,
+            amountAssetDec: minDeltaAsset,
+            amountQuoteDec: minDeltaQuote
+        });
 
         PortfolioPair memory pair = pools[poolId].pair;
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
@@ -279,6 +332,9 @@ abstract contract PortfolioVirtual is Objective {
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
             );
+
+        if (_currentMulticall == false) _settlement();
+        _postLock();
     }
 
     /**
@@ -287,10 +343,6 @@ abstract contract PortfolioVirtual is Objective {
     function _changeLiquidity(ChangeLiquidityParams memory args) internal {
         (PortfolioPool storage pool, PortfolioPosition storage position) =
             (pools[args.poolId], positions[args.owner][args.poolId]);
-
-        bool canUpdate =
-            checkPosition(args.poolId, args.owner, args.deltaLiquidity);
-        if (!canUpdate) revert JitLiquidity(pool.params.jit);
 
         (uint128 deltaAssetWad, uint128 deltaQuoteWad) =
             (args.deltaAsset.safeCastTo128(), args.deltaQuote.safeCastTo128());
@@ -338,26 +390,45 @@ abstract contract PortfolioVirtual is Objective {
      * Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote)
      * for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
      *
-     * Fees can be saved into two buckets:
-     * 1. Re-invested into the pool, increasing the value of liquidity.
-     * 2. Pro-rata distribution to all liquidity position's `owed` tokens, via fee growth accumulator.
+     * Fees are re-invested into the pool, increasing the value of liquidity.
      *
-     * These different fee buckets are applied using this logic:
-     * 1. Add the input swap amount, fee included, to the per liquidity reserves in `syncPool`.
-     * 2. Add the input swap amount less the fee, to the per liquidity reserves in `syncPool`
-     *    and increase the `feeGrowthGlobal` value by the `feeAmount` divided by `pool.liquidity`.
+     * This is done via the following logic:
+     * - Compute the new reserve that is being increased without the fee amount included.
+     * - Check the invariant condition passes using this new reserve without the fee amount included.
+     * - Update the new reserve with the fee amount included in `syncPool`.
      *
-     * @custom:invariant MUST not change liquidity of a pool.
+     * @param args Swap parameters, token amounts are expected to be in WAD units.
+     * @return poolId Pool which had the swap happen.
+     * @return input Real quantity of `input` tokens sent to pool, in native token decimals.
+     * @return output Real quantity of `output` tokens sent to swapper, in native token decimals.
      */
-    function _swap(Order memory args)
-        internal
+    function swap(Order memory args)
+        external
+        payable
         returns (uint64 poolId, uint256 input, uint256 output)
     {
+        _preLock();
+        if (_currentMulticall == false) _deposit();
+
+        if (args.sellAsset) {
+            (args.input, args.output) = _scaleAmountsToWad({
+                poolId: args.poolId,
+                amountAssetDec: args.input,
+                amountQuoteDec: args.output
+            });
+        } else {
+            (args.output, args.input) = _scaleAmountsToWad({
+                poolId: args.poolId,
+                amountAssetDec: args.output,
+                amountQuoteDec: args.input
+            });
+        }
+
         PortfolioPool storage pool = pools[args.poolId];
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
         // -=- Load Fee & Token Info -=- //
-        _state.sell = args.sellAsset == 1;
+        _state.sell = args.sellAsset == true;
         _state.fee = msg.sender == pool.controller
             ? pool.params.priorityFee
             : pool.params.fee;
@@ -377,7 +448,7 @@ abstract contract PortfolioVirtual is Objective {
                 _beforeSwapEffects(args.poolId, _state.sell);
             if (!success) revert PoolExpired();
 
-            if (args.useMax == 1) {
+            if (args.useMax == true) {
                 // Net balance is the surplus of tokens in the accounting state that can be spent.
                 int256 netBalance = getNetBalance(
                     _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
@@ -514,6 +585,7 @@ abstract contract PortfolioVirtual is Objective {
             // But all the token related amounts must be in their native token decimals.
             iteration.input = iteration.input.scaleFromWadDown(inputDec);
             iteration.output = iteration.output.scaleFromWadDown(outputDec);
+            iteration.feeAmount = iteration.feeAmount.scaleFromWadDown(inputDec);
 
             if (iteration.protocolFeeAmount != 0) {
                 protocolFees[_state.tokenInput] += iteration.protocolFeeAmount;
@@ -522,7 +594,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Swap(
             args.poolId,
-            getVirtualPrice(args.poolId),
+            getSpotPrice(args.poolId),
             _state.tokenInput,
             iteration.input,
             _state.tokenOutput,
@@ -532,6 +604,10 @@ abstract contract PortfolioVirtual is Objective {
             );
 
         delete _state;
+
+        if (_currentMulticall == false) _settlement();
+        _postLock();
+
         return (args.poolId, iteration.input, iteration.output);
     }
 
@@ -554,10 +630,12 @@ abstract contract PortfolioVirtual is Objective {
         }
     }
 
-    function _createPair(
+    function createPair(
         address asset,
         address quote
-    ) internal returns (uint24 pairId) {
+    ) external payable returns (uint24 pairId) {
+        _preLock();
+
         if (asset == quote) revert SameTokenError();
 
         pairId = getPairId[asset][quote];
@@ -583,30 +661,32 @@ abstract contract PortfolioVirtual is Objective {
         });
 
         emit CreatePair(pairId, asset, quote, decimalsAsset, decimalsQuote);
+
+        _postLock();
     }
 
     /**
      * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
-     * @param controller An address that can change the `fee`, `priorityFee`, and `jit` parameters of the created pool.
+     * @param controller An address that can change the `fee`, `priorityFee` parameters of the created pool.
      * @param priorityFee Priority fee for the pool (10,000 being 100%). This is a percentage of fees paid by the controller when swapping.
      * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
-     * @param volatility Expected volatility of the pool.
+     * @param volatility Expected volatility of the pool in basis points, minimum of 1 (0.01%) and maximum of 25,000 (250%).
      * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
-     * @param jit Just In Time policy (expressed in seconds).
-     * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token).
-     * @param price Initial price of the pool (expressed in the quote token).
+     * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
+     * @param price Initial price of the pool (expressed in the quote token), in WAD units.
      */
-    function _createPool(
+    function createPool(
         uint24 pairId,
         address controller,
         uint16 priorityFee,
         uint16 fee,
         uint16 volatility,
         uint16 duration,
-        uint16 jit,
         uint128 maxPrice,
         uint128 price
-    ) internal returns (uint64 poolId) {
+    ) external payable returns (uint64 poolId) {
+        _preLock();
+
         if (price == 0) revert ZeroPrice();
         uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable
         if (pairNonce == 0) revert InvalidPair();
@@ -614,7 +694,8 @@ abstract contract PortfolioVirtual is Objective {
         bool hasController = controller != address(0);
         {
             uint32 poolNonce = ++getPoolNonce[pairNonce];
-            poolId = FVM.encodePoolId(pairNonce, hasController, poolNonce);
+            poolId =
+                AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
         }
 
         PortfolioPool storage pool = pools[poolId];
@@ -625,16 +706,18 @@ abstract contract PortfolioVirtual is Objective {
         pool.lastTimestamp = timestamp;
         pool.pair = pairs[pairNonce];
 
-        bool isPerpetual = duration == type(uint16).max ? true : false; // type(uint16).max is a magic variable
+        // `type(uint16).max` is a magic variable for perpetual pools.
+        if (duration > uint16(MAX_DURATION) && duration != type(uint16).max) {
+            revert InvalidDuration(duration);
+        }
+
         PortfolioCurve memory params = PortfolioCurve({
             maxPrice: maxPrice,
-            jit: hasController ? jit : uint16(_liquidityPolicy),
             fee: fee,
-            duration: isPerpetual ? uint16(MAX_DURATION) : duration, // Set duration to the max if perpetual.
+            duration: duration,
             volatility: volatility,
             priorityFee: hasController ? priorityFee : 0,
-            createdAt: timestamp,
-            perpetual: isPerpetual
+            createdAt: timestamp
         });
         pool.changePoolParameters(params);
 
@@ -647,12 +730,13 @@ abstract contract PortfolioVirtual is Objective {
             pool.pair.tokenQuote,
             pool.controller,
             pool.params.maxPrice,
-            pool.params.jit,
             pool.params.fee,
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
             );
+
+        _postLock();
     }
 
     // ===== Accounting System ===== //
@@ -661,7 +745,7 @@ abstract contract PortfolioVirtual is Objective {
      * @dev Wraps address(this).balance of ether but does not credit to `msg.sender`.
      * Received WETH will remain in the contract as a surplus, i.e. `getNetBalance(WETH)` will be positive.
      * The `settlement` function handles how to apply the surplus,
-     * by either using it to pay a debit or by gifting the `msg.sender`.
+     * by either using it to pay a debit or transferring it to `msg.sender`.
      */
     function _deposit() internal {
         if (msg.value > 0) {
@@ -672,6 +756,8 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
+     * @param token Address of the token to increment the reserves of.
+     * @param amount Quantity of tokens to add to the reserves in WAD units.
      *
      * @custom:security Directly manipulates reserves.
      */
@@ -682,6 +768,8 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Reserves are an internally tracked amount of tokens that should match the return value of `balanceOf`.
+     * @param token Address of the token to decrement the reserves of.
+     * @param amount Quantity of tokens to subtract from the reserves in WAD units.
      *
      * @custom:security Directly manipulates reserves.
      * @custom:reverts With `InsufficientReserve` if current reserve balance for `token` iss less than `amount`.
@@ -693,6 +781,10 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Used on every entry point to scale user-provided arguments from decimals to WAD.
+     * @param amountAssetDec Quantity of asset tokens in native token decimals.
+     * @param amountQuoteDec Quantity of quote tokens in native token decimals.
+     * @return amountAssetWad Quantity of asset tokens in WAD units.
+     * @return amountQuoteWad Quantity of quote tokens in WAD units.
      */
     function _scaleAmountsToWad(
         uint64 poolId,
@@ -715,109 +807,8 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
-     * @dev Use `multiprocess` to enter this function to process instructions.
-     * @param data Custom encoded FVM data. First byte must be an FVM instruction.
-     */
-    function _process(bytes calldata data) internal {
-        (, bytes1 instruction) = AssemblyLib.separate(data[0]); // Upper byte is useMax, lower byte is instruction.
-
-        if (instruction == FVM.SWAP_ASSET || instruction == FVM.SWAP_QUOTE) {
-            Order memory args;
-            (args.useMax, args.poolId, args.input, args.output, args.sellAsset)
-            = FVM.decodeSwap(data);
-
-            if (args.sellAsset == 1) {
-                (args.input, args.output) = _scaleAmountsToWad({
-                    poolId: args.poolId,
-                    amountAssetDec: args.input,
-                    amountQuoteDec: args.output
-                });
-            } else {
-                (args.output, args.input) = _scaleAmountsToWad({
-                    poolId: args.poolId,
-                    amountAssetDec: args.output,
-                    amountQuoteDec: args.input
-                });
-            }
-
-            _swap(args);
-        } else if (instruction == FVM.ALLOCATE) {
-            (
-                uint8 useMax,
-                uint64 poolId,
-                uint128 deltaLiquidity,
-                uint128 maxDeltaAsset,
-                uint128 maxDeltaQuote
-            ) = FVM.decodeAllocateOrDeallocate(data);
-
-            (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
-                poolId: poolId,
-                amountAssetDec: maxDeltaAsset,
-                amountQuoteDec: maxDeltaQuote
-            });
-
-            _allocate(
-                useMax == 1,
-                poolId,
-                deltaLiquidity,
-                maxDeltaAsset,
-                maxDeltaQuote
-            );
-        } else if (instruction == FVM.DEALLOCATE) {
-            (
-                uint8 useMax,
-                uint64 poolId,
-                uint128 deltaLiquidity,
-                uint128 minDeltaAsset,
-                uint128 minDeltaQuote
-            ) = FVM.decodeAllocateOrDeallocate(data);
-
-            (minDeltaAsset, minDeltaQuote) = _scaleAmountsToWad({
-                poolId: poolId,
-                amountAssetDec: minDeltaAsset,
-                amountQuoteDec: minDeltaQuote
-            });
-            _deallocate(
-                useMax == 1,
-                poolId,
-                deltaLiquidity,
-                minDeltaAsset,
-                minDeltaQuote
-            );
-        } else if (instruction == FVM.CREATE_POOL) {
-            (
-                uint24 pairId,
-                address controller,
-                uint16 priorityFee,
-                uint16 fee,
-                uint16 vol,
-                uint16 dur,
-                uint16 jit,
-                uint128 maxPrice,
-                uint128 price
-            ) = FVM.decodeCreatePool(data);
-            _createPool(
-                pairId,
-                controller,
-                priorityFee,
-                fee,
-                vol,
-                dur,
-                jit,
-                maxPrice,
-                price
-            );
-        } else if (instruction == FVM.CREATE_PAIR) {
-            (address asset, address quote) = FVM.decodeCreatePair(data);
-            _createPair(asset, quote);
-        } else {
-            revert InvalidInstruction();
-        }
-    }
-
-    /**
      * Be aware of these settlement invariants:
-     * =
+     *
      *     Invariant 1. Every token that is interacted with is cached and exists.
      *     Invariant 2. Tokens are removed from cache and cache is empty by end of settlement.
      *     Invariant 3. Cached tokens cannot be carried over from previous transactions.
@@ -839,8 +830,9 @@ abstract contract PortfolioVirtual is Objective {
 
             // Apply credits or debits to net balance.
             // If credited, these are extra tokens that will be transferred to `msg.sender`.
-            // If debited, some tokens were paid via `msg.sender`'s internal balance.
             // If remainder, not enough tokens were paid. Must be transferred in from `msg.sender`.
+            // The `credited` amount is in native token decimals of `token`.
+            // The `remainder` amount is in native token decimals of `token`.
             (uint256 credited, uint256 remainder) =
                 __account__.settle(token, address(this));
 
@@ -925,7 +917,8 @@ abstract contract PortfolioVirtual is Objective {
         delete _payments;
     }
 
-    function claimFee(address token, uint256 amount) external override lock {
+    /// @inheritdoc IPortfolioActions
+    function claimFee(address token, uint256 amount) external override {
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
         }
@@ -947,7 +940,8 @@ abstract contract PortfolioVirtual is Objective {
         emit ClaimFees(token, amount);
     }
 
-    function setProtocolFee(uint256 fee) external override lock {
+    /// @inheritdoc IPortfolioActions
+    function setProtocolFee(uint256 fee) external override {
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
         }

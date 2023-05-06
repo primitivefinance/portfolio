@@ -22,8 +22,9 @@ contract RevertCatcher {
     /**
      * @dev Assumes portfolio calls this, for testing only. Uses try catch to bubble up errors.
      */
+    /*
     function process(bytes calldata data) external payable returns (bool) {
-        try portfolio.multiprocess{value: msg.value}(data) { }
+        try portfolio.multicall{ value: msg.value }(data) { }
         catch (bytes memory reason) {
             assembly {
                 revert(add(32, reason), mload(reason))
@@ -31,12 +32,14 @@ contract RevertCatcher {
         }
         return true;
     }
+    */
 
     /**
      * @dev Assumes Portfolio calls this, for testing only. Uses try catch to bubble up errors.
      */
+    /*
     function jumpProcess(bytes calldata data) external payable returns (bool) {
-        try portfolio.multiprocess{value: msg.value}(data) { }
+        try portfolio.multiprocess{ value: msg.value }(data) { }
         catch (bytes memory reason) {
             assembly {
                 revert(add(32, reason), mload(reason))
@@ -44,4 +47,5 @@ contract RevertCatcher {
         }
         return true;
     }
+    */
 }

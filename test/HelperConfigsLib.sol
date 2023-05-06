@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "solmate/utils/SafeCastLib.sol";
 import "contracts/interfaces/IPortfolio.sol";
-import "contracts/libraries/FVMLib.sol" as FVMLib;
+import "contracts/libraries/AssemblyLib.sol";
 
 using Configs for ConfigState global;
 
@@ -15,7 +15,6 @@ struct ConfigState {
     uint16 priorityFeeBps;
     uint16 durationDays;
     uint16 volatilityBps;
-    uint16 justInTimeSec;
     uint128 terminalPriceWad;
     uint128 reportedPriceWad;
 }
@@ -24,7 +23,6 @@ uint16 constant DEFAULT_PRIORITY_FEE = 10;
 uint16 constant DEFAULT_FEE = 100; // 100 bps = 1%
 uint16 constant DEFAULT_VOLATILITY = 10_000;
 uint16 constant DEFAULT_DURATION = 365;
-uint16 constant DEFAULT_JIT = 4;
 uint128 constant DEFAULT_STRIKE = 10 ether;
 uint128 constant DEFAULT_PRICE = 10 ether;
 uint128 constant DEFAULT_LIQUIDITY = 1 ether;
@@ -68,7 +66,6 @@ library Configs {
             priorityFeeBps: DEFAULT_PRIORITY_FEE,
             durationDays: DEFAULT_DURATION,
             volatilityBps: DEFAULT_VOLATILITY,
-            justInTimeSec: DEFAULT_JIT,
             terminalPriceWad: DEFAULT_STRIKE,
             reportedPriceWad: DEFAULT_PRICE
         });
@@ -103,8 +100,6 @@ library Configs {
             self.priorityFeeBps = abi.decode(data, (uint16));
         } else if (what == "fee") {
             self.feeBps = abi.decode(data, (uint16));
-        } else if (what == "jit") {
-            self.justInTimeSec = abi.decode(data, (uint16));
         }
         return self;
     }
@@ -131,48 +126,53 @@ library Configs {
             IPortfolioGetters(Portfolio).getPairId(self.asset, self.quote);
         if (pairId == 0) {
             bytes[] memory data = new bytes[](2);
-            data[0] = (FVMLib.encodeCreatePair(self.asset, self.quote));
-            data[1] = (
-                FVMLib.encodeCreatePool({
-                    pairId: pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
-                    controller: self.controller,
-                    priorityFee: self.priorityFeeBps,
-                    fee: self.feeBps,
-                    dur: self.durationDays,
-                    vol: self.volatilityBps,
-                    jit: self.justInTimeSec,
-                    maxPrice: self.terminalPriceWad,
-                    price: self.reportedPriceWad
-                })
+            data[0] = abi.encodeCall(
+                IPortfolioActions.createPair, (self.asset, self.quote)
+            );
+            data[1] = abi.encodeCall(
+                IPortfolioActions.createPool,
+                (
+                    pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
+                    self.controller,
+                    self.priorityFeeBps,
+                    self.feeBps,
+                    self.volatilityBps,
+                    self.durationDays,
+                    self.terminalPriceWad,
+                    self.reportedPriceWad
+                )
             );
 
-            bytes memory payload = FVMLib.encodeJumpInstruction(data);
-
-            IPortfolio(Portfolio).multiprocess(payload);
+            IPortfolio(Portfolio).multicall(data);
 
             bool controlled = self.controller != address(0);
             uint24 pairNonce = IPortfolioGetters(Portfolio).getPairNonce();
-            poolId = FVMLib.encodePoolId(
+            poolId = AssemblyLib.encodePoolId(
                 pairNonce,
                 controlled,
                 IPortfolioGetters(Portfolio).getPoolNonce(pairNonce)
             );
             require(poolId != 0, "ConfigLib.generate failed to createPool");
         } else {
-            bytes memory payload = FVMLib.encodeCreatePool({
-                pairId: pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
-                controller: self.controller,
-                priorityFee: self.priorityFeeBps,
-                fee: self.feeBps,
-                dur: self.durationDays,
-                vol: self.volatilityBps,
-                jit: self.justInTimeSec,
-                maxPrice: self.terminalPriceWad,
-                price: self.reportedPriceWad
-            });
-            IPortfolio(Portfolio).multiprocess(payload);
+            bytes[] memory data = new bytes[](1);
+
+            data[0] = abi.encodeCall(
+                IPortfolioActions.createPool,
+                (
+                    pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
+                    self.controller,
+                    self.priorityFeeBps,
+                    self.feeBps,
+                    self.durationDays,
+                    self.volatilityBps,
+                    self.terminalPriceWad,
+                    self.reportedPriceWad
+                )
+            );
+
+            IPortfolio(Portfolio).multicall(data);
             bool controlled = self.controller != address(0);
-            poolId = FVMLib.encodePoolId(
+            poolId = AssemblyLib.encodePoolId(
                 pairId,
                 controlled,
                 IPortfolioGetters(Portfolio).getPoolNonce(pairId)

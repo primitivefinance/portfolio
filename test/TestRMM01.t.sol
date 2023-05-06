@@ -26,6 +26,6 @@ contract TestRMM01 is
     }
 
     function test_version() public {
-        assertEq(subject().VERSION(), "v1.0.0-beta", "version-not-equal");
+        assertEq(subject().VERSION(), "v1.1.1-beta", "version-not-equal");
     }
 }

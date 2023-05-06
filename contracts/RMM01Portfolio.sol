@@ -98,13 +98,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         address owner,
         int256 delta
     ) public view override returns (bool) {
-        // Just in time liquidity protection.
-        if (delta < 0) {
-            uint256 distance =
-                positions[owner][poolId].getTimeSinceChanged(block.timestamp);
-            return (pools[poolId].params.jit <= distance);
-        }
-
         return true;
     }
 
@@ -170,19 +163,21 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
+        int256 liquidityDelta,
         address swapper
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
+            liquidityDelta: liquidityDelta,
             timestamp: block.timestamp,
             swapper: swapper
         });
     }
 
     /// @inheritdoc Objective
-    function getVirtualPrice(uint64 poolId)
+    function getSpotPrice(uint64 poolId)
         public
         view
         override

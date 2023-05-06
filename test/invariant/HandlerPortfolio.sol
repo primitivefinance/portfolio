@@ -89,7 +89,7 @@ contract HandlerPortfolio is HandlerBase {
         uint16 priorityFee;
     }
 
-    bytes[] instructions;
+    bytes[] data;
 
     function _assertCreatePool(CreateArgs memory args) internal {
         address controller = address(0);
@@ -98,29 +98,32 @@ contract HandlerPortfolio is HandlerBase {
         {
             // PortfolioPair not created? Push a create pair call to the stack.
             if (pairId == 0) {
-                instructions.push(
-                    FVM.encodeCreatePair(args.token0, args.token1)
+                data.push(
+                    abi.encodeCall(
+                        IPortfolioActions.createPair, (args.token0, args.token1)
+                    )
                 );
             }
 
             // Push create pool to stack
-            instructions.push(
-                FVM.encodeCreatePool(
-                    pairId,
-                    controller,
-                    args.priorityFee, // priorityFee
-                    args.fee, // fee
-                    args.volatility, // vol
-                    args.duration, // dur
-                    4, // jit
-                    args.terminalPrice,
-                    args.price
+            data.push(
+                abi.encodeCall(
+                    IPortfolioActions.createPool,
+                    (
+                        pairId,
+                        controller,
+                        args.priorityFee, // priorityFee
+                        args.fee, // fee
+                        args.volatility, // vol
+                        args.duration, // dur
+                        args.terminalPrice,
+                        args.price
+                    )
                 )
-            ); // temp
+            );
         }
-        bytes memory payload = FVM.encodeJumpInstruction(instructions);
 
-        try ctx.subject().multiprocess(payload) {
+        try ctx.subject().multicall(data) {
             console.log("Successfully created a pool.");
         } catch {
             console.log("Errored on attempting to create a pool.");
@@ -131,7 +134,7 @@ contract HandlerPortfolio is HandlerBase {
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = FVM.encodePoolId(
+        uint64 poolId = AssemblyLib.encodePoolId(
             pairId, isMutable, uint32(ctx.subject().getPoolNonce(pairId))
         );
         // Add the created pool to the list of pools.
@@ -139,7 +142,7 @@ contract HandlerPortfolio is HandlerBase {
         ctx.addGhostPoolId(poolId);
 
         // Reset instructions so we don't use some old payload data...
-        delete instructions;
+        delete data;
     }
 
     function fetchAccountingState()
@@ -249,16 +252,22 @@ contract HandlerPortfolio is HandlerBase {
         (deltaAsset, deltaQuote) = ctx.subject().getLiquidityDeltas(
             ctx.ghost().poolId, int128(uint128(deltaLiquidity))
         );
-        ctx.subject().multiprocess(
-            FVM.encodeAllocateOrDeallocate(
-                true,
-                uint8(0),
-                ctx.ghost().poolId,
-                deltaLiquidity.safeCastTo128(),
-                type(uint128).max,
-                type(uint128).max
+        data.push(
+            abi.encodeCall(
+                IPortfolioActions.allocate,
+                (
+                    false,
+                    ctx.ghost().poolId,
+                    deltaLiquidity.safeCastTo128(),
+                    type(uint128).max,
+                    type(uint128).max
+                )
             )
         );
+
+        ctx.subject().multicall(data);
+        delete data;
+
         post = fetchAccountingState();
 
         // Postconditions
@@ -345,16 +354,20 @@ contract HandlerPortfolio is HandlerBase {
             );
             prev = fetchAccountingState();
 
-            ctx.subject().multiprocess(
-                FVM.encodeAllocateOrDeallocate(
-                    false,
-                    uint8(0),
-                    ctx.ghost().poolId,
-                    deltaLiquidity.safeCastTo128(),
-                    0,
-                    0
+            data.push(
+                abi.encodeCall(
+                    IPortfolioActions.deallocate,
+                    (
+                        false,
+                        ctx.ghost().poolId,
+                        deltaLiquidity.safeCastTo128(),
+                        0,
+                        0
+                    )
                 )
             );
+
+            delete data;
 
             AccountingState memory end = fetchAccountingState();
 

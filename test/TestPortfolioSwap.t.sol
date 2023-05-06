@@ -5,9 +5,9 @@ import "solmate/utils/SafeCastLib.sol";
 import "./Setup.sol";
 
 contract TestPortfolioSwap is Setup {
-    using AssemblyLib for uint256;
-    using RMM01Lib for PortfolioPool;
     using SafeCastLib for uint256;
+    using AssemblyLib for uint256;
+    using AssemblyLib for uint128;
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for uint128;
 
@@ -24,20 +24,23 @@ contract TestPortfolioSwap is Setup {
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
             subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, address(this)
+                ghost().poolId, sellAsset, amtIn, 0, address(this)
             )
         );
 
         uint256 prev = ghost().quote().to_token().balanceOf(actor());
-        subject().multiprocess(
-            FVMLib.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amtIn,
-                amtOut,
-                uint8(sellAsset ? 1 : 0)
-            )
-        );
+
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+        subject().multicall(data);
+
         uint256 post = ghost().quote().to_token().balanceOf(actor());
 
         assertTrue(post > prev, "balance-did-not-increase");
@@ -54,7 +57,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
-            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, 0, actor())
         );
 
         uint256 prev = ghost().quote().to_token().balanceOf(actor());
@@ -63,15 +66,18 @@ contract TestPortfolioSwap is Setup {
             block.timestamp
                 + (uint256(ghost().pool().params.duration) / 2 * 60 * 60 * 24)
         );
-        subject().multiprocess(
-            FVMLib.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amtIn,
-                amtOut,
-                uint8(sellAsset ? 1 : 0)
-            )
-        );
+
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+        subject().multicall(data);
+
         uint256 post = ghost().quote().to_token().balanceOf(actor());
 
         assertTrue(post > prev, "physical-balance-did-not-increase");
@@ -93,19 +99,20 @@ contract TestPortfolioSwap is Setup {
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
             subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, address(this)
+                ghost().poolId, sellAsset, amtIn, 0, address(this)
             )
         );
 
-        subject().multiprocess(
-            FVMLib.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amtIn,
-                amtOut,
-                uint8(sellAsset ? 1 : 0)
-            )
-        );
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+        subject().multicall(data);
 
         uint256 preBal =
             ghost().asset().to_token().balanceOf(subjects().registry);
@@ -171,15 +178,17 @@ contract TestPortfolioSwap is Setup {
             prevYPerL = prevYPerL.divWadDown(pool.liquidity);
         }
 
-        try subject().multiprocess(
-            FVMLib.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amountIn,
-                amountOut,
-                uint8(sellAsset ? 1 : 0)
-            )
-        ) {
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amountIn,
+            output: amountOut,
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+
+        try subject().multicall(data) {
             pool = ghost().pool();
 
             (uint256 postXPerL, uint256 postYPerL) =
@@ -315,15 +324,17 @@ contract TestPortfolioSwap is Setup {
             block.timestamp
         );
 
-        try subject().multiprocess(
-            FVMLib.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amountIn.safeCastTo128(),
-                amountOut.safeCastTo128(),
-                uint8(sellAsset ? 1 : 0)
-            )
-        ) {
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amountIn.safeCastTo128(),
+            output: amountOut.safeCastTo128(),
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+
+        try subject().multicall(data) {
             pool = ghost().pool();
 
             (, int256 invariant) = RMM01Portfolio(
@@ -369,7 +380,7 @@ contract TestPortfolioSwap is Setup {
         }
 
         uint128 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, actor()
+            ghost().poolId, sellAsset, amountIn, 0, actor()
         ).safeCastTo128();
 
         // todo: fix getAmountOut to be accurate
@@ -390,16 +401,18 @@ contract TestPortfolioSwap is Setup {
         uint256 prevPhysicalOut =
             IERC20(tokenOut).balanceOf(address(ghost().subject));
 
-        subject().multiprocess{
-            value: tokenIn == subject().WETH() ? amountIn : 0
-        }(
-            FVMLib.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amountIn,
-                amountOut,
-                uint8(sellAsset ? 1 : 0)
-            )
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amountIn,
+            output: amountOut,
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+
+        subject().multicall{value: tokenIn == subject().WETH() ? amountIn : 0}(
+            data
         );
 
         uint256 postPhysicalOut =
@@ -413,66 +426,7 @@ contract TestPortfolioSwap is Setup {
         );
     }
 
-    function testFuzz_swap_check_invariant(uint128 amountIn)
-        public
-        defaultConfig
-        useActor
-        usePairTokens(1000 ether)
-        allocateSome(25 ether)
-        isArmed
-    {
-        bool sellAsset = true;
-        vm.assume(amountIn > 100);
-        PortfolioPool memory pool = ghost().pool();
-        uint256 maxIn = Objective(address(subject())).computeMaxInput(
-            ghost().poolId,
-            sellAsset,
-            sellAsset ? pool.virtualX : pool.virtualY,
-            pool.liquidity
-        );
-        vm.assume(maxIn > amountIn);
-
-        uint128 amountOut = uint128(
-            subject().getAmountOut(
-                ghost().poolId, sellAsset, uint128(amountIn), actor()
-            )
-        );
-        vm.assume(amountOut > 0);
-
-        (, int256 prevInvariant) = RMM01Portfolio(payable(address(subject())))
-            .checkInvariant(
-            ghost().poolId,
-            int256(0),
-            pool.virtualX,
-            pool.virtualY,
-            block.timestamp
-        );
-        subject().multiprocess(
-            FVMLib.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amountIn,
-                amountOut,
-                uint8(sellAsset ? 1 : 0)
-            )
-        );
-
-        pool = ghost().pool();
-        (, int256 invariant) = RMM01Portfolio(payable(address(subject())))
-            .checkInvariant(
-            ghost().poolId,
-            prevInvariant,
-            pool.virtualX,
-            pool.virtualY,
-            block.timestamp
-        );
-
-        console.logInt(prevInvariant);
-        console.logInt(invariant);
-        assertTrue(invariant >= prevInvariant, "invalid invariant condition");
-    }
-
-    function test_swap_quote_in()
+    function test_swap_price_decreases()
         public
         defaultConfig
         useActor
@@ -482,8 +436,9 @@ contract TestPortfolioSwap is Setup {
     {
         bool sellAsset = true;
         uint256 amountIn = 0.01 ether;
-        uint256 amountOut =
-            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+        uint256 amountOut = subject().getAmountOut(
+            ghost().poolId, sellAsset, amountIn, 0, actor()
+        );
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -498,8 +453,9 @@ contract TestPortfolioSwap is Setup {
     {
         bool sellAsset = false;
         uint256 amountIn = 0.01 ether;
-        uint256 amountOut =
-            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+        uint256 amountOut = subject().getAmountOut(
+            ghost().poolId, sellAsset, amountIn, 0, actor()
+        );
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -516,8 +472,9 @@ contract TestPortfolioSwap is Setup {
         uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
             ghost().asset().to_token().decimals()
         );
-        uint256 amountOut =
-            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+        uint256 amountOut = subject().getAmountOut(
+            ghost().poolId, sellAsset, amountIn, 0, actor()
+        );
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -534,8 +491,9 @@ contract TestPortfolioSwap is Setup {
         uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
             ghost().quote().to_token().decimals()
         );
-        uint256 amountOut =
-            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+        uint256 amountOut = subject().getAmountOut(
+            ghost().poolId, sellAsset, amountIn, 0, actor()
+        );
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -545,19 +503,20 @@ contract TestPortfolioSwap is Setup {
         uint256 amountIn,
         uint256 amountOut
     ) internal {
-        uint256 prevPrice = subject().getVirtualPrice(ghost().poolId);
+        uint256 prevPrice = subject().getSpotPrice(ghost().poolId);
 
-        subject().multiprocess(
-            FVM.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amountIn.safeCastTo128(),
-                amountOut.safeCastTo128(),
-                uint8(sellAsset ? 1 : 0)
-            )
-        );
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amountIn.safeCastTo128(),
+            output: amountOut.safeCastTo128(),
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+        subject().multicall(data);
 
-        uint256 postPrice = subject().getVirtualPrice(ghost().poolId);
+        uint256 postPrice = subject().getSpotPrice(ghost().poolId);
         if (sellAsset) {
             assertTrue(postPrice < prevPrice, "price-not-decreased");
         } else {
@@ -653,8 +612,9 @@ contract TestPortfolioSwap is Setup {
         );
         vm.assume(maxIn > amountIn);
 
-        uint256 amountOut =
-            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+        uint256 amountOut = subject().getAmountOut(
+            ghost().poolId, sellAsset, amountIn, 0, actor()
+        );
 
         _swap_check_invariant(
             sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
@@ -677,15 +637,17 @@ contract TestPortfolioSwap is Setup {
             timestamp: block.timestamp
         });
 
-        try subject().multiprocess(
-            FVM.encodeSwap(
-                uint8(0),
-                ghost().poolId,
-                amountIn.safeCastTo128(),
-                amountOut.safeCastTo128(),
-                uint8(sellAsset ? 1 : 0)
-            )
-        ) {
+        bytes[] memory data = new bytes[](1);
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amountIn.safeCastTo128(),
+            output: amountOut.safeCastTo128(),
+            sellAsset: sellAsset
+        });
+        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
+
+        try subject().multicall(data) {
             PortfolioPool memory pool = ghost().pool();
 
             if (sellAsset) {
