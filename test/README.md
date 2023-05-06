@@ -82,7 +82,6 @@ Thanks to horsefacts.eth for their stellar walkthrough of building an invariant 
 
 - Preconditions:
   - The `msg.sender`'s `positions` `freeLiquidity` for `poolId` is greater than zero.
-  - The `msg.sender`'s `positions` `lastTimestamp` for `poolId` is less than `block.timestamp` by at least (equal) `JIT_LIQUIDITY_POLICY` seconds.
 - During Execution:
   - n/a
 - Postconditions:
