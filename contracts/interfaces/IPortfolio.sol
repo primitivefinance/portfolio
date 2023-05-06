@@ -226,7 +226,7 @@ interface IPortfolioGetters {
     function positions(
         address owner,
         uint64 poolId
-    ) external view returns (uint128 freeLiquidity, uint32 lastTimestamp);
+    ) external view returns (uint128 freeLiquidity);
 
     // ===== Portfolio View ===== //
 

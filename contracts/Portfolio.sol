@@ -368,7 +368,7 @@ abstract contract PortfolioVirtual is Objective {
             positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
         }
 
-        position.changePositionLiquidity(args.timestamp, positionLiquidity);
+        position.changePositionLiquidity(positionLiquidity);
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);

@@ -15,10 +15,7 @@ using SafeCastLib for uint256;
 using {
     checkParameters, maturity, validateParameters
 } for PortfolioCurve global;
-using {
-    changePositionLiquidity,
-    getTimeSinceChanged
-} for PortfolioPosition global;
+using { changePositionLiquidity } for PortfolioPosition global;
 using {
     changePoolLiquidity,
     changePoolParameters,
@@ -110,7 +107,6 @@ struct PortfolioPool {
 
 struct PortfolioPosition {
     uint128 freeLiquidity; // Liquidity owned by the position owner in WAD units.
-    uint32 lastTimestamp; // The block.timestamp of the last position update.
 }
 
 struct ChangeLiquidityParams {
@@ -183,10 +179,8 @@ function changePoolParameters(
 
 function changePositionLiquidity(
     PortfolioPosition storage self,
-    uint256 timestamp,
     int128 liquidityDelta
 ) {
-    self.lastTimestamp = uint32(timestamp);
     self.freeLiquidity =
         AssemblyLib.addSignedDelta(self.freeLiquidity, liquidityDelta);
 }
@@ -299,13 +293,6 @@ function getVirtualReservesWad(PortfolioPool memory self)
 }
 
 // ===== Derived ===== //
-
-function getTimeSinceChanged(
-    PortfolioPosition memory self,
-    uint256 timestamp
-) pure returns (uint256 distance) {
-    return timestamp - self.lastTimestamp;
-}
 
 function exists(PortfolioPool memory self) pure returns (bool) {
     return self.lastTimestamp != 0;
