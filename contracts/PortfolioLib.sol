@@ -80,7 +80,6 @@ error ZeroValue();
 error InvalidNegativeLiquidity();
 error MaxDeltaReached();
 error MinDeltaUnmatched();
-error InvalidNegativeLiquidity();
 
 struct PortfolioPair {
     address tokenAsset; // Base asset, referred to as "X" reserve.
