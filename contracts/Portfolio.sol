@@ -706,15 +706,18 @@ abstract contract PortfolioVirtual is Objective {
         pool.lastTimestamp = timestamp;
         pool.pair = pairs[pairNonce];
 
-        bool isPerpetual = duration == type(uint16).max ? true : false; // type(uint16).max is a magic variable
+        // `type(uint16).max` is a magic variable for perpetual pools.
+        if (duration > uint16(MAX_DURATION) && duration != type(uint16).max) {
+            revert InvalidDuration(duration);
+        }
+
         PortfolioCurve memory params = PortfolioCurve({
             maxPrice: maxPrice,
             fee: fee,
-            duration: isPerpetual ? uint16(MAX_DURATION) : duration, // Set duration to the max if perpetual.
+            duration: duration,
             volatility: volatility,
             priorityFee: hasController ? priorityFee : 0,
-            createdAt: timestamp,
-            perpetual: isPerpetual
+            createdAt: timestamp
         });
         pool.changePoolParameters(params);
 

@@ -92,11 +92,10 @@ struct PortfolioCurve {
     // single slot
     uint128 maxPrice; // Can be used as a terminal price (max price that can be reached by maturity).
     uint16 fee; // Can be manipulated by a controller of a pool, if there is one.
-    uint16 duration; // Set to max duration for perpetual pools.
+    uint16 duration; // Set to `type(uint16).max` for perpetual pools.
     uint16 volatility; // Effects the pool like an amplification factor, increasing price impact of swaps.
     uint16 priorityFee; // Only set for controlled pools, and can be changed by controller.
     uint32 createdAt; // Set to the `block.timestamp` on pool creation.
-    bool perpetual; // Set to `true` if the `duration` variable in pool creation is the magic variable type(uint16).max.
 }
 
 struct PortfolioPool {
@@ -324,7 +323,7 @@ function computeTau(
     PortfolioPool memory self,
     uint256 timestamp
 ) pure returns (uint256) {
-    if (self.params.perpetual) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
+    if (self.params.duration == MAX_DURATION) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
 
     uint256 end = self.params.maturity();
     unchecked {
@@ -341,7 +340,7 @@ function maturity(PortfolioCurve memory self)
     pure
     returns (uint32 endTimestamp)
 {
-    if (self.perpetual) revert NotExpiringPool();
+    if (self.duration == MAX_DURATION) revert NotExpiringPool();
 
     unchecked {
         // Portfolio duration is limited such that this addition will never overflow 256 bits.
