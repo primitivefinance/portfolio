@@ -140,8 +140,8 @@ contract TestPortfolioCreatePool is Setup {
         );
         assertEq(
             ghost().poolOf(poolId).params.duration,
-            MAX_DURATION,
-            "duration != max duration"
+            perpetualMagicVariable,
+            "duration != perpetualMagicVariable"
         );
         assertEq(
             ghost().poolOf(poolId).computeTau(0),
