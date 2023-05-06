@@ -43,6 +43,10 @@ abstract contract PortfolioVirtual is Objective {
     /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
 
+    // Tracks the id of the last pool that was created, quite useful during a
+    // multicall to avoid being tricked into allocating into the wrong pool.
+    uint64 public getLastPoolId;
+
     mapping(address => uint256) public protocolFees;
     mapping(uint24 => uint32) public getPoolNonce;
     mapping(uint24 => PortfolioPair) public pairs;
@@ -204,6 +208,7 @@ abstract contract PortfolioVirtual is Objective {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
+        if (poolId == 0) poolId = getLastPoolId;
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
         (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
@@ -698,6 +703,10 @@ abstract contract PortfolioVirtual is Objective {
             uint32 poolNonce = ++getPoolNonce[pairNonce];
             poolId =
                 AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
+
+            // TODO: Checks if it's cheaper to assign the storage variable this
+            // way or get rid of the returned variable `poolId` instead.
+            getLastPoolId = poolId;
         }
 
         PortfolioPool storage pool = pools[poolId];
