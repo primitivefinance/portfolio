@@ -496,6 +496,8 @@ abstract contract PortfolioVirtual is Objective {
             deltaInput = iteration.input;
 
             iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
+            if (iteration.feeAmount == 0) iteration.feeAmount = 1;
+
             if (_protocolFee != 0) {
                 uint256 protocolFeeAmountWad =
                     iteration.feeAmount / _protocolFee;
