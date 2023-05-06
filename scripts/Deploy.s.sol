@@ -3,8 +3,8 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
 import "solmate/tokens/WETH.sol";
-import "create3-factory/src/ICREATE3Factory.sol";
 
+import "./Create3Factory.sol";
 import "contracts/RMM01Portfolio.sol";
 import "contracts/test/SimpleRegistry.sol";
 
@@ -25,8 +25,7 @@ contract Deploy is Script {
         address weth = __weth__;
         if (weth == address(0)) weth = address(new WETH());
 
-        ICREATE3Factory factory =
-            ICREATE3Factory(0x9fBB3DF7C40Da2e5A0dE984fFE2CCB7C47cd0ABf);
+        Create3Factory factory = new Create3Factory();
 
         address registry =
             factory.deploy(salt, type(SimpleRegistry).creationCode);
@@ -40,6 +39,7 @@ contract Deploy is Script {
 
         emit Deployed(msg.sender, weth, portfolio, registry);
 
+        console.log("Factory:", address(factory));
         console.log("WETH:", weth);
         console.log("Portfolio:", portfolio);
         console.log("Registry:", registry);
