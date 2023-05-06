@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity ^0.8.13;
 
 /**
  * @dev Marginal price to trade y (∆) for x (∆′).
@@ -67,7 +67,7 @@ function computeMarginalPriceQuoteIn(
     int256 inv
 ) pure returns (uint256) {
     Parameters memory params =
-        Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
+        Parameters({ stk: stk, vol: vol, tau: tau, fee: fee, inv: inv });
     uint256 volSqrtTau;
     uint256 gamma;
     {
@@ -123,7 +123,7 @@ function computeMarginalPriceAssetIn(
     int256 inv
 ) pure returns (uint256) {
     Parameters memory params =
-        Parameters({stk: stk, vol: vol, tau: tau, fee: fee, inv: inv});
+        Parameters({ stk: stk, vol: vol, tau: tau, fee: fee, inv: inv });
     uint256 sqrtTau;
     uint256 volSqrtTau;
     uint256 gamma;
