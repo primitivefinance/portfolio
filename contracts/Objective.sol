@@ -24,17 +24,6 @@ abstract contract Objective is IPortfolio {
     ) internal virtual returns (bool success, int256 invariant);
 
     /**
-     * @dev Conditional check made before changing `pool.liquidity` and `position.freeLiquidity`.
-     * @param delta Signed quantity of liquidity in WAD units to change liquidity by.
-     * @return True if position liquidity can be changed by `delta` amount.
-     */
-    function checkPosition(
-        uint64 poolId,
-        address owner,
-        int256 delta
-    ) public view virtual returns (bool);
-
-    /**
      * @dev Conditional check before interacting with a pool.
      * @return True if pool exists and is ready to be interacted with.
      */

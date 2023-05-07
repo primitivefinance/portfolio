@@ -92,15 +92,6 @@ contract RMM01Portfolio is PortfolioVirtual {
     }
 
     /// @inheritdoc Objective
-    function checkPosition(
-        uint64 poolId,
-        address owner,
-        int256 delta
-    ) public view override returns (bool) {
-        return true;
-    }
-
-    /// @inheritdoc Objective
     function checkPool(uint64 poolId) public view override returns (bool) {
         return pools[poolId].exists();
     }
