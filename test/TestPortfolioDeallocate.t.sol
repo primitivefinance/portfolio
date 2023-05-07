@@ -28,7 +28,7 @@ contract TestPortfolioDeallocate is Setup {
         subject().multicall(data);
 
         // Deallocating liquidity can round down.
-        uint256 prev = ghost().position(actor()).freeLiquidity;
+        uint256 prev = ghost().position(actor());
         uint128 amount = liquidity;
         if (amount > prev) {
             amount = uint128(prev);
@@ -37,7 +37,7 @@ contract TestPortfolioDeallocate is Setup {
             IPortfolioActions.deallocate, (true, ghost().poolId, amount, 0, 0)
         );
         subject().multicall(data);
-        uint256 post = ghost().position(actor()).freeLiquidity;
+        uint256 post = ghost().position(actor());
 
         assertApproxEqAbs(
             post, prev - liquidity, 1, "liquidity-did-not-decrease"
@@ -226,7 +226,7 @@ contract TestPortfolioDeallocate is Setup {
     }
 
     function _simple_deallocate(uint128 amount) internal {
-        uint256 prev = ghost().position(actor()).freeLiquidity;
+        uint256 prev = ghost().position(actor());
 
         uint128 amountToRemove = amount;
         if (amount > prev) {
@@ -242,7 +242,7 @@ contract TestPortfolioDeallocate is Setup {
         );
         subject().multicall(data);
 
-        uint256 post = ghost().position(actor()).freeLiquidity;
+        uint256 post = ghost().position(actor());
 
         // Deallocating liquidity can round down.
         assertApproxEqAbs(

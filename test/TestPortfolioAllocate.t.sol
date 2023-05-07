@@ -100,7 +100,7 @@ contract TestPortfolioAllocate is Setup {
         // Direct assertions of pool state.
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
-            ghost().position(actor()).freeLiquidity,
+            ghost().position(actor()),
             "position.freeLiquidity != pool.liquidity"
         );
     }
@@ -131,7 +131,7 @@ contract TestPortfolioAllocate is Setup {
         // Direct assertions of pool state.
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
-            ghost().position(actor()).freeLiquidity,
+            ghost().position(actor()),
             "position.freeLiquidity != pool.liquidity"
         );
     }
@@ -585,7 +585,7 @@ contract TestPortfolioAllocate is Setup {
         assertEq(post, prev + amount, "pool.liquidity");
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
-            ghost().position(actor()).freeLiquidity,
+            ghost().position(actor()),
             "position.freeLiquidity != pool.liquidity"
         );
     }

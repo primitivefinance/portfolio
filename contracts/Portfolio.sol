@@ -52,7 +52,7 @@ abstract contract PortfolioVirtual is Objective {
     mapping(uint24 => PortfolioPair) public pairs;
     mapping(uint64 => PortfolioPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
-    mapping(address => mapping(uint64 => PortfolioPosition)) public positions;
+    mapping(address => mapping(uint64 => uint128 liquidity)) public positions;
 
     uint256 internal _locked = 1;
     uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
@@ -304,7 +304,7 @@ abstract contract PortfolioVirtual is Objective {
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
 
         if (useMax) {
-            deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
+            deltaLiquidity = positions[msg.sender][poolId];
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
@@ -346,8 +346,7 @@ abstract contract PortfolioVirtual is Objective {
      * @dev Manipulates reserves depending on if liquidity is being allocated or deallocated.
      */
     function _changeLiquidity(ChangeLiquidityParams memory args) internal {
-        (PortfolioPool storage pool, PortfolioPosition storage position) =
-            (pools[args.poolId], positions[args.owner][args.poolId]);
+        PortfolioPool storage pool = pools[args.poolId];
 
         (uint128 deltaAssetWad, uint128 deltaQuoteWad) =
             (args.deltaAsset.safeCastTo128(), args.deltaQuote.safeCastTo128());
@@ -373,7 +372,9 @@ abstract contract PortfolioVirtual is Objective {
             positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
         }
 
-        position.changePositionLiquidity(positionLiquidity);
+        positions[args.owner][args.poolId] = AssemblyLib.addSignedDelta(
+            positions[args.owner][args.poolId], positionLiquidity
+        );
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);

@@ -15,7 +15,6 @@ using SafeCastLib for uint256;
 using {
     checkParameters, maturity, validateParameters
 } for PortfolioCurve global;
-using { changePositionLiquidity } for PortfolioPosition global;
 using {
     changePoolLiquidity,
     changePoolParameters,
@@ -105,10 +104,6 @@ struct PortfolioPool {
     PortfolioPair pair; // Token pair data.
 }
 
-struct PortfolioPosition {
-    uint128 freeLiquidity; // Liquidity owned by the position owner in WAD units.
-}
-
 struct ChangeLiquidityParams {
     address owner;
     uint64 poolId;
@@ -175,14 +170,6 @@ function changePoolParameters(
     // Reverts on invalid parameters.
     updated.validateParameters();
     self.params = updated;
-}
-
-function changePositionLiquidity(
-    PortfolioPosition storage self,
-    int128 liquidityDelta
-) {
-    self.freeLiquidity =
-        AssemblyLib.addSignedDelta(self.freeLiquidity, liquidityDelta);
 }
 
 // ===== View ===== //
