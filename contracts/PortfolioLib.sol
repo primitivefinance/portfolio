@@ -12,9 +12,7 @@ using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
 using SafeCastLib for uint256;
 
-using {
-    checkParameters, maturity, validateParameters
-} for PortfolioCurve global;
+using { maturity } for PortfolioCurve global;
 using {
     changePoolLiquidity,
     changePoolParameters,
@@ -162,8 +160,28 @@ function changePoolParameters(
     PortfolioPool storage self,
     PortfolioCurve memory updated
 ) {
-    // Reverts on invalid parameters.
-    updated.validateParameters();
+    if (
+        !AssemblyLib.isBetween(
+            updated.volatility, MIN_VOLATILITY, MAX_VOLATILITY
+        )
+    ) {
+        revert InvalidVolatility(updated.volatility);
+    }
+    if (!AssemblyLib.isBetween(updated.duration, MIN_DURATION, MAX_DURATION)) {
+        revert InvalidDuration(updated.duration);
+    }
+    if (!AssemblyLib.isBetween(updated.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE))
+    {
+        revert InvalidStrike(updated.maxPrice);
+    }
+    if (!AssemblyLib.isBetween(updated.fee, MIN_FEE, MAX_FEE)) {
+        revert InvalidFee(updated.fee);
+    }
+    // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
+    if (!AssemblyLib.isBetween(updated.priorityFee, 0, updated.fee)) {
+        revert InvalidPriorityFee(updated.priorityFee);
+    }
+
     self.params = updated;
 }
 
@@ -317,54 +335,4 @@ function maturity(PortfolioCurve memory self)
             AssemblyLib.convertDaysToSeconds(self.duration) + self.createdAt
         ).safeCastTo32();
     }
-}
-
-function validateParameters(PortfolioCurve memory self) pure {
-    (bool success, bytes memory reason) = self.checkParameters();
-    if (!success) {
-        assembly {
-            revert(add(32, reason), mload(reason))
-        }
-    }
-}
-
-/**
- * @dev Invalid parameters should revert. Bound checks are inclusive.
- */
-function checkParameters(PortfolioCurve memory self)
-    pure
-    returns (bool, bytes memory)
-{
-    if (!AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
-    {
-        return (
-            false,
-            abi.encodeWithSelector(InvalidVolatility.selector, self.volatility)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.duration, MIN_DURATION, MAX_DURATION)) {
-        return (
-            false,
-            abi.encodeWithSelector(InvalidDuration.selector, self.duration)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE)) {
-        return (
-            false, abi.encodeWithSelector(InvalidStrike.selector, self.maxPrice)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.fee, MIN_FEE, MAX_FEE)) {
-        return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
-    }
-    // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
-    if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
-        return (
-            false,
-            abi.encodeWithSelector(
-                InvalidPriorityFee.selector, self.priorityFee
-                )
-        );
-    }
-
-    return (true, "");
 }
