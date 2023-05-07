@@ -58,7 +58,6 @@ error InvalidVolatility(uint16 sigma);
 error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
-error NonExistentPosition(address owner, uint64 poolId);
 error NotExpiringPool();
 error PairExists(uint24 pairId);
 error PoolExpired();
