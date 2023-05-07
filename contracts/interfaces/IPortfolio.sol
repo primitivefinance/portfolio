@@ -5,7 +5,7 @@ import { PortfolioCurve, PortfolioPair, Order } from "../PortfolioLib.sol";
 
 interface IPortfolioEvents {
     /**
-     * @dev Ether transfers into Portfolio via payable `multiprocess` function.
+     * @dev Ether transfers into Portfolio via a payable function.
      */
     event Deposit(address indexed account, uint256 amount);
 
