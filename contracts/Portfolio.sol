@@ -697,7 +697,7 @@ abstract contract PortfolioVirtual is Objective {
 
         if (price == 0) revert ZeroPrice();
         uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable
-        if (pairNonce == 0) revert InvalidPair();
+        if (pairNonce == 0) revert InvalidPairNonce();
 
         bool hasController = controller != address(0);
         {
