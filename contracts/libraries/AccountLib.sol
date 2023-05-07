@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
 /**
  * -------------
@@ -74,10 +74,8 @@ function __balanceOf__(address token, address account) view returns (uint256) {
  * @dev Must validate `weth` is real weth.
  */
 function __wrapEther__(AccountSystem storage self, address weth) {
-    if (msg.value > 0) {
-        self.touch(weth);
-        IWETH(weth).deposit{value: msg.value}();
-    }
+    self.touch(weth);
+    IWETH(weth).deposit{value: msg.value}();
 }
 
 /**

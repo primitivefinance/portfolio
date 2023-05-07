@@ -150,7 +150,7 @@ contract HandlerPortfolio is HandlerBase {
         view
         returns (AccountingState memory)
     {
-        PortfolioPosition memory position = ctx.ghost().position(ctx.actor());
+        uint128 position = ctx.ghost().position(ctx.actor());
         PortfolioPool memory pool = ctx.ghost().pool();
         PortfolioPair memory pair = pool.pair;
 
@@ -163,7 +163,7 @@ contract HandlerPortfolio is HandlerBase {
             ctx.ghost().asset().to_token().balanceOf(address(ctx.subject())),
             ctx.ghost().quote().to_token().balanceOf(address(ctx.subject())),
             ctx.getPositionsLiquiditySum(),
-            position.freeLiquidity,
+            position,
             pool.liquidity
         );
 
@@ -336,9 +336,9 @@ contract HandlerPortfolio is HandlerBase {
         // TODO: Add use max flag support.
 
         // Get some liquidity.
-        PortfolioPosition memory pos = ctx.ghost().position(ctx.actor());
+        uint128 position = ctx.ghost().position(ctx.actor());
 
-        if (pos.freeLiquidity >= deltaLiquidity) {
+        if (position >= deltaLiquidity) {
             // Preconditions
             PortfolioPool memory pool = ctx.ghost().pool();
             assertTrue(pool.lastTimestamp != 0, "Pool not initialized");

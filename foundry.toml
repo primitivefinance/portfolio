@@ -1,53 +1,51 @@
 [profile.default] # all profiles inherit from this
-solc = '0.8.13'
-src = 'contracts'
-out = 'out' # default
-test = 'test' # default
-libs = ['lib', 'node_modules']
 cache = false # !important! breaks echidna if cache = true.
+libs = ['lib', 'node_modules'] 
+out = 'out' # default
 remappings = [
-    'forge-std/=lib/forge-std/src/',
-    'solmate/=lib/solmate/src/',
-    'solstat/=lib/solstat/src/',
-]
+  'forge-std/=lib/forge-std/src/',
+  'solmate/=lib/solmate/src/',
+  'solstat/=lib/solstat/src/',
+] 
+solc = '0.8.19' 
+src = 'contracts' 
+test = 'test' # default
 
 [profile.optimized] # uses via_ir and optimizer
-via_ir = true
-optimizer_runs = 0
 optimizer = true
+optimizer_runs = 0
 out = 'optimized-out'
+via_ir = true
 
 [profile.optimizedcalls]
-via_ir = true
 optimizer = true
 optimizer_runs = 10000
 out = 'optimized-out'
+via_ir = true
 
 [profile.test] # does not use optimizer
-src = 'test/'  # not default
-gas_reports = ["*"]
-ffi = true
+ffi = true 
+gas_reports = ["*"] 
+src = 'test/' # not default
 
 [profile.echidna]
-via_ir = false
-src = 'test/echidna'  # not default
+src = 'test/echidna' # not default
 test = 'test/echidna' # not default
-
+via_ir = false 
 
 [rpc_endpoints]
-primitive = "${PRIMITIVE_RPC}"
 anvil = "http://127.0.0.1:8545"
+primitive = "${PRIMITIVE_RPC}"
 prod = "${MAINNET_URL}"
 
 [fmt]
-line_length = 80
-tab_width = 4
 bracket_spacing = true
 int_types = 'long'
+line_length = 80
 multiline_func_header = 'params_first'
 quote_style = 'double'
+tab_width = 4
 wrap_comments = false
-
 
 # See more config options https://github.com/gakonst/foundry/tree/master/config
 

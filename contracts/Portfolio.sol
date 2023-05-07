@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
 import "./Objective.sol";
 
@@ -23,11 +23,11 @@ abstract contract PortfolioVirtual is Objective {
             mstore(0x00, 0x20)
 
             // Then we load both the length of our string (11 bytes, 0x0b in hex) and its
-            // actual hex value (0x76312e312e312d62657461) using the offset 0x2b. Using this
+            // actual hex value (0x76312e322e302d62657461) using the offset 0x2b. Using this
             // particular offset value will right pad the length at the end of the slot
             // and left pad the string at the beginning of the next slot, assuring the
             // right ABI format to return a string.
-            mstore(0x2b, 0x0b76312e312e312d62657461) // "v1.1.1-beta"
+            mstore(0x2b, 0x0b76312e322e302d62657461) // "v1.2.0-beta"
 
             // Return all the 96 bytes (0x60) of data that was loaded into the memory.
             return(0x00, 0x60)
@@ -43,12 +43,16 @@ abstract contract PortfolioVirtual is Objective {
     /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
 
+    // Tracks the id of the last pool that was created, quite useful during a
+    // multicall to avoid being tricked into allocating into the wrong pool.
+    uint64 public getLastPoolId;
+
     mapping(address => uint256) public protocolFees;
     mapping(uint24 => uint32) public getPoolNonce;
     mapping(uint24 => PortfolioPair) public pairs;
     mapping(uint64 => PortfolioPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
-    mapping(address => mapping(uint64 => PortfolioPosition)) public positions;
+    mapping(address => mapping(uint64 => uint128 liquidity)) public positions;
 
     uint256 internal _locked = 1;
     uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
@@ -204,6 +208,7 @@ abstract contract PortfolioVirtual is Objective {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
+        if (poolId == 0) poolId = getLastPoolId;
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
         (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
@@ -299,7 +304,7 @@ abstract contract PortfolioVirtual is Objective {
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
 
         if (useMax) {
-            deltaLiquidity = positions[msg.sender][poolId].freeLiquidity;
+            deltaLiquidity = positions[msg.sender][poolId];
         }
 
         if (deltaLiquidity == 0) revert ZeroLiquidity();
@@ -341,8 +346,7 @@ abstract contract PortfolioVirtual is Objective {
      * @dev Manipulates reserves depending on if liquidity is being allocated or deallocated.
      */
     function _changeLiquidity(ChangeLiquidityParams memory args) internal {
-        (PortfolioPool storage pool, PortfolioPosition storage position) =
-            (pools[args.poolId], positions[args.owner][args.poolId]);
+        PortfolioPool storage pool = pools[args.poolId];
 
         (uint128 deltaAssetWad, uint128 deltaQuoteWad) =
             (args.deltaAsset.safeCastTo128(), args.deltaQuote.safeCastTo128());
@@ -368,7 +372,9 @@ abstract contract PortfolioVirtual is Objective {
             positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
         }
 
-        position.changePositionLiquidity(args.timestamp, positionLiquidity);
+        positions[args.owner][args.poolId] = AssemblyLib.addSignedDelta(
+            positions[args.owner][args.poolId], positionLiquidity
+        );
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
@@ -496,6 +502,8 @@ abstract contract PortfolioVirtual is Objective {
             deltaInput = iteration.input;
 
             iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
+            if (iteration.feeAmount == 0) iteration.feeAmount = 1;
+
             if (_protocolFee != 0) {
                 uint256 protocolFeeAmountWad =
                     iteration.feeAmount / _protocolFee;
@@ -689,13 +697,17 @@ abstract contract PortfolioVirtual is Objective {
 
         if (price == 0) revert ZeroPrice();
         uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable
-        if (pairNonce == 0) revert InvalidPair();
+        if (pairNonce == 0) revert InvalidPairNonce();
 
         bool hasController = controller != address(0);
         {
             uint32 poolNonce = ++getPoolNonce[pairNonce];
             poolId =
                 AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
+
+            // TODO: Checks if it's cheaper to assign the storage variable this
+            // way or get rid of the returned variable `poolId` instead.
+            getLastPoolId = poolId;
         }
 
         PortfolioPool storage pool = pools[poolId];

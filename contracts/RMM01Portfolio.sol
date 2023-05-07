@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
 import "./Portfolio.sol";
 import "./libraries/RMM01Lib.sol";
@@ -90,15 +90,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         if (pools[poolId].lastTau() == 0) return (false, invariant);
 
         return (true, invariant);
-    }
-
-    /// @inheritdoc Objective
-    function checkPosition(
-        uint64 poolId,
-        address owner,
-        int256 delta
-    ) public view override returns (bool) {
-        return true;
     }
 
     /// @inheritdoc Objective

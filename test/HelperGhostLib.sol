@@ -45,8 +45,8 @@ library Ghost {
     function position(
         GhostState memory self,
         address owner
-    ) internal view returns (PortfolioPosition memory) {
-        return IPortfolioStruct(self.subject).positions(owner, self.poolId);
+    ) internal view returns (uint128) {
+        return IPortfolio(self.subject).positions(owner, self.poolId);
     }
 
     function pairOf(
@@ -122,11 +122,6 @@ interface IPortfolioStruct {
         external
         view
         returns (PortfolioPair memory);
-
-    function positions(
-        address owner,
-        uint64 positionId
-    ) external view returns (PortfolioPosition memory);
 
     function pools(uint64 poolId)
         external

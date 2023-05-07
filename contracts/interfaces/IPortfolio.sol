@@ -5,7 +5,7 @@ import { PortfolioCurve, PortfolioPair, Order } from "../PortfolioLib.sol";
 
 interface IPortfolioEvents {
     /**
-     * @dev Ether transfers into Portfolio via payable `multiprocess` function.
+     * @dev Ether transfers into Portfolio via a payable function.
      */
     event Deposit(address indexed account, uint256 amount);
 
@@ -226,7 +226,7 @@ interface IPortfolioGetters {
     function positions(
         address owner,
         uint64 poolId
-    ) external view returns (uint128 freeLiquidity, uint32 lastTimestamp);
+    ) external view returns (uint128 freeLiquidity);
 
     // ===== Portfolio View ===== //
 

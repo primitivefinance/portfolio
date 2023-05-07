@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
 import "solmate/utils/SafeCastLib.sol";
 import "solmate/utils/FixedPointMathLib.sol";
@@ -12,13 +12,7 @@ using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
 using SafeCastLib for uint256;
 
-using {
-    checkParameters, maturity, validateParameters
-} for PortfolioCurve global;
-using {
-    changePositionLiquidity,
-    getTimeSinceChanged
-} for PortfolioPosition global;
+using { maturity } for PortfolioCurve global;
 using {
     changePoolLiquidity,
     changePoolParameters,
@@ -48,24 +42,20 @@ uint256 constant MAX_DURATION = 500; // days, but without units
 uint256 constant JUST_IN_TIME_MAX = 600 seconds;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
-error DrawBalance();
 error InsufficientLiquidity();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
 error InvalidPriorityFee(uint16 priorityFee);
-error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
-error InvalidPair();
+error InvalidPairNonce();
 error InvalidReentrancy();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
-error InvalidTransfer();
 error InvalidVolatility(uint16 sigma);
 error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
-error NonExistentPosition(address owner, uint64 poolId);
 error NotExpiringPool();
 error PairExists(uint24 pairId);
 error PoolExpired();
@@ -76,7 +66,6 @@ error ZeroInput();
 error ZeroLiquidity();
 error ZeroOutput();
 error ZeroPrice();
-error ZeroValue();
 error InvalidNegativeLiquidity();
 error MaxDeltaReached();
 error MinDeltaUnmatched();
@@ -106,11 +95,6 @@ struct PortfolioPool {
     address controller; // Address that can change fee, priorityFee params.
     PortfolioCurve params; // Parameters of the objective's trading function.
     PortfolioPair pair; // Token pair data.
-}
-
-struct PortfolioPosition {
-    uint128 freeLiquidity; // Liquidity owned by the position owner in WAD units.
-    uint32 lastTimestamp; // The block.timestamp of the last position update.
 }
 
 struct ChangeLiquidityParams {
@@ -176,19 +160,29 @@ function changePoolParameters(
     PortfolioPool storage self,
     PortfolioCurve memory updated
 ) {
-    // Reverts on invalid parameters.
-    updated.validateParameters();
-    self.params = updated;
-}
+    if (
+        !AssemblyLib.isBetween(
+            updated.volatility, MIN_VOLATILITY, MAX_VOLATILITY
+        )
+    ) {
+        revert InvalidVolatility(updated.volatility);
+    }
+    if (!AssemblyLib.isBetween(updated.duration, MIN_DURATION, MAX_DURATION)) {
+        revert InvalidDuration(updated.duration);
+    }
+    if (!AssemblyLib.isBetween(updated.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE))
+    {
+        revert InvalidStrike(updated.maxPrice);
+    }
+    if (!AssemblyLib.isBetween(updated.fee, MIN_FEE, MAX_FEE)) {
+        revert InvalidFee(updated.fee);
+    }
+    // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
+    if (!AssemblyLib.isBetween(updated.priorityFee, 0, updated.fee)) {
+        revert InvalidPriorityFee(updated.priorityFee);
+    }
 
-function changePositionLiquidity(
-    PortfolioPosition storage self,
-    uint256 timestamp,
-    int128 liquidityDelta
-) {
-    self.lastTimestamp = uint32(timestamp);
-    self.freeLiquidity =
-        AssemblyLib.addSignedDelta(self.freeLiquidity, liquidityDelta);
+    self.params = updated;
 }
 
 // ===== View ===== //
@@ -300,13 +294,6 @@ function getVirtualReservesWad(PortfolioPool memory self)
 
 // ===== Derived ===== //
 
-function getTimeSinceChanged(
-    PortfolioPosition memory self,
-    uint256 timestamp
-) pure returns (uint256 distance) {
-    return timestamp - self.lastTimestamp;
-}
-
 function exists(PortfolioPool memory self) pure returns (bool) {
     return self.lastTimestamp != 0;
 }
@@ -348,54 +335,4 @@ function maturity(PortfolioCurve memory self)
             AssemblyLib.convertDaysToSeconds(self.duration) + self.createdAt
         ).safeCastTo32();
     }
-}
-
-function validateParameters(PortfolioCurve memory self) pure {
-    (bool success, bytes memory reason) = self.checkParameters();
-    if (!success) {
-        assembly {
-            revert(add(32, reason), mload(reason))
-        }
-    }
-}
-
-/**
- * @dev Invalid parameters should revert. Bound checks are inclusive.
- */
-function checkParameters(PortfolioCurve memory self)
-    pure
-    returns (bool, bytes memory)
-{
-    if (!AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
-    {
-        return (
-            false,
-            abi.encodeWithSelector(InvalidVolatility.selector, self.volatility)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.duration, MIN_DURATION, MAX_DURATION)) {
-        return (
-            false,
-            abi.encodeWithSelector(InvalidDuration.selector, self.duration)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE)) {
-        return (
-            false, abi.encodeWithSelector(InvalidStrike.selector, self.maxPrice)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.fee, MIN_FEE, MAX_FEE)) {
-        return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
-    }
-    // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
-    if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
-        return (
-            false,
-            abi.encodeWithSelector(
-                InvalidPriorityFee.selector, self.priorityFee
-                )
-        );
-    }
-
-    return (true, "");
 }
