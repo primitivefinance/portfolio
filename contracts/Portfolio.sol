@@ -539,20 +539,26 @@ abstract contract PortfolioVirtual is Objective {
         {
             bool validInvariant;
             int256 nextInvariantWad;
+            uint reserveXPerLiquidity;
+            uint reserveYPerLiquidity;
 
             if (_state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
                     (nextIndependentWadLessFee, nextDependentWad);
+                reserveXPerLiquidity = iteration.virtualX.divWadDown(iteration.liquidity);
+                reserveYPerLiquidity = iteration.virtualY.divWadUp(iteration.liquidity);
             } else {
                 (iteration.virtualX, iteration.virtualY) =
                     (nextDependentWad, nextIndependentWadLessFee);
+                reserveXPerLiquidity = iteration.virtualX.divWadUp(iteration.liquidity);
+                reserveYPerLiquidity = iteration.virtualY.divWadDown(iteration.liquidity);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
                 args.poolId,
                 iteration.prevInvariant,
-                iteration.virtualX.divWadDown(iteration.liquidity), // Expects X per liquidity.
-                iteration.virtualY.divWadDown(iteration.liquidity), // Expects Y per liquidity.
+                reserveXPerLiquidity, // Expects X per liquidity.
+                reserveYPerLiquidity, // Expects Y per liquidity.
                 block.timestamp
             );
 

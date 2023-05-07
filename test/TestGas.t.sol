@@ -8,6 +8,7 @@ contract TestGas is Setup {
     using SafeCastLib for uint256;
     using AssemblyLib for uint256;
     using FixedPointMathLib for uint128;
+    using FixedPointMathLib for uint256;
 
     // helpers
     modifier usePools(uint256 amount) {
@@ -614,18 +615,16 @@ contract TestGas is Setup {
             uint64 poolId = uint64(ghost().poolId + i); // We can do this because we create pools from one nonce.
 
             bool sellAsset = i % 2 == 0;
+            uint256 reserveIn = sellAsset ? pool.virtualX : pool.virtualY;
             uint128 amountIn = RMM01Portfolio(payable(address(_subject)))
                 .computeMaxInput({
                 poolId: poolId,
                 sellAsset: sellAsset,
-                reserveIn: IPortfolioStruct(address(_subject)).pools(poolId)
-                    .virtualX,
-                liquidity: IPortfolioStruct(address(_subject)).pools(poolId)
-                    .liquidity
+                reserveIn: reserveIn.divWadDown(pool.liquidity),
+                liquidity: pool.liquidity
             }).safeCastTo128() / 10;
             uint128 estimatedAmountOut = uint128(
                 _subject.getAmountOut(poolId, sellAsset, amountIn, 0, actor())
-                    * 95 / 100
             );
 
             Order memory order = Order({

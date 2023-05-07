@@ -128,6 +128,7 @@ library RMM01Lib {
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
         data.feeAmount = (data.remainder * fee) / PERCENTAGE;
+        if (data.feeAmount == 0) data.feeAmount = 1;
 
         return (data, tau);
     }
@@ -186,8 +187,8 @@ library RMM01Lib {
         args.tauSeconds = tau;
         args.reserveWadPerLiquidity = nextIndWadPerLiquidity;
 
-        uint256 lower = nextDep.mulDivDown(9999, 10000);
-        uint256 upper = nextDep.mulDivUp(10001, 10000);
+        uint256 lower = nextDepWadPerLiquidity.mulDivDown(98, 100);
+        uint256 upper = nextDepWadPerLiquidity.mulDivUp(102, 100);
         // Each reserve has a minimum lower bound of 0.
         // Each reserve has its own upper bound per liquidity unit.
         // The quote reserve is bounded by the max price.
@@ -196,7 +197,7 @@ library RMM01Lib {
         upper = upper > maximum ? maximum : upper;
 
         // Using the approximated next dependent reserve,
-        // optimize around 0.01% error to find the precise dependent reserve.
+        // optimize around 2.00% error to find the precise dependent reserve.
         nextDepWadPerLiquidity = bisection(
             args,
             lower,
