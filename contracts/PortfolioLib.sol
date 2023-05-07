@@ -44,7 +44,6 @@ uint256 constant MAX_DURATION = 500; // days, but without units
 uint256 constant JUST_IN_TIME_MAX = 600 seconds;
 uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
-error DrawBalance();
 error InsufficientLiquidity();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
