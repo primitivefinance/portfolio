@@ -45,7 +45,7 @@ contract TestRMM01PortfolioInvariants is Setup {
             selectors[1] = HandlerPortfolio.allocate.selector;
             selectors[2] = HandlerPortfolio.deallocate.selector;
             targetSelector(
-                FuzzSelector({addr: address(_portfolio), selectors: selectors})
+                FuzzSelector({ addr: address(_portfolio), selectors: selectors })
             );
             targetContract(address(_portfolio));
         }
@@ -173,7 +173,7 @@ contract TestRMM01PortfolioInvariants is Setup {
         address[] memory actors = getActors();
         uint256 sum;
         for (uint256 i; i != actors.length; ++i) {
-            sum += ghost().position(actors[i]).freeLiquidity;
+            sum += ghost().position(actors[i]);
         }
 
         return sum;
