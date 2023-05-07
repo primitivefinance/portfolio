@@ -68,7 +68,6 @@ error ZeroInput();
 error ZeroLiquidity();
 error ZeroOutput();
 error ZeroPrice();
-error ZeroValue();
 error InvalidNegativeLiquidity();
 error MaxDeltaReached();
 error MinDeltaUnmatched();
