@@ -49,7 +49,6 @@ error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
 error InvalidPriorityFee(uint16 priorityFee);
-error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
 error InvalidPair();
 error InvalidReentrancy();
