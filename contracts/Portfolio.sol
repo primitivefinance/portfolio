@@ -52,7 +52,7 @@ abstract contract PortfolioVirtual is Objective {
     mapping(uint24 => PortfolioPair) public pairs;
     mapping(uint64 => PortfolioPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
-    mapping(address => mapping(uint64 => uint128 liquidity)) public positions;
+    mapping(address => mapping(uint64 => uint128)) public positions;
 
     uint256 internal _locked = 1;
     uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
@@ -539,19 +539,23 @@ abstract contract PortfolioVirtual is Objective {
         {
             bool validInvariant;
             int256 nextInvariantWad;
-            uint reserveXPerLiquidity;
-            uint reserveYPerLiquidity;
+            uint256 reserveXPerLiquidity;
+            uint256 reserveYPerLiquidity;
 
             if (_state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
                     (nextIndependentWadLessFee, nextDependentWad);
-                reserveXPerLiquidity = iteration.virtualX.divWadDown(iteration.liquidity);
-                reserveYPerLiquidity = iteration.virtualY.divWadUp(iteration.liquidity);
+                reserveXPerLiquidity =
+                    iteration.virtualX.divWadDown(iteration.liquidity);
+                reserveYPerLiquidity =
+                    iteration.virtualY.divWadUp(iteration.liquidity);
             } else {
                 (iteration.virtualX, iteration.virtualY) =
                     (nextDependentWad, nextIndependentWadLessFee);
-                reserveXPerLiquidity = iteration.virtualX.divWadUp(iteration.liquidity);
-                reserveYPerLiquidity = iteration.virtualY.divWadDown(iteration.liquidity);
+                reserveXPerLiquidity =
+                    iteration.virtualX.divWadUp(iteration.liquidity);
+                reserveYPerLiquidity =
+                    iteration.virtualY.divWadDown(iteration.liquidity);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
