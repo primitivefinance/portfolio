@@ -54,7 +54,6 @@ error InvalidPair();
 error InvalidReentrancy();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
-error InvalidTransfer();
 error InvalidVolatility(uint16 sigma);
 error NegativeBalance(address token, int256 net);
 error NotController();
