@@ -57,14 +57,12 @@ contract TestPortfolioChangeParameters is Setup {
             priorityFee: 56,
             createdAt: 100000000
         });
-        (, bytes memory revertData) = curve.checkParameters();
-        assertEq(
-            revertData,
+
+        vm.expectRevert(
             abi.encodeWithSelector(
                 InvalidPriorityFee.selector, curve.priorityFee
             )
         );
-        vm.expectRevert(revertData);
         subject().changeParameters(poolId, curve.priorityFee, curve.fee);
     }
 
