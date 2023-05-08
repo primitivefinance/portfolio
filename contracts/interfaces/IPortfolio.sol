@@ -6,9 +6,7 @@ import {
 } from "../libraries/PortfolioLib.sol";
 
 interface IPortfolioEvents {
-    /**
-     * @dev Ether transfers into Portfolio via a payable function.
-     */
+    /// @dev Ether transfers into Portfolio via a payable function.
     event Deposit(address indexed account, uint256 amount);
 
     /**
@@ -165,30 +163,23 @@ interface IPortfolioGetters {
 
     // ===== State Getters ===== //
 
-    /**
-     * @dev Current semantic version of the Portfolio.
-     */
+    /// @dev Current semantic version of the Portfolio.
     function VERSION() external pure returns (string memory);
 
-    /**
-     * @dev Wrapped Ether address initialized on creating the Portfolio.
-     */
+    /// @dev Wrapped Ether address initialized on creating the Portfolio.
     function WETH() external view returns (address);
 
-    /**
-     * @dev Contract for storing canonical Portfolio deployments.
-     */
+    /// @dev Contract for storing canonical Portfolio deployments.
     function REGISTRY() external view returns (address);
 
-    /**
-     * @dev Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
-     */
+    /// @dev Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
     function getPairNonce() external view returns (uint24);
 
-    /**
-     * @dev Incremented when a pool is created.
-     */
+    /// @dev Incremented when a pool is created.
     function getPoolNonce(uint24 pairNonce) external view returns (uint32);
+
+    /// @dev Returns the id of the last pool created.
+    function getLastPoolId() external view returns (uint64);
 
     /**
      * @dev Reverse lookup to find the `pairId` of a given `asset` and `quote`.
@@ -198,6 +189,9 @@ interface IPortfolioGetters {
         address asset,
         address quote
     ) external view returns (uint24 pairId);
+
+    /// @dev Tracks the amount of protocol fees collected for a given `token`.
+    function protocolFees(address token) external view returns (uint256);
 
     function pairs(uint24 pairId)
         external
@@ -209,9 +203,7 @@ interface IPortfolioGetters {
             uint8 decimalsQuote
         );
 
-    /**
-     * @dev Structs in memory are returned as tuples, e.g. (foo, bar...).
-     */
+    /// @dev Structs in memory are returned as tuples, e.g. (foo, bar...).
     function pools(uint64 poolId)
         external
         view

@@ -39,8 +39,10 @@ abstract contract PortfolioVirtual is Objective {
 
     /// @inheritdoc IPortfolioGetters
     address public immutable WETH;
+
     /// @inheritdoc IPortfolioGetters
     address public immutable REGISTRY;
+
     /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
 
@@ -48,11 +50,22 @@ abstract contract PortfolioVirtual is Objective {
     // multicall to avoid being tricked into allocating into the wrong pool.
     uint64 public getLastPoolId;
 
+    /// @inheritdoc IPortfolioGetters
     mapping(address => uint256) public protocolFees;
+
+    /// @inheritdoc IPortfolioGetters
     mapping(uint24 => uint32) public getPoolNonce;
+
+    /// @inheritdoc IPortfolioGetters
     mapping(uint24 => PortfolioPair) public pairs;
+
+    /// @inheritdoc IPortfolioGetters
     mapping(uint64 => PortfolioPool) public pools;
+
+    /// @inheritdoc IPortfolioGetters
     mapping(address => mapping(address => uint24)) public getPairId;
+
+    /// @inheritdoc IPortfolioGetters
     mapping(address => mapping(uint64 => uint128)) public positions;
 
     uint256 internal _locked = 1;
