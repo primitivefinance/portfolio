@@ -12,7 +12,7 @@ contract TestPortfolioCreatePool is Setup {
         uint16 fee,
         uint16 duration,
         uint16 volatility,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint128 price
     ) public {
         uint24 pairId = uint24(1);
@@ -21,7 +21,7 @@ contract TestPortfolioCreatePool is Setup {
         duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
         volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
         vm.assume(price > 0);
-        vm.assume(maxPrice > 0);
+        vm.assume(strikePrice > 0);
 
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
@@ -33,7 +33,7 @@ contract TestPortfolioCreatePool is Setup {
                 fee,
                 volatility,
                 duration,
-                maxPrice,
+                strikePrice,
                 price
             )
         );
@@ -53,7 +53,7 @@ contract TestPortfolioCreatePool is Setup {
         assertEq(actual.fee, fee, "fee");
         assertEq(actual.volatility, volatility, "volatility");
         assertEq(actual.duration, duration, "duration");
-        assertEq(actual.maxPrice, maxPrice, "maxPrice");
+        assertEq(actual.strikePrice, strikePrice, "strikePrice");
     }
 
     function test_revert_createPool_zero_price() public {

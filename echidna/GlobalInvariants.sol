@@ -93,7 +93,7 @@ contract GlobalInvariants is
                 emit LogUint256("priority feel value", pool.params.priorityFee);
                 emit AssertionFailed(
                     "BUG: Mutable pool has a non zero priority fee."
-                    );
+                );
             }
         }
     }
@@ -106,10 +106,10 @@ contract GlobalInvariants is
 
             emit LogUint256(
                 "pool's last price", _portfolio.getVirtualPrice(poolId)
-                );
-            emit LogUint256("strike price", curve.maxPrice);
+            );
+            emit LogUint256("strike price", curve.strikePrice);
 
-            assert(_portfolio.getVirtualPrice(poolId) <= curve.maxPrice);
+            assert(_portfolio.getVirtualPrice(poolId) <= curve.strikePrice);
         }
     }
 
@@ -123,10 +123,10 @@ contract GlobalInvariants is
 
             emit LogUint256(
                 "pool's last price", _portfolio.getVirtualPrice(poolId)
-                );
-            emit LogUint256("strike price", curve.maxPrice);
+            );
+            emit LogUint256("strike price", curve.strikePrice);
 
-            if (curve.maxPrice == 0) {
+            if (curve.strikePrice == 0) {
                 emit AssertionFailed("BUG: Strike price should never be 0.");
             }
         }
@@ -140,13 +140,13 @@ contract GlobalInvariants is
 
             emit LogUint256(
                 "Portfolio pool last timestamp: ", pool.lastTimestamp
-                );
+            );
             emit LogUint256("maturity", curve.maturity());
 
             if (curve.maturity() < pool.lastTimestamp) {
                 emit AssertionFailed(
                     "BUG: curve maturity is less than last timestamp"
-                    );
+                );
             }
         }
     }
@@ -161,17 +161,17 @@ contract GlobalInvariants is
             if (_portfolio.getVirtualPrice(poolId) != 0) {
                 emit LogUint256(
                     "pool's last price", _portfolio.getVirtualPrice(poolId)
-                    );
+                );
                 if (pool.liquidity == 0) {
                     emit AssertionFailed(
                         "BUG: non zero last price should have a non zero liquidity"
-                        );
+                    );
                 }
             } else {
                 if (pool.liquidity != 0) {
                     emit AssertionFailed(
                         "BUG: zero last price should have a zero liquidity."
-                        );
+                    );
                 }
             }
         }
@@ -192,13 +192,13 @@ contract GlobalInvariants is
         if (deltaAsset == 0) {
             emit AssertionFailed(
                 "BUG: getLiquidityDeltas returned 0 for deltaAsset"
-                );
+            );
         }
         emit LogUint256("deltaQuote", deltaQuote);
         if (deltaQuote == 0) {
             emit AssertionFailed(
                 "BUG: getLiquidityDeltas returned 0 for deltaQuote"
-                );
+            );
         }
     }
 
@@ -237,14 +237,14 @@ contract GlobalInvariants is
                 emit LogUint256("assetReserves", assetReserves);
                 emit AssertionFailed(
                     "BUG (`asset`): virtualReserves returned more than getReserve function"
-                    );
+                );
             }
             if (deltaQuote > quoteReserves) {
                 emit LogUint256("deltaQuote", deltaQuote);
                 emit LogUint256("quoteReserves", quoteReserves);
                 emit AssertionFailed(
                     "BUG (`asset`): virtualReserves returned more than getReserve function"
-                    );
+                );
             }
         }
     }
@@ -265,11 +265,11 @@ contract GlobalInvariants is
                 emit AssertionFailed("BUG amountAssetWad is greater than 1e18");
             }
             // Inclusive of strike price?
-            if (amountQuoteWad > curve.maxPrice) {
+            if (amountQuoteWad > curve.strikePrice) {
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
                 emit AssertionFailed(
                     "BUG amountQuoteWad is greater than strike"
-                    );
+                );
             }
         }
     }
@@ -293,7 +293,7 @@ contract GlobalInvariants is
                 emit LogUint256("amountAssetWad", amountAssetWad);
                 emit AssertionFailed(
                     "BUG (asset): getAmounts returned more than getVirtualReservesWad"
-                    );
+                );
             }
             // Assumes inclusivity of bounds (i.e: equivalence is okay)
             if (amountQuoteDec > amountQuoteWad) {
@@ -301,7 +301,7 @@ contract GlobalInvariants is
                 emit LogUint256("amountQuoteWad", amountQuoteWad);
                 emit AssertionFailed(
                     "BUG (quote): getAmounts returned more than getVirtualReservesWad"
-                    );
+                );
             }
         }
     }

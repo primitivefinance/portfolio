@@ -48,7 +48,7 @@ library RMM01Lib {
         return Invariant.invariant({
             R_y: R_y,
             R_x: R_x,
-            stk: self.params.maxPrice,
+            stk: self.params.strikePrice,
             vol: convertPercentageToWad(self.params.volatility),
             tau: timeRemainingSec
         });
@@ -174,7 +174,7 @@ library RMM01Lib {
         if (sellAsset) {
             adjustedDependentReserve = Invariant.getY({
                 R_x: adjustedIndependentReserve,
-                stk: self.params.maxPrice,
+                stk: self.params.strikePrice,
                 vol: volatilityWad,
                 tau: tau,
                 inv: data.prevInvariant
@@ -182,7 +182,7 @@ library RMM01Lib {
         } else {
             adjustedDependentReserve = Invariant.getX({
                 R_y: adjustedIndependentReserve,
-                stk: self.params.maxPrice,
+                stk: self.params.strikePrice,
                 vol: volatilityWad,
                 tau: tau,
                 inv: data.prevInvariant
@@ -192,7 +192,7 @@ library RMM01Lib {
         // Since the dependent reserve is approximated, a bisection method is used to find the precise dependent reserve.
         Bisection memory args;
         args.optimizeQuoteReserve = sellAsset;
-        args.terminalPriceWad = self.params.maxPrice;
+        args.terminalPriceWad = self.params.strikePrice;
         args.volatilityWad = volatilityWad;
         args.tauSeconds = tau;
         args.reserveWadPerLiquidity = adjustedIndependentReserve;
@@ -247,7 +247,7 @@ library RMM01Lib {
         uint256 priceWad,
         int128 invariantWad
     ) internal pure returns (uint256 R_x, uint256 R_y) {
-        uint256 terminalPriceWad = self.params.maxPrice;
+        uint256 terminalPriceWad = self.params.strikePrice;
         uint256 volatilityFactorWad =
             convertPercentageToWad(self.params.volatility);
         uint256 timeRemainingSec = self.lastTau(); // uses self.lastTimestamp, is it set?

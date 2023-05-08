@@ -50,7 +50,7 @@ contract Swaps is EchidnaStateHandling {
         uint256 maxInput;
         uint256 maxOutput;
         PortfolioCurve memory curve = pool.params;
-        uint256 stk = curve.maxPrice;
+        uint256 stk = curve.strikePrice;
 
         // Compute reserves to determine max input and output.
         (uint256 R_x, uint256 R_y) =
@@ -98,7 +98,7 @@ contract Swaps is EchidnaStateHandling {
         emit LogUint256(
             "difference in maturity and timestamp:",
             uint256(curve.maturity()) - uint256(block.timestamp)
-            );
+        );
 
         if (curve.maturity() <= block.timestamp) {
             emit LogUint256("Maturity timestamp", curve.maturity());
@@ -111,7 +111,7 @@ contract Swaps is EchidnaStateHandling {
                 "BUG: Swap on an expired pool should have failed."
             );
         } else {
-            uint256 stk = curve.maxPrice;
+            uint256 stk = curve.strikePrice;
             emit LogUint256("stk", stk);
 
             (uint256 input, uint256 output) =
@@ -161,12 +161,12 @@ contract Swaps is EchidnaStateHandling {
                     "asset gain",
                     EchidnaERC20(pair.tokenAsset).balanceOf(address(this))
                         - initAsset
-                    );
+                );
                 emit LogUint256(
                     "quote gain",
                     EchidnaERC20(pair.tokenQuote).balanceOf(address(this))
                         - initQuote
-                    );
+                );
                 emit AssertionFailed("Swap allowed to extract tokens");
             }
         }
@@ -273,7 +273,7 @@ contract Swaps is EchidnaStateHandling {
         emit LogBool(
             "is curve maturity greater than timestamp?",
             curve.maturity() > block.timestamp
-            );
+        );
         // require(curve.maturity() > block.timestamp);
 
         amount = between(amount, 1, type(uint256).max);
@@ -321,7 +321,7 @@ contract Swaps is EchidnaStateHandling {
                 emit LogUint256("price after swap", c.postPoolLastPrice);
                 emit AssertionFailed(
                     "BUG: pool.lastPrice increased after swapping assets in, it should have decreased."
-                    );
+                );
             }
 
             // feeGrowthSell = asset
@@ -391,7 +391,7 @@ contract Swaps is EchidnaStateHandling {
                 emit LogUint256("price after swap", c.postPoolLastPrice);
                 emit AssertionFailed(
                     "BUG: pool.lastPrice decreased after swapping quote in, it should have increased."
-                    );
+                );
             }
 
             // feeGrowthSell = quote
@@ -472,7 +472,7 @@ contract Swaps is EchidnaStateHandling {
                 emit LogUint256("asset reserve after swap", c.postReserveSell);
                 emit AssertionFailed(
                     "BUG: reserve decreased after swapping asset in, it should have increased."
-                    );
+                );
             }
 
             // feeGrowthSell = asset
@@ -544,7 +544,7 @@ contract Swaps is EchidnaStateHandling {
                 emit LogUint256("quote reserve after swap", c.prevReserveSell);
                 emit AssertionFailed(
                     "BUG: reserve decreased after swapping quote in, it should have increased."
-                    );
+                );
             }
 
             // feeGrowthSell = quote

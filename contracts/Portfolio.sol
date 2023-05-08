@@ -259,7 +259,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaAsset,
             deltaQuote,
             deltaLiquidity
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -328,7 +328,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -570,7 +570,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -647,7 +647,7 @@ abstract contract PortfolioVirtual is Objective {
      * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
      * @param volatility Expected volatility of the pool in basis points, minimum of 1 (0.01%) and maximum of 25,000 (250%).
      * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
-     * @param maxPrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
+     * @param strikePrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
      * @param price Initial price of the pool (expressed in the quote token), in WAD units.
      */
     function createPool(
@@ -657,7 +657,7 @@ abstract contract PortfolioVirtual is Objective {
         uint16 fee,
         uint16 volatility,
         uint16 duration,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint128 price
     ) external payable returns (uint64 poolId) {
         _preLock();
@@ -691,7 +691,7 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         PortfolioCurve memory params = PortfolioCurve({
-            maxPrice: maxPrice,
+            strikePrice: strikePrice,
             fee: fee,
             duration: duration,
             volatility: volatility,
@@ -708,12 +708,12 @@ abstract contract PortfolioVirtual is Objective {
             pool.pair.tokenAsset,
             pool.pair.tokenQuote,
             pool.controller,
-            pool.params.maxPrice,
+            pool.params.strikePrice,
             pool.params.fee,
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
-            );
+        );
 
         _postLock();
     }
