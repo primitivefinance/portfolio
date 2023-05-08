@@ -71,6 +71,7 @@ abstract contract PortfolioVirtual is Objective {
     /// @dev Part of the reentrancy guard, 1 = unlocked, 2 = locked.
     uint256 internal _locked = 1;
 
+    /// @inheritdoc IPortfolioGetters
     uint256 public protocolFee;
 
     /**
