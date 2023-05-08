@@ -64,6 +64,7 @@ abstract contract PortfolioVirtual is Objective {
      */
     Payment[] private _payments;
 
+    /// @dev True if the current call is a multicall.
     bool private _currentMulticall;
 
     /**
