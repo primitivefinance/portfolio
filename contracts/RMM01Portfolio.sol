@@ -43,7 +43,7 @@ contract RMM01Portfolio is PortfolioVirtual {
             liquidityDelta: 0, // Uses unmodified pool liquidity to compute invariant.
             timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
             swapper: address(0) // Setting the swapp affects the swap fee %, which is not used in this function.
-         });
+        });
 
         invariant = int128(iteration.prevInvariant); // todo: fix safe cast
 
