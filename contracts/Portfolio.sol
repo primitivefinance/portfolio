@@ -864,7 +864,7 @@ abstract contract PortfolioVirtual is Objective {
                     );
                 } else {
                     Account.SafeTransferLib.safeTransfer(
-                        Account.ERC20(token), msg.sender, amountTransferTo
+                        token, msg.sender, amountTransferTo
                     );
                 }
 
@@ -879,8 +879,8 @@ abstract contract PortfolioVirtual is Objective {
                 uint256 prev = payments[index].balance;
 
                 // Interaction
-                Account.__dangerousTransferFrom__(
-                    token, address(this), amountTransferFrom
+                Account.SafeTransferLib.safeTransferFrom(
+                    token, msg.sender, address(this), amountTransferFrom
                 );
 
                 uint256 post = Account.__balanceOf__(token, address(this));
