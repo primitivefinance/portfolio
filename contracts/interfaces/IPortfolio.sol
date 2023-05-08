@@ -180,9 +180,6 @@ interface IPortfolioGetters {
     /// @notice Incremented when a pool is created.
     function getPoolNonce(uint24 pairNonce) external view returns (uint32);
 
-    /// @notice Returns the id of the last pool created.
-    function getLastPoolId() external view returns (uint64);
-
     /**
      * @dev Reverse lookup to find the `pairId` of a given `asset` and `quote`.
      * Order matters! There can be two pairs for every two tokens.

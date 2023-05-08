@@ -51,7 +51,7 @@ abstract contract PortfolioVirtual is Objective {
 
     // Tracks the id of the last pool that was created, quite useful during a
     // multicall to avoid being tricked into allocating into the wrong pool.
-    uint64 public getLastPoolId;
+    uint64 private getLastPoolId;
 
     /// @inheritdoc IPortfolioGetters
     mapping(address => uint256) public protocolFees;
