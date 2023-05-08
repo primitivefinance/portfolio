@@ -272,7 +272,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaAsset,
             deltaQuote,
             deltaLiquidity
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -334,7 +334,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -559,7 +559,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -686,7 +686,7 @@ abstract contract PortfolioVirtual is Objective {
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
-            );
+        );
 
         _postLock();
     }
@@ -873,6 +873,8 @@ abstract contract PortfolioVirtual is Objective {
             revert NotController();
         }
 
+        _preLock();
+
         uint256 amountWad;
         uint8 decimals = IERC20(token).decimals();
         if (amount == type(uint256).max) {
@@ -888,10 +890,14 @@ abstract contract PortfolioVirtual is Objective {
         _settlement();
 
         emit ClaimFees(token, amount);
+
+        _postLock();
     }
 
     /// @inheritdoc IPortfolioActions
     function setProtocolFee(uint256 fee) external override {
+        _preLock();
+
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
         }
@@ -901,6 +907,8 @@ abstract contract PortfolioVirtual is Objective {
         protocolFee = fee;
 
         emit UpdateProtocolFee(prevFee, fee);
+
+        _postLock();
     }
 
     // ===== Public View ===== //
