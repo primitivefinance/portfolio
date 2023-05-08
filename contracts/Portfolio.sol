@@ -51,7 +51,7 @@ abstract contract PortfolioVirtual is Objective {
 
     // Tracks the id of the last pool that was created, quite useful during a
     // multicall to avoid being tricked into allocating into the wrong pool.
-    uint64 private getLastPoolId;
+    uint64 private _getLastPoolId;
 
     /// @inheritdoc IPortfolioGetters
     mapping(address => uint256) public protocolFees;
@@ -212,7 +212,7 @@ abstract contract PortfolioVirtual is Objective {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
-        if (poolId == 0) poolId = getLastPoolId;
+        if (poolId == 0) poolId = _getLastPoolId;
         if (!checkPool(poolId)) revert NonExistentPool(poolId);
 
         (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
@@ -679,7 +679,7 @@ abstract contract PortfolioVirtual is Objective {
 
             // TODO: Checks if it's cheaper to assign the storage variable this
             // way or get rid of the returned variable `poolId` instead.
-            getLastPoolId = poolId;
+            _getLastPoolId = poolId;
         }
 
         PortfolioPool storage pool = pools[poolId];
