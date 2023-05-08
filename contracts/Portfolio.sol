@@ -16,6 +16,7 @@ abstract contract PortfolioVirtual is Objective {
     using AssemblyLib for int256;
     using AssemblyLib for uint256;
 
+    /// @inheritdoc IPortfolioGetters
     function VERSION() public pure returns (string memory) {
         assembly ("memory-safe") {
             // Load 0x20 (32) in memory at slot 0x00, this corresponds to the
