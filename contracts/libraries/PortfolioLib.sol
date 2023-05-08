@@ -39,6 +39,7 @@ uint256 constant MIN_VOLATILITY = 1; // 0.01%
 uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = 1; // days, but without units
 uint256 constant MAX_DURATION = 500; // days, but without units
+uint256 constant PERPETUAL_DURATION = type(uint16).max;
 
 error InsufficientLiquidity();
 error InvalidDecimals(uint8 decimals);
@@ -166,7 +167,10 @@ function changePoolParameters(
     ) {
         revert InvalidVolatility(updated.volatility);
     }
-    if (!AssemblyLib.isBetween(updated.duration, MIN_DURATION, MAX_DURATION)) {
+    if (
+        updated.duration != PERPETUAL_DURATION
+            && !AssemblyLib.isBetween(updated.duration, MIN_DURATION, MAX_DURATION)
+    ) {
         revert InvalidDuration(updated.duration);
     }
     if (
@@ -310,7 +314,7 @@ function computeTau(
     PortfolioPool memory self,
     uint256 timestamp
 ) pure returns (uint256) {
-    if (self.params.duration == MAX_DURATION) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
+    if (self.params.duration == PERPETUAL_DURATION) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
 
     uint256 end = self.params.maturity();
     unchecked {
@@ -327,7 +331,7 @@ function maturity(PortfolioCurve memory self)
     pure
     returns (uint32 endTimestamp)
 {
-    if (self.duration == MAX_DURATION) revert NotExpiringPool();
+    if (self.duration == PERPETUAL_DURATION) revert NotExpiringPool();
 
     unchecked {
         // Portfolio duration is limited such that this addition will never overflow 256 bits.

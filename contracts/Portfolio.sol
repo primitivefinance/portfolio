@@ -664,11 +664,6 @@ abstract contract PortfolioVirtual is Objective {
         pool.lastTimestamp = timestamp;
         pool.pair = pairs[pairNonce];
 
-        // `type(uint16).max` is a magic variable for perpetual pools.
-        if (duration > uint16(MAX_DURATION) && duration != type(uint16).max) {
-            revert InvalidDuration(duration);
-        }
-
         PortfolioCurve memory params = PortfolioCurve({
             strikePrice: strikePrice,
             fee: fee,
