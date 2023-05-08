@@ -39,8 +39,6 @@ uint256 constant MIN_VOLATILITY = 1; // 0.01%
 uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = 1; // days, but without units
 uint256 constant MAX_DURATION = 500; // days, but without units
-uint256 constant JUST_IN_TIME_MAX = 600 seconds;
-uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
 error InsufficientLiquidity();
 error InvalidDecimals(uint8 decimals);

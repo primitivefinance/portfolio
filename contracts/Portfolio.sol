@@ -68,8 +68,9 @@ abstract contract PortfolioVirtual is Objective {
     /// @inheritdoc IPortfolioGetters
     mapping(address => mapping(uint64 => uint128)) public positions;
 
+    /// @dev Part of the reentrancy guard, 1 = unlocked, 2 = locked.
     uint256 internal _locked = 1;
-    uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
+
     uint256 private _protocolFee;
 
     /**
