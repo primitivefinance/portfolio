@@ -79,7 +79,7 @@ struct PortfolioPair {
 
 struct PortfolioCurve {
     // single slot
-    uint128 maxPrice; // Can be used as a terminal price (max price that can be reached by maturity).
+    uint128 strikePrice; // Can be used as a terminal price (max price that can be reached by maturity).
     uint16 fee; // Can be manipulated by a controller of a pool, if there is one.
     uint16 duration; // Set to `type(uint16).max` for perpetual pools.
     uint16 volatility; // Effects the pool like an amplification factor, increasing price impact of swaps.
@@ -170,9 +170,10 @@ function changePoolParameters(
     if (!AssemblyLib.isBetween(updated.duration, MIN_DURATION, MAX_DURATION)) {
         revert InvalidDuration(updated.duration);
     }
-    if (!AssemblyLib.isBetween(updated.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE))
-    {
-        revert InvalidStrike(updated.maxPrice);
+    if (
+        !AssemblyLib.isBetween(updated.strikePrice, MIN_MAX_PRICE, MAX_MAX_PRICE)
+    ) {
+        revert InvalidStrike(updated.strikePrice);
     }
     if (!AssemblyLib.isBetween(updated.fee, MIN_FEE, MAX_FEE)) {
         revert InvalidFee(updated.fee);

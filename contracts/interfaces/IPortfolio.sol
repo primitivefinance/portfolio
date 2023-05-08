@@ -102,7 +102,7 @@ interface IPortfolioEvents {
      * @param asset Token that is being paired.
      * @param quote Token that is being paired.
      * @param controller Address that can call `changeParameters` on the pool.
-     * @param maxPrice The terminal price reached upon the end of the duration.
+     * @param strikePrice The terminal price reached upon the end of the duration.
      * @param fee Fee percentage paid by swappers.
      * @param duration Days until the pool cannot be swapped in anymore.
      * @param volatility Volatility in basis points which determines price impact of swaps.
@@ -113,7 +113,7 @@ interface IPortfolioEvents {
         address indexed asset,
         address indexed quote,
         address controller,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint16 fee,
         uint16 duration,
         uint16 volatility,
@@ -377,7 +377,7 @@ interface IPortfolioActions {
         uint16 fee,
         uint16 volatility,
         uint16 duration,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint128 price
     ) external payable returns (uint64 poolId);
 

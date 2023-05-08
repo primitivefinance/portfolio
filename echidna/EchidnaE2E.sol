@@ -66,14 +66,14 @@ contract EchidnaE2E is GlobalInvariants {
                 emit LogUint256("assetReserves", assetReserves);
                 emit AssertionFailed(
                     "BUG (`asset`): virtualReserves returned more than getReserve function"
-                    );
+                );
             }
             if (deltaQuote > quoteReserves) {
                 emit LogUint256("deltaQuote", deltaQuote);
                 emit LogUint256("quoteReserves", quoteReserves);
                 emit AssertionFailed(
                     "BUG (`asset`): virtualReserves returned more than getReserve function"
-                    );
+                );
             }
         }
     }
@@ -89,7 +89,7 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -129,7 +129,7 @@ contract EchidnaE2E is GlobalInvariants {
             assert(postChangeCurve.volatility == volatility);
             assert(postChangeCurve.duration == duration);
             assert(postChangeCurve.jit == jit);
-            assert(postChangeCurve.maxPrice == maxPrice);
+            assert(postChangeCurve.strikePrice == strikePrice);
         }
     }
 
@@ -138,13 +138,13 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
         uint128 price
     ) public {
-        maxPrice;
+        strikePrice;
 
         (PortfolioPool memory preChangeState, uint64 poolId,,) =
             retrieve_random_pool_and_tokens(id);
@@ -167,7 +167,7 @@ contract EchidnaE2E is GlobalInvariants {
         try _portfolio.changeParameters(poolId, priorityFee, fee, jit) {
             emit AssertionFailed(
                 "BUG: Changing pool parameters of a nonmutable pool should not be possible"
-                );
+            );
         } catch { }
     }
 
@@ -403,7 +403,7 @@ contract EchidnaE2E is GlobalInvariants {
             emit LogUint256("price after swap", postPoolLastPrice);
             emit AssertionFailed(
                 "BUG: pool.lastPrice increased after swapping assets in, it should have decreased."
-                );
+            );
         }
 
         // feeGrowthSell = asset
@@ -490,7 +490,7 @@ contract EchidnaE2E is GlobalInvariants {
                 emit LogUint256("price after swap", t.postPoolLastPrice);
                 emit AssertionFailed(
                     "BUG: pool.lastPrice decreased after swapping quote in, it should have increased."
-                    );
+                );
             }
 
             t.postReserveSell = getReserve(address(_portfolio), address(_quote));
@@ -574,7 +574,7 @@ contract EchidnaE2E is GlobalInvariants {
             emit LogUint256("asset reserve after swap", t.postReserveSell);
             emit AssertionFailed(
                 "BUG: reserve decreased after swapping asset in, it should have increased."
-                );
+            );
         }
 
         // feeGrowthSell = asset
@@ -654,7 +654,7 @@ contract EchidnaE2E is GlobalInvariants {
             emit LogUint256("quote reserve after swap", t.prevReserveSell);
             emit AssertionFailed(
                 "BUG: reserve decreased after swapping quote in, it should have increased."
-                );
+            );
         }
 
         // feeGrowthSell = quote

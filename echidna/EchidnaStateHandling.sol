@@ -33,7 +33,7 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
         uint16 volatility;
         uint16 duration;
         uint16 jit;
-        uint128 maxPrice;
+        uint128 strikePrice;
         uint128 price;
     }
 
@@ -57,7 +57,11 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
         return (PortfolioTokens[id1], PortfolioTokens[id2]);
     }
 
-    function get_token_at_index(uint256 index) internal view returns (EchidnaERC20 token) {
+    function get_token_at_index(uint256 index)
+        internal
+        view
+        returns (EchidnaERC20 token)
+    {
         return PortfolioTokens[index];
     }
 
@@ -68,7 +72,11 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
         pairIds.push(pairId);
     }
 
-    function retrieve_created_pair(uint256 id) internal view returns (uint24 pairId) {
+    function retrieve_created_pair(uint256 id)
+        internal
+        view
+        returns (uint24 pairId)
+    {
         require(pairIds.length > 0);
         id = between(id, 0, pairIds.length);
         return pairIds[id];
@@ -91,7 +99,12 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
     function retrieve_random_pool_and_tokens(uint256 id)
         internal
         view
-        returns (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote)
+        returns (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 asset,
+            EchidnaERC20 quote
+        )
     {
         // assumes that at least one pool exists because it's been created in the constructor
         uint256 random = between(id, 0, poolIds.length - 1);
@@ -107,7 +120,12 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
     function retrieve_non_expired_pool_and_tokens()
         internal
         view
-        returns (PortfolioPool memory pool, uint64 poolId, EchidnaERC20 asset, EchidnaERC20 quote)
+        returns (
+            PortfolioPool memory pool,
+            uint64 poolId,
+            EchidnaERC20 asset,
+            EchidnaERC20 quote
+        )
     {
         for (uint8 i = 0; i < poolIds.length; i++) {
             // will auto skew to the first pool that is not expired, however this should be okay.
@@ -116,7 +134,12 @@ contract EchidnaStateHandling is Helper, HelperPortfolioView {
             PortfolioCurve memory curve = pool.params;
             if (curve.maturity() > block.timestamp) {
                 PortfolioPair memory pair = pool.pair;
-                return (pool, poolIds[i], EchidnaERC20(pair.tokenQuote), EchidnaERC20(pair.tokenAsset));
+                return (
+                    pool,
+                    poolIds[i],
+                    EchidnaERC20(pair.tokenQuote),
+                    EchidnaERC20(pair.tokenAsset)
+                );
             }
         }
     }

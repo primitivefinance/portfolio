@@ -50,7 +50,7 @@ contract TestPortfolioChangeParameters is Setup {
     {
         uint64 poolId = ghost().poolId;
         PortfolioCurve memory curve = PortfolioCurve({
-            maxPrice: DEFAULT_STRIKE,
+            strikePrice: DEFAULT_STRIKE,
             fee: 55,
             duration: DEFAULT_DURATION,
             volatility: DEFAULT_VOLATILITY,
