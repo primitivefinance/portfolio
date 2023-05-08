@@ -94,7 +94,7 @@ contract TestPortfolioAllocate is Setup {
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
             ghost().position(actor()),
-            "position.freeLiquidity != pool.liquidity"
+            "position != pool.liquidity"
         );
     }
 
@@ -125,7 +125,7 @@ contract TestPortfolioAllocate is Setup {
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
             ghost().position(actor()),
-            "position.freeLiquidity != pool.liquidity"
+            "position != pool.liquidity"
         );
     }
 
@@ -153,8 +153,8 @@ contract TestPortfolioAllocate is Setup {
         );
         assertEq(
             ghost().pool().liquidity,
-            ghost().position(actor()).freeLiquidity,
-            "position.freeLiquidity != pool.liquidity"
+            ghost().position(actor()).liquidity,
+            "position != pool.liquidity"
         );
     } */
 
@@ -571,7 +571,7 @@ contract TestPortfolioAllocate is Setup {
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
             ghost().position(actor()),
-            "position.freeLiquidity != pool.liquidity"
+            "position.liquidity != pool.liquidity"
         );
     }
 }

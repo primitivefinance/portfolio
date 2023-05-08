@@ -21,20 +21,22 @@ using {
 error InsufficientReserve(uint256 amount, uint256 delta); // 0x315276c9
 error InvalidBalance(); // 0xc52e3eff
 
+/**
+ * @param reserves Maps token addresses to virtual balances in WAD units.
+ * @param cached Cached tokens are settled via `settle`.
+ * @param warm Tokens that have been interacted with during the transaction.
+ * @param settled Must be `true` outside of execution. Mutex for settlement interactions.
+ */
 struct AccountSystem {
-    // token -> virtual reserve.
     mapping(address => uint256) reserves;
-    // token -> cached status.
     mapping(address => bool) cached;
-    // Transiently stored cached tokens, must be length zero outside of execution.
     address[] warm;
-    // Must be `true` outside of execution. Mutex for settlement interactions.
     bool settled;
 }
 
 /**
  * @dev Gets the balance of `account` in `token`.
- * Note: This is a gas optimized version
+ * Note: This is a gas optimized version.
  * @param token Address of the token.
  * @param account Address of the account to check.
  * @return Balance of the account.
@@ -50,7 +52,7 @@ function __balanceOf__(address token, address account) view returns (uint256) {
 /// @dev Must validate `weth` is real weth.
 function __wrapEther__(AccountSystem storage self, address weth) {
     self.touch(weth);
-    IWETH(weth).deposit{ value: msg.value }();
+    IWETH(weth).deposit{value: msg.value}();
 }
 
 /**
@@ -95,6 +97,7 @@ function settle(
     address token,
     address account
 ) returns (uint256 credited, uint256 remainder) {
+    // Returns A token amount in native token decimals.
     int256 net = self.getNetBalance(token, account);
     if (net > 0) {
         // Token remaining in internal balance or untracked tokens to transfer out.

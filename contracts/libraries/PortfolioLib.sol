@@ -28,11 +28,11 @@ using {
     computeTau
 } for PortfolioPool global;
 
-uint256 constant BURNED_LIQUIDITY = 1e9;
-uint256 constant INIT_LIQUIDITY = 1e18;
+uint256 constant BURNED_LIQUIDITY = 1e9; // Quantity of liquidity burned on the first allocate call.
+uint256 constant INIT_LIQUIDITY = 1e18; // Ghost quantity of liquidity on pool creation, used to calculate the first price.
 uint256 constant PERCENTAGE = 10_000;
-uint256 constant MIN_MAX_PRICE = 1;
-uint256 constant MAX_MAX_PRICE = type(uint128).max;
+uint256 constant MIN_STRIKE_PRICE = 1;
+uint256 constant MAX_STRIKE_PRICE = type(uint128).max;
 uint256 constant MIN_FEE = 1; // 0.01%
 uint256 constant MAX_FEE = 1000; // 10%
 uint256 constant MIN_VOLATILITY = 1; // 0.01%
@@ -79,9 +79,9 @@ struct PortfolioPair {
 
 struct PortfolioCurve {
     // single slot
-    uint128 strikePrice; // Can be used as a terminal price (max price that can be reached by maturity).
+    uint128 strikePrice; // Terminal price of a pool once a pool's duration as eclipsed.
     uint16 fee; // Can be manipulated by a controller of a pool, if there is one.
-    uint16 duration; // Set to `type(uint16).max` for perpetual pools.
+    uint16 duration; // Set to `type(uint16).max` for perpetual pools, otherwise days until pool cannot have swaps.
     uint16 volatility; // Effects the pool like an amplification factor, increasing price impact of swaps.
     uint16 priorityFee; // Only set for controlled pools, and can be changed by controller.
     uint32 createdAt; // Set to the `block.timestamp` on pool creation.
@@ -102,8 +102,8 @@ struct ChangeLiquidityParams {
     uint256 deltaAsset; // Quantity of asset tokens in WAD units to add or remove.
     uint256 deltaQuote; // Quantity of quote tokens in WAD units to add or remove.
     int128 deltaLiquidity; // Quantity of liquidity tokens in WAD units to add or remove.
-    uint64 poolId;
-    address owner;
+    uint64 poolId; // If allocating, setting the poolId to 0 will be a magic variable to use the `_getLastPoolId` as the poolId.
+    address owner; // Address with position liquidity to change.
     address tokenAsset; // Address of the asset token.
     address tokenQuote; // Address of the quote token.
 }
@@ -174,7 +174,9 @@ function changePoolParameters(
         revert InvalidDuration(updated.duration);
     }
     if (
-        !AssemblyLib.isBetween(updated.strikePrice, MIN_MAX_PRICE, MAX_MAX_PRICE)
+        !AssemblyLib.isBetween(
+            updated.strikePrice, MIN_STRIKE_PRICE, MAX_STRIKE_PRICE
+        )
     ) {
         revert InvalidStrike(updated.strikePrice);
     }
@@ -218,7 +220,7 @@ function getPoolMaxLiquidity(
     uint256 deltaQuote
 ) pure returns (uint128 deltaLiquidity) {
     uint256 totalLiquidity = self.liquidity;
-    if (totalLiquidity == 0) totalLiquidity = INIT_LIQUIDITY; // use 1E18 of liquidity
+    if (totalLiquidity == 0) totalLiquidity = INIT_LIQUIDITY; // Use 1E18 of ghost liquidity to do math for amounts.
 
     (uint256 amountAssetWad, uint256 amountQuoteWad) =
         self.getVirtualReservesWad();

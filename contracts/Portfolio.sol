@@ -118,7 +118,7 @@ abstract contract PortfolioVirtual is Objective {
      * @param weth Address of the WETH contract. Failing to pass a valid WETH
      * contract that implements the `deposit()` function will cause all
      * transactions with Portfolio to fail once `address(this).balance > 0`.
-     * @param registry Address of the Primitive Registry contract.
+     * @param registry Address of a contract that implements the `IRegistry` interface.
      */
     constructor(address weth, address registry) {
         WETH = weth;
@@ -272,7 +272,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaAsset,
             deltaQuote,
             deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -334,7 +334,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -454,7 +454,7 @@ abstract contract PortfolioVirtual is Objective {
         // --- Effects --- //
 
         // In the case of a non-zero protocol fee, a small portion of the input amount (protocol fee) is not re-invested to the pool.
-        // Therefore, this input amount will properly sync the pool's reserves by subtracting the protocol fee amount from this value.
+        // Therefore, to properly sync the pool's reserve, the protocol fee must be subtracted from the input.
         uint256 deltaIndependentReserveWad = iteration.input;
 
         {
@@ -471,9 +471,9 @@ abstract contract PortfolioVirtual is Objective {
             if (protocolFee != 0) {
                 // Protocol fee is a proportion of the fee amount.
                 iteration.protocolFeeAmount = iteration.feeAmount / protocolFee;
-                // Reduce the increase in the independent reserve, so that protocol fee is not re-invested into pool.
+                // Take the protocol fee from the input amount, so that protocol fee is not re-invested into pool.
                 deltaIndependentReserveWad -= iteration.protocolFeeAmount;
-                // Take the protocol fee from the fee amount.
+                // Take the protocol fee from the fee amount, so total fees paid are not affected.
                 iteration.feeAmount -= iteration.protocolFeeAmount;
             }
 
@@ -481,7 +481,7 @@ abstract contract PortfolioVirtual is Objective {
                 (iteration.virtualX, iteration.virtualY);
 
             // 1. Compute the new independent reserve without the fee amount included,
-            //      so that the invariant check passes even without the additional fees.
+            //      so that the invariant check passes even without the swap fee amount.
             // 2. Compute the new dependent reserve by subtracting the full output swap amount.
             // 3. Adjust the reserves to be the pool reserves per 1E18 liquidity.
             //      Independent reserve is rounded down and dependent reserve is rounded up.
@@ -553,14 +553,13 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Swap(
             args.poolId,
-            getSpotPrice(args.poolId),
             info.tokenInput,
             iteration.input,
             info.tokenOutput,
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -569,7 +568,7 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
-     * @dev Effects on a `pool` after a successful swap.
+     * @dev Effects on a pool after a successful swap.
      * @param deltaInWad Amount of input tokens in WAD units to increase the independent reserve by.
      * @param deltaOutWad Amount of output tokens in WAD units to decrease the dependent reserve by.
      */
@@ -687,7 +686,7 @@ abstract contract PortfolioVirtual is Objective {
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
-        );
+            );
 
         _postLock();
     }
@@ -760,14 +759,12 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
-     * Be aware of these settlement invariants:
-     *
-     *     Invariant 1. Every token that is interacted with is cached and exists.
-     *     Invariant 2. Tokens are removed from cache and cache is empty by end of settlement.
-     *     Invariant 3. Cached tokens cannot be carried over from previous transactions.
-     *     Invariant 4. Execution does not exit during the loops prematurely.
-     *     Invariant 5. Account `settled` bool is set to true at end of `settlement`.
-     *     Invariant 6. Debits reduce `reserves` of `token`.
+     * @dev Be aware of these settlement invariants:
+     *      Invariant 1. Every token that is interacted with is cached and exists.
+     *      Invariant 2. Tokens are removed from cache and cache is empty by end of settlement.
+     *      Invariant 3. Cached tokens cannot be carried over from previous transactions.
+     *      Invariant 4. Execution does not exit during the loops prematurely.
+     *      Invariant 5. Account `settled` bool is set to true at end of `settlement`.
      */
     function _settlement() internal {
         address[] memory tokens = __account__.warm;

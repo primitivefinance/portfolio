@@ -523,6 +523,6 @@ struct AccountingState {
     uint256 physicalBalanceAsset; // balanceOf
     uint256 physicalBalanceQuote; // balanceOf
     uint256 totalPositionLiquidity; // sum of all position liquidity
-    uint256 callerPositionLiquidity; // position.freeLiquidity
+    uint256 callerPositionLiquidity; // position
     uint256 totalPoolLiquidity; // pool.liquidity
 }

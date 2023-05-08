@@ -166,6 +166,9 @@ library AssemblyLib {
      * @custom:example
      * ```
      * uint64 poolId = encodePoolId(7, true, 42);
+     * assertEq(poolId, 0x000007010000002a);
+     * uint64 poolIdEncoded = abi.encodePacked(uint24(pairId), uint8(isMutable ? 1 : 0), uint32(poolNonce));
+     * assertEq(poolIdEncoded, poolId);
      * ```
      */
     function encodePoolId(
