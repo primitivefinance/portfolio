@@ -37,8 +37,7 @@ abstract contract PortfolioVirtual is Objective {
         }
     }
 
-    // TODO: Why not make this private?
-    Account.AccountSystem public __account__;
+    Account.AccountSystem internal __account__;
 
     /// @inheritdoc IPortfolioGetters
     address public immutable WETH;
@@ -654,9 +653,6 @@ abstract contract PortfolioVirtual is Objective {
             uint32 poolNonce = ++getPoolNonce[pairNonce];
             poolId =
                 AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
-
-            // TODO: Checks if it's cheaper to assign the storage variable this
-            // way or get rid of the returned variable `poolId` instead.
             _getLastPoolId = poolId;
         }
 
