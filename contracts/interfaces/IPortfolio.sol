@@ -306,23 +306,6 @@ interface IPortfolioGetters {
 
 interface IPortfolioActions {
     /**
-     * @notice Entrypoint to allocate, deallocate, or swap in Portfolio.
-     * @dev Multiprocess expects custom encoded data that can be built off-chain
-     * or on-chain using the `FVMLib` library. This function is similar to
-     * multicall, which sends calldata to a target by looping over an array of
-     * calldatas and targets.
-     *
-     * The difference is that the transactions in a multicall
-     * must setttle token amounts in each call.
-     * In multiprocess, token amounts are settled after all calls
-     * have been processed.
-     *
-     * This means that token deficits can be carried over between calls
-     * and paid by future ones (within the same multiprocess transaction)!
-     */
-    // function multiprocess(bytes calldata data) external payable;
-
-    /**
      * @notice Updates the parameters of the pool `poolId`.
      * @dev The sender must be the pool controller, leaving a function parameter
      * as '0' will not change the pool parameter.
