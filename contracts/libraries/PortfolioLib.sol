@@ -97,21 +97,21 @@ struct PortfolioPool {
 }
 
 struct ChangeLiquidityParams {
-    address owner;
-    uint64 poolId;
     uint256 timestamp;
     uint256 deltaAsset; // Quantity of asset tokens in WAD units to add or remove.
     uint256 deltaQuote; // Quantity of quote tokens in WAD units to add or remove.
+    int128 deltaLiquidity; // Quantity of liquidity tokens in WAD units to add or remove.
+    uint64 poolId;
+    address owner;
     address tokenAsset; // Address of the asset token.
     address tokenQuote; // Address of the quote token.
-    int128 deltaLiquidity; // Quantity of liquidity tokens in WAD units to add or remove.
 }
 
 struct Order {
-    bool useMax; // Use the transiently stored `balance` for the `input`.
-    uint64 poolId;
     uint128 input; // Quantity of asset tokens in WAD units to swap in, adding to reserves.
     uint128 output; // Quantity of quote tokens in WAD units to swap out, removing from reserves.
+    bool useMax; // Use the transiently stored `balance` for the `input`.
+    uint64 poolId;
     bool sellAsset; // 0 = quote -> asset, 1 = asset -> quote.
 }
 
@@ -136,10 +136,10 @@ struct SwapState {
 }
 
 struct Payment {
-    address token;
     uint256 amountTransferTo; // Amount to transfer to the `msg.sender` in `settlement`, in WAD.
     uint256 amountTransferFrom; // Amount to transfer from the `msg.sender` in `settlement`, in WAD.
     uint256 balance; // Current `token.balanceOf(address(this))` in `settlement`, in native token decimals.
+    address token;
 }
 
 // ===== Effects ===== //
