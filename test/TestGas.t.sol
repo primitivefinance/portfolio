@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
-import "contracts/PortfolioLib.sol";
+import "contracts/libraries/PortfolioLib.sol";
 
 contract TestGas is Setup {
     using SafeCastLib for uint256;

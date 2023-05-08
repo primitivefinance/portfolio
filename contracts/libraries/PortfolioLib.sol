@@ -3,8 +3,8 @@ pragma solidity 0.8.19;
 
 import "solmate/utils/SafeCastLib.sol";
 import "solmate/utils/FixedPointMathLib.sol";
-import "./libraries/AssemblyLib.sol";
-import "./libraries/AccountLib.sol" as Account;
+import "./AssemblyLib.sol";
+import "./AccountLib.sol" as Account;
 
 using AssemblyLib for uint256;
 using FixedPointMathLib for uint256;

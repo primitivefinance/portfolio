@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "solmate/test/utils/mocks/MockERC20.sol";
 
-import "contracts/PortfolioLib.sol";
+import "contracts/libraries/PortfolioLib.sol";
 import { RMM01Portfolio as Portfolio } from "contracts/RMM01Portfolio.sol";
 
 contract RevertCatcher {
