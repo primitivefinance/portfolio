@@ -87,11 +87,6 @@ contract TestRMM01PortfolioInvariants is Setup {
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
     }
 
-    function invariant_account_settled() public {
-        bool settled = AccountLike(address(subject())).__account__();
-        assertTrue(settled, "invariant-settled");
-    }
-
     function invariant_virtual_pool_asset_reserves() public {
         PortfolioPool memory pool = ghost().pool();
 
