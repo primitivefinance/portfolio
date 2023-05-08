@@ -63,10 +63,7 @@ abstract contract Objective is IPortfolio {
         uint256 price
     ) public view virtual returns (uint256 reserveX, uint256 reserveY);
 
-    /**
-     * @dev Computes an amount of tokens out given an amount in, units are in the token's decimals.
-     * @param amountIn Quantity to swap in, in native decimals.
-     */
+    /// @inheritdoc IPortfolioGetters
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
@@ -80,12 +77,7 @@ abstract contract Objective is IPortfolio {
         override(IPortfolioGetters)
         returns (uint256 output);
 
-    /**
-     * @dev
-     * WARNING! Do not rely on this price value. This CAN be manipulated. It is also an estimate that has error.
-     * Estimates the `price` of a pool with `poolId` given the pool's reserves.
-     * @return price Estimated quantity of "Quote" tokens per "Asset" tokens in WAD units.
-     */
+    /// @inheritdoc IPortfolioGetters
     function getSpotPrice(uint64 poolId)
         public
         view

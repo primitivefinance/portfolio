@@ -292,8 +292,8 @@ interface IPortfolioGetters {
 
     /**
      * @dev Computes an estimated on-chain price of the `poolId`.
-     * @custom:mev Vulnerable to manipulation, do not rely on this function on-chain.
      * @return price Estimated price in wad units of `quote` tokens per `asset` token.
+     * @custom:mev Vulnerable to manipulation, do not rely on this function on-chain.
      */
     function getSpotPrice(uint64 poolId)
         external
