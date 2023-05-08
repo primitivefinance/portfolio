@@ -68,7 +68,7 @@ contract TestPortfolioAllocate is Setup {
             )
         );
 
-        subject().multicall{ value: 250 ether }(data);
+        subject().multicall{value: 250 ether}(data);
     }
 
     function test_allocate_multicall_modifies_liquidity()

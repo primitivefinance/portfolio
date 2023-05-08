@@ -52,7 +52,7 @@ abstract contract PortfolioVirtual is Objective {
     mapping(uint24 => PortfolioPair) public pairs;
     mapping(uint64 => PortfolioPool) public pools;
     mapping(address => mapping(address => uint24)) public getPairId;
-    mapping(address => mapping(uint64 => uint128 liquidity)) public positions;
+    mapping(address => mapping(uint64 => uint128)) public positions;
 
     uint256 internal _locked = 1;
     uint256 internal _liquidityPolicy = JUST_IN_TIME_LIQUIDITY_POLICY;
@@ -267,7 +267,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaAsset,
             deltaQuote,
             deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -336,7 +336,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -539,20 +539,30 @@ abstract contract PortfolioVirtual is Objective {
         {
             bool validInvariant;
             int256 nextInvariantWad;
+            uint256 reserveXPerLiquidity;
+            uint256 reserveYPerLiquidity;
 
             if (_state.sell) {
                 (iteration.virtualX, iteration.virtualY) =
                     (nextIndependentWadLessFee, nextDependentWad);
+                reserveXPerLiquidity =
+                    iteration.virtualX.divWadDown(iteration.liquidity);
+                reserveYPerLiquidity =
+                    iteration.virtualY.divWadUp(iteration.liquidity);
             } else {
                 (iteration.virtualX, iteration.virtualY) =
                     (nextDependentWad, nextIndependentWadLessFee);
+                reserveXPerLiquidity =
+                    iteration.virtualX.divWadUp(iteration.liquidity);
+                reserveYPerLiquidity =
+                    iteration.virtualY.divWadDown(iteration.liquidity);
             }
 
             (validInvariant, nextInvariantWad) = checkInvariant(
                 args.poolId,
                 iteration.prevInvariant,
-                iteration.virtualX.divWadDown(iteration.liquidity), // Expects X per liquidity.
-                iteration.virtualY.divWadDown(iteration.liquidity), // Expects Y per liquidity.
+                reserveXPerLiquidity, // Expects X per liquidity.
+                reserveYPerLiquidity, // Expects Y per liquidity.
                 block.timestamp
             );
 
@@ -609,7 +619,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
-        );
+            );
 
         delete _state;
 
@@ -746,7 +756,7 @@ abstract contract PortfolioVirtual is Objective {
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
-        );
+            );
 
         _postLock();
     }

@@ -143,7 +143,7 @@ contract TestPortfolioDeallocate is Setup {
                 type(uint128).max
             )
         );
-        subject().multicall{ value: 250 ether }(data);
+        subject().multicall{value: 250 ether}(data);
         _simple_deallocate(liquidity);
     }
 

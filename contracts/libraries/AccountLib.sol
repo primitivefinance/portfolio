@@ -75,7 +75,7 @@ function __balanceOf__(address token, address account) view returns (uint256) {
  */
 function __wrapEther__(AccountSystem storage self, address weth) {
     self.touch(weth);
-    IWETH(weth).deposit{ value: msg.value }();
+    IWETH(weth).deposit{value: msg.value}();
 }
 
 /**
@@ -83,7 +83,7 @@ function __wrapEther__(AccountSystem storage self, address weth) {
  */
 function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
-    (bool success,) = to.call{ value: amount }(new bytes(0));
+    (bool success,) = to.call{value: amount}(new bytes(0));
     if (!success) revert EtherTransferFail();
 }
 

@@ -211,6 +211,21 @@ contract Setup is Test {
         _;
     }
 
+    modifier stablecoinPortfolioConfig() {
+        uint16 duration = type(uint16).max;
+        uint16 volatility = uint16(MIN_VOLATILITY);
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[1]))
+        ).edit("quote", abi.encode(address(subjects().tokens[2]))).edit(
+            "duration", abi.encode(duration)
+        ).edit("volatility", abi.encode(volatility)).edit(
+            "fee", abi.encode(uint16(MIN_FEE))
+        ).edit("price", abi.encode(uint128(1e18))).generate(address(subject()));
+
+        setGhostPoolId(poolId);
+        _;
+    }
+
     modifier sixDecimalQuoteConfig() {
         uint64 poolId = Configs.fresh().edit(
             "asset", abi.encode(address(subjects().tokens[0]))

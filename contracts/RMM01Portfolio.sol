@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "./Portfolio.sol";
 import "./libraries/RMM01Lib.sol";
+import "./libraries/BisectionLib.sol";
 
 /**
  * @title   RMM-01 Portfolio

@@ -411,7 +411,7 @@ contract TestPortfolioSwap is Setup {
         });
         data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
 
-        subject().multicall{ value: tokenIn == subject().WETH() ? amountIn : 0 }(
+        subject().multicall{value: tokenIn == subject().WETH() ? amountIn : 0}(
             data
         );
 

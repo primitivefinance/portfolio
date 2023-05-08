@@ -9,10 +9,12 @@ import {
     AssemblyLib,
     PERCENTAGE
 } from "../PortfolioLib.sol";
+import "./BisectionLib.sol";
 
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant WAD = 1 ether;
 uint256 constant YEAR = 31556953 seconds;
+uint256 constant BISECTION_EPSILON = 1;
 
 /**
  * @title   RMM01Lib
@@ -66,7 +68,7 @@ library RMM01Lib {
         int256 liquidityDelta,
         uint256 timestamp,
         address swapper
-    ) internal pure returns (uint256 amountOut) {
+    ) internal view returns (uint256 amountOut) {
         // Sets data.invariant, data.liquidity, and data.remainder.
         (Iteration memory data, uint256 tau) = getSwapData(
             self, sellAsset, amountIn, liquidityDelta, timestamp, swapper
@@ -120,16 +122,13 @@ library RMM01Lib {
             R_y = data.virtualY.divWadDown(data.liquidity);
         }
 
-        data.prevInvariant = invariantOf({
-            self: self,
-            R_x: R_x,
-            R_y: R_y,
-            timeRemainingSec: tau
-        });
+        data.prevInvariant =
+            invariantOf({self: self, R_x: R_x, R_y: R_y, timeRemainingSec: tau});
         data.remainder = amountIn.scaleToWad(
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
         data.feeAmount = (data.remainder * fee) / PERCENTAGE;
+        if (data.feeAmount == 0) data.feeAmount = 1;
 
         return (data, tau);
     }
@@ -181,8 +180,48 @@ library RMM01Lib {
             });
         }
 
+        Bisection memory args;
+        args.optimizeQuoteReserve = sellAsset;
+        args.terminalPriceWad = self.params.maxPrice;
+        args.volatilityWad = volatilityWad;
+        args.tauSeconds = tau;
+        args.reserveWadPerLiquidity = nextIndWadPerLiquidity;
+
+        uint256 lower = nextDepWadPerLiquidity.mulDivDown(98, 100);
+        uint256 upper = nextDepWadPerLiquidity.mulDivUp(102, 100);
+        // Each reserve has a minimum lower bound of 0.
+        // Each reserve has its own upper bound per liquidity unit.
+        // The quote reserve is bounded by the max price.
+        // The asset reserve is bounded by 1E18.
+        uint256 maximum = sellAsset ? args.terminalPriceWad : 1 ether;
+        upper = upper > maximum ? maximum : upper;
+
+        // Using the approximated next dependent reserve,
+        // optimize around 2.00% error to find the precise dependent reserve.
+        nextDepWadPerLiquidity = bisection(
+            args,
+            lower,
+            upper,
+            BISECTION_EPSILON,
+            256, // todo: potentially expose the max iteration parameter to the Portfolio `getAmountOut` function.
+            optimizeDependentReserve
+        );
+
         // Scales the next dependent per liquidity to total dependent reserves, in WAD units.
         nextDep = nextDepWadPerLiquidity.mulWadDown(data.liquidity);
+    }
+
+    function optimizeDependentReserve(
+        Bisection memory args,
+        uint256 optimized
+    ) internal pure returns (int256) {
+        return Invariant.invariant({
+            R_y: args.optimizeQuoteReserve ? optimized : args.reserveWadPerLiquidity,
+            R_x: args.optimizeQuoteReserve ? args.reserveWadPerLiquidity : optimized,
+            stk: args.terminalPriceWad,
+            vol: args.volatilityWad,
+            tau: args.tauSeconds
+        });
     }
 
     /**
