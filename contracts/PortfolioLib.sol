@@ -50,6 +50,7 @@ error InvalidPriorityFee(uint16 priorityFee);
 error InvalidInvariant(int256 prev, int256 next);
 error InvalidPairNonce();
 error InvalidReentrancy();
+error InvalidMulticall();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
 error InvalidVolatility(uint16 sigma);

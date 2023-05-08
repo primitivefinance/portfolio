@@ -68,19 +68,15 @@ abstract contract PortfolioVirtual is Objective {
     bool private _currentMulticall;
 
     /**
-     * @dev
-     * Protects against re-entrancy and getting to invalid settlement states.
-     * Used on all external non-view functions.
+     * @dev Protects against reentrancy and getting to invalid settlement states.
+     * This lock works in pair with `_postLock` and both should be used on all
+     * external non-view functions (except the restricted ones).
      *
-     * @custom:guide
-     * Step 1. Enter `_locked` re-entrancy guard.
-     * Step 3. Wrap the entire ether balance of this contract and credit the wrapped ether to the msg.sender account.
-     * Step 5. Execute the function logic.
-     * Step 7. Enter the settlement function, requesting token payments or sending them out to msg.sender.
-     * Step 8. Validate Portfolio's account system was settled.
-     * Step 10. Exit `_locked` re-entrancy guard.
+     * Note: Private functions are used instead of modifiers to reduce the size
+     * of the bytecode.
      */
     function _preLock() private {
+        // Reverts if the lock was already set and the current call is not a multicall.
         if (_locked != 1 && !_currentMulticall) {
             revert InvalidReentrancy();
         }
@@ -88,9 +84,13 @@ abstract contract PortfolioVirtual is Objective {
         _locked = 2;
     }
 
+    /**
+     * @dev Second part of the reentracy guard (see `_preLock`).
+     */
     function _postLock() private {
         _locked = 1;
 
+        // Reverts if the account system was not settled after a normal call.
         if (!__account__.settled && !_currentMulticall) {
             revert InvalidSettlement();
         }
@@ -133,6 +133,9 @@ abstract contract PortfolioVirtual is Objective {
         payable
         returns (bytes[] memory results)
     {
+        // Prevents multicall reentrancy.
+        if (_currentMulticall) revert InvalidMulticall();
+
         _preLock();
         _currentMulticall = true;
 
@@ -155,6 +158,7 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         _currentMulticall = false;
+
         // Interactions
         _settlement();
         _postLock();
