@@ -71,7 +71,7 @@ abstract contract PortfolioVirtual is Objective {
     /// @dev Part of the reentrancy guard, 1 = unlocked, 2 = locked.
     uint256 internal _locked = 1;
 
-    uint256 private _protocolFee;
+    uint256 public protocolFee;
 
     /**
      * @dev Manipulated in `_settlement` only.
@@ -483,9 +483,9 @@ abstract contract PortfolioVirtual is Objective {
                 (deltaIndependentReserveWad * feePercentage) / PERCENTAGE;
             if (iteration.feeAmount == 0) iteration.feeAmount = 1; // Fee should never be zero.
 
-            if (_protocolFee != 0) {
+            if (protocolFee != 0) {
                 // Protocol fee is a proportion of the fee amount.
-                iteration.protocolFeeAmount = iteration.feeAmount / _protocolFee;
+                iteration.protocolFeeAmount = iteration.feeAmount / protocolFee;
                 // Reduce the increase in the independent reserve, so that protocol fee is not re-invested into pool.
                 deltaIndependentReserveWad -= iteration.protocolFeeAmount;
                 // Take the protocol fee from the fee amount.
@@ -931,8 +931,8 @@ abstract contract PortfolioVirtual is Objective {
         }
         if (fee > 20 || fee < 4) revert InvalidFee(uint16(fee));
 
-        uint256 prevFee = _protocolFee;
-        _protocolFee = fee;
+        uint256 prevFee = protocolFee;
+        protocolFee = fee;
 
         emit UpdateProtocolFee(prevFee, fee);
     }

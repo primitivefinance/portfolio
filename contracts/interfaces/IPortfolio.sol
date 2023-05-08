@@ -172,6 +172,8 @@ interface IPortfolioGetters {
     /// @dev Contract for storing canonical Portfolio deployments.
     function REGISTRY() external view returns (address);
 
+    function protocolFee() external view returns (uint256);
+
     /// @dev Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
     function getPairNonce() external view returns (uint24);
 
