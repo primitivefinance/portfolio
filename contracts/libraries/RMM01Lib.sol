@@ -210,8 +210,8 @@ library RMM01Lib {
             args,
             lower,
             upper,
-            BISECTION_EPSILON,
-            256, // todo: potentially expose the max iteration parameter to the Portfolio `getAmountOut` function.
+            BISECTION_EPSILON, // Set to 0 to find the exact dependent reserve which sets the invariant to 0.
+            256, // Maximum amount of loops to run in bisection.
             optimizeDependentReserve
         );
         // Increase dependent reserve per liquidity by 1 to account for precision loss.

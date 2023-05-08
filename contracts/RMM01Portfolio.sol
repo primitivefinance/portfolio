@@ -45,7 +45,7 @@ contract RMM01Portfolio is PortfolioVirtual {
             swapper: address(0) // Setting the swapp affects the swap fee %, which is not used in this function.
         });
 
-        invariant = int128(iteration.prevInvariant); // todo: fix safe cast
+        invariant = iteration.prevInvariant;
 
         // Approximated and rounded down in all cases via rounding down of virtualX.
         price = RMM01Lib.getPriceWithX({
