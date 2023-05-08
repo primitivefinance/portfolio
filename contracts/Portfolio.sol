@@ -6,6 +6,7 @@ import "./Objective.sol";
 /**
  * @title   Portfolio
  * @author  Primitive™
+ * @dev Note: All tokens sent to this contract will be lost.
  * @custom:contributor TomAFrench
  */
 abstract contract PortfolioVirtual is Objective {
@@ -23,18 +24,20 @@ abstract contract PortfolioVirtual is Objective {
             // offset location of the next data.
             mstore(0x00, 0x20)
 
-            // Then we load both the length of our string (11 bytes, 0x0b in hex) and its
-            // actual hex value (0x76312e322e302d62657461) using the offset 0x2b. Using this
-            // particular offset value will right pad the length at the end of the slot
-            // and left pad the string at the beginning of the next slot, assuring the
-            // right ABI format to return a string.
+            // We load the length of our string (11 bytes, 0x0b in hex) and its
+            // actual hex value (0x76312e322e302d62657461) using the offset 0x2b.
+            // Using this particular offset value will right pad the length at
+            // the end of the slot and left pad the string at the beginning of
+            // the next slot, assuring the right ABI format to return a string.
             mstore(0x2b, 0x0b76312e322e302d62657461) // "v1.2.0-beta"
 
-            // Return all the 96 bytes (0x60) of data that was loaded into the memory.
+            // Return all the 96 bytes (0x60) of data that was loaded into
+            // the memory.
             return(0x00, 0x60)
         }
     }
 
+    // TODO: Why not make this private?
     Account.AccountSystem public __account__;
 
     /// @inheritdoc IPortfolioGetters
@@ -100,9 +103,7 @@ abstract contract PortfolioVirtual is Objective {
         _locked = 2;
     }
 
-    /**
-     * @dev Second part of the reentracy guard (see `_preLock`).
-     */
+    /// @dev Second part of the reentracy guard (see `_preLock`).
     function _postLock() private {
         _locked = 1;
 
@@ -113,12 +114,10 @@ abstract contract PortfolioVirtual is Objective {
     }
 
     /**
-     * @dev
-     * Failing to pass a valid WETH contract that implements the `deposit()` function,
-     * will cause all transactions with Portfolio to fail once address(this).balance > 0.
-     *
-     * @notice
-     * Tokens sent to this contract are lost.
+     * @param weth Address of the WETH contract. Failing to pass a valid WETH
+     * contract that implements the `deposit()` function will cause all
+     * transactions with Portfolio to fail once `address(this).balance > 0`.
+     * @param registry Address of the Primitive Registry contract.
      */
     constructor(address weth, address registry) {
         WETH = weth;

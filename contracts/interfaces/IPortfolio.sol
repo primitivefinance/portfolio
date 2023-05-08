@@ -163,24 +163,24 @@ interface IPortfolioGetters {
 
     // ===== State Getters ===== //
 
-    /// @dev Current semantic version of the Portfolio.
+    /// @notice Current semantic version of the Portfolio.
     function VERSION() external pure returns (string memory);
 
-    /// @dev Wrapped Ether address initialized on creating the Portfolio.
+    /// @notice Wrapped Ether address initialized on creating the Portfolio.
     function WETH() external view returns (address);
 
-    /// @dev Contract for storing canonical Portfolio deployments.
+    /// @notice Contract for storing canonical Portfolio deployments.
     function REGISTRY() external view returns (address);
 
     function protocolFee() external view returns (uint256);
 
-    /// @dev Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
+    /// @notice Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
     function getPairNonce() external view returns (uint24);
 
-    /// @dev Incremented when a pool is created.
+    /// @notice Incremented when a pool is created.
     function getPoolNonce(uint24 pairNonce) external view returns (uint32);
 
-    /// @dev Returns the id of the last pool created.
+    /// @notice Returns the id of the last pool created.
     function getLastPoolId() external view returns (uint64);
 
     /**

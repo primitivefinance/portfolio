@@ -1,32 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
-/**
- * -------------
- *
- *   This is a custom accounting system to support FVM's
- *   jump processing. Without jump processing, the benefits
- *   are marginal at best. Combining the two reduces the
- *   marginal cost of aditional operations to only ~20% of a single operation.
- *   This is by design, in order to support a system that interacts with a lot
- *   of different parameters, tokens, actors, and pools.
- *
- *   -------------
- *
- *   Glossary:
- *
- *   Virtual Reserves  - Expected balance of tokens.
- *   Physical Reserves - Actual balance of tokens.
- *   Net Balance       - Difference of physical reserve and virtual reserve.
- *   Credit            - Increase (+) spendable tokens.
- *   Debit             - Decrease (-) spendable tokens.
- *   Settle            - Apply net balance (+/-) as credit (+) or debit (-) to user.
- *
- *   -------------
- *
- *   Primitive™
- */
-
 import "../libraries/SafeTransferLib.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IWETH.sol";
@@ -59,7 +33,11 @@ struct AccountSystem {
 }
 
 /**
- * @dev Gas optimized.
+ * @dev Gets the balance of `account` in `token`.
+ * Note: This is a gas optimized version
+ * @param token Address of the token.
+ * @param account Address of the account to check.
+ * @return Balance of the account.
  */
 function __balanceOf__(address token, address account) view returns (uint256) {
     (bool success, bytes memory data) = token.staticcall(
@@ -69,25 +47,22 @@ function __balanceOf__(address token, address account) view returns (uint256) {
     return abi.decode(data, (uint256));
 }
 
-/**
- * @dev Must validate `weth` is real weth.
- */
+/// @dev Must validate `weth` is real weth.
 function __wrapEther__(AccountSystem storage self, address weth) {
     self.touch(weth);
     IWETH(weth).deposit{ value: msg.value }();
 }
 
 /**
- * @dev Dangerously sends ether to `to` in a low-level call.
+ * @dev Unwraps `amount` WETH tokens and dangerously sends the ETH to `to` via a
+ * low-level call.
  */
 function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
     SafeTransferLib.safeTransferETH(to, amount);
 }
 
-/**
- * @dev External call to the `to` address is dangerous.
- */
+/// @dev External call to the `to` address is dangerous.
 function dangerousFund(
     AccountSystem storage self,
     address token,
@@ -99,17 +74,13 @@ function dangerousFund(
     SafeTransferLib.safeTransferFrom(token, msg.sender, to, amount);
 }
 
-/**
- * @dev Actives a token and increases the reserves. Settlement will pick up this activated token.
- */
+/// @dev Actives a token and increases the reserves. Settlement will pick up this activated token.
 function increase(AccountSystem storage self, address token, uint256 amount) {
     self.touch(token);
     self.reserves[token] += amount;
 }
 
-/**
- * @dev Actives a token and decreases the reserves. Settlement will pick up this activated token.
- */
+/// @dev Actives a token and decreases the reserves. Settlement will pick up this activated token.
 function decrease(AccountSystem storage self, address token, uint256 amount) {
     uint256 balance = self.reserves[token];
     if (amount > balance) revert InsufficientReserve(balance, amount);
@@ -118,9 +89,7 @@ function decrease(AccountSystem storage self, address token, uint256 amount) {
     self.reserves[token] -= amount;
 }
 
-/**
- * @notice Settles the difference in balance between virtual tokens and physically held tokens.
- */
+/// @dev Settles the difference in balance between virtual tokens and physically held tokens.
 function settle(
     AccountSystem storage self,
     address token,
@@ -138,9 +107,7 @@ function settle(
     delete self.cached[token]; // Note: Assumes this token is completely paid for by the end of the transaction.
 }
 
-/**
- * @dev Interacting with a token will activate it, adding it to an array of interacted tokens for settlement to loop through.
- */
+/// @dev Interacting with a token will activate it, adding it to an array of interacted tokens for settlement to loop through.
 function touch(AccountSystem storage self, address token) {
     if (self.settled) self.settled = false; // If tokens are warm, they are not settled.
     if (!self.cached[token]) {
@@ -150,18 +117,14 @@ function touch(AccountSystem storage self, address token) {
     // do nothing if already cached.
 }
 
-/**
- * @dev Account system is reset after settlement is successful.
- */
+/// @dev Account system is reset after settlement is successful.
 function reset(AccountSystem storage self) {
     assert(self.warm.length == 0);
     self.settled = true;
     delete self.warm;
 }
 
-/**
- * @dev Set the cache status of a token.
- */
+/// @dev Set the cache status of a token.
 function cache(AccountSystem storage self, address token, bool status) {
     self.cached[token] = status;
 }
