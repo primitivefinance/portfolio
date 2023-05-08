@@ -24,7 +24,7 @@ contract RMM01Portfolio is PortfolioVirtual {
     ) PortfolioVirtual(weth, registry) { }
 
     /**
-     * @dev Computes the price of the pool, which changes over time.
+     * @dev Computes the latest invariant and spot price of the pool using the latest timestamp.
      *
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price
      * movement.
@@ -33,45 +33,26 @@ contract RMM01Portfolio is PortfolioVirtual {
     function _getLatestInvariantAndVirtualPrice(
         uint64 poolId,
         bool sellAsset
-    )
-        internal
-        view
-        returns (uint256 price, int256 invariant, uint256 updatedTau)
-    {
+    ) internal view returns (uint256 price, int256 invariant, uint256 tau) {
         PortfolioPool storage pool = pools[poolId];
-        updatedTau = pool.computeTau(block.timestamp);
 
-        uint256 reserveXPerLiquidity = pool.virtualX;
-        uint256 reserveYPerLiquidity = pool.virtualY;
+        Iteration memory iteration;
+        (iteration, tau) = pool.getSwapData({
+            sellAsset: sellAsset,
+            amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
+            liquidityDelta: 0, // Uses unmodified pool liquidity to compute invariant.
+            timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
+            swapper: address(0) // Setting the swapp affects the swap fee %, which is not used in this function.
+        });
 
-        // The reserve which sends tokens out in this swap must be rounded up
-        // to avoid the scenario that the remainder in a truncated output amount
-        // is not stolen in the swap.
-        if (sellAsset) {
-            // Swap X -> Y, Y is output, so round up Y.
-            reserveXPerLiquidity =
-                reserveXPerLiquidity.divWadDown(pool.liquidity);
-            reserveYPerLiquidity = reserveYPerLiquidity.divWadUp(pool.liquidity);
-        } else {
-            // Swap Y -> X, X is output, so round up X.
-            reserveXPerLiquidity = reserveXPerLiquidity.divWadUp(pool.liquidity);
-            reserveYPerLiquidity =
-                reserveYPerLiquidity.divWadDown(pool.liquidity);
-        }
+        invariant = int128(iteration.prevInvariant); // todo: fix safe cast
 
-        invariant = int128(
-            pool.invariantOf({
-                R_x: reserveXPerLiquidity,
-                R_y: reserveYPerLiquidity,
-                timeRemainingSec: updatedTau
-            })
-        );
-
+        // Approximated and rounded down in all cases via rounding down of virtualX.
         price = RMM01Lib.getPriceWithX({
-            R_x: reserveXPerLiquidity,
+            R_x: iteration.virtualX.divWadDown(iteration.liquidity),
             stk: pool.params.maxPrice,
             vol: pool.params.volatility,
-            tau: updatedTau
+            tau: tau
         });
     }
 
@@ -82,6 +63,8 @@ contract RMM01Portfolio is PortfolioVirtual {
     ) internal override returns (bool, int256) {
         (, int256 invariant,) =
             _getLatestInvariantAndVirtualPrice(poolId, sellAsset);
+
+        // Sets the pool's lastTimestamp to the current block timestamp, in storage.
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
         // Buffer for post-maturity swaps would go here.

@@ -130,9 +130,9 @@ struct Iteration {
 }
 
 struct SwapState {
-    bool sell;
+    uint8 decimalsInput;
     address tokenInput;
-    uint16 fee;
+    uint8 decimalsOutput;
     address tokenOutput;
 }
 

@@ -14,7 +14,7 @@ import "./BisectionLib.sol";
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant WAD = 1 ether;
 uint256 constant YEAR = 31556953 seconds;
-uint256 constant BISECTION_EPSILON = 1;
+uint256 constant BISECTION_EPSILON = 0;
 
 /**
  * @title   RMM01Lib
@@ -69,12 +69,16 @@ library RMM01Lib {
         uint256 timestamp,
         address swapper
     ) internal view returns (uint256 amountOut) {
-        // Sets data.invariant, data.liquidity, and data.remainder.
-        (Iteration memory data, uint256 tau) = getSwapData(
-            self, sellAsset, amountIn, liquidityDelta, timestamp, swapper
-        ); // Declare and assign variables individual to save on gas spent on initializing 0 values.
+        uint256 amountInWad = amountIn.scaleToWad(
+            sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
+        );
 
-        // Uses data.invariant, data.liquidity, and data.remainder to compute next input reserve.
+        // Sets data.invariant, data.liquidity, data.feeAmount, and data.input.
+        (Iteration memory data, uint256 tau) = getSwapData(
+            self, sellAsset, amountInWad, liquidityDelta, timestamp, swapper
+        );
+
+        // Uses data.invariant, data.liquidity, and data.input to compute next input reserve.
         // Uses next input reserve to compute output reserve.
         (uint256 prevDepTotalWad, uint256 nextDepTotalWad) =
             computeSwapStep(self, data, sellAsset, tau);
@@ -90,51 +94,56 @@ library RMM01Lib {
     }
 
     /**
-     * @dev Fetches the data needed to simulate a swap to compute the output of tokens.
+     * @notice Fetches the data needed to simulate a swap to compute the output of tokens.
+     * @dev Does not consider protocol fees, therefore feeAmount could be overestimated since protocol fees are not subtracted.
      */
     function getSwapData(
         PortfolioPool memory self,
         bool sellAsset,
-        uint256 amountIn,
+        uint256 amountInWad,
         int256 liquidityDelta,
         uint256 timestamp,
         address swapper
-    ) internal pure returns (Iteration memory, uint256 tau) {
-        Iteration memory data;
-        uint256 fee = self.controller == swapper
+    ) internal pure returns (Iteration memory iteration, uint256 tau) {
+        tau = self.computeTau(timestamp);
+
+        iteration.input = amountInWad;
+        iteration.liquidity = liquidityDelta > 0
+            ? self.liquidity + uint256(liquidityDelta)
+            : self.liquidity - uint256(-liquidityDelta);
+        (iteration.virtualX, iteration.virtualY) = self.getVirtualReservesWad();
+
+        uint256 reserveXPerLiquidity;
+        uint256 reserveYPerLiquidity;
+        if (sellAsset) {
+            reserveXPerLiquidity =
+                iteration.virtualX.divWadDown(iteration.liquidity);
+            reserveYPerLiquidity =
+                iteration.virtualY.divWadUp(iteration.liquidity);
+        } else {
+            reserveXPerLiquidity =
+                iteration.virtualX.divWadUp(iteration.liquidity);
+            reserveYPerLiquidity =
+                iteration.virtualY.divWadDown(iteration.liquidity);
+        }
+
+        iteration.prevInvariant = invariantOf({
+            self: self,
+            R_x: reserveXPerLiquidity,
+            R_y: reserveYPerLiquidity,
+            timeRemainingSec: tau
+        });
+
+        uint256 feePercentage = self.controller == swapper
             ? self.params.priorityFee
             : self.params.fee;
 
-        data.liquidity = liquidityDelta > 0
-            ? self.liquidity + uint256(liquidityDelta)
-            : self.liquidity - uint256(-liquidityDelta);
-
-        (data.virtualX, data.virtualY) = self.getVirtualReservesWad();
-        tau = self.computeTau(timestamp);
-
-        uint256 R_x;
-        uint256 R_y;
-        if (sellAsset) {
-            R_x = data.virtualX.divWadDown(data.liquidity);
-            R_y = data.virtualY.divWadUp(data.liquidity);
-        } else {
-            R_x = data.virtualX.divWadUp(data.liquidity);
-            R_y = data.virtualY.divWadDown(data.liquidity);
-        }
-
-        data.prevInvariant =
-            invariantOf({self: self, R_x: R_x, R_y: R_y, timeRemainingSec: tau});
-        data.remainder = amountIn.scaleToWad(
-            sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
-        );
-        data.feeAmount = (data.remainder * fee) / PERCENTAGE;
-        if (data.feeAmount == 0) data.feeAmount = 1;
-
-        return (data, tau);
+        iteration.feeAmount = (iteration.input * feePercentage) / PERCENTAGE;
+        if (iteration.feeAmount == 0) iteration.feeAmount = 1;
     }
 
     /**
-     * @dev Simulates a swap and computes the output tokens given an amount of tokens in.
+     * @dev Simulates a swap and returns the next dependent reserve, which can be used to compute the output.
      */
     function computeSwapStep(
         PortfolioPool memory self,
@@ -142,37 +151,37 @@ library RMM01Lib {
         bool sellAsset,
         uint256 tau
     ) internal pure returns (uint256 prevDep, uint256 nextDep) {
-        uint256 prevInd;
-        uint256 nextIndWadPerLiquidity;
-        uint256 nextDepWadPerLiquidity;
+        // Independent reserves are being adjusted with the input amount.
+        // Dependent reserves are being adjusted based on the output amount.
+        uint256 adjustedIndependentReserve;
+        uint256 adjustedDependentReserve;
+        if (sellAsset) {
+            (adjustedIndependentReserve, prevDep) =
+                (data.virtualX, data.virtualY);
+        } else {
+            (prevDep, adjustedIndependentReserve) =
+                (data.virtualX, data.virtualY);
+        }
+
+        // 1. Compute the increased independent pool reserve by adding the input amount and subtracting the fee.
+        // 2. Compute the independent pool reserve per 1E18 liquidity.
+        adjustedIndependentReserve += (data.input - data.feeAmount);
+        adjustedIndependentReserve =
+            adjustedIndependentReserve.divWadDown(data.liquidity);
+
+        // 3. Compute the approximated dependent pool reserve using the adjusted independent reserve per 1E18 liquidity.
         uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
-
-        // If sellAsset, ind = x && dep = y, else ind = y && dep = x
-        // These are the total reserves of tokens in the pool scaled to WAD decimals.
         if (sellAsset) {
-            (prevInd, prevDep) = (data.virtualX, data.virtualY);
-        } else {
-            (prevDep, prevInd) = (data.virtualX, data.virtualY);
-        }
-
-        uint256 deltaInLessFee = data.remainder - data.feeAmount;
-        nextIndWadPerLiquidity = prevInd + deltaInLessFee;
-        nextIndWadPerLiquidity =
-            nextIndWadPerLiquidity.divWadDown(data.liquidity);
-
-        // Compute the output of the swap by computing the difference between the dependent reserves.
-        // Uses the next independent reserve in WAD units per 1 WAD of liquidity.
-        if (sellAsset) {
-            nextDepWadPerLiquidity = Invariant.getY({
-                R_x: nextIndWadPerLiquidity,
+            adjustedDependentReserve = Invariant.getY({
+                R_x: adjustedIndependentReserve,
                 stk: self.params.maxPrice,
                 vol: volatilityWad,
                 tau: tau,
                 inv: data.prevInvariant
             });
         } else {
-            nextDepWadPerLiquidity = Invariant.getX({
-                R_y: nextIndWadPerLiquidity,
+            adjustedDependentReserve = Invariant.getX({
+                R_y: adjustedIndependentReserve,
                 stk: self.params.maxPrice,
                 vol: volatilityWad,
                 tau: tau,
@@ -180,25 +189,24 @@ library RMM01Lib {
             });
         }
 
+        // Since the dependent reserve is approximated, a bisection method is used to find the precise dependent reserve.
         Bisection memory args;
         args.optimizeQuoteReserve = sellAsset;
         args.terminalPriceWad = self.params.maxPrice;
         args.volatilityWad = volatilityWad;
         args.tauSeconds = tau;
-        args.reserveWadPerLiquidity = nextIndWadPerLiquidity;
-
-        uint256 lower = nextDepWadPerLiquidity.mulDivDown(98, 100);
-        uint256 upper = nextDepWadPerLiquidity.mulDivUp(102, 100);
+        args.reserveWadPerLiquidity = adjustedIndependentReserve;
+        // Compute the upper and lower bounds to start the bisection method.
+        uint256 lower = adjustedDependentReserve.mulDivDown(98, 100);
+        uint256 upper = adjustedDependentReserve.mulDivUp(102, 100);
         // Each reserve has a minimum lower bound of 0.
-        // Each reserve has its own upper bound per liquidity unit.
+        // Each reserve has its own upper bound per 1E18 liquidity.
         // The quote reserve is bounded by the max price.
         // The asset reserve is bounded by 1E18.
         uint256 maximum = sellAsset ? args.terminalPriceWad : 1 ether;
         upper = upper > maximum ? maximum : upper;
-
-        // Using the approximated next dependent reserve,
-        // optimize around 2.00% error to find the precise dependent reserve.
-        nextDepWadPerLiquidity = bisection(
+        // Use bisection to compute the precise dependent reserve which sets the invariant to 0.
+        adjustedDependentReserve = bisection(
             args,
             lower,
             upper,
@@ -206,11 +214,16 @@ library RMM01Lib {
             256, // todo: potentially expose the max iteration parameter to the Portfolio `getAmountOut` function.
             optimizeDependentReserve
         );
-
-        // Scales the next dependent per liquidity to total dependent reserves, in WAD units.
-        nextDep = nextDepWadPerLiquidity.mulWadDown(data.liquidity);
+        // Increase dependent reserve per liquidity by 1 to account for precision loss.
+        adjustedDependentReserve++;
+        // Return the total adjusted dependent pool reserve for all the liquidity.
+        nextDep = adjustedDependentReserve.mulWadDown(data.liquidity);
     }
 
+    /**
+     * @dev Optimized function used in the bisection method to compute the precise dependent reserve.
+     * @param optimized Dependent reserve in WAD units per 1E18 liquidity.
+     */
     function optimizeDependentReserve(
         Bisection memory args,
         uint256 optimized

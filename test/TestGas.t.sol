@@ -623,9 +623,17 @@ contract TestGas is Setup {
                 reserveIn: reserveIn.divWadDown(pool.liquidity),
                 liquidity: pool.liquidity
             }).safeCastTo128() / 10;
+
+            // This estimated amount is accurate, however, each getAmountOut computation uses the current invariant.
+            // Since all the computed output amounts use the current invariant, once these are executed there will be small
+            // discrepencies in the invariant which will throw the InvalidInvariant error.
+            // To properly get all the amounts out, the getAmountOut needs to take into account the invariant change as well.
             uint128 estimatedAmountOut = uint128(
                 _subject.getAmountOut(poolId, sellAsset, amountIn, 0, actor())
             );
+
+            // For now, we use a slightly underestimated amount out so that we can test the multi swaps.
+            estimatedAmountOut = estimatedAmountOut * 99_999 / 100_000;
 
             Order memory order = Order({
                 useMax: false,
