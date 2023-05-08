@@ -35,14 +35,7 @@ contract TestPortfolioAllocate is Setup {
 
         subject().multicall(data);
 
-        (
-            uint128 virtualX,
-            uint128 virtualY,
-            uint128 liquidity,
-            uint32 lastTimestamp,
-            address controller,
-            ,
-        ) = subject().pools(poolId);
+        (,, uint128 liquidity,,,,) = subject().pools(poolId);
 
         assertEq(liquidity, 1 ether, "liquidity");
     }
@@ -68,7 +61,7 @@ contract TestPortfolioAllocate is Setup {
             )
         );
 
-        subject().multicall{value: 250 ether}(data);
+        subject().multicall{ value: 250 ether }(data);
     }
 
     function test_allocate_multicall_modifies_liquidity()
@@ -230,10 +223,6 @@ contract TestPortfolioAllocate is Setup {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
-            deltaLiquidity: int128(amount)
-        });
-
         vm.expectRevert();
 
         bytes[] memory instructions = new bytes[](1);
@@ -253,10 +242,6 @@ contract TestPortfolioAllocate is Setup {
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
-        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
-            deltaLiquidity: int128(amount)
-        });
 
         vm.expectRevert();
 
@@ -412,7 +397,7 @@ contract TestPortfolioAllocate is Setup {
         (uint256 amount0, uint256 amount1) =
             subject().getLiquidityDeltas(ghost().poolId, int128(amount));
         uint256 fee0 = amount0 * 1 / 100;
-        uint256 fee1 = amount1 * 1 / 100;
+        // uint256 fee1 = amount1 * 1 / 100;
 
         vm.expectRevert(
             abi.encodeWithSelector(

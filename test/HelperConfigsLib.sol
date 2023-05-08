@@ -57,7 +57,7 @@ library Configs {
      * // note: Must edit the `asset` and `quote`, or `generate` will revert.
      * ```
      */
-    function fresh() internal returns (ConfigState memory) {
+    function fresh() internal pure returns (ConfigState memory) {
         ConfigState memory config = ConfigState({
             asset: address(0),
             quote: address(0),

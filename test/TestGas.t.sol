@@ -556,9 +556,6 @@ contract TestGas is Setup {
 
         // Fund all the tokens we have, because it only makes sense to use internal balances
         // for multiple instructions.
-        PortfolioPool memory pool =
-            IPortfolioStruct(address(_subject)).pools(ghost().poolId);
-        (address a, address q) = (pool.pair.tokenAsset, pool.pair.tokenQuote);
 
         bytes[] memory instructions = new bytes[](amount);
         for (uint256 i; i != amount; ++i) {
@@ -608,7 +605,6 @@ contract TestGas is Setup {
         // for multiple instructions.
         PortfolioPool memory pool =
             IPortfolioStruct(address(_subject)).pools(ghost().poolId);
-        (address a, address q) = (pool.pair.tokenAsset, pool.pair.tokenQuote);
 
         bytes[] memory instructions = new bytes[](amount);
         for (uint256 i; i != amount; ++i) {
@@ -652,6 +648,7 @@ contract TestGas is Setup {
 
     function _createInstruction(uint24 pairId)
         internal
+        pure
         returns (bytes memory)
     {
         return abi.encodeCall(
@@ -671,6 +668,7 @@ contract TestGas is Setup {
 
     function _allocateInstruction(uint64 poolId)
         internal
+        pure
         returns (bytes memory)
     {
         return abi.encodeCall(
@@ -682,7 +680,7 @@ contract TestGas is Setup {
     function _swapInstruction(
         bool direction,
         uint64 poolId
-    ) internal returns (bytes memory) {
+    ) internal view returns (bytes memory) {
         uint128 amountIn = uint128(0.05 ether);
         uint128 amountOut = subject().getAmountOut(
             poolId, direction, amountIn, 0, actor()
@@ -701,6 +699,7 @@ contract TestGas is Setup {
 
     function _deallocateInstruction(uint64 poolId)
         internal
+        pure
         returns (bytes memory)
     {
         return abi.encodeCall(

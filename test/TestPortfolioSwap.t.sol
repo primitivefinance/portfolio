@@ -372,8 +372,7 @@ contract TestPortfolioSwap is Setup {
             uint256 decimalsIn =
                 sellAsset ? pool.pair.decimalsAsset : pool.pair.decimalsQuote;
 
-            uint256 decimalsOut =
-                sellAsset ? pool.pair.decimalsQuote : pool.pair.decimalsAsset;
+            // uint256 decimalsOut = sellAsset ? pool.pair.decimalsQuote : pool.pair.decimalsAsset;
 
             maxAmountIn = maxAmountIn.scaleFromWadDown(decimalsIn);
             vm.assume(maxAmountIn > amountIn);
@@ -408,7 +407,7 @@ contract TestPortfolioSwap is Setup {
         });
         data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
 
-        subject().multicall{value: tokenIn == subject().WETH() ? amountIn : 0}(
+        subject().multicall{ value: tokenIn == subject().WETH() ? amountIn : 0 }(
             data
         );
 
