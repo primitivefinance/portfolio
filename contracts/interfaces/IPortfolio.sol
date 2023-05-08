@@ -216,6 +216,12 @@ interface IPortfolioGetters {
             PortfolioPair memory
         );
 
+    /**
+     * @notice Amount of liquidity owned by `owner` in the pool `poolId`.
+     * @param owner Address that owns the liquidity.
+     * @param poolId Id of the pool to check.
+     * @return freeLiquidity Amount of liquidity.
+     */
     function positions(
         address owner,
         uint64 poolId
@@ -310,14 +316,12 @@ interface IPortfolioActions {
     ) external;
 
     /**
-     * @dev Sets the `protocolFee` state value.
+     * @notice Sets the `protocolFee` state value.
      * @param fee Must be within the range: 4 <= x <= 20.
      */
     function setProtocolFee(uint256 fee) external;
 
-    /**
-     * @dev Transfers fees earned in `amount` of `token` to `REGISTRY` address.
-     */
+    /// @notice Transfers fees earned in `amount` of `token` to `REGISTRY` address.
     function claimFee(address token, uint256 amount) external;
 
     /**
@@ -352,16 +356,49 @@ interface IPortfolioActions {
         uint128 minDeltaQuote
     ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
 
+    /**
+     * @dev
+     * Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote)
+     * for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
+     *
+     * Fees are re-invested into the pool, increasing the value of liquidity.
+     *
+     * This is done via the following logic:
+     * - Compute the new reserve that is being increased without the fee amount included.
+     * - Check the invariant condition passes using this new reserve without the fee amount included.
+     * - Update the new reserve with the fee amount included in `syncPool`.
+     *
+     * @param args Swap parameters, token amounts are expected to be in WAD units.
+     * @return poolId Pool which had the swap happen.
+     * @return input Real quantity of `input` tokens sent to pool, in native token decimals.
+     * @return output Real quantity of `output` tokens sent to swapper, in native token decimals.
+     */
     function swap(Order memory args)
         external
         payable
         returns (uint64 poolId, uint256 input, uint256 output);
 
+    /**
+     * @dev Creates a new pair of tokens.
+     * @param asset Address of the asset token.
+     * @param quote Address of the quote token.
+     * @return pairId Id of the created pair.
+     */
     function createPair(
         address asset,
         address quote
     ) external payable returns (uint24 pairId);
 
+    /**
+     * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
+     * @param controller An address that can change the `fee`, `priorityFee` parameters of the created pool.
+     * @param priorityFee Priority fee for the pool (10,000 being 100%). This is a percentage of fees paid by the controller when swapping.
+     * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
+     * @param volatility Expected volatility of the pool in basis points, minimum of 1 (0.01%) and maximum of 25,000 (250%).
+     * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
+     * @param strikePrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
+     * @param price Initial price of the pool (expressed in the quote token), in WAD units.
+     */
     function createPool(
         uint24 pairId,
         address controller,
@@ -373,6 +410,19 @@ interface IPortfolioActions {
         uint128 price
     ) external payable returns (uint64 poolId);
 
+    /**
+     * @notice Entry point to execute multiple function calls in one transaction.
+     * Note that if one call reverts the whole transaction will revert.
+     * @param data Encoded function calls in an array of bytes.
+     * @return results Encoded results of each function call.
+     * @custom:example
+     * ```
+     * // Create a new pair by calling the `multicall` function.
+     * bytes[] memory data = new bytes[](1);
+     * data[0] = abi.encodeCall(IPortfolioActions.createPair, (token0, token1));
+     * bytes[] memory results = subject().multicall(data);
+     * ```
+     */
     function multicall(bytes[] calldata data)
         external
         payable

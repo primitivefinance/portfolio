@@ -49,10 +49,6 @@ abstract contract PortfolioVirtual is Objective {
     /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
 
-    // Tracks the id of the last pool that was created, quite useful during a
-    // multicall to avoid being tricked into allocating into the wrong pool.
-    uint64 private _getLastPoolId;
-
     /// @inheritdoc IPortfolioGetters
     mapping(address => uint256) public protocolFees;
 
@@ -85,6 +81,12 @@ abstract contract PortfolioVirtual is Objective {
 
     /// @dev True if the current call is a multicall.
     bool private _currentMulticall;
+
+    /**
+     * @dev Tracks the id of the last pool that was created, quite useful during
+     * a multicall to avoid being tricked into allocating into the wrong pool.
+     */
+    uint64 private _getLastPoolId;
 
     /**
      * @dev Protects against reentrancy and getting to invalid settlement states.
@@ -388,23 +390,7 @@ abstract contract PortfolioVirtual is Objective {
         }
     }
 
-    /**
-     * @dev
-     * Swaps in input of tokens (sellAsset == 1 = asset, sellAsset == 0 = quote)
-     * for output of tokens (sellAsset == 1 = quote, sellAsset == 0 = asset).
-     *
-     * Fees are re-invested into the pool, increasing the value of liquidity.
-     *
-     * This is done via the following logic:
-     * - Compute the new reserve that is being increased without the fee amount included.
-     * - Check the invariant condition passes using this new reserve without the fee amount included.
-     * - Update the new reserve with the fee amount included in `syncPool`.
-     *
-     * @param args Swap parameters, token amounts are expected to be in WAD units.
-     * @return poolId Pool which had the swap happen.
-     * @return input Real quantity of `input` tokens sent to pool, in native token decimals.
-     * @return output Real quantity of `output` tokens sent to swapper, in native token decimals.
-     */
+    /// @inheritdoc IPortfolioActions
     function swap(Order memory args)
         external
         payable
@@ -610,6 +596,7 @@ abstract contract PortfolioVirtual is Objective {
         }
     }
 
+    /// @inheritdoc IPortfolioActions
     function createPair(
         address asset,
         address quote
@@ -645,16 +632,7 @@ abstract contract PortfolioVirtual is Objective {
         _postLock();
     }
 
-    /**
-     * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
-     * @param controller An address that can change the `fee`, `priorityFee` parameters of the created pool.
-     * @param priorityFee Priority fee for the pool (10,000 being 100%). This is a percentage of fees paid by the controller when swapping.
-     * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
-     * @param volatility Expected volatility of the pool in basis points, minimum of 1 (0.01%) and maximum of 25,000 (250%).
-     * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
-     * @param strikePrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
-     * @param price Initial price of the pool (expressed in the quote token), in WAD units.
-     */
+    /// @inheritdoc IPortfolioActions
     function createPool(
         uint24 pairId,
         address controller,
