@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "contracts/interfaces/IPortfolio.sol";
-import "contracts/PortfolioLib.sol";
+import "contracts/libraries/PortfolioLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import { Coin } from "./HelperUtils.sol";
 

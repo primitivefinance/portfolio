@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./setup/HandlerBase.sol";
-import "contracts/PortfolioLib.sol";
+import "contracts/libraries/PortfolioLib.sol";
 import "solmate/utils/SafeCastLib.sol";
 
 contract HandlerPortfolio is HandlerBase {

@@ -8,7 +8,7 @@ import {
     SwapInputTooSmall,
     AssemblyLib,
     PERCENTAGE
-} from "../PortfolioLib.sol";
+} from "../libraries/PortfolioLib.sol";
 import "./BisectionLib.sol";
 
 uint256 constant SQRT_WAD = 1e9;

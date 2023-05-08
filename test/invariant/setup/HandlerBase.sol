@@ -23,7 +23,7 @@ import {
     MAX_FEE,
     MIN_DURATION,
     MAX_DURATION
-} from "contracts/PortfolioLib.sol";
+} from "contracts/libraries/PortfolioLib.sol";
 
 interface Context {
     // Manipulate ghost environment
