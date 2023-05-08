@@ -143,6 +143,7 @@ abstract contract PortfolioVirtual is Objective {
 
     // ===== External Actions ===== //
 
+    /// @inheritdoc IPortfolioActions
     function multicall(bytes[] calldata data)
         public
         payable
@@ -200,16 +201,7 @@ abstract contract PortfolioVirtual is Objective {
         _postLock();
     }
 
-    // ===== Internal ===== //
-
-    /**
-     * @dev Increases virtual reserves and liquidity. Debits `msg.sender`.
-     * @param deltaLiquidity Quantity of liquidity to mint in WAD units.
-     * @param maxDeltaAsset Maximum quantity of asset tokens paid in WAD units.
-     * @param maxDeltaQuote Maximum quantity of quote tokens paid in WAD units.
-     * @return deltaAsset Real quantity of `asset` tokens paid to pool, in native token decimals.
-     * @return deltaQuote Real quantity of `quote` tokens paid to pool, in native token decimals.
-     */
+    /// @inheritdoc IPortfolioActions
     function allocate(
         bool useMax,
         uint64 poolId,
@@ -285,14 +277,7 @@ abstract contract PortfolioVirtual is Objective {
         _postLock();
     }
 
-    /**
-     * @dev Reduces virtual reserves and liquidity. Credits `msg.sender`.
-     * @param deltaLiquidity Quantity of liquidity to burn in WAD units.
-     * @param minDeltaAsset Minimum quantity of asset tokens to receive in WAD units.
-     * @param minDeltaQuote Minimum quantity of quote tokens to receive in WAD units.
-     * @return deltaAsset Real quantity of `asset` tokens received from pool, in native token decimals.
-     * @return deltaQuote Real quantity of `quote` tokens received from pool, in native token decimals.
-     */
+    /// @inheritdoc IPortfolioActions
     function deallocate(
         bool useMax,
         uint64 poolId,

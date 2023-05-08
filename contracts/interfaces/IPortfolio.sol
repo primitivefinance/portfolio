@@ -321,6 +321,14 @@ interface IPortfolioActions {
      */
     function claimFee(address token, uint256 amount) external;
 
+    /**
+     * @dev Increases virtual reserves and liquidity. Debits `msg.sender`.
+     * @param deltaLiquidity Quantity of liquidity to mint in WAD units.
+     * @param maxDeltaAsset Maximum quantity of asset tokens paid in WAD units.
+     * @param maxDeltaQuote Maximum quantity of quote tokens paid in WAD units.
+     * @return deltaAsset Real quantity of `asset` tokens paid to pool, in native token decimals.
+     * @return deltaQuote Real quantity of `quote` tokens paid to pool, in native token decimals.
+     */
     function allocate(
         bool useMax,
         uint64 poolId,
@@ -329,6 +337,14 @@ interface IPortfolioActions {
         uint128 maxDeltaQuote
     ) external payable returns (uint256 deltaAsset, uint256 deltaQuote);
 
+    /**
+     * @dev Reduces virtual reserves and liquidity. Credits `msg.sender`.
+     * @param deltaLiquidity Quantity of liquidity to burn in WAD units.
+     * @param minDeltaAsset Minimum quantity of asset tokens to receive in WAD units.
+     * @param minDeltaQuote Minimum quantity of quote tokens to receive in WAD units.
+     * @return deltaAsset Real quantity of `asset` tokens received from pool, in native token decimals.
+     * @return deltaQuote Real quantity of `quote` tokens received from pool, in native token decimals.
+     */
     function deallocate(
         bool useMax,
         uint64 poolId,
