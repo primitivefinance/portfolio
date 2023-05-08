@@ -27,7 +27,7 @@ pragma solidity 0.8.19;
  *   Primitive™
  */
 
-import "solmate/utils/SafeTransferLib.sol";
+import "../libraries/SafeTransferLib.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/IWETH.sol";
 import "./AssemblyLib.sol";
@@ -44,7 +44,6 @@ using {
     getNetBalance
 } for AccountSystem global;
 
-error EtherTransferFail(); // 0x75f42683
 error InsufficientReserve(uint256 amount, uint256 delta); // 0x315276c9
 error InvalidBalance(); // 0xc52e3eff
 
@@ -75,7 +74,7 @@ function __balanceOf__(address token, address account) view returns (uint256) {
  */
 function __wrapEther__(AccountSystem storage self, address weth) {
     self.touch(weth);
-    IWETH(weth).deposit{value: msg.value}();
+    IWETH(weth).deposit{ value: msg.value }();
 }
 
 /**
@@ -83,15 +82,7 @@ function __wrapEther__(AccountSystem storage self, address weth) {
  */
 function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
-    (bool success,) = to.call{value: amount}(new bytes(0));
-    if (!success) revert EtherTransferFail();
-}
-
-/**
- * @dev External call to the `to` address is dangerous.
- */
-function __dangerousTransferFrom__(address token, address to, uint256 amount) {
-    SafeTransferLib.safeTransferFrom(ERC20(token), msg.sender, to, amount);
+    SafeTransferLib.safeTransferETH(to, amount);
 }
 
 /**
@@ -104,7 +95,8 @@ function dangerousFund(
     uint256 amount
 ) {
     self.touch(token);
-    __dangerousTransferFrom__(token, to, amount); // Settlement gifts tokens to msg.sender.
+    // Settlement gifts tokens to msg.sender.
+    SafeTransferLib.safeTransferFrom(token, msg.sender, to, amount);
 }
 
 /**
