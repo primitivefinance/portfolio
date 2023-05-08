@@ -45,7 +45,6 @@ contract PoolCreation is EchidnaStateHandling {
             assert(curve.fee == fee);
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
-            assert(curve.jit == JUST_IN_TIME_LIQUIDITY_POLICY);
             assert(curve.strikePrice == strikePrice);
             // assert(curve.maturity() >= block.timestamp);
         }

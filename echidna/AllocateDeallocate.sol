@@ -81,24 +81,24 @@ contract AllocateDeallocate is EchidnaStateHandling {
             if (preState.reserveAsset + deltaAsset != postState.reserveAsset) {
                 emit LogUint256(
                     "pre allocate reserve asset", preState.reserveAsset
-                    );
+                );
                 emit LogUint256(
                     "post allocate reserve asset", postState.reserveAsset
-                    );
+                );
                 emit AssertionFailed(
                     "BUG: Reserve asset did not increase by deltaAsset"
-                    );
+                );
             }
             if (preState.reserveQuote + deltaQuote != postState.reserveQuote) {
                 emit LogUint256(
                     "pre allocate reserve quote", preState.reserveQuote
-                    );
+                );
                 emit LogUint256(
                     "post allocate reserve quote", postState.reserveQuote
-                    );
+                );
                 emit AssertionFailed(
                     "BUG: Reserve quote did not increase by deltaQuote"
-                    );
+                );
             }
             // Total pool liquidity should increase by deltaLiquidity
             if (
@@ -108,14 +108,14 @@ contract AllocateDeallocate is EchidnaStateHandling {
                 emit LogUint256(
                     "pre allocate total pool liqudity",
                     preState.totalPoolLiquidity
-                    );
+                );
                 emit LogUint256(
                     "post allocate total pool liquidity",
                     postState.totalPoolLiquidity
-                    );
+                );
                 emit AssertionFailed(
                     "BUG: Total liquidity did not increase by deltaLiquidity"
-                    );
+                );
             }
             // Physical asset balance of both tokens should increase
             assert(
@@ -177,7 +177,7 @@ contract AllocateDeallocate is EchidnaStateHandling {
         ) {
             emit AssertionFailed(
                 "BUG: allocate with non existent pool should fail"
-                );
+            );
         } catch { }
     }
 
@@ -216,7 +216,7 @@ contract AllocateDeallocate is EchidnaStateHandling {
         ) {
             emit AssertionFailed(
                 "BUG: allocate with deltaLiquidity=0 should fail"
-                );
+            );
         } catch { }
     }
 
@@ -243,9 +243,6 @@ contract AllocateDeallocate is EchidnaStateHandling {
         uint256 preDeallocateAssetBalance = _asset.balanceOf(address(this));
         uint256 preDeallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
-        require(
-            pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY
-        );
 
         (uint256 deltaAsset, uint256 deltaQuote) =
             _portfolio.getPoolReserves(poolId);
@@ -292,11 +289,6 @@ contract AllocateDeallocate is EchidnaStateHandling {
     ) public {
         (PortfolioPool memory pool, uint64 poolId,,) =
             retrieve_random_pool_and_tokens(id);
-
-        // Save pre unallocation state
-        require(
-            pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY
-        );
 
         deallocate_should_fail(
             poolId, amount, "BUG: Deallocate without a position should fail."

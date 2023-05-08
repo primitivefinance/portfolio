@@ -109,7 +109,6 @@ contract EchidnaE2E is GlobalInvariants {
                 uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
             duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
             // maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
-            jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
@@ -160,7 +159,6 @@ contract EchidnaE2E is GlobalInvariants {
                 uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
             duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
             // maxTick = (-MAX_TICK) + (maxTick % (MAX_TICK - (-MAX_TICK))); // [-MAX_TICK,MAX_TICK]
-            jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
             price = uint128(between(price, 1, type(uint128).max)); // price is between 1-uint256.max
         }
 
@@ -200,9 +198,6 @@ contract EchidnaE2E is GlobalInvariants {
         uint256 preDeallocateAssetBalance = _asset.balanceOf(address(this));
         uint256 preDeallocateQuoteBalance = _quote.balanceOf(address(this));
         require(preState.callerPositionLiquidity > 0);
-        require(
-            pool.lastTimestamp - block.timestamp < JUST_IN_TIME_LIQUIDITY_POLICY
-        );
 
         (uint256 deltaAsset, uint256 deltaQuote) =
             _portfolio.getPoolReserves(poolId);

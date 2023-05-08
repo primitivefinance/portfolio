@@ -19,8 +19,6 @@ contract Helper {
     uint256 constant MAX_VOLATILITY = 25_000; // 250%
     uint256 constant MIN_DURATION = 1; // days, but without units
     uint256 constant MAX_DURATION = 500; // days, but without units
-    uint256 constant JUST_IN_TIME_MAX = 600 seconds;
-    uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
 
     function clam_safe_create_bounds(
         uint16 priorityFee,
@@ -40,7 +38,6 @@ contract Helper {
         emit LogUint256("priority fee", uint256(priorityFee));
         volatility = uint16(between(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
         duration = uint16(between(duration, MIN_DURATION, MAX_DURATION));
-        jit = uint16(between(jit, 1, JUST_IN_TIME_MAX));
         price = uint128(between(price, MIN_PRICE, MAX_PRICE));
         strikePrice = uint128(between(strikePrice, MIN_PRICE, MAX_PRICE));
         return (priorityFee, fee, strikePrice, volatility, duration, jit, price);
