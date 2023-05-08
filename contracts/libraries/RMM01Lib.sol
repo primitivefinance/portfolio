@@ -68,7 +68,7 @@ library RMM01Lib {
         int256 liquidityDelta,
         uint256 timestamp,
         address swapper
-    ) internal view returns (uint256 amountOut) {
+    ) internal pure returns (uint256 amountOut) {
         uint256 amountInWad = amountIn.scaleToWad(
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
