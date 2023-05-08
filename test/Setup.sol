@@ -38,7 +38,6 @@ import "./HelperUtils.sol" as Utils;
 contract Setup is Test {
     using SafeCastLib for uint256;
 
-    uint256 internal constant JIT_LIQUIDITY_POLICY_STORAGE_SLOT = 12; // UPDATE IF STORAGE CHANGES.
     /**
      * @dev Manages the addresses calling the subjects in the environment.
      */
@@ -212,6 +211,21 @@ contract Setup is Test {
         _;
     }
 
+    modifier stablecoinPortfolioConfig() {
+        uint16 duration = type(uint16).max;
+        uint16 volatility = uint16(MIN_VOLATILITY);
+        uint64 poolId = Configs.fresh().edit(
+            "asset", abi.encode(address(subjects().tokens[1]))
+        ).edit("quote", abi.encode(address(subjects().tokens[2]))).edit(
+            "duration", abi.encode(duration)
+        ).edit("volatility", abi.encode(volatility)).edit(
+            "fee", abi.encode(uint16(MIN_FEE))
+        ).edit("price", abi.encode(uint128(1e18))).generate(address(subject()));
+
+        setGhostPoolId(poolId);
+        _;
+    }
+
     modifier sixDecimalQuoteConfig() {
         uint64 poolId = Configs.fresh().edit(
             "asset", abi.encode(address(subjects().tokens[0]))
@@ -272,18 +286,6 @@ contract Setup is Test {
         _;
     }
 
-    /**
-     * @dev Sets internal default jit protection seconds value to 0.
-     */
-    modifier noJit() {
-        vm.store(
-            address(subject()),
-            bytes32(JIT_LIQUIDITY_POLICY_STORAGE_SLOT),
-            bytes32(0)
-        );
-        _;
-    }
-
     modifier allocateSome(uint128 amt) {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
@@ -305,7 +307,7 @@ contract Setup is Test {
 
     modifier swapSome(uint128 amt, bool sellAsset) {
         uint128 amtOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amt, address(this)
+            ghost().poolId, sellAsset, amt, 0, address(this)
         ).safeCastTo128();
 
         Order memory order = Order({
@@ -324,7 +326,7 @@ contract Setup is Test {
 
     modifier swapSomeGetOut(uint128 amt, int256 amtOutDelta, bool sellAsset) {
         uint128 amtOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amt, address(this)
+            ghost().poolId, sellAsset, amt, 0, address(this)
         ).safeCastTo128();
         amtOut = amtOutDelta > 0
             ? amtOut + uint256(amtOutDelta).safeCastTo128()

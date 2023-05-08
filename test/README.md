@@ -40,8 +40,8 @@ Thanks to horsefacts.eth for their stellar walkthrough of building an invariant 
 #### Global
 
 - Token balances of Portfolio should be greater than or equal to the `reserves` of all tokens.
-- For every pool, `reserves` of the pool's tokens should always be greater than the `getPoolAmountsPerLiquidity` output for the pool's entire liquidity.
-- The sum of liquidity in all pools must be equal to the sum of liquidity of every position.
+- For every pool, `reserves` of the pool's tokens should always be greater than the `getPoolReserves` output for the pool's entire liquidity.
+- The sum of liquidity in all pools must be equal to the sum of liquidity of every position, less the `BURNED_LIQUIDITY` amount.
 - The `lock` variable must always return `1` outside of execution.
 - The `__account__.settled` variable must always return true outside of execution.
 - The `__account__.warm` variable must always be an empty array outside of execution.
@@ -59,46 +59,6 @@ Thanks to horsefacts.eth for their stellar walkthrough of building an invariant 
   - Portfolio's `balanceOf` `weth` increased by `msg.value`.
   - The `Deposit` event was emitted.
 
-#### Fund
-
-- Preconditions:
-  - `msg.sender` must approve Portfolio to spend `amount` of tokens.
-  - `msg.sender` must have a balance greater than equal to `amount` of tokens.
-- During Execution:
-  - The `token` must be added to the `__account__.warm` address array.
-  - The `__account__.cache` mapping must return `true` for `token`.
-- Postconditions:
-  - The `msg.sender`'s `balances` value for the `token` increased by `amount`.
-  - The `IncreaseUserBalance` event was emitted.
-  - Portfolio's `reserves` value for the `token` increased by `amount`.
-  - The `balanceOf` Portfolio for `token` increased by `amount`.
-  - Calling `draw` with the same `amount` always succeeds.
-
-#### Draw
-
-- Preconditions:
-  - `msg.sender` must have a `balances` of `token` greater than or equal to `amount` to withdraw.
-- During Execution:
-  - Internal `AccountSystem.debit` function returns `true`.
-- Postcondition:
-  - The `msg.sender`'s `balances` value for `token` decreased by `amount`.
-  - The `DecreaseUserBalance` event was emitted.
-  - Portfolio's `reserves` value for the `token` decreased by `amount`.
-  - The `to` address received `amount` of token or `amount` of Ether, if `token === weth`.
-  - Portfolio's `balanceOf` value for `token` decreased by `amount`.
-
-#### Claim
-
-- Preconditions:
-  - `msg.sender` has a position.
-- During Execution:
-  - n/a
-- Postcondition:
-  - Fee growth values updated if different from pool growth checkpoints.
-  - If tokens were owed, decremented from position.
-  - If tokens were owed, `getBalance` of token increased for `msg.sender`.
-  - Credit event emitted.
-
 #### Allocate
 
 - Preconditions:
@@ -108,53 +68,44 @@ Thanks to horsefacts.eth for their stellar walkthrough of building an invariant 
 - During Execution:
   - n/a
 - Postconditions:
-  - The `pools` `liquidity` for `poolId` always increases by `deltaLiquidity`.
+  - The `pools` `liquidity` for `poolId` always increases by `deltaLiquidity` if not making the first allocation, if making the first allocation the `BURNED_LIQUIDITY` amount is lost.
   - The `pools` `liquidity` for `poolId` never decreases.
-  - The `msg.sender`'s `positions` `freeLiquidity` for `poolId` always increased by `deltaLiquidity`.
-  - Calling `deallocate` with the same `deltaLiquidity` always succeeds when the time elapsed in seconds between calls is greater than `JIT_LIQUIDITY_POLICY`.
-  - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same `msg.sender` allocated to `poolId` and the pool's fee growth condition is met (e.g. pool's invariant is positive) the position's change in `feeGrowth{}` must not be zero.
-  - Portfolio's `reserves` value for the pool's tokens increased by respective amounts computed with `getPoolAmountsPerLiquidity`, if the `msg.sender` did not have enough tokens in their `balances`.
-  - The `balanceOf` Portfolio for the pool's tokens increased by respective amounts computed with `getPoolAmountsPerLiquidity`, if the `msg.sender` did not have enough tokens in their `balances`.
-  - The `ChangePosition` event is emitted.
+  - The `msg.sender`'s `positions` amount for `poolId` increases by `deltaLiquidity`, less `BURNED_LIQUIDITY` if making the first allocation of the pool.
+  - Portfolio's `reserves` value for the pool's tokens increased by respective amounts computed with `getPoolReserves`, if the `msg.sender` did not have enough tokens in their `balances`.
+  - The `balanceOf` Portfolio for the pool's tokens increased by respective amounts computed with `getPoolReserves`, if the `msg.sender` did not have enough tokens in their `balances`.
   - The `Allocate` event is emitted.
 
 #### Deallocate
 
 - Preconditions:
-  - The `msg.sender`'s `positions` `freeLiquidity` for `poolId` is greater than zero.
-  - The `msg.sender`'s `positions` `lastTimestamp` for `poolId` is less than `block.timestamp` by at least (equal) `JIT_LIQUIDITY_POLICY` seconds.
+  - The `msg.sender`'s `positions` amount for `poolId` is greater than zero.
 - During Execution:
   - n/a
 - Postconditions:
   - The `pools` `liquidity` for `poolId` always decreases by `deltaLiquidity`.
   - The `pools` `liquidity` for `poolId` never increases.
-  - The `msg.sender`'s `positions` `freeLiquidity` for `poolId` always decreases by `deltaLiquidity`.
-  - If `pools` `feeGrowth{}` value for `poolId` is different from the previous time the same `msg.sender` allocated to `poolId`, the position's change in `feeGrowth{}` must not be zero.
-  - The `msg.sender`'s `balances` value for the pool's tokens increases by respective amounts computed with `getPoolAmountsPerLiquidity`.
+  - The `msg.sender`'s `positions` amount for `poolId` always decreases by `deltaLiquidity`.
+  - The `msg.sender`'s `balances` value for the pool's tokens increases by respective amounts computed with `getPoolReserves`.
   - Portfolio's `reserves` value for the pool's tokens stays the same.
   - The `balanceOf` Portfolio for the pool's tokens stays the same.
-  - The `DecreasePosition` event is emitted.
   - The `Deallocate` event is emitted.
 
 #### Swap
 
 - Preconditions:
   - For swaps with the argument `sellAsset = 1` then the input token for `poolId` is the pair's `pair.tokenAsset`, else swaps with the argument `sellAsset = 0` the input token for `poolId` is the pair's `pair.tokenQuote`
-    - `msg.sender` must have approved token to be spent by Portfolio and have `input` of balance of tokens held by their address, or `msg.sender` must have `input` of tokens in their `balances`.
+    - `msg.sender` must have approved token to be spent by Portfolio and have `input` of balance of tokens held by their address, or there must be a surplus of tokens in the contract from `getNetBalance` and `useMax` must be set to true.
   - The `pools` `poolId` value must return a `lastTimestamp` != 0, `lastPrice` != 0, and `liquidity` != 0.
   - The `input` amount must be greater than zero.
   - The `poolId`'s `curve.maturity` value must be less than `block.timestamp`.
 - During Execution:
-  - If `useMax` === 1, the `remainder` value in memory must be initialized with the `msg.sender`'s entire `balances` value of the input token.
+  - n/a
 - Postconditions:
   - Portfolio's `reserves` changed:
-    - For `input` amount, changed by zero if `msg.sender` used their internal balance.
     - For `input` amount, changed by `input` if `msg.sender` paid with external tokens.
-    - For `output` amount, changed by zero.
+    - For `output` amount, changed by `output` amount if not used in consecutive instructions.
   - Portfolio's `balanceOf` value for each token remains unchanged before or after a swap.
-  - Portfolio's `getBalance` call to the `msg.sender` changed equal to the respective tokens changed equal to changes in `reserves`.
   - The `Swap` event was emitted.
-  - The `PoolUpdate` event was emitted.
 
 # III. Basic Testing
 
@@ -267,18 +218,25 @@ function test_allocate_modifies_liquidity()
         // Fetch the ghost variables to interact with the target pool.
         uint64 xid = ghost().poolId;
         // Fetch the variable we are changing (pool.liquidity).
-        uint prev = ghost().pool().liquidity;
+        uint256 prev = ghost().pool().liquidity;
         // Trigger the function being tested.
-        subject().multiprocess(FVMLib.encodeAllocate({useMax: uint8(0), poolId: xid, power: 0, amount: amount}));
+
+        bytes[] memory instructions = new bytes[](1);
+        instructions[0] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, xid, amount, type(uint128).max, type(uint128).max)
+        );
+        subject().multicall(instructions);
+
         // Fetch the variable changed.
-        uint post = ghost().pool().liquidity;
+        uint256 post = ghost().pool().liquidity;
         // Ghost assertions comparing the actual and expected deltas.
         assertEq(post, prev + amount, "pool.liquidity");
         // Direct assertions of pool state.
         assertEq(
-            ghost().pool().liquidity,
-            ghost().position(actor()).freeLiquidity,
-            "position.freeLiquidity != pool.liquidity"
+            ghost().pool().liquidity - BURNED_LIQUIDITY,
+            ghost().position(actor()),
+            "position != pool.liquidity"
         );
     }
 ```

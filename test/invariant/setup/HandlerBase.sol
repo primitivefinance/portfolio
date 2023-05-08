@@ -14,10 +14,8 @@ import { GhostState } from "../../HelperGhostLib.sol";
 import { ActorsState } from "../../HelperActorsLib.sol";
 import {
     PortfolioPool,
-    PortfolioPosition,
     PortfolioPair,
     PortfolioCurve,
-    FVM,
     AssemblyLib,
     MIN_VOLATILITY,
     MAX_VOLATILITY,
@@ -25,7 +23,7 @@ import {
     MAX_FEE,
     MIN_DURATION,
     MAX_DURATION
-} from "contracts/PortfolioLib.sol";
+} from "contracts/libraries/PortfolioLib.sol";
 
 interface Context {
     // Manipulate ghost environment

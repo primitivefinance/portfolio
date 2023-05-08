@@ -10,20 +10,18 @@ contract TestPortfolioCreatePool is Setup {
     function testFuzz_createPool(
         uint16 priorityFee,
         uint16 fee,
-        uint16 jit,
         uint16 duration,
         uint16 volatility,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint128 price
     ) public {
         uint24 pairId = uint24(1);
         fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
         priorityFee = uint16(bound(priorityFee, 1, fee));
-        jit = uint16(bound(jit, 1, JUST_IN_TIME_MAX));
         duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
         volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
         vm.assume(price > 0);
-        vm.assume(maxPrice > 0);
+        vm.assume(strikePrice > 0);
 
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
@@ -35,16 +33,16 @@ contract TestPortfolioCreatePool is Setup {
                 fee,
                 volatility,
                 duration,
-                jit,
-                maxPrice,
+                strikePrice,
                 price
             )
         );
 
         subject().multicall(data);
 
-        uint64 poolId =
-            FVM.encodePoolId(pairId, true, subject().getPoolNonce(pairId));
+        uint64 poolId = AssemblyLib.encodePoolId(
+            pairId, true, subject().getPoolNonce(pairId)
+        );
         setGhostPoolId(poolId);
 
         PortfolioPool memory pool = ghost().pool();
@@ -55,33 +53,14 @@ contract TestPortfolioCreatePool is Setup {
         assertEq(actual.fee, fee, "fee");
         assertEq(actual.volatility, volatility, "volatility");
         assertEq(actual.duration, duration, "duration");
-        assertEq(actual.jit, jit, "jit");
-        assertEq(actual.maxPrice, maxPrice, "maxPrice");
-    }
-
-    function test_createPool_non_controlled_default_jit() public {
-        uint24 pairNonce = uint24(1);
-
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (pairNonce, address(0), 1, 100, 100, 100, 100, 100, 100)
-        );
-        subject().multicall(data);
-
-        uint64 poolId = FVM.encodePoolId(
-            pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
-        );
-        assertEq(
-            ghost().poolOf(poolId).params.jit, JUST_IN_TIME_LIQUIDITY_POLICY
-        );
+        assertEq(actual.strikePrice, strikePrice, "strikePrice");
     }
 
     function test_revert_createPool_zero_price() public {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
-            (uint24(1), address(this), 1, 1, 1, 1, 1, 1, 0)
+            (uint24(1), address(this), 1, 1, 1, 1, 1, 0)
         );
         vm.expectRevert(ZeroPrice.selector);
         subject().multicall(data);
@@ -91,7 +70,7 @@ contract TestPortfolioCreatePool is Setup {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
-            (uint24(1), address(this), 0, 1, 1, 1, 1, 1, 1)
+            (uint24(1), address(this), 0, 1, 1, 1, 1, 1)
         );
         vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, 0));
         subject().multicall(data);
@@ -131,7 +110,7 @@ contract TestPortfolioCreatePool is Setup {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
-            (pairNonce, address(0), 1, 100, 100, 100, 100, 100, 1001)
+            (pairNonce, address(0), 1, 100, 100, 100, 100, 1001)
         );
         vm.expectRevert(arithmeticError);
         subject().multicall(data);
@@ -151,19 +130,18 @@ contract TestPortfolioCreatePool is Setup {
                 100,
                 perpetualMagicVariable,
                 100,
-                100,
                 100
             )
         );
 
         subject().multicall(data);
-        uint64 poolId = FVM.encodePoolId(
+        uint64 poolId = AssemblyLib.encodePoolId(
             pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
         );
         assertEq(
             ghost().poolOf(poolId).params.duration,
-            MAX_DURATION,
-            "duration != max duration"
+            perpetualMagicVariable,
+            "duration != perpetualMagicVariable"
         );
         assertEq(
             ghost().poolOf(poolId).computeTau(0),

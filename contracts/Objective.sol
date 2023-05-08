@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
-import "./PortfolioLib.sol";
+import "./libraries/PortfolioLib.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IPortfolioRegistry.sol";
@@ -22,17 +22,6 @@ abstract contract Objective is IPortfolio {
         uint64 poolId,
         bool sellAsset
     ) internal virtual returns (bool success, int256 invariant);
-
-    /**
-     * @dev Conditional check made before changing `pool.liquidity` and `position.freeLiquidity`.
-     * @param delta Signed quantity of liquidity in WAD units to change liquidity by.
-     * @return True if position liquidity can be changed by `delta` amount.
-     */
-    function checkPosition(
-        uint64 poolId,
-        address owner,
-        int256 delta
-    ) public view virtual returns (bool);
 
     /**
      * @dev Conditional check before interacting with a pool.
@@ -74,14 +63,12 @@ abstract contract Objective is IPortfolio {
         uint256 price
     ) public view virtual returns (uint256 reserveX, uint256 reserveY);
 
-    /**
-     * @dev Computes an amount of tokens out given an amount in, units are in the token's decimals.
-     * @param amountIn Quantity to swap in, in native decimals.
-     */
+    /// @inheritdoc IPortfolioGetters
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
+        int256 liquidityDelta,
         address swapper
     )
         public
@@ -90,13 +77,8 @@ abstract contract Objective is IPortfolio {
         override(IPortfolioGetters)
         returns (uint256 output);
 
-    /**
-     * @dev
-     * WARNING! Do not rely on this price value. This CAN be manipulated. It is also an estimate that has error.
-     * Estimates the `price` of a pool with `poolId` given the pool's reserves.
-     * @return price Estimated quantity of "Quote" tokens per "Asset" tokens in WAD units.
-     */
-    function getVirtualPrice(uint64 poolId)
+    /// @inheritdoc IPortfolioGetters
+    function getSpotPrice(uint64 poolId)
         public
         view
         virtual

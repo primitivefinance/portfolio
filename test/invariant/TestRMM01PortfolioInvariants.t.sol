@@ -20,7 +20,7 @@ interface AccountLike {
  * Invariant 2. AccountSystem.settled == true.
  * Invariant 3. AccountSystem.prepared == false.
  * Invariant 4. (balanceOf(asset), balanceOf(quote)) >= Portfolio.getVirtualReserves, for all pools.
- * Invariant 5. ∑ Portfolio.positions(owner, poolId).freeLiquidity == Portfolio.pools(poolId).liquidity, for all
+ * Invariant 5. ∑ Portfolio.positions(owner, poolId).liquidity == Portfolio.pools(poolId).liquidity, for all
  * pools.
  */
 contract TestRMM01PortfolioInvariants is Setup {
@@ -85,11 +85,6 @@ contract TestRMM01PortfolioInvariants is Setup {
         reserve =
             reserve.scaleFromWadDown(ghost().quote().to_token().decimals());
         assertTrue(physical >= reserve, "invariant-quote-physical-balance");
-    }
-
-    function invariant_account_settled() public {
-        bool settled = AccountLike(address(subject())).__account__();
-        assertTrue(settled, "invariant-settled");
     }
 
     function invariant_virtual_pool_asset_reserves() public {
@@ -173,7 +168,7 @@ contract TestRMM01PortfolioInvariants is Setup {
         address[] memory actors = getActors();
         uint256 sum;
         for (uint256 i; i != actors.length; ++i) {
-            sum += ghost().position(actors[i]).freeLiquidity;
+            sum += ghost().position(actors[i]);
         }
 
         return sum;

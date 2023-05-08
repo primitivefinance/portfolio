@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./setup/HandlerBase.sol";
-import "contracts/PortfolioLib.sol";
+import "contracts/libraries/PortfolioLib.sol";
 import "solmate/utils/SafeCastLib.sol";
 
 contract HandlerPortfolio is HandlerBase {
@@ -116,7 +116,6 @@ contract HandlerPortfolio is HandlerBase {
                         args.fee, // fee
                         args.volatility, // vol
                         args.duration, // dur
-                        4, // jit
                         args.terminalPrice,
                         args.price
                     )
@@ -135,7 +134,7 @@ contract HandlerPortfolio is HandlerBase {
         assertTrue(pairId != 0, "pair-not-created");
 
         // todo: make sure we create the last pool...
-        uint64 poolId = FVM.encodePoolId(
+        uint64 poolId = AssemblyLib.encodePoolId(
             pairId, isMutable, uint32(ctx.subject().getPoolNonce(pairId))
         );
         // Add the created pool to the list of pools.
@@ -151,7 +150,7 @@ contract HandlerPortfolio is HandlerBase {
         view
         returns (AccountingState memory)
     {
-        PortfolioPosition memory position = ctx.ghost().position(ctx.actor());
+        uint128 position = ctx.ghost().position(ctx.actor());
         PortfolioPool memory pool = ctx.ghost().pool();
         PortfolioPair memory pair = pool.pair;
 
@@ -164,7 +163,7 @@ contract HandlerPortfolio is HandlerBase {
             ctx.ghost().asset().to_token().balanceOf(address(ctx.subject())),
             ctx.ghost().quote().to_token().balanceOf(address(ctx.subject())),
             ctx.getPositionsLiquiditySum(),
-            position.freeLiquidity,
+            position,
             pool.liquidity
         );
 
@@ -337,9 +336,9 @@ contract HandlerPortfolio is HandlerBase {
         // TODO: Add use max flag support.
 
         // Get some liquidity.
-        PortfolioPosition memory pos = ctx.ghost().position(ctx.actor());
+        uint128 position = ctx.ghost().position(ctx.actor());
 
-        if (pos.freeLiquidity >= deltaLiquidity) {
+        if (position >= deltaLiquidity) {
             // Preconditions
             PortfolioPool memory pool = ctx.ghost().pool();
             assertTrue(pool.lastTimestamp != 0, "Pool not initialized");
@@ -524,6 +523,6 @@ struct AccountingState {
     uint256 physicalBalanceAsset; // balanceOf
     uint256 physicalBalanceQuote; // balanceOf
     uint256 totalPositionLiquidity; // sum of all position liquidity
-    uint256 callerPositionLiquidity; // position.freeLiquidity
+    uint256 callerPositionLiquidity; // position
     uint256 totalPoolLiquidity; // pool.liquidity
 }

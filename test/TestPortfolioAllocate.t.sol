@@ -6,9 +6,42 @@ import "./Setup.sol";
 contract TestPortfolioAllocate is Setup {
     using AssemblyLib for uint256;
 
+    function test_multicall_create_pair_pool_allocate() public useActor {
+        MockERC20 tokenA = new MockERC20("TokenA", "AAA", 18);
+        MockERC20 tokenB = new MockERC20("TokenB", "BBB", 18);
+
+        tokenA.mint(actor(), 100 ether);
+        tokenB.mint(actor(), 100 ether);
+
+        tokenA.approve(address(subject()), type(uint256).max);
+        tokenB.approve(address(subject()), type(uint256).max);
+
+        bytes[] memory data = new bytes[](3);
+        data[0] = abi.encodeCall(
+            IPortfolioActions.createPair, (address(tokenA), address(tokenB))
+        );
+
+        data[1] = abi.encodeCall(
+            IPortfolioActions.createPool,
+            (0, address(0), 1, 100, 100, 100, 1 ether, 1 ether)
+        );
+
+        uint64 poolId = AssemblyLib.encodePoolId(1, false, 1);
+
+        data[2] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (false, poolId, 1 ether, type(uint128).max, type(uint128).max)
+        );
+
+        subject().multicall(data);
+
+        (,, uint128 liquidity,,,,) = subject().pools(poolId);
+
+        assertEq(liquidity, 1 ether, "liquidity");
+    }
+
     function test_allocate_weth()
         public
-        noJit
         wethConfig
         useActor
         usePairTokens(500 ether)
@@ -60,8 +93,8 @@ contract TestPortfolioAllocate is Setup {
         // Direct assertions of pool state.
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
-            ghost().position(actor()).freeLiquidity,
-            "position.freeLiquidity != pool.liquidity"
+            ghost().position(actor()),
+            "position != pool.liquidity"
         );
     }
 
@@ -91,8 +124,8 @@ contract TestPortfolioAllocate is Setup {
         // Direct assertions of pool state.
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
-            ghost().position(actor()).freeLiquidity,
-            "position.freeLiquidity != pool.liquidity"
+            ghost().position(actor()),
+            "position != pool.liquidity"
         );
     }
 
@@ -120,8 +153,8 @@ contract TestPortfolioAllocate is Setup {
         );
         assertEq(
             ghost().pool().liquidity,
-            ghost().position(actor()).freeLiquidity,
-            "position.freeLiquidity != pool.liquidity"
+            ghost().position(actor()).liquidity,
+            "position != pool.liquidity"
         );
     } */
 
@@ -190,10 +223,6 @@ contract TestPortfolioAllocate is Setup {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
-            deltaLiquidity: int128(amount)
-        });
-
         vm.expectRevert();
 
         bytes[] memory instructions = new bytes[](1);
@@ -213,10 +242,6 @@ contract TestPortfolioAllocate is Setup {
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
-        (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
-            deltaLiquidity: int128(amount)
-        });
 
         vm.expectRevert();
 
@@ -372,7 +397,7 @@ contract TestPortfolioAllocate is Setup {
         (uint256 amount0, uint256 amount1) =
             subject().getLiquidityDeltas(ghost().poolId, int128(amount));
         uint256 fee0 = amount0 * 1 / 100;
-        uint256 fee1 = amount1 * 1 / 100;
+        // uint256 fee1 = amount1 * 1 / 100;
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -545,8 +570,8 @@ contract TestPortfolioAllocate is Setup {
         assertEq(post, prev + amount, "pool.liquidity");
         assertEq(
             ghost().pool().liquidity - BURNED_LIQUIDITY,
-            ghost().position(actor()).freeLiquidity,
-            "position.freeLiquidity != pool.liquidity"
+            ghost().position(actor()),
+            "position.liquidity != pool.liquidity"
         );
     }
 }

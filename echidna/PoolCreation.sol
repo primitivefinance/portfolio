@@ -9,16 +9,16 @@ contract PoolCreation is EchidnaStateHandling {
     function create_non_controlled_pool(
         uint256 id,
         uint16 fee,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint16 volatility,
         uint16 duration,
         uint128 price
     ) public {
         uint24 pairId = retrieve_created_pair(uint256(id));
         {
-            (, fee, maxPrice, volatility, duration,, price) =
+            (, fee, strikePrice, volatility, duration,, price) =
             clam_safe_create_bounds(
-                0, fee, maxPrice, volatility, duration, 0, price
+                0, fee, strikePrice, volatility, duration, 0, price
             );
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
@@ -29,7 +29,7 @@ contract PoolCreation is EchidnaStateHandling {
             volatility,
             duration,
             0, // no jit
-            maxPrice,
+            strikePrice,
             price
         );
         {
@@ -45,8 +45,7 @@ contract PoolCreation is EchidnaStateHandling {
             assert(curve.fee == fee);
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
-            assert(curve.jit == JUST_IN_TIME_LIQUIDITY_POLICY);
-            assert(curve.maxPrice == maxPrice);
+            assert(curve.strikePrice == strikePrice);
             // assert(curve.maturity() >= block.timestamp);
         }
     }
@@ -55,7 +54,7 @@ contract PoolCreation is EchidnaStateHandling {
         uint256 id,
         uint16 priorityFee,
         uint16 fee,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -63,9 +62,9 @@ contract PoolCreation is EchidnaStateHandling {
     ) public {
         uint24 pairId = retrieve_created_pair(id);
         {
-            (, fee, maxPrice, volatility, duration,, price) =
+            (, fee, strikePrice, volatility, duration,, price) =
             clam_safe_create_bounds(
-                0, fee, maxPrice, volatility, duration, 0, price
+                0, fee, strikePrice, volatility, duration, 0, price
             );
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
@@ -76,7 +75,7 @@ contract PoolCreation is EchidnaStateHandling {
             volatility,
             duration,
             0, // no jit
-            maxPrice,
+            strikePrice,
             price
         );
         {
@@ -92,7 +91,7 @@ contract PoolCreation is EchidnaStateHandling {
             assert(curve.volatility == volatility);
             assert(curve.duration == duration);
             assert(curve.jit == jit);
-            assert(curve.maxPrice == maxPrice);
+            assert(curve.strikePrice == strikePrice);
             // assert(curve.maturity() > block.timestamp);
         }
     }
@@ -100,7 +99,7 @@ contract PoolCreation is EchidnaStateHandling {
     function create_controlled_pool_with_zero_priority_fee_should_fail(
         uint256 id,
         uint16 fee,
-        uint128 maxPrice,
+        uint128 strikePrice,
         uint16 volatility,
         uint16 duration,
         uint16 jit,
@@ -109,9 +108,9 @@ contract PoolCreation is EchidnaStateHandling {
         uint24 pairId = retrieve_created_pair(id);
         uint16 priorityFee = 0;
         {
-            (, fee, maxPrice, volatility, duration,, price) =
+            (, fee, strikePrice, volatility, duration,, price) =
             clam_safe_create_bounds(
-                0, fee, maxPrice, volatility, duration, 0, price
+                0, fee, strikePrice, volatility, duration, 0, price
             );
         }
         bytes memory createPoolData = ProcessingLib.encodeCreatePool(
@@ -122,7 +121,7 @@ contract PoolCreation is EchidnaStateHandling {
             volatility,
             duration,
             0, // no jit
-            maxPrice,
+            strikePrice,
             price
         );
         (bool success,) = address(_portfolio).call(createPoolData);
@@ -149,7 +148,7 @@ contract PoolCreation is EchidnaStateHandling {
         if (!pool.exists()) {
             emit AssertionFailed(
                 "BUG: Pool should return true on exists after being created."
-                );
+            );
         }
 
         // save pools in Echidna
@@ -165,7 +164,7 @@ contract PoolCreation is EchidnaStateHandling {
         (
             _pp.priorityFee,
             _pp.fee,
-            _pp.maxPrice,
+            _pp.strikePrice,
             _pp.volatility,
             _pp.duration,
             _pp.jit,
@@ -173,7 +172,7 @@ contract PoolCreation is EchidnaStateHandling {
         ) = clam_safe_create_bounds(
             pp.priorityFee,
             pp.fee,
-            pp.maxPrice,
+            pp.strikePrice,
             pp.volatility,
             pp.duration,
             pp.jit,
@@ -187,7 +186,7 @@ contract PoolCreation is EchidnaStateHandling {
             _pp.volatility,
             _pp.duration,
             _pp.jit,
-            _pp.maxPrice,
+            _pp.strikePrice,
             _pp.price
         );
         (, poolId) = execute_create_pool(pairId, createPoolData, false);

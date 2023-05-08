@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
 import "./Portfolio.sol";
 import "./libraries/RMM01Lib.sol";
+import "./libraries/BisectionLib.sol";
 
 /**
  * @title   RMM-01 Portfolio
@@ -23,7 +24,7 @@ contract RMM01Portfolio is PortfolioVirtual {
     ) PortfolioVirtual(weth, registry) { }
 
     /**
-     * @dev Computes the price of the pool, which changes over time.
+     * @dev Computes the latest invariant and spot price of the pool using the latest timestamp.
      *
      * @custom:reverts Underflows if the reserve of the input token is lower than the next one, after the next price
      * movement.
@@ -32,45 +33,26 @@ contract RMM01Portfolio is PortfolioVirtual {
     function _getLatestInvariantAndVirtualPrice(
         uint64 poolId,
         bool sellAsset
-    )
-        internal
-        view
-        returns (uint256 price, int256 invariant, uint256 updatedTau)
-    {
+    ) internal view returns (uint256 price, int256 invariant, uint256 tau) {
         PortfolioPool storage pool = pools[poolId];
-        updatedTau = pool.computeTau(block.timestamp);
 
-        uint256 reserveXPerLiquidity = pool.virtualX;
-        uint256 reserveYPerLiquidity = pool.virtualY;
+        Iteration memory iteration;
+        (iteration, tau) = pool.getSwapData({
+            sellAsset: sellAsset,
+            amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
+            liquidityDelta: 0, // Uses unmodified pool liquidity to compute invariant.
+            timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
+            swapper: address(0) // Setting the swapp affects the swap fee %, which is not used in this function.
+        });
 
-        // The reserve which sends tokens out in this swap must be rounded up
-        // to avoid the scenario that the remainder in a truncated output amount
-        // is not stolen in the swap.
-        if (sellAsset) {
-            // Swap X -> Y, Y is output, so round up Y.
-            reserveXPerLiquidity =
-                reserveXPerLiquidity.divWadDown(pool.liquidity);
-            reserveYPerLiquidity = reserveYPerLiquidity.divWadUp(pool.liquidity);
-        } else {
-            // Swap Y -> X, X is output, so round up X.
-            reserveXPerLiquidity = reserveXPerLiquidity.divWadUp(pool.liquidity);
-            reserveYPerLiquidity =
-                reserveYPerLiquidity.divWadDown(pool.liquidity);
-        }
+        invariant = iteration.prevInvariant;
 
-        invariant = int128(
-            pool.invariantOf({
-                R_x: reserveXPerLiquidity,
-                R_y: reserveYPerLiquidity,
-                timeRemainingSec: updatedTau
-            })
-        );
-
+        // Approximated and rounded down in all cases via rounding down of virtualX.
         price = RMM01Lib.getPriceWithX({
-            R_x: reserveXPerLiquidity,
-            stk: pool.params.maxPrice,
+            R_x: iteration.virtualX.divWadDown(iteration.liquidity),
+            stk: pool.params.strikePrice,
             vol: pool.params.volatility,
-            tau: updatedTau
+            tau: tau
         });
     }
 
@@ -81,6 +63,8 @@ contract RMM01Portfolio is PortfolioVirtual {
     ) internal override returns (bool, int256) {
         (, int256 invariant,) =
             _getLatestInvariantAndVirtualPrice(poolId, sellAsset);
+
+        // Sets the pool's lastTimestamp to the current block timestamp, in storage.
         pools[poolId].syncPoolTimestamp(block.timestamp);
 
         // Buffer for post-maturity swaps would go here.
@@ -89,22 +73,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         if (pools[poolId].lastTau() == 0) return (false, invariant);
 
         return (true, invariant);
-    }
-
-    /// @inheritdoc Objective
-    function checkPosition(
-        uint64 poolId,
-        address owner,
-        int256 delta
-    ) public view override returns (bool) {
-        // Just in time liquidity protection.
-        if (delta < 0) {
-            uint256 distance =
-                positions[owner][poolId].getTimeSinceChanged(block.timestamp);
-            return (pools[poolId].params.jit <= distance);
-        }
-
-        return true;
     }
 
     /// @inheritdoc Objective
@@ -143,7 +111,7 @@ contract RMM01Portfolio is PortfolioVirtual {
             maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio
                 // between assets and liqudiity.
         } else {
-            maxInput = (pools[poolId].params.maxPrice - reserveIn).mulWadDown(
+            maxInput = (pools[poolId].params.strikePrice - reserveIn).mulWadDown(
                 liquidity
             ); // There can be maximum
                 // strike:1 liquidity ratio between quote and liquidity.
@@ -169,19 +137,21 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
+        int256 liquidityDelta,
         address swapper
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
+            liquidityDelta: liquidityDelta,
             timestamp: block.timestamp,
             swapper: swapper
         });
     }
 
     /// @inheritdoc Objective
-    function getVirtualPrice(uint64 poolId)
+    function getSpotPrice(uint64 poolId)
         public
         view
         override

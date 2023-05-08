@@ -2,12 +2,13 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
-import "contracts/PortfolioLib.sol";
+import "contracts/libraries/PortfolioLib.sol";
 
 contract TestGas is Setup {
     using SafeCastLib for uint256;
     using AssemblyLib for uint256;
     using FixedPointMathLib for uint128;
+    using FixedPointMathLib for uint256;
 
     // helpers
     modifier usePools(uint256 amount) {
@@ -55,7 +56,6 @@ contract TestGas is Setup {
     function test_gas_single_deallocate()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(10 ether)
@@ -82,8 +82,9 @@ contract TestGas is Setup {
         bool sellAsset = true;
         uint128 amountIn = uint128(0.01 ether);
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, actor())
-                * 95 / 100
+            _subject.getAmountOut(
+                ghost().poolId, sellAsset, amountIn, 0, actor()
+            ) * 95 / 100
         );
         bytes[] memory data = new bytes[](1);
 
@@ -129,7 +130,6 @@ contract TestGas is Setup {
                 hundred,
                 1e4,
                 hundred,
-                0,
                 10 ether,
                 10 ether
             )
@@ -142,7 +142,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
 
             instructions[i] = abi.encodeCall(
                 IPortfolioActions.allocate,
@@ -223,7 +223,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_2_pool_2_pair()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
@@ -250,7 +249,6 @@ contract TestGas is Setup {
                 hundred,
                 1e4,
                 hundred,
-                0,
                 10 ether,
                 10 ether
             )
@@ -262,7 +260,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
 
             bytes[] memory go = new bytes[](1);
             go[0] = abi.encodeCall(
@@ -289,7 +287,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_2()
         public
         pauseGas
-        noJit
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
@@ -302,7 +299,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_5()
         public
         pauseGas
-        noJit
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
@@ -315,7 +311,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_10()
         public
         pauseGas
-        noJit
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
@@ -328,7 +323,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_25()
         public
         pauseGas
-        noJit
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
@@ -341,7 +335,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_50()
         public
         pauseGas
-        noJit
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
@@ -354,7 +347,6 @@ contract TestGas is Setup {
     function test_gas_multi_deallocate_100()
         public
         pauseGas
-        noJit
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
@@ -367,7 +359,6 @@ contract TestGas is Setup {
     function test_gas_multi_create_pool_100()
         public
         pauseGas
-        noJit
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
@@ -403,7 +394,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = FVM.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
             subject().allocate(
                 false, poolId, 5 ether, type(uint128).max, type(uint128).max
             );
@@ -537,7 +528,6 @@ contract TestGas is Setup {
                         uint16(100 + 100 / i),
                         uint16(1000 + 1000 / i),
                         uint16(1 + 100 / i),
-                        0,
                         uint128(1 ether * i),
                         uint128(1 ether * i)
                     )
@@ -546,8 +536,9 @@ contract TestGas is Setup {
         }
 
         // Super important
-        uint64 poolId =
-            FVM.encodePoolId(uint24(1), controller != address(0), uint32(1));
+        uint64 poolId = AssemblyLib.encodePoolId(
+            uint24(1), controller != address(0), uint32(1)
+        );
         // By setting this poolId all the modifiers that rely on the tokens asset and quote
         // can use this set poolId's pair. Since we created all the pools with the same pair,
         // all the test modifiers work, even though we don't use a config modifier in the beginning of them.
@@ -565,9 +556,6 @@ contract TestGas is Setup {
 
         // Fund all the tokens we have, because it only makes sense to use internal balances
         // for multiple instructions.
-        PortfolioPool memory pool =
-            IPortfolioStruct(address(_subject)).pools(ghost().poolId);
-        (address a, address q) = (pool.pair.tokenAsset, pool.pair.tokenQuote);
 
         bytes[] memory instructions = new bytes[](amount);
         for (uint256 i; i != amount; ++i) {
@@ -617,26 +605,31 @@ contract TestGas is Setup {
         // for multiple instructions.
         PortfolioPool memory pool =
             IPortfolioStruct(address(_subject)).pools(ghost().poolId);
-        (address a, address q) = (pool.pair.tokenAsset, pool.pair.tokenQuote);
 
         bytes[] memory instructions = new bytes[](amount);
         for (uint256 i; i != amount; ++i) {
             uint64 poolId = uint64(ghost().poolId + i); // We can do this because we create pools from one nonce.
 
             bool sellAsset = i % 2 == 0;
+            uint256 reserveIn = sellAsset ? pool.virtualX : pool.virtualY;
             uint128 amountIn = RMM01Portfolio(payable(address(_subject)))
                 .computeMaxInput({
                 poolId: poolId,
                 sellAsset: sellAsset,
-                reserveIn: IPortfolioStruct(address(_subject)).pools(poolId)
-                    .virtualX,
-                liquidity: IPortfolioStruct(address(_subject)).pools(poolId)
-                    .liquidity
+                reserveIn: reserveIn.divWadDown(pool.liquidity),
+                liquidity: pool.liquidity
             }).safeCastTo128() / 10;
+
+            // This estimated amount is accurate, however, each getAmountOut computation uses the current invariant.
+            // Since all the computed output amounts use the current invariant, once these are executed there will be small
+            // discrepencies in the invariant which will throw the InvalidInvariant error.
+            // To properly get all the amounts out, the getAmountOut needs to take into account the invariant change as well.
             uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(poolId, sellAsset, amountIn, actor()) * 95
-                    / 100
+                _subject.getAmountOut(poolId, sellAsset, amountIn, 0, actor())
             );
+
+            // For now, we use a slightly underestimated amount out so that we can test the multi swaps.
+            estimatedAmountOut = estimatedAmountOut * 99_999 / 100_000;
 
             Order memory order = Order({
                 useMax: false,
@@ -655,6 +648,7 @@ contract TestGas is Setup {
 
     function _createInstruction(uint24 pairId)
         internal
+        pure
         returns (bytes memory)
     {
         return abi.encodeCall(
@@ -666,7 +660,6 @@ contract TestGas is Setup {
                 uint16(100),
                 uint16(1000),
                 uint16(100),
-                uint16(4),
                 uint128(1 ether),
                 uint128(1 ether)
             )
@@ -675,6 +668,7 @@ contract TestGas is Setup {
 
     function _allocateInstruction(uint64 poolId)
         internal
+        pure
         returns (bytes memory)
     {
         return abi.encodeCall(
@@ -686,10 +680,10 @@ contract TestGas is Setup {
     function _swapInstruction(
         bool direction,
         uint64 poolId
-    ) internal returns (bytes memory) {
+    ) internal view returns (bytes memory) {
         uint128 amountIn = uint128(0.05 ether);
         uint128 amountOut = subject().getAmountOut(
-            poolId, direction, amountIn, actor()
+            poolId, direction, amountIn, 0, actor()
         ).safeCastTo128();
 
         Order memory order = Order({
@@ -705,6 +699,7 @@ contract TestGas is Setup {
 
     function _deallocateInstruction(uint64 poolId)
         internal
+        pure
         returns (bytes memory)
     {
         return abi.encodeCall(
@@ -734,8 +729,9 @@ contract TestGas is Setup {
         }
 
         uint24 pairId = 1;
-        uint64 poolId =
-            FVM.encodePoolId(pairId, false, subject().getPoolNonce(pairId) + 1);
+        uint64 poolId = AssemblyLib.encodePoolId(
+            pairId, false, subject().getPoolNonce(pairId) + 1
+        );
 
         bytes[] memory instructions = new bytes[](2);
         instructions[0] = _createInstruction(pairId);
@@ -780,7 +776,6 @@ contract TestGas is Setup {
     function test_gas_chain_swap_deallocate_create_allocate_from_portfolio()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(100 ether)
@@ -854,8 +849,9 @@ contract TestGas is Setup {
         }
 
         uint24 pairId = 1;
-        uint64 poolId =
-            FVM.encodePoolId(pairId, false, subject().getPoolNonce(pairId) + 1);
+        uint64 poolId = AssemblyLib.encodePoolId(
+            pairId, false, subject().getPoolNonce(pairId) + 1
+        );
 
         bytes[] memory instructions = new bytes[](2);
         instructions[0] = _createInstruction(pairId);
@@ -871,7 +867,6 @@ contract TestGas is Setup {
     function test_gas_chain_allocate_deallocate_from_portfolio_balance()
         public
         pauseGas
-        noJit
         usePools(1)
         useActor
         usePairTokens(10 ether)

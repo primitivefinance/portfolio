@@ -3,7 +3,7 @@ pragma solidity ^0.8.4;
 
 import "solmate/utils/SafeCastLib.sol";
 import "contracts/interfaces/IPortfolio.sol";
-import "contracts/libraries/FVMLib.sol" as FVMLib;
+import "contracts/libraries/AssemblyLib.sol";
 
 using Configs for ConfigState global;
 
@@ -15,7 +15,6 @@ struct ConfigState {
     uint16 priorityFeeBps;
     uint16 durationDays;
     uint16 volatilityBps;
-    uint16 justInTimeSec;
     uint128 terminalPriceWad;
     uint128 reportedPriceWad;
 }
@@ -24,7 +23,6 @@ uint16 constant DEFAULT_PRIORITY_FEE = 10;
 uint16 constant DEFAULT_FEE = 100; // 100 bps = 1%
 uint16 constant DEFAULT_VOLATILITY = 10_000;
 uint16 constant DEFAULT_DURATION = 365;
-uint16 constant DEFAULT_JIT = 4;
 uint128 constant DEFAULT_STRIKE = 10 ether;
 uint128 constant DEFAULT_PRICE = 10 ether;
 uint128 constant DEFAULT_LIQUIDITY = 1 ether;
@@ -59,7 +57,7 @@ library Configs {
      * // note: Must edit the `asset` and `quote`, or `generate` will revert.
      * ```
      */
-    function fresh() internal returns (ConfigState memory) {
+    function fresh() internal pure returns (ConfigState memory) {
         ConfigState memory config = ConfigState({
             asset: address(0),
             quote: address(0),
@@ -68,7 +66,6 @@ library Configs {
             priorityFeeBps: DEFAULT_PRIORITY_FEE,
             durationDays: DEFAULT_DURATION,
             volatilityBps: DEFAULT_VOLATILITY,
-            justInTimeSec: DEFAULT_JIT,
             terminalPriceWad: DEFAULT_STRIKE,
             reportedPriceWad: DEFAULT_PRICE
         });
@@ -103,8 +100,6 @@ library Configs {
             self.priorityFeeBps = abi.decode(data, (uint16));
         } else if (what == "fee") {
             self.feeBps = abi.decode(data, (uint16));
-        } else if (what == "jit") {
-            self.justInTimeSec = abi.decode(data, (uint16));
         }
         return self;
     }
@@ -143,7 +138,6 @@ library Configs {
                     self.feeBps,
                     self.volatilityBps,
                     self.durationDays,
-                    self.justInTimeSec,
                     self.terminalPriceWad,
                     self.reportedPriceWad
                 )
@@ -153,7 +147,7 @@ library Configs {
 
             bool controlled = self.controller != address(0);
             uint24 pairNonce = IPortfolioGetters(Portfolio).getPairNonce();
-            poolId = FVMLib.encodePoolId(
+            poolId = AssemblyLib.encodePoolId(
                 pairNonce,
                 controlled,
                 IPortfolioGetters(Portfolio).getPoolNonce(pairNonce)
@@ -171,7 +165,6 @@ library Configs {
                     self.feeBps,
                     self.durationDays,
                     self.volatilityBps,
-                    self.justInTimeSec,
                     self.terminalPriceWad,
                     self.reportedPriceWad
                 )
@@ -179,7 +172,7 @@ library Configs {
 
             IPortfolio(Portfolio).multicall(data);
             bool controlled = self.controller != address(0);
-            poolId = FVMLib.encodePoolId(
+            poolId = AssemblyLib.encodePoolId(
                 pairId,
                 controlled,
                 IPortfolioGetters(Portfolio).getPoolNonce(pairId)

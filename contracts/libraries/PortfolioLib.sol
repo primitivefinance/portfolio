@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.13;
+pragma solidity 0.8.19;
 
 import "solmate/utils/SafeCastLib.sol";
 import "solmate/utils/FixedPointMathLib.sol";
-import "./libraries/AssemblyLib.sol";
-import "./libraries/FVMLib.sol" as FVM;
-import "./libraries/AccountLib.sol" as Account;
+import "./AssemblyLib.sol";
+import "./AccountLib.sol" as Account;
 
 using AssemblyLib for uint256;
 using FixedPointMathLib for uint256;
@@ -13,13 +12,7 @@ using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
 using SafeCastLib for uint256;
 
-using {
-    checkParameters, maturity, validateParameters
-} for PortfolioCurve global;
-using {
-    changePositionLiquidity,
-    getTimeSinceChanged
-} for PortfolioPosition global;
+using { maturity } for PortfolioCurve global;
 using {
     changePoolLiquidity,
     changePoolParameters,
@@ -35,40 +28,34 @@ using {
     computeTau
 } for PortfolioPool global;
 
-uint256 constant BURNED_LIQUIDITY = 1e9;
-uint256 constant INIT_LIQUIDITY = 1e18;
+uint256 constant BURNED_LIQUIDITY = 1e9; // Quantity of liquidity burned on the first allocate call.
+uint256 constant INIT_LIQUIDITY = 1e18; // Ghost quantity of liquidity on pool creation, used to calculate the first price.
 uint256 constant PERCENTAGE = 10_000;
-uint256 constant MIN_MAX_PRICE = 1;
-uint256 constant MAX_MAX_PRICE = type(uint128).max;
+uint256 constant MIN_STRIKE_PRICE = 1;
+uint256 constant MAX_STRIKE_PRICE = type(uint128).max;
 uint256 constant MIN_FEE = 1; // 0.01%
 uint256 constant MAX_FEE = 1000; // 10%
 uint256 constant MIN_VOLATILITY = 1; // 0.01%
 uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = 1; // days, but without units
 uint256 constant MAX_DURATION = 500; // days, but without units
-uint256 constant JUST_IN_TIME_MAX = 600 seconds;
-uint256 constant JUST_IN_TIME_LIQUIDITY_POLICY = 4 seconds;
+uint256 constant PERPETUAL_DURATION = type(uint16).max;
 
-error DrawBalance();
 error InsufficientLiquidity();
 error InvalidDecimals(uint8 decimals);
 error InvalidDuration(uint16);
 error InvalidFee(uint16 fee);
 error InvalidPriorityFee(uint16 priorityFee);
-error InvalidInstruction();
 error InvalidInvariant(int256 prev, int256 next);
-error InvalidJit(uint16);
-error InvalidPair();
+error InvalidPairNonce();
 error InvalidReentrancy();
+error InvalidMulticall();
 error InvalidSettlement();
 error InvalidStrike(uint128 strike);
-error InvalidTransfer();
 error InvalidVolatility(uint16 sigma);
-error JitLiquidity(uint256 distance);
 error NegativeBalance(address token, int256 net);
 error NotController();
 error NonExistentPool(uint64 poolId);
-error NonExistentPosition(address owner, uint64 poolId);
 error NotExpiringPool();
 error PairExists(uint24 pairId);
 error PoolExpired();
@@ -79,7 +66,6 @@ error ZeroInput();
 error ZeroLiquidity();
 error ZeroOutput();
 error ZeroPrice();
-error ZeroValue();
 error InvalidNegativeLiquidity();
 error MaxDeltaReached();
 error MinDeltaUnmatched();
@@ -93,14 +79,12 @@ struct PortfolioPair {
 
 struct PortfolioCurve {
     // single slot
-    uint128 maxPrice; // Can be used as a terminal price (max price that can be reached by maturity).
-    uint16 jit; // Set to a default value in seconds for non-controlled pools.
+    uint128 strikePrice; // Terminal price of a pool once a pool's duration as eclipsed.
     uint16 fee; // Can be manipulated by a controller of a pool, if there is one.
-    uint16 duration; // Set to max duration for perpetual pools.
+    uint16 duration; // Set to `type(uint16).max` for perpetual pools, otherwise days until pool cannot have swaps.
     uint16 volatility; // Effects the pool like an amplification factor, increasing price impact of swaps.
     uint16 priorityFee; // Only set for controlled pools, and can be changed by controller.
     uint32 createdAt; // Set to the `block.timestamp` on pool creation.
-    bool perpetual; // Set to `true` if the `duration` variable in pool creation is the magic variable type(uint16).max.
 }
 
 struct PortfolioPool {
@@ -108,32 +92,27 @@ struct PortfolioPool {
     uint128 virtualY; // Total Y reserves in WAD units for all liquidity.
     uint128 liquidity; // Total supply of liquidity.
     uint32 lastTimestamp; // The block.timestamp of the last swap.
-    address controller; // Address that can change fee, priorityFee, or jit params.
+    address controller; // Address that can change fee, priorityFee params.
     PortfolioCurve params; // Parameters of the objective's trading function.
     PortfolioPair pair; // Token pair data.
 }
 
-struct PortfolioPosition {
-    uint128 freeLiquidity; // Liquidity owned by the position owner in WAD units.
-    uint32 lastTimestamp; // The block.timestamp of the last position update.
-}
-
 struct ChangeLiquidityParams {
-    address owner;
-    uint64 poolId;
     uint256 timestamp;
     uint256 deltaAsset; // Quantity of asset tokens in WAD units to add or remove.
     uint256 deltaQuote; // Quantity of quote tokens in WAD units to add or remove.
+    int128 deltaLiquidity; // Quantity of liquidity tokens in WAD units to add or remove.
+    uint64 poolId; // If allocating, setting the poolId to 0 will be a magic variable to use the `_getLastPoolId` as the poolId.
+    address owner; // Address with position liquidity to change.
     address tokenAsset; // Address of the asset token.
     address tokenQuote; // Address of the quote token.
-    int128 deltaLiquidity; // Quantity of liquidity tokens in WAD units to add or remove.
 }
 
 struct Order {
-    bool useMax; // Use the transiently stored `balance` for the `input`.
-    uint64 poolId;
     uint128 input; // Quantity of asset tokens in WAD units to swap in, adding to reserves.
     uint128 output; // Quantity of quote tokens in WAD units to swap out, removing from reserves.
+    bool useMax; // Use the transiently stored `balance` for the `input`.
+    uint64 poolId;
     bool sellAsset; // 0 = quote -> asset, 1 = asset -> quote.
 }
 
@@ -151,17 +130,17 @@ struct Iteration {
 }
 
 struct SwapState {
-    bool sell;
+    uint8 decimalsInput;
     address tokenInput;
-    uint16 fee;
+    uint8 decimalsOutput;
     address tokenOutput;
 }
 
 struct Payment {
-    address token;
     uint256 amountTransferTo; // Amount to transfer to the `msg.sender` in `settlement`, in WAD.
     uint256 amountTransferFrom; // Amount to transfer from the `msg.sender` in `settlement`, in WAD.
     uint256 balance; // Current `token.balanceOf(address(this))` in `settlement`, in native token decimals.
+    address token;
 }
 
 // ===== Effects ===== //
@@ -181,19 +160,35 @@ function changePoolParameters(
     PortfolioPool storage self,
     PortfolioCurve memory updated
 ) {
-    // Reverts on invalid parameters.
-    updated.validateParameters();
-    self.params = updated;
-}
+    if (
+        !AssemblyLib.isBetween(
+            updated.volatility, MIN_VOLATILITY, MAX_VOLATILITY
+        )
+    ) {
+        revert InvalidVolatility(updated.volatility);
+    }
+    if (
+        updated.duration != PERPETUAL_DURATION
+            && !AssemblyLib.isBetween(updated.duration, MIN_DURATION, MAX_DURATION)
+    ) {
+        revert InvalidDuration(updated.duration);
+    }
+    if (
+        !AssemblyLib.isBetween(
+            updated.strikePrice, MIN_STRIKE_PRICE, MAX_STRIKE_PRICE
+        )
+    ) {
+        revert InvalidStrike(updated.strikePrice);
+    }
+    if (!AssemblyLib.isBetween(updated.fee, MIN_FEE, MAX_FEE)) {
+        revert InvalidFee(updated.fee);
+    }
+    // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
+    if (!AssemblyLib.isBetween(updated.priorityFee, 0, updated.fee)) {
+        revert InvalidPriorityFee(updated.priorityFee);
+    }
 
-function changePositionLiquidity(
-    PortfolioPosition storage self,
-    uint256 timestamp,
-    int128 liquidityDelta
-) {
-    self.lastTimestamp = uint32(timestamp);
-    self.freeLiquidity =
-        AssemblyLib.addSignedDelta(self.freeLiquidity, liquidityDelta);
+    self.params = updated;
 }
 
 // ===== View ===== //
@@ -225,7 +220,7 @@ function getPoolMaxLiquidity(
     uint256 deltaQuote
 ) pure returns (uint128 deltaLiquidity) {
     uint256 totalLiquidity = self.liquidity;
-    if (totalLiquidity == 0) totalLiquidity = INIT_LIQUIDITY; // use 1E18 of liquidity
+    if (totalLiquidity == 0) totalLiquidity = INIT_LIQUIDITY; // Use 1E18 of ghost liquidity to do math for amounts.
 
     (uint256 amountAssetWad, uint256 amountQuoteWad) =
         self.getVirtualReservesWad();
@@ -305,13 +300,6 @@ function getVirtualReservesWad(PortfolioPool memory self)
 
 // ===== Derived ===== //
 
-function getTimeSinceChanged(
-    PortfolioPosition memory self,
-    uint256 timestamp
-) pure returns (uint256 distance) {
-    return timestamp - self.lastTimestamp;
-}
-
 function exists(PortfolioPool memory self) pure returns (bool) {
     return self.lastTimestamp != 0;
 }
@@ -328,7 +316,7 @@ function computeTau(
     PortfolioPool memory self,
     uint256 timestamp
 ) pure returns (uint256) {
-    if (self.params.perpetual) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
+    if (self.params.duration == PERPETUAL_DURATION) return SECONDS_PER_YEAR; // Default to 1 year for perpetual pools.
 
     uint256 end = self.params.maturity();
     unchecked {
@@ -345,7 +333,7 @@ function maturity(PortfolioCurve memory self)
     pure
     returns (uint32 endTimestamp)
 {
-    if (self.perpetual) revert NotExpiringPool();
+    if (self.duration == PERPETUAL_DURATION) revert NotExpiringPool();
 
     unchecked {
         // Portfolio duration is limited such that this addition will never overflow 256 bits.
@@ -353,57 +341,4 @@ function maturity(PortfolioCurve memory self)
             AssemblyLib.convertDaysToSeconds(self.duration) + self.createdAt
         ).safeCastTo32();
     }
-}
-
-function validateParameters(PortfolioCurve memory self) pure {
-    (bool success, bytes memory reason) = self.checkParameters();
-    if (!success) {
-        assembly {
-            revert(add(32, reason), mload(reason))
-        }
-    }
-}
-
-/**
- * @dev Invalid parameters should revert. Bound checks are inclusive.
- */
-function checkParameters(PortfolioCurve memory self)
-    pure
-    returns (bool, bytes memory)
-{
-    if (self.jit > JUST_IN_TIME_MAX) {
-        return (false, abi.encodeWithSelector(InvalidJit.selector, self.jit));
-    }
-    if (!AssemblyLib.isBetween(self.volatility, MIN_VOLATILITY, MAX_VOLATILITY))
-    {
-        return (
-            false,
-            abi.encodeWithSelector(InvalidVolatility.selector, self.volatility)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.duration, MIN_DURATION, MAX_DURATION)) {
-        return (
-            false,
-            abi.encodeWithSelector(InvalidDuration.selector, self.duration)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.maxPrice, MIN_MAX_PRICE, MAX_MAX_PRICE)) {
-        return (
-            false, abi.encodeWithSelector(InvalidStrike.selector, self.maxPrice)
-        );
-    }
-    if (!AssemblyLib.isBetween(self.fee, MIN_FEE, MAX_FEE)) {
-        return (false, abi.encodeWithSelector(InvalidFee.selector, self.fee));
-    }
-    // 0 priority fee == no controller, impossible to set to zero unless default from non controlled pools.
-    if (!AssemblyLib.isBetween(self.priorityFee, 0, self.fee)) {
-        return (
-            false,
-            abi.encodeWithSelector(
-                InvalidPriorityFee.selector, self.priorityFee
-                )
-        );
-    }
-
-    return (true, "");
 }
