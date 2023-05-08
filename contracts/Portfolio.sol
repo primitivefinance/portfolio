@@ -64,14 +64,6 @@ abstract contract PortfolioVirtual is Objective {
      */
     Payment[] private _payments;
 
-    /**
-     * @dev
-     * Manipulated in `_swap` to avoid stack too deep and contract size limit.
-     *
-     * @custom:invariant MUST be deleted after every transaction that uses it.
-     */
-    SwapState private _state;
-
     bool private _currentMulticall;
 
     /**
@@ -416,212 +408,169 @@ abstract contract PortfolioVirtual is Objective {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
+        PortfolioPool storage pool = pools[args.poolId];
+
+        // Scale amounts from native token decimals to WAD.
+        // Load input and output token information with respective pair tokens.
+        SwapState memory info;
         if (args.sellAsset) {
             (args.input, args.output) = _scaleAmountsToWad({
                 poolId: args.poolId,
                 amountAssetDec: args.input,
                 amountQuoteDec: args.output
             });
+
+            info.decimalsInput = pool.pair.decimalsAsset;
+            info.decimalsOutput = pool.pair.decimalsQuote;
+            info.tokenInput = pool.pair.tokenAsset;
+            info.tokenOutput = pool.pair.tokenQuote;
         } else {
             (args.output, args.input) = _scaleAmountsToWad({
                 poolId: args.poolId,
                 amountAssetDec: args.output,
                 amountQuoteDec: args.input
             });
+
+            info.decimalsInput = pool.pair.decimalsQuote;
+            info.decimalsOutput = pool.pair.decimalsAsset;
+            info.tokenInput = pool.pair.tokenQuote;
+            info.tokenOutput = pool.pair.tokenAsset;
         }
 
-        PortfolioPool storage pool = pools[args.poolId];
+        // --- Checks --- //
         if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
-        // -=- Load Fee & Token Info -=- //
-        _state.sell = args.sellAsset == true;
-        _state.fee = msg.sender == pool.controller
-            ? pool.params.priorityFee
-            : pool.params.fee;
+        (bool success, int256 invariant) =
+            _beforeSwapEffects(args.poolId, args.sellAsset);
+        if (!success) revert PoolExpired();
 
-        if (_state.sell) {
-            _state.tokenInput = pool.pair.tokenAsset;
-            _state.tokenOutput = pool.pair.tokenQuote;
-        } else {
-            _state.tokenInput = pool.pair.tokenQuote;
-            _state.tokenOutput = pool.pair.tokenAsset;
-        }
-
-        // -=- Load Swap Info -=- //
         Iteration memory iteration;
-        {
-            (bool success, int256 invariant) =
-                _beforeSwapEffects(args.poolId, _state.sell);
-            if (!success) revert PoolExpired();
+        iteration.input = args.input;
+        iteration.output = args.output;
+        iteration.prevInvariant = invariant;
+        iteration.liquidity = pool.liquidity;
+        (iteration.virtualX, iteration.virtualY) = pool.getVirtualReservesWad();
 
-            if (args.useMax == true) {
-                // Net balance is the surplus of tokens in the accounting state that can be spent.
-                int256 netBalance = getNetBalance(
-                    _state.sell ? pool.pair.tokenAsset : pool.pair.tokenQuote
-                );
-                if (netBalance < 0) netBalance = 0;
-                input = uint256(netBalance);
-            } else {
-                input = args.input;
-            }
-
-            output = args.output;
-            iteration.prevInvariant = invariant;
-            iteration.input = input;
-            iteration.liquidity = pool.liquidity;
-            iteration.output = output;
-            (iteration.virtualX, iteration.virtualY) =
-                pool.getVirtualReservesWad();
+        if (args.useMax) {
+            // Net balance is the surplus of tokens in the accounting state that can be spent.
+            int256 netBalance = getNetBalance(info.tokenInput);
+            if (netBalance > 0) iteration.input = uint256(netBalance);
         }
 
         if (iteration.output == 0) revert ZeroOutput();
         if (iteration.input == 0) revert ZeroInput();
         if (iteration.liquidity == 0) revert ZeroLiquidity();
 
-        uint256 liveIndependentWad; // total reserve of input token in WAD
-        uint256 nextIndependentWad;
-        uint256 nextIndependentWadLessFee;
-        uint256 liveDependentWad; // total reserve of output token in WAD
-        uint256 nextDependentWad;
+        // --- Effects --- //
 
-        //  -=- Compute New Reserves -=- //
+        // In the case of a non-zero protocol fee, a small portion of the input amount (protocol fee) is not re-invested to the pool.
+        // Therefore, this input amount will properly sync the pool's reserves by subtracting the protocol fee amount from this value.
+        uint256 deltaIndependentReserveWad = iteration.input;
+
         {
-            uint256 deltaInput;
-            uint256 deltaInputLessFee;
-            uint256 deltaOutput = iteration.output;
+            // Use the priority fee if the pool controller is the caller.
+            uint256 feePercentage = pool.controller == msg.sender
+                ? pool.params.priorityFee
+                : pool.params.fee;
 
-            // Virtual reserves
-            if (_state.sell) {
-                (liveIndependentWad, liveDependentWad) =
-                    (iteration.virtualX, iteration.virtualY);
-            } else {
-                (liveDependentWad, liveIndependentWad) =
-                    (iteration.virtualX, iteration.virtualY);
-            }
-
-            deltaInput = iteration.input;
-
-            iteration.feeAmount = (deltaInput * _state.fee) / PERCENTAGE;
-            if (iteration.feeAmount == 0) iteration.feeAmount = 1;
+            // Compute the respective fee and protocol fee amounts.
+            iteration.feeAmount =
+                (deltaIndependentReserveWad * feePercentage) / PERCENTAGE;
+            if (iteration.feeAmount == 0) iteration.feeAmount = 1; // Fee should never be zero.
 
             if (_protocolFee != 0) {
-                uint256 protocolFeeAmountWad =
-                    iteration.feeAmount / _protocolFee;
-
-                // Reduce both the input amount and fee amount by the protocol fee.
-                // The protocol fee is not applied to the reserve, so it is not included in deltaInput.
-                // The feeAmount pays for the protocolFeeAmount, so it is not included in feeAmount.
-                deltaInput -= protocolFeeAmountWad;
-                iteration.feeAmount -= protocolFeeAmountWad;
-                iteration.protocolFeeAmount = protocolFeeAmountWad;
+                // Protocol fee is a proportion of the fee amount.
+                iteration.protocolFeeAmount = iteration.feeAmount / _protocolFee;
+                // Reduce the increase in the independent reserve, so that protocol fee is not re-invested into pool.
+                deltaIndependentReserveWad -= iteration.protocolFeeAmount;
+                // Take the protocol fee from the fee amount.
+                iteration.feeAmount -= iteration.protocolFeeAmount;
             }
 
-            deltaInputLessFee = deltaInput - iteration.feeAmount;
-            nextIndependentWad = liveIndependentWad + deltaInput;
+            (uint256 adjustedVirtualX, uint256 adjustedVirtualY) =
+                (iteration.virtualX, iteration.virtualY);
 
-            // This is a very critical piece of code!
-            // nextIndependentWadLessFee:
-            // This value should be used in `syncPool`.
-            // The next independent amount is computed with the fee amount applied.
-            // This means the lesser next independent reserve and dependent reserve
-            // will pass the invariant.
-            //
-            // nextIndependent:
-            // The fee amount has to be added to the reserve to re-invest it in the pool.
-            // So the next reserve should include the fee amount, since it was added to the reserves.
-            // This will mean the independent reserve has more tokens than expected,
-            // leading to a larger invariant.
-            nextIndependentWadLessFee = liveIndependentWad + deltaInputLessFee;
-            nextDependentWad = liveDependentWad - deltaOutput;
-        }
+            // 1. Compute the new independent reserve without the fee amount included,
+            //      so that the invariant check passes even without the additional fees.
+            // 2. Compute the new dependent reserve by subtracting the full output swap amount.
+            // 3. Adjust the reserves to be the pool reserves per 1E18 liquidity.
+            //      Independent reserve is rounded down and dependent reserve is rounded up.
+            //      This ensures the invariant check is done using reserves that are rounded to the benefit of Portfolio.
+            if (args.sellAsset) {
+                adjustedVirtualX +=
+                    (deltaIndependentReserveWad - iteration.feeAmount);
+                adjustedVirtualX =
+                    adjustedVirtualX.divWadDown(iteration.liquidity);
 
-        // -=- Assert Invariant Passes -=- //
-        {
-            bool validInvariant;
-            int256 nextInvariantWad;
-            uint256 reserveXPerLiquidity;
-            uint256 reserveYPerLiquidity;
-
-            if (_state.sell) {
-                (iteration.virtualX, iteration.virtualY) =
-                    (nextIndependentWadLessFee, nextDependentWad);
-                reserveXPerLiquidity =
-                    iteration.virtualX.divWadDown(iteration.liquidity);
-                reserveYPerLiquidity =
-                    iteration.virtualY.divWadUp(iteration.liquidity);
+                adjustedVirtualY -= iteration.output;
+                adjustedVirtualY =
+                    adjustedVirtualY.divWadUp(iteration.liquidity);
             } else {
-                (iteration.virtualX, iteration.virtualY) =
-                    (nextDependentWad, nextIndependentWadLessFee);
-                reserveXPerLiquidity =
-                    iteration.virtualX.divWadUp(iteration.liquidity);
-                reserveYPerLiquidity =
-                    iteration.virtualY.divWadDown(iteration.liquidity);
+                adjustedVirtualX -= iteration.output;
+                adjustedVirtualX =
+                    adjustedVirtualX.divWadUp(iteration.liquidity);
+
+                adjustedVirtualY +=
+                    (deltaIndependentReserveWad - iteration.feeAmount);
+                adjustedVirtualY =
+                    adjustedVirtualY.divWadDown(iteration.liquidity);
             }
 
-            (validInvariant, nextInvariantWad) = checkInvariant(
+            // --- Invariant Check --- //
+
+            bool validInvariant;
+            (validInvariant, iteration.nextInvariant) = checkInvariant(
                 args.poolId,
                 iteration.prevInvariant,
-                reserveXPerLiquidity, // Expects X per liquidity.
-                reserveYPerLiquidity, // Expects Y per liquidity.
+                adjustedVirtualX,
+                adjustedVirtualY,
                 block.timestamp
             );
 
             if (!validInvariant) {
                 revert InvalidInvariant(
-                    iteration.prevInvariant, nextInvariantWad
+                    iteration.prevInvariant, iteration.nextInvariant
                 );
             }
-            iteration.nextInvariant = nextInvariantWad;
         }
 
-        if (_state.sell) {
-            iteration.virtualX = nextIndependentWad;
-        } else {
-            iteration.virtualY = nextIndependentWad;
+        // Increases the independent pool reserve by the input amount, including fee and excluding protocol fee.
+        // Decrease the dependent pool reserve by the output amount.
+        _syncPool(
+            args.poolId,
+            args.sellAsset,
+            deltaIndependentReserveWad,
+            iteration.output
+        );
+
+        _increaseReserves(info.tokenInput, iteration.input); // Increasing global reserves creates a debit that must be paid from `msg.sender`.
+        _decreaseReserves(info.tokenOutput, iteration.output); // Decreasing global reserves creates a surplus that can be used in following instructions.
+
+        // --- Post-conditions --- //
+
+        // Protocol fees are applied to a mapping that can be claimed by Registry controller.
+        // Protocol fees are in WAD units and are downscaled to their original decimals when being claimed.
+        if (iteration.protocolFeeAmount != 0) {
+            protocolFees[info.tokenInput] += iteration.protocolFeeAmount;
         }
 
-        // =---= Effects =---= //
-
-        _syncPool(args.poolId, iteration.virtualX, iteration.virtualY);
-
-        _increaseReserves(_state.tokenInput, iteration.input); // Increasing reserves creates a debit that must be paid from `msg.sender`.
-        _decreaseReserves(_state.tokenOutput, iteration.output); // Decreasing reserves creates a surplus that can be used in following instructions.
-
-        // -=- Scale Amounts to Native Token Decimals -=- //
-        {
-            uint256 inputDec;
-            uint256 outputDec;
-            if (_state.sell) {
-                inputDec = pool.pair.decimalsAsset;
-                outputDec = pool.pair.decimalsQuote;
-            } else {
-                inputDec = pool.pair.decimalsQuote;
-                outputDec = pool.pair.decimalsAsset;
-            }
-
-            // Scaling the input here is important. ALl the math was done using WAD units.
-            // But all the token related amounts must be in their native token decimals.
-            iteration.input = iteration.input.scaleFromWadDown(inputDec);
-            iteration.output = iteration.output.scaleFromWadDown(outputDec);
-            iteration.feeAmount = iteration.feeAmount.scaleFromWadDown(inputDec);
-
-            if (iteration.protocolFeeAmount != 0) {
-                protocolFees[_state.tokenInput] += iteration.protocolFeeAmount;
-            }
-        }
+        // Amounts are scaled back to their original decimals for the swap event and return variables.
+        iteration.input = iteration.input.scaleFromWadDown(info.decimalsInput);
+        iteration.output =
+            iteration.output.scaleFromWadDown(info.decimalsOutput);
+        iteration.feeAmount =
+            iteration.feeAmount.scaleFromWadDown(info.decimalsInput);
 
         emit Swap(
             args.poolId,
             getSpotPrice(args.poolId),
-            _state.tokenInput,
+            info.tokenInput,
             iteration.input,
-            _state.tokenOutput,
+            info.tokenOutput,
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
             );
-
-        delete _state;
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -631,16 +580,24 @@ abstract contract PortfolioVirtual is Objective {
 
     /**
      * @dev Effects on a `pool` after a successful swap.
+     * @param deltaInWad Amount of input tokens in WAD units to increase the independent reserve by.
+     * @param deltaOutWad Amount of output tokens in WAD units to decrease the dependent reserve by.
      */
     function _syncPool(
         uint64 poolId,
-        uint256 nextVirtualX,
-        uint256 nextVirtualY
+        bool sellAsset,
+        uint256 deltaInWad,
+        uint256 deltaOutWad
     ) internal {
         PortfolioPool storage pool = pools[poolId];
 
-        pool.virtualX = nextVirtualX.safeCastTo128();
-        pool.virtualY = nextVirtualY.safeCastTo128();
+        if (sellAsset) {
+            pool.virtualX += deltaInWad.safeCastTo128();
+            pool.virtualY -= deltaOutWad.safeCastTo128();
+        } else {
+            pool.virtualX -= deltaOutWad.safeCastTo128();
+            pool.virtualY += deltaInWad.safeCastTo128();
+        }
 
         // If not updated in the other swap hooks, update the timestamp.
         if (pool.lastTimestamp != block.timestamp) {

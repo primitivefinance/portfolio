@@ -383,9 +383,6 @@ contract TestPortfolioSwap is Setup {
             ghost().poolId, sellAsset, amountIn, 0, actor()
         ).safeCastTo128();
 
-        // todo: fix getAmountOut to be accurate
-        amountOut = amountOut * 80 / 100;
-
         vm.assume(amountOut > 0);
 
         address tokenIn;
