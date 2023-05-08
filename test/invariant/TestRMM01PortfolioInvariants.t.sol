@@ -20,7 +20,7 @@ interface AccountLike {
  * Invariant 2. AccountSystem.settled == true.
  * Invariant 3. AccountSystem.prepared == false.
  * Invariant 4. (balanceOf(asset), balanceOf(quote)) >= Portfolio.getVirtualReserves, for all pools.
- * Invariant 5. ∑ Portfolio.positions(owner, poolId).freeLiquidity == Portfolio.pools(poolId).liquidity, for all
+ * Invariant 5. ∑ Portfolio.positions(owner, poolId).liquidity == Portfolio.pools(poolId).liquidity, for all
  * pools.
  */
 contract TestRMM01PortfolioInvariants is Setup {
@@ -45,7 +45,7 @@ contract TestRMM01PortfolioInvariants is Setup {
             selectors[1] = HandlerPortfolio.allocate.selector;
             selectors[2] = HandlerPortfolio.deallocate.selector;
             targetSelector(
-                FuzzSelector({ addr: address(_portfolio), selectors: selectors })
+                FuzzSelector({addr: address(_portfolio), selectors: selectors})
             );
             targetContract(address(_portfolio));
         }

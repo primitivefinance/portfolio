@@ -25,17 +25,15 @@ interface IPortfolioEvents {
 
     /**
      * @dev Swaps `input` amount of `tokenIn` for `output` amount of `tokenOut` in pool with `poolId`.
-     * @param price Post-swap approximated marginal price in wad units.
      * @param tokenIn Token sold.
      * @param input Quantity of input token sold in native token decimals.
      * @param tokenOut Token bought.
      * @param output Quantity of output token bought in native token decimals.
      * @param feeAmountDec Amount of the sold tokens that are paid as a fee to LPs.
-     * @param invariantWad Post-swap invariant in wad units.
+     * @param invariantWad Post-swap invariant of the new input reserve WITHOUT the fee amount included.
      */
     event Swap(
         uint64 indexed poolId,
-        uint256 price,
         address indexed tokenIn,
         uint256 input,
         address indexed tokenOut,
@@ -172,6 +170,7 @@ interface IPortfolioGetters {
     /// @notice Contract for storing canonical Portfolio deployments.
     function REGISTRY() external view returns (address);
 
+    /// @notice Proportion of swap fee allocated to the Registry controller.
     function protocolFee() external view returns (uint256);
 
     /// @notice Incremented when a new pair of tokens is made and stored in the `pairs` mapping.
@@ -220,12 +219,12 @@ interface IPortfolioGetters {
      * @notice Amount of liquidity owned by `owner` in the pool `poolId`.
      * @param owner Address that owns the liquidity.
      * @param poolId Id of the pool to check.
-     * @return freeLiquidity Amount of liquidity.
+     * @return liquidity Amount of liquidity.
      */
     function positions(
         address owner,
         uint64 poolId
-    ) external view returns (uint128 freeLiquidity);
+    ) external view returns (uint128 liquidity);
 
     // ===== Portfolio View ===== //
 
@@ -264,7 +263,7 @@ interface IPortfolioGetters {
         returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
-     * @dev Amount of tokens in native token decimals.
+     * @dev Amount of tokens in native token decimals that are in the virtually tracked reserves.
      * @return deltaAsset Quantity of `asset` tokens in native decimal units.
      * @return deltaQuote Quantity of `quote` tokens in native decimal units.
      */
@@ -279,6 +278,7 @@ interface IPortfolioGetters {
      * @dev Computes an amount out of tokens given an `amountIn`.
      * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
+     * @param liquidityDelta Pass a non-zero liquidity delta amount if building a multicall with a call that manipulates liquidity before the swap.
      * @param swapper Address that will execute the swap.
      * @return amountOut of tokens in native token decimal units.
      */
@@ -326,6 +326,7 @@ interface IPortfolioActions {
 
     /**
      * @dev Increases virtual reserves and liquidity. Debits `msg.sender`.
+     * @param poolId A `0` poolId is a magic variable to use `_getLastPoolId` for this allocate.
      * @param deltaLiquidity Quantity of liquidity to mint in WAD units.
      * @param maxDeltaAsset Maximum quantity of asset tokens paid in WAD units.
      * @param maxDeltaQuote Maximum quantity of quote tokens paid in WAD units.

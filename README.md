@@ -6,16 +6,17 @@ On-chain portfolio management. Optimized for managing risk and liquidity.
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/primitivefinance/portfolio#contributing) [![](https://dcbadge.vercel.app/api/server/primitive?style=flat)](https://discord.gg/primitive) [![Twitter Badge](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/primitivefi)
 
-## Yellow Paper
 
-A technical summary of Portfolio is detailed in the [Yellow Paper](https://www.primitive.xyz/papers/yellow.pdf).
+# Portfolio Security
+
+[Visit Primitive Security](https://www.primitive.xyz/security) to view a comprehensive overview of the security initiatives of Portfolio.
 
 ## System Invariants
 
 The system is designed around a single invariant:
 
 ```
-Balance >= Reserve
+Actual balance of tokens in contract >= virtually tracked token balance in `__account__.reserves`.
 ```
 
 Exposed via: `Portfolio.getNetBalance(token)`
@@ -63,7 +64,7 @@ forge test --match-contract TestRMM01
 
 ## Resources
 
-- [Portfolio Yellow Paper](https://www.primitive.xyz/papers/yellow.pdf)
+- [Portfolio Yellow Paper (Deprecated)](https://www.primitive.xyz/papers/yellow.pdf)
 - [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
 - [Original codebase](https://github.com/primitivefinance/rmm-core)
 - [solstat](https://github.com/primitivefinance/solstat)
@@ -73,11 +74,12 @@ forge test --match-contract TestRMM01
 
 ## Audits
 
-| Security Firm | Review Time | Status    |
-| ------------- | ----------- | --------- |
-| ChainSecurity | 8-weeks     | Completed |
-| Trail of Bits | 8-weeks     | Completed |
-| Spearbit      | 5-weeks     | Completed |
+| Security Firm      | Review Time | Status    |
+| ------------------ | ----------- | --------- |
+| ChainSecurity      | 8-weeks     | Completed |
+| Trail of Bits      | 8-weeks     | Completed |
+| Spearbit           | 5-weeks     | Completed |
+| Spearbit Extension | 2-weeks     | Pending   |
 
 
 ## Contributing
