@@ -2,7 +2,6 @@
 pragma solidity 0.8.19;
 
 error InvalidDays();
-error DataTooLong();
 
 uint256 constant SECONDS_PER_YEAR = 31556953 seconds;
 uint256 constant SECONDS_PER_DAY = 86_400 seconds;
