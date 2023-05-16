@@ -191,6 +191,7 @@ library RMM01Lib {
         args.volatilityWad = volatilityWad;
         args.tauSeconds = tau;
         args.reserveWadPerLiquidity = adjustedIndependentReserve;
+        args.prevInvariant = data.prevInvariant;
         // Compute the upper and lower bounds to start the bisection method.
         uint256 lower = adjustedDependentReserve.mulDivDown(98, 100);
         uint256 upper = adjustedDependentReserve.mulDivUp(102, 100);
@@ -223,13 +224,14 @@ library RMM01Lib {
         Bisection memory args,
         uint256 optimized
     ) internal pure returns (int256) {
-        return Invariant.invariant({
-            R_y: args.optimizeQuoteReserve ? optimized : args.reserveWadPerLiquidity,
-            R_x: args.optimizeQuoteReserve ? args.reserveWadPerLiquidity : optimized,
-            stk: args.terminalPriceWad,
-            vol: args.volatilityWad,
-            tau: args.tauSeconds
-        });
+        return args.prevInvariant
+            - Invariant.invariant({
+                R_y: args.optimizeQuoteReserve ? optimized : args.reserveWadPerLiquidity,
+                R_x: args.optimizeQuoteReserve ? args.reserveWadPerLiquidity : optimized,
+                stk: args.terminalPriceWad,
+                vol: args.volatilityWad,
+                tau: args.tauSeconds
+            });
     }
 
     /**
