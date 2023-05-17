@@ -68,5 +68,5 @@ function bisection(
         unchecked {
             iterations++; // Increment the iterator.
         }
-    } while (distance >= epsilon && iterations != maxIterations);
+    } while (distance > epsilon && iterations < maxIterations);
 }
