@@ -163,8 +163,8 @@ library Configs {
                     self.controller,
                     self.priorityFeeBps,
                     self.feeBps,
-                    self.durationDays,
                     self.volatilityBps,
+                    self.durationDays,
                     self.terminalPriceWad,
                     self.reportedPriceWad
                 )
