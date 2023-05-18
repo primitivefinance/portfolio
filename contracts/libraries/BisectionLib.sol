@@ -7,6 +7,7 @@ struct Bisection {
     uint256 volatilityWad;
     uint256 tauSeconds;
     uint256 reserveWadPerLiquidity;
+    int256 prevInvariant;
 }
 
 error NotInsideBounds(uint256 lower, uint256 upper);
