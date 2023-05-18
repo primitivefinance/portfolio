@@ -887,10 +887,9 @@ abstract contract PortfolioVirtual is Objective {
         protocolFees[token] -= amountWad;
         _decreaseReserves(token, amountWad);
 
-        _settlement();
-
         emit ClaimFees(token, amount);
 
+        if (_currentMulticall == false) _settlement();
         _postLock();
     }
 
