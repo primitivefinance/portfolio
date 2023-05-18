@@ -398,6 +398,9 @@ abstract contract PortfolioVirtual is Objective {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
+        // --- Checks --- //
+        if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
+
         PortfolioPool storage pool = pools[args.poolId];
 
         // Scale amounts from native token decimals to WAD.
@@ -426,9 +429,6 @@ abstract contract PortfolioVirtual is Objective {
             info.tokenInput = pool.pair.tokenQuote;
             info.tokenOutput = pool.pair.tokenAsset;
         }
-
-        // --- Checks --- //
-        if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
 
         (bool success, int256 invariant) =
             _beforeSwapEffects(args.poolId, args.sellAsset);
@@ -887,10 +887,9 @@ abstract contract PortfolioVirtual is Objective {
         protocolFees[token] -= amountWad;
         _decreaseReserves(token, amountWad);
 
-        _settlement();
-
         emit ClaimFees(token, amount);
 
+        if (_currentMulticall == false) _settlement();
         _postLock();
     }
 

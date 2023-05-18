@@ -60,6 +60,7 @@ function bisection(
             upper = root; // Set the new upper bound to the root because we know its between the lower and root.
         } else {
             lower = root; // Set the new lower bound to the root because we know its between the upper and root.
+            lowerOutput = output; // root function value becomes new lower output value
         }
 
         // Update the distance with the new bounds.
@@ -68,5 +69,5 @@ function bisection(
         unchecked {
             iterations++; // Increment the iterator.
         }
-    } while (distance >= epsilon && iterations != maxIterations);
+    } while (distance > epsilon && iterations < maxIterations);
 }
