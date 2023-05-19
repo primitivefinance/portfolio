@@ -612,6 +612,37 @@ contract TestPortfolioSwap is Setup {
         );
     }
 
+    function test_swap_deallocate_before_swap_reverts()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(10 ether)
+        isArmed
+    {
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeCall(
+            IPortfolioActions.deallocate, (false, ghost().poolId, 1 ether, 0, 0)
+        );
+
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, true, 0.1 ether, actor());
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: 0.1 ether,
+            output: uint128(amountOut),
+            sellAsset: true
+        });
+
+        data[1] = abi.encodeCall(IPortfolioActions.swap, (order));
+
+        // Reverts with an InvalidInvariant error
+        vm.expectRevert();
+        subject().multicall(data);
+    }
+
     function _swap_check_invariant(
         bool sellAsset,
         uint256 amountIn,
