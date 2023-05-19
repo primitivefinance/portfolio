@@ -24,7 +24,7 @@ contract TestPortfolioSwap is Setup {
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
             subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, 0, address(this)
+                ghost().poolId, sellAsset, amtIn, address(this)
             )
         );
 
@@ -57,7 +57,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
-            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, 0, actor())
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
         );
 
         uint256 prev = ghost().quote().to_token().balanceOf(actor());
@@ -99,7 +99,7 @@ contract TestPortfolioSwap is Setup {
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
             subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, 0, address(this)
+                ghost().poolId, sellAsset, amtIn, address(this)
             )
         );
 
@@ -379,7 +379,7 @@ contract TestPortfolioSwap is Setup {
         }
 
         uint128 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, 0, actor()
+            ghost().poolId, sellAsset, amountIn, actor()
         ).safeCastTo128();
 
         vm.assume(amountOut > 0);
@@ -432,9 +432,8 @@ contract TestPortfolioSwap is Setup {
     {
         bool sellAsset = true;
         uint256 amountIn = 0.01 ether;
-        uint256 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, 0, actor()
-        );
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -449,9 +448,8 @@ contract TestPortfolioSwap is Setup {
     {
         bool sellAsset = false;
         uint256 amountIn = 0.01 ether;
-        uint256 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, 0, actor()
-        );
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -468,9 +466,8 @@ contract TestPortfolioSwap is Setup {
         uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
             ghost().asset().to_token().decimals()
         );
-        uint256 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, 0, actor()
-        );
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -487,9 +484,8 @@ contract TestPortfolioSwap is Setup {
         uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
             ghost().quote().to_token().decimals()
         );
-        uint256 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, 0, actor()
-        );
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }
@@ -608,9 +604,8 @@ contract TestPortfolioSwap is Setup {
         );
         vm.assume(maxIn > amountIn);
 
-        uint256 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, 0, actor()
-        );
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
         _swap_check_invariant(
             sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
