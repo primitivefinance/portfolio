@@ -643,6 +643,30 @@ contract TestPortfolioSwap is Setup {
         subject().multicall(data);
     }
 
+    function test_swap_deallocate_before_swap_works()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(10 ether)
+        isArmed
+    {
+        subject().deallocate(false, ghost().poolId, 1 ether, 0, 0);
+
+        uint256 amountOut =
+            subject().getAmountOut(ghost().poolId, true, 0.1 ether, actor());
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: 0.1 ether,
+            output: uint128(amountOut),
+            sellAsset: true
+        });
+
+        subject().swap(order);
+    }
+
     function _swap_check_invariant(
         bool sellAsset,
         uint256 amountIn,
