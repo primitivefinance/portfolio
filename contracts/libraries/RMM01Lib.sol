@@ -65,7 +65,6 @@ library RMM01Lib {
         PortfolioPool memory self,
         bool sellAsset,
         uint256 amountIn,
-        int256 liquidityDelta,
         uint256 timestamp,
         address swapper
     ) internal pure returns (uint256 amountOut) {
@@ -74,9 +73,8 @@ library RMM01Lib {
         );
 
         // Sets data.invariant, data.liquidity, data.feeAmount, and data.input.
-        (Iteration memory data, uint256 tau) = getSwapData(
-            self, sellAsset, amountInWad, liquidityDelta, timestamp, swapper
-        );
+        (Iteration memory data, uint256 tau) =
+            getSwapData(self, sellAsset, amountInWad, timestamp, swapper);
 
         // Uses data.invariant, data.liquidity, and data.input to compute next input reserve.
         // Uses next input reserve to compute output reserve.
@@ -101,16 +99,13 @@ library RMM01Lib {
         PortfolioPool memory self,
         bool sellAsset,
         uint256 amountInWad,
-        int256 liquidityDelta,
         uint256 timestamp,
         address swapper
     ) internal pure returns (Iteration memory iteration, uint256 tau) {
         tau = self.computeTau(timestamp);
 
         iteration.input = amountInWad;
-        iteration.liquidity = liquidityDelta > 0
-            ? self.liquidity + uint256(liquidityDelta)
-            : self.liquidity - uint256(-liquidityDelta);
+        iteration.liquidity = self.liquidity;
         (iteration.virtualX, iteration.virtualY) = self.getVirtualReservesWad();
 
         uint256 reserveXPerLiquidity;

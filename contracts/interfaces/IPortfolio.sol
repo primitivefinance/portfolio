@@ -278,7 +278,6 @@ interface IPortfolioGetters {
      * @dev Computes an amount out of tokens given an `amountIn`.
      * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
-     * @param liquidityDelta Pass a non-zero liquidity delta amount if building a multicall with a call that manipulates liquidity before the swap.
      * @param swapper Address that will execute the swap.
      * @return amountOut of tokens in native token decimal units.
      */
@@ -286,7 +285,6 @@ interface IPortfolioGetters {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
-        int256 liquidityDelta,
         address swapper
     ) external view returns (uint256);
 

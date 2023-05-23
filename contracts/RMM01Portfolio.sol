@@ -40,10 +40,9 @@ contract RMM01Portfolio is PortfolioVirtual {
         (iteration, tau) = pool.getSwapData({
             sellAsset: sellAsset,
             amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
-            liquidityDelta: 0, // Uses unmodified pool liquidity to compute invariant.
             timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
             swapper: address(0) // Setting the swapp affects the swap fee %, which is not used in this function.
-        });
+         });
 
         invariant = iteration.prevInvariant;
 
@@ -137,14 +136,12 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
-        int256 liquidityDelta,
         address swapper
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
-            liquidityDelta: liquidityDelta,
             timestamp: block.timestamp,
             swapper: swapper
         });
