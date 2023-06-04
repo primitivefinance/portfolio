@@ -51,7 +51,7 @@ wrap_comments = false
 
 [fuzz]
 # The number of fuzz runs for fuzz tests
-runs = 256
+runs = 1000
 # The maximum number of test case rejections allowed by proptest, to be
 # encountered during usage of `vm.assume` cheatcode. This will be used
 # to set the `max_global_rejects` value in proptest test runner config.

@@ -11,8 +11,8 @@ import {
 } from "../libraries/PortfolioLib.sol";
 import "./BisectionLib.sol";
 
+uint256 constant WAD = 1e18;
 uint256 constant SQRT_WAD = 1e9;
-uint256 constant WAD = 1 ether;
 uint256 constant YEAR = 31556953 seconds;
 uint256 constant BISECTION_EPSILON = 1;
 
@@ -28,6 +28,37 @@ library RMM01Lib {
 
     error UndefinedPrice();
     error OverflowWad(int256 wad);
+
+    /**
+     * @notice
+     * Trading function:
+     * `0 <= y - KΦ(Φ⁻¹(1-x) - σ√τ)`
+     * `y <= KΦ(Φ⁻¹(1-x) - σ√τ)`
+     * `y/K <= Φ(Φ⁻¹(1-x) - σ√τ)`
+     * `Φ⁻¹(y/K) <= Φ⁻¹(1-x) - σ√τ`
+     * `0 <= (Φ⁻¹(1-x) - σ√τ) - Φ⁻¹(y/K)`
+     * `result = Φ⁻¹(1-x) - σ√τ - Φ⁻¹(y/K)`
+     */
+    function portfolioInvariant(
+        uint256 reserveXPerWad,
+        uint256 reserveYPerWad,
+        uint256 strikePriceWad,
+        uint256 volatilityWad,
+        uint256 timeRemainingSec
+    ) internal pure returns (int256 result) {
+        uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
+        uint256 volSqrtYearsWad =
+            volatilityWad.mulWadDown(yearsWad.sqrt() * uint256(SQRT_WAD)); // σ√τ, √τ is scaled to WAD by multiplying by 1E9.
+
+        uint256 quotient = reserveYPerWad.divWadDown(strikePriceWad);
+        int256 inverseCdfQuotient = Gaussian.ppf(int256(quotient));
+
+        uint256 difference = WAD - reserveXPerWad;
+        int256 inverseCdfDifference = Gaussian.ppf(int256(difference));
+
+        result =
+            inverseCdfDifference - int256(volSqrtYearsWad) - inverseCdfQuotient;
+    }
 
     /**
      * @dev Computes the invariant of the RMM-01 trading function.
