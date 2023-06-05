@@ -18,6 +18,8 @@ contract RMM01Portfolio is PortfolioVirtual {
     using FixedPointMathLib for uint128;
     using FixedPointMathLib for uint256;
 
+    int256 internal constant MINIMUM_INVARIANT_DELTA = 1;
+
     constructor(
         address weth,
         address registry
@@ -42,7 +44,7 @@ contract RMM01Portfolio is PortfolioVirtual {
             amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
             timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
             swapper: address(0) // Setting the swapp affects the swap fee %, which is not used in this function.
-         });
+        });
 
         invariant = iteration.prevInvariant;
 
@@ -95,7 +97,9 @@ contract RMM01Portfolio is PortfolioVirtual {
             R_y: reserveY,
             timeRemainingSec: tau
         });
-        return (nextInvariant >= invariant, nextInvariant);
+        return (
+            nextInvariant - invariant >= MINIMUM_INVARIANT_DELTA, nextInvariant
+        );
     }
 
     /// @inheritdoc Objective

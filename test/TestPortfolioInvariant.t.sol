@@ -27,7 +27,7 @@ contract TestPortfolioInvariant is Setup {
         uint256 volatilityWad = 1 ether;
         uint256 timeRemainingSec = 31556953;
 
-        int256 result1 = RMM01Lib.portfolioInvariant(
+        int256 result1 = RMM01Lib.tradingFunction(
             reserveX, reserveY, strikePrice, volatilityWad, timeRemainingSec
         );
 
@@ -82,7 +82,7 @@ contract TestPortfolioInvariant is Setup {
         deltaX =
             bound(deltaX, MINIMUM_DELTA, MAXIMUM_RESERVE_X - reserveXPerWad);
 
-        int256 previousResult = RMM01Lib.portfolioInvariant(
+        int256 previousResult = RMM01Lib.tradingFunction(
             reserveXPerWad,
             reserveYPerWad,
             strikePriceWad,
@@ -90,7 +90,7 @@ contract TestPortfolioInvariant is Setup {
             timeRemainingSec
         );
 
-        int256 result = RMM01Lib.portfolioInvariant(
+        int256 result = RMM01Lib.tradingFunction(
             reserveXPerWad + deltaX,
             reserveYPerWad,
             strikePriceWad,
@@ -151,7 +151,7 @@ contract TestPortfolioInvariant is Setup {
         deltaX =
             bound(deltaX, MINIMUM_DELTA, reserveXPerWad - MINIMUM_RESERVE_X);
 
-        int256 previousResult = RMM01Lib.portfolioInvariant(
+        int256 previousResult = RMM01Lib.tradingFunction(
             reserveXPerWad,
             reserveYPerWad,
             strikePriceWad,
@@ -159,7 +159,7 @@ contract TestPortfolioInvariant is Setup {
             timeRemainingSec
         );
 
-        int256 result = RMM01Lib.portfolioInvariant(
+        int256 result = RMM01Lib.tradingFunction(
             reserveXPerWad - deltaX,
             reserveYPerWad,
             strikePriceWad,
