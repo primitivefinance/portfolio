@@ -15,7 +15,7 @@ uint256 constant WAD = 1e18;
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant YEAR = 31556953 seconds;
 uint256 constant BISECTION_EPSILON = 1;
-int256 constant BISECTION_ERROR = 5;
+int256 constant BISECTION_ERROR = 1;
 
 /**
  * @title   RMM01Lib
@@ -80,7 +80,7 @@ library RMM01Lib {
         // σ√τ
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // y / K
-        uint256 quotientWad = reserveYPerWad.divWadDown(strikePriceWad);
+        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad); // todo: review rounding direction. Avoids scenarios division truncates to 0.
         // Φ⁻¹(y/K)
         int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
         // 1 - x
