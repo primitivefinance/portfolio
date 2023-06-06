@@ -48,20 +48,24 @@ library RMM01Lib {
      * { -∞   otherwise
      *
      * k = y - KΦ(Φ⁻¹(1-x) - σ√τ)
+     * y = KΦ(Φ⁻¹(1-x) - σ√τ) - k
+     * x = 1 - Φ(Φ⁻¹((y + k)/K) + σ√τ)
      *
      * Adjusted trading function
      * { 0    Φ⁻¹(1-x) - σ√τ >= Φ⁻¹(y/K)
      * { -∞   otherwise
      *
      * k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
+     * y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
+     * x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
      * ```
      *
-     * @param reserveXPerWad Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
-     * @param reserveYPerWad Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
-     * @param strikePriceWad Strike price of the pool, scaled to WAD units.
-     * @param volatilityWad Volatility of the pool, scaled to WAD units.
-     * @param timeRemainingSec Amount of time in seconds until the pool is matured.
-     * @return invariant Signed invariant of the pool.
+     * @param reserveXPerWad    x; Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
+     * @param reserveYPerWad    y; Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
+     * @param strikePriceWad    K; Strike price of the pool, scaled to WAD units.
+     * @param volatilityWad     σ; Volatility of the pool, scaled to WAD units.
+     * @param timeRemainingSec  τ; Amount of time in seconds until the pool is matured.
+     * @return invariant        k; Signed invariant of the pool.
      */
     function tradingFunction(
         uint256 reserveXPerWad,
@@ -85,7 +89,86 @@ library RMM01Lib {
         int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
         // k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
         invariant =
-            inverseCdfDifference - inverseCdfQuotient + int256(volSqrtYearsWad);
+            inverseCdfQuotient - inverseCdfDifference + int256(volSqrtYearsWad);
+    }
+
+    /**
+     * @notice
+     * Computes the x reserves given y reserves.
+     *
+     * @dev
+     * Uses the adjusted trading function.
+     *
+     * @custom:math
+     * x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
+     *
+     * @param reserveYPerWad    y; Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
+     * @param strikePriceWad    K; Strike price of the pool, scaled to WAD units.
+     * @param volatilityWad     σ; Volatility of the pool, scaled to WAD units.
+     * @param timeRemainingSec  τ; Amount of time in seconds until the pool is matured.
+     * @param invariant         k; Signed invariant of the pool.
+     */
+    function getReserveXPerWad(
+        uint256 reserveYPerWad,
+        uint256 strikePriceWad,
+        uint256 volatilityWad,
+        uint256 timeRemainingSec,
+        int256 invariant
+    ) internal pure returns (uint256 reserveXPerWad) {
+        uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
+        // √τ, √τ is scaled to WAD by multiplying by 1E9.
+        uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
+        // σ√τ
+        uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
+        // y / K
+        uint256 quotientWad = reserveYPerWad.divWadDown(strikePriceWad);
+        // Φ⁻¹(y/K)
+        int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
+        // Φ⁻¹(y/K) + σ√τ - k
+        int256 independent =
+            inverseCdfQuotient + int256(volSqrtYearsWad) - invariant;
+        // x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
+        reserveXPerWad = WAD - uint256(Gaussian.cdf(independent));
+    }
+
+    /**
+     * @notice
+     * Computes the y reserves given x reserves.
+     *
+     * @dev
+     * Uses the adjusted trading function.
+     *
+     * @custom:math
+     * y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
+     *
+     * @param reserveXPerWad    x; Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
+     * @param strikePriceWad    K; Strike price of the pool, scaled to WAD units.
+     * @param volatilityWad     σ; Volatility of the pool, scaled to WAD units.
+     * @param timeRemainingSec  τ; Amount of time in seconds until the pool is matured.
+     * @param invariant         k; Signed invariant of the pool. Truncated.
+     */
+    function getReserveYPerWad(
+        uint256 reserveXPerWad,
+        uint256 strikePriceWad,
+        uint256 volatilityWad,
+        uint256 timeRemainingSec,
+        int256 invariant
+    ) internal pure returns (uint256 reserveYPerWad) {
+        uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
+        // √τ, √τ is scaled to WAD by multiplying by 1E9.
+        uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
+        // σ√τ
+        uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
+        // 1 - x
+        uint256 differenceWad = WAD - reserveXPerWad;
+        // Φ⁻¹(1-x)
+        int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
+        // Φ⁻¹(1-x) - σ√τ + k
+        int256 independent =
+            inverseCdfDifference - int256(volSqrtYearsWad) + invariant;
+        // y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
+        reserveYPerWad =
+            uint256(Gaussian.cdf(independent)).mulWadDown(strikePriceWad);
     }
 
     /**
@@ -233,20 +316,20 @@ library RMM01Lib {
         // 3. Compute the approximated dependent pool reserve using the adjusted independent reserve per 1E18 liquidity.
         uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
         if (sellAsset) {
-            adjustedDependentReserve = Invariant.getY({
-                R_x: adjustedIndependentReserve,
-                stk: self.params.strikePrice,
-                vol: volatilityWad,
-                tau: tau,
-                inv: data.prevInvariant
+            adjustedDependentReserve = getReserveYPerWad({
+                reserveXPerWad: adjustedIndependentReserve,
+                strikePriceWad: self.params.strikePrice,
+                volatilityWad: volatilityWad,
+                timeRemainingSec: tau,
+                invariant: data.prevInvariant
             });
         } else {
-            adjustedDependentReserve = Invariant.getX({
-                R_y: adjustedIndependentReserve,
-                stk: self.params.strikePrice,
-                vol: volatilityWad,
-                tau: tau,
-                inv: data.prevInvariant
+            adjustedDependentReserve = getReserveXPerWad({
+                reserveYPerWad: adjustedIndependentReserve,
+                strikePriceWad: self.params.strikePrice,
+                volatilityWad: volatilityWad,
+                timeRemainingSec: tau,
+                invariant: data.prevInvariant
             });
         }
 

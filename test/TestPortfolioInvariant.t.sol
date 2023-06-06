@@ -17,24 +17,72 @@ uint256 constant BASIS_POINTS_DEN = 10000;
 contract TestPortfolioInvariant is Setup {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for int256;
-    // Default test case. Returns an invariant close to 0.
-    // The result is about 1e-7.
 
+    /// Trading function is pure so here's a hack to test the intermediate values.
+    function tradingFunction(
+        uint256 reserveXPerWad,
+        uint256 reserveYPerWad,
+        uint256 strikePriceWad,
+        uint256 volatilityWad,
+        uint256 timeRemainingSec
+    ) internal view returns (int256 invariant) {
+        uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
+        // √τ, √τ is scaled to WAD by multiplying by 1E9.
+        uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
+        // σ√τ
+        uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
+        // y / K
+        uint256 quotientWad = reserveYPerWad.divWadDown(strikePriceWad);
+        // Φ⁻¹(y/K)
+        int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
+        // 1 - x
+        uint256 differenceWad = WAD - reserveXPerWad;
+        // Φ⁻¹(1-x)
+        int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
+        // k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
+        invariant =
+            inverseCdfQuotient - inverseCdfDifference + int256(volSqrtYearsWad);
+    }
+
+    function test_trading_function() public {
+        uint256 reserveXPerWad = 0.308537538726 ether;
+        uint256 reserveYPerWad = 0.308537538726 ether;
+        uint256 strikePriceWad = 1 ether;
+        uint256 volatilityWad = 1 ether;
+        uint256 timeRemainingSec = 31556953;
+
+        int256 result1 = tradingFunction(
+            reserveXPerWad,
+            reserveYPerWad,
+            strikePriceWad,
+            volatilityWad,
+            timeRemainingSec
+        );
+
+        console.logInt(result1);
+    }
+
+    /// Default test case. Returns an invariant close to 0.
+    /// The result is about 1e-7.
     function test_invariant_initial() public {
-        uint256 reserveX = 0.308537538726 ether;
-        uint256 reserveY = 0.308537538726 ether;
-        uint256 strikePrice = 1 ether;
+        uint256 reserveXPerWad = 0.308537538726 ether;
+        uint256 reserveYPerWad = 0.308537538726 ether;
+        uint256 strikePriceWad = 1 ether;
         uint256 volatilityWad = 1 ether;
         uint256 timeRemainingSec = 31556953;
 
         int256 result1 = RMM01Lib.tradingFunction(
-            reserveX, reserveY, strikePrice, volatilityWad, timeRemainingSec
+            reserveXPerWad,
+            reserveYPerWad,
+            strikePriceWad,
+            volatilityWad,
+            timeRemainingSec
         );
 
         int256 result2 = Invariant.invariant({
-            R_y: reserveY,
-            R_x: reserveX,
-            stk: strikePrice,
+            R_y: reserveYPerWad,
+            R_x: reserveXPerWad,
+            stk: strikePriceWad,
             vol: volatilityWad,
             tau: timeRemainingSec
         });
@@ -42,6 +90,15 @@ contract TestPortfolioInvariant is Setup {
         console.logInt(result1);
         console.logInt(result2);
         console.logInt(result1 - result2);
+
+        uint256 computedY = RMM01Lib.getReserveXPerWad(
+            reserveYPerWad, strikePriceWad, volatilityWad, timeRemainingSec, 0
+        );
+        uint256 computedX = RMM01Lib.getReserveYPerWad(
+            reserveXPerWad, strikePriceWad, volatilityWad, timeRemainingSec, 0
+        );
+        console.log("computedX: ", computedX);
+        console.log("computedY: ", computedY);
         assertTrue(result2 > result1, "Old invariant larger than new one");
     }
 
@@ -264,7 +321,7 @@ contract TestPortfolioInvariant is Setup {
             delta < 0 ? "-" : "",
             uint256(delta < 0 ? -delta : delta)
         );
-        console.log("delta to reserveX     : ", applyDeltaToX);
+        console.log("delta to reserveXPerWad     : ", applyDeltaToX);
         console.log("strikePriceWad        : ", strikePriceWad);
         console.log("volatilityWad         : ", volatilityWad);
         console.log("timeRemainingSec      : ", timeRemainingSec);
