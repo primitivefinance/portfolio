@@ -43,6 +43,7 @@ contract TestGas is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 1 ether,
                 type(uint128).max,
@@ -146,7 +147,14 @@ contract TestGas is Setup {
 
             instructions[i] = abi.encodeCall(
                 IPortfolioActions.allocate,
-                (false, poolId, 1 ether, type(uint128).max, type(uint128).max)
+                (
+                    false,
+                    address(this),
+                    poolId,
+                    1 ether,
+                    type(uint128).max,
+                    type(uint128).max
+                )
             );
         }
 
@@ -267,6 +275,7 @@ contract TestGas is Setup {
                 IPortfolioActions.allocate,
                 (
                     false,
+                    address(this),
                     poolId,
                     1 ether + uint128(BURNED_LIQUIDITY),
                     type(uint128).max,
@@ -566,6 +575,7 @@ contract TestGas is Setup {
                 IPortfolioActions.allocate,
                 (
                     false,
+                    address(this),
                     poolId,
                     1 ether + uint128(BURNED_LIQUIDITY),
                     type(uint128).max,
@@ -668,12 +678,19 @@ contract TestGas is Setup {
 
     function _allocateInstruction(uint64 poolId)
         internal
-        pure
+        view
         returns (bytes memory)
     {
         return abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, poolId, 1 ether, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                poolId,
+                1 ether,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
     }
 
@@ -760,7 +777,14 @@ contract TestGas is Setup {
             bytes[] memory actions = new bytes[](1);
             actions[0] = abi.encodeCall(
                 IPortfolioActions.allocate,
-                (false, poolId, 10 ether, type(uint128).max, type(uint128).max)
+                (
+                    false,
+                    address(this),
+                    poolId,
+                    10 ether,
+                    type(uint128).max,
+                    type(uint128).max
+                )
             );
             subject().multicall(actions);
         }
@@ -789,7 +813,14 @@ contract TestGas is Setup {
             bytes[] memory actions = new bytes[](1);
             actions[0] = abi.encodeCall(
                 IPortfolioActions.allocate,
-                (false, poolId, 25 ether, type(uint128).max, type(uint128).max)
+                (
+                    false,
+                    address(this),
+                    poolId,
+                    25 ether,
+                    type(uint128).max,
+                    type(uint128).max
+                )
             );
             subject().multicall(actions);
         }

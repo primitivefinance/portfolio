@@ -19,6 +19,7 @@ contract TestPortfolioDeallocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 liquidity,
                 type(uint128).max,
@@ -58,6 +59,7 @@ contract TestPortfolioDeallocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 liquidity,
                 type(uint128).max,
@@ -85,6 +87,7 @@ contract TestPortfolioDeallocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 liquidity,
                 type(uint128).max,
@@ -112,6 +115,7 @@ contract TestPortfolioDeallocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 liquidity,
                 type(uint128).max,
@@ -137,13 +141,14 @@ contract TestPortfolioDeallocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 liquidity,
                 type(uint128).max,
                 type(uint128).max
             )
         );
-        subject().multicall{value: 250 ether}(data);
+        subject().multicall{ value: 250 ether }(data);
         _simple_deallocate(liquidity);
     }
 
@@ -164,6 +169,7 @@ contract TestPortfolioDeallocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 liquidity,
                 type(uint128).max,
@@ -188,7 +194,14 @@ contract TestPortfolioDeallocate is Setup {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(data);
         vm.expectRevert();
@@ -213,13 +226,20 @@ contract TestPortfolioDeallocate is Setup {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(data);
 
         data[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, ghost().poolId, amount, 0, type(uint128).max)
+            (false, address(this), ghost().poolId, amount, 0, type(uint128).max)
         );
         vm.expectRevert();
         subject().multicall(data);

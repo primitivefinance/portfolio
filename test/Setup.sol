@@ -290,7 +290,14 @@ contract Setup is Test {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, ghost().poolId, amt, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                ghost().poolId,
+                amt,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(data);
         _;

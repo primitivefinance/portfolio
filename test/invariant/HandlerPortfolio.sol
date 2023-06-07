@@ -257,6 +257,7 @@ contract HandlerPortfolio is HandlerBase {
                 IPortfolioActions.allocate,
                 (
                     false,
+                    address(this),
                     ctx.ghost().poolId,
                     deltaLiquidity.safeCastTo128(),
                     type(uint128).max,
