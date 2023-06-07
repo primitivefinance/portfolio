@@ -205,6 +205,7 @@ abstract contract PortfolioVirtual is Objective {
     /// @inheritdoc IPortfolioActions
     function allocate(
         bool useMax,
+        address recipient,
         uint64 poolId,
         uint128 deltaLiquidity,
         uint128 maxDeltaAsset,
@@ -246,7 +247,7 @@ abstract contract PortfolioVirtual is Objective {
         }
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
-            owner: msg.sender,
+            owner: recipient,
             poolId: poolId,
             timestamp: block.timestamp,
             deltaAsset: deltaAsset,
