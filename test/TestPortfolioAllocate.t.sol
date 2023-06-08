@@ -72,6 +72,48 @@ contract TestPortfolioAllocate is Setup {
         subject().multicall{ value: 250 ether }(data);
     }
 
+    function test_allocate_recipient_weth()
+        public
+        wethConfig
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.deal(actor(), 250 ether);
+
+        subject().allocate{ value: 250 ether }(
+            false,
+            address(0xbeef),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
+        );
+
+        assertEq(ghost().position(address(this)), 0);
+        assertEq(ghost().position(address(0xbeef)), 1 ether - BURNED_LIQUIDITY);
+    }
+
+    function test_allocate_recipient_tokens()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        subject().allocate(
+            false,
+            address(0xbeef),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
+        );
+
+        assertEq(ghost().position(address(this)), 0);
+        assertEq(ghost().position(address(0xbeef)), 1 ether - BURNED_LIQUIDITY);
+    }
+
     function test_allocate_multicall_modifies_liquidity()
         public
         defaultConfig
