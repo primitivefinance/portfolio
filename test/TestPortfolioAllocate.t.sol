@@ -574,4 +574,77 @@ contract TestPortfolioAllocate is Setup {
             "position.liquidity != pool.liquidity"
         );
     }
+
+    function test_allocate_useMax()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(uint128(BURNED_LIQUIDITY))
+        isArmed
+    {
+        uint128 liquidity = 1 ether;
+
+        subject().allocate(
+            false,
+            ghost().poolId,
+            liquidity,
+            type(uint128).max,
+            type(uint128).max
+        );
+
+        uint64 poolId = subject().createPool(
+            1,
+            address(0),
+            DEFAULT_PRIORITY_FEE,
+            DEFAULT_FEE,
+            DEFAULT_VOLATILITY,
+            DEFAULT_DURATION,
+            DEFAULT_STRIKE,
+            DEFAULT_PRICE
+        );
+
+        uint128 liq = subject().positions(actor(), ghost().poolId);
+        (uint128 deltaAsset, uint128 deltaQuote) =
+            subject().getLiquidityDeltas(ghost().poolId, int128(liq));
+
+        uint128 maxLiquidity =
+            subject().getMaxLiquidity(ghost().poolId, deltaAsset, deltaQuote);
+
+        uint256 preAssetBalance =
+            ghost().asset().to_token().balanceOf(address(actor()));
+        uint256 preQuoteBalance =
+            ghost().quote().to_token().balanceOf(address(actor()));
+
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeCall(
+            IPortfolioActions.deallocate,
+            (true, ghost().poolId, 0, type(uint128).min, type(uint128).min)
+        );
+        data[1] = abi.encodeCall(
+            IPortfolioActions.allocate,
+            (true, poolId, maxLiquidity, type(uint128).max, type(uint128).max)
+        );
+
+        bytes[] memory res = subject().multicall(data);
+
+        (uint256 assetDeallocate, uint256 quoteDeallocate) =
+            abi.decode(res[0], (uint256, uint256));
+
+        (uint256 assetAllocate, uint256 quoteAllocate) =
+            abi.decode(res[1], (uint256, uint256));
+
+        uint256 postAssetBalance =
+            ghost().asset().to_token().balanceOf(address(actor()));
+
+        uint256 postQuoteBalance =
+            ghost().quote().to_token().balanceOf(address(actor()));
+
+        assertEq(
+            postAssetBalance,
+            preAssetBalance + assetDeallocate - assetAllocate,
+            "asset balance"
+        );
+        assertEq(postQuoteBalance, preQuoteBalance, "quote balance");
+    }
 }
