@@ -52,7 +52,6 @@ function bisection(
         root = (lower + upper) / 2;
 
         int256 output = fx(args, root);
-        lowerOutput = fx(args, lower); // Lower point could have changed in the previous iteration.
 
         // If the product is negative, the root is between the lower and root.
         // If the product is positive, the root is between the root and upper.
