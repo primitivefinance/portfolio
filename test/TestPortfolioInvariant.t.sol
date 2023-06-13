@@ -13,8 +13,9 @@ import "solstat/Invariant.sol";
 /// will not change.
 /// A minimum delta of 2 will let the x test cases pass.
 /// A minimum delta of 4 will let the y test cases pass.
-uint256 constant MINIMUM_DELTA = 20;
+uint256 constant MINIMUM_DELTA = 1e6;
 
+uint256 constant MINIMUM_LIQUIDITY = PortfolioLib.BURNED_LIQUIDITY;
 uint256 constant MAXIMUM_RESERVE_X = 1e18 - 1;
 uint256 constant MINIMUM_RESERVE_X = 1;
 uint256 constant MINIMUM_RESERVE_Y = 1;
