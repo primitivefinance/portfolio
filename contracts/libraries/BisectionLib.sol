@@ -7,6 +7,7 @@ struct Bisection {
     uint256 volatilityWad;
     uint256 tauSeconds;
     uint256 reserveWadPerLiquidity;
+    int256 prevInvariant;
 }
 
 error NotInsideBounds(uint256 lower, uint256 upper);
@@ -51,11 +52,10 @@ function bisection(
         root = (lower + upper) / 2;
 
         int256 output = fx(args, root);
-        if (output == 0) break; // Found the root.
 
         // If the product is negative, the root is between the lower and root.
         // If the product is positive, the root is between the root and upper.
-        if (output * lowerOutput < 0) {
+        if (output * lowerOutput <= 0) {
             upper = root; // Set the new upper bound to the root because we know its between the lower and root.
         } else {
             lower = root; // Set the new lower bound to the root because we know its between the upper and root.
