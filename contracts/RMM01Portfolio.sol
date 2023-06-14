@@ -111,13 +111,12 @@ contract RMM01Portfolio is PortfolioVirtual {
     ) public view override returns (uint256) {
         uint256 maxInput;
         if (sellAsset) {
-            maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio
-                // between assets and liqudiity.
+            // invariant: x reserve < 1E18
+            maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity);
         } else {
-            maxInput = (pools[poolId].params.strikePrice - reserveIn).mulWadDown(
-                liquidity
-            ); // There can be maximum
-                // strike:1 liquidity ratio between quote and liquidity.
+            // invariant: y reserve < strikePrice
+            maxInput = (pools[poolId].params.strikePrice - reserveIn - 1)
+                .mulWadDown(liquidity);
         }
 
         return maxInput;

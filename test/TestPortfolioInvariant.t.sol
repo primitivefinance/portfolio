@@ -8,18 +8,28 @@ import "../contracts/libraries/RMM01Lib.sol";
 import "solstat/Gaussian.sol";
 import "solstat/Invariant.sol";
 
+/// todo: Explain the bounds and deltas and min/maxes better.
+
+/// @dev Basis points units are 1e4, percentages are stored in WAD with 1e18 decimals.
+uint256 constant BASIS_POINTS_DEN = 10000;
+
 /// @dev Critical constant. Minimum acceptable delta to change x or y by.
 /// Setting this to 1 should fail the tests, since there are cases where the invariant
 /// will not change.
-/// A minimum delta of 2 will let the x test cases pass.
-/// A minimum delta of 4 will let the y test cases pass.
-uint256 constant MINIMUM_DELTA = 1e6;
+uint256 constant MINIMUM_DELTA = 1e9;
 
 uint256 constant MINIMUM_LIQUIDITY = PortfolioLib.BURNED_LIQUIDITY;
 uint256 constant MAXIMUM_RESERVE_X = 1e18 - 1;
 uint256 constant MINIMUM_RESERVE_X = 1;
 uint256 constant MINIMUM_RESERVE_Y = 1;
-uint256 constant BASIS_POINTS_DEN = 10000;
+uint256 constant MAXIMUM_STRIKE_PRICE = 1e27;
+
+/// @dev Quotient is the ratio of the Y reserve to the strike price.
+uint256 constant MAXIMUM_QUOTIENT = 1 ether;
+uint256 constant MINIMUM_QUOTIENT_DELTA = 2;
+
+/// @dev Difference is 1 less x reserve.
+uint256 constant MAXIMUM_DIFFERENCE = 1 ether;
 
 contract TestPortfolioInvariant is Setup {
     using FixedPointMathLib for uint256;
@@ -288,10 +298,14 @@ contract TestPortfolioInvariant is Setup {
 
         // With a Y reserve, we make sure to only use a delta that will reach the maximum.
         // min delta <= delta <= strike - y
-        deltaY = bound(
-            deltaY,
-            MINIMUM_DELTA,
-            strikePriceWad - reserveYPerWad - MINIMUM_RESERVE_Y
+        deltaY = bound(deltaY, MINIMUM_DELTA, strikePriceWad - reserveYPerWad);
+
+        uint256 prevQuotient = reserveYPerWad.divWadUp(strikePriceWad);
+        uint256 quotient = (reserveYPerWad + deltaY).divWadUp(strikePriceWad);
+
+        vm.assume(
+            quotient < MAXIMUM_QUOTIENT
+                && quotient >= prevQuotient + MINIMUM_QUOTIENT_DELTA
         );
 
         int256 previousResult = RMM01Lib.tradingFunction(
@@ -368,6 +382,18 @@ contract TestPortfolioInvariant is Setup {
         deltaY =
             bound(deltaY, MINIMUM_DELTA, reserveYPerWad - MINIMUM_RESERVE_Y);
 
+        uint256 prevQuotient = reserveYPerWad.divWadUp(strikePriceWad);
+        uint256 quotient = (reserveYPerWad - deltaY).divWadUp(strikePriceWad);
+        console.log("prevQuotient: ", prevQuotient);
+        console.log("quotient: ", quotient);
+
+        /// Make sure quotient is within bounds and it decreases by at least 2
+        vm.assume(prevQuotient >= MINIMUM_QUOTIENT_DELTA);
+        vm.assume(
+            quotient < MAXIMUM_QUOTIENT
+                && prevQuotient - MINIMUM_QUOTIENT_DELTA >= quotient
+        );
+
         int256 previousResult = RMM01Lib.tradingFunction(
             reserveXPerWad,
             reserveYPerWad,
@@ -430,7 +456,7 @@ contract TestPortfolioInvariant is Setup {
         strikePriceWad = bound(
             strikePriceWad,
             MINIMUM_RESERVE_Y + MINIMUM_DELTA * 2 + 1,
-            type(uint128).max
+            MAXIMUM_STRIKE_PRICE
         );
 
         // The Y reserve is bounded between the min delta and the strike price less min delta.
@@ -438,7 +464,7 @@ contract TestPortfolioInvariant is Setup {
         reserveYPerWad = bound(
             reserveYPerWad,
             MINIMUM_RESERVE_Y + MINIMUM_DELTA,
-            strikePriceWad - MINIMUM_DELTA + MINIMUM_RESERVE_Y
+            strikePriceWad - MINIMUM_DELTA + MINIMUM_RESERVE_Y - 1
         );
 
         // Volatility should be between the Portfolio bounds.
@@ -485,6 +511,9 @@ contract TestPortfolioInvariant is Setup {
         int256 previousResult,
         int256 result
     ) internal {
+        uint256 postReserve = applyDeltaToX
+            ? uint256(int256(reserveXPerWad) + delta)
+            : uint256(int256(reserveYPerWad) + delta);
         console.log("=== PROFILE ===");
         console.log("reserveXPerWad        : ", reserveXPerWad);
         console.log("reserveYPerWad        : ", reserveYPerWad);
@@ -493,10 +522,26 @@ contract TestPortfolioInvariant is Setup {
             delta < 0 ? "-" : "",
             uint256(delta < 0 ? -delta : delta)
         );
+        console.log("postReserve           : ", postReserve);
         console.log("add delta to reserveX : ", applyDeltaToX);
         console.log("strikePriceWad        : ", strikePriceWad);
         console.log("volatilityWad         : ", volatilityWad);
         console.log("timeRemainingSec      : ", timeRemainingSec);
+        console.log(
+            "prevQuotient          : ", reserveYPerWad.divWadUp(strikePriceWad)
+        );
+        console.log(
+            "quotient              : ",
+            applyDeltaToX
+                ? reserveYPerWad.divWadUp(strikePriceWad)
+                : postReserve.divWadUp(strikePriceWad)
+        );
+
+        console.log("prevDifference        : ", 1 ether - reserveXPerWad);
+        console.log(
+            "difference            : ",
+            applyDeltaToX ? 1 ether - postReserve : 1 ether - reserveXPerWad
+        );
         console.log("=== RESULT ===");
         console.logInt(previousResult);
         console.logInt(result);

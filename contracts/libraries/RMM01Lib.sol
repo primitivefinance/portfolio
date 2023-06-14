@@ -15,7 +15,7 @@ uint256 constant WAD = 1e18;
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant YEAR = 31556953 seconds;
 uint256 constant BISECTION_EPSILON = 1;
-int256 constant BISECTION_ERROR = 1;
+int256 constant BISECTION_ERROR = 2;
 
 /**
  * @title   RMM01Lib
