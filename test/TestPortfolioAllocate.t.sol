@@ -700,6 +700,7 @@ contract TestPortfolioAllocate is Setup {
 
         subject().allocate(
             false,
+            address(this),
             ghost().poolId,
             liquidity,
             type(uint128).max,
@@ -736,7 +737,14 @@ contract TestPortfolioAllocate is Setup {
         );
         data[1] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (true, poolId, maxLiquidity, type(uint128).max, type(uint128).max)
+            (
+                true,
+                address(this),
+                poolId,
+                maxLiquidity,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
 
         bytes[] memory res = subject().multicall(data);
