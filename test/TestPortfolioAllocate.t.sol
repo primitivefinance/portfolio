@@ -30,7 +30,14 @@ contract TestPortfolioAllocate is Setup {
 
         data[2] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, poolId, 1 ether, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                poolId,
+                1 ether,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
 
         subject().multicall(data);
@@ -54,6 +61,7 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 1 ether,
                 type(uint128).max,
@@ -62,6 +70,48 @@ contract TestPortfolioAllocate is Setup {
         );
 
         subject().multicall{ value: 250 ether }(data);
+    }
+
+    function test_allocate_recipient_weth()
+        public
+        wethConfig
+        useActor
+        usePairTokens(500 ether)
+        isArmed
+    {
+        vm.deal(actor(), 250 ether);
+
+        subject().allocate{ value: 250 ether }(
+            false,
+            address(0xbeef),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
+        );
+
+        assertEq(ghost().position(address(this)), 0);
+        assertEq(ghost().position(address(0xbeef)), 1 ether - BURNED_LIQUIDITY);
+    }
+
+    function test_allocate_recipient_tokens()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        isArmed
+    {
+        subject().allocate(
+            false,
+            address(0xbeef),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
+        );
+
+        assertEq(ghost().position(address(this)), 0);
+        assertEq(ghost().position(address(0xbeef)), 1 ether - BURNED_LIQUIDITY);
     }
 
     function test_allocate_multicall_modifies_liquidity()
@@ -82,7 +132,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
 
@@ -114,7 +171,12 @@ contract TestPortfolioAllocate is Setup {
         // Trigger the function being tested.
 
         subject().allocate(
-            false, xid, amount, type(uint128).max, type(uint128).max
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
 
         // Fetch the variable changed.
@@ -173,7 +235,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
 
@@ -200,7 +269,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
 
@@ -228,7 +304,7 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, 0, type(uint128).max)
+            (false, address(this), xid, amount, 0, type(uint128).max)
         );
         subject().multicall(instructions);
     }
@@ -248,7 +324,7 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, 0)
+            (false, address(this), xid, amount, type(uint128).max, 0)
         );
         subject().multicall(instructions);
     }
@@ -275,7 +351,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
 
@@ -309,7 +392,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
 
@@ -333,7 +423,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, failureArg, 1 ether, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                failureArg,
+                1 ether,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
     }
@@ -352,6 +449,7 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 uint128(failureArg),
                 type(uint128).max,
@@ -375,6 +473,7 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.allocate,
             (
                 false,
+                address(this),
                 ghost().poolId,
                 uint128(failureArg),
                 type(uint128).max,
@@ -410,7 +509,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
 
@@ -539,7 +645,14 @@ contract TestPortfolioAllocate is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
             IPortfolioActions.allocate,
-            (false, xid, amount, type(uint128).max, type(uint128).max)
+            (
+                false,
+                address(this),
+                xid,
+                amount,
+                type(uint128).max,
+                type(uint128).max
+            )
         );
         subject().multicall(instructions);
 

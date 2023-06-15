@@ -333,6 +333,7 @@ interface IPortfolioActions {
      */
     function allocate(
         bool useMax,
+        address recipient,
         uint64 poolId,
         uint128 deltaLiquidity,
         uint128 maxDeltaAsset,
