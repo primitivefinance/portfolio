@@ -52,15 +52,14 @@ function bisection(
         root = (lower + upper) / 2;
 
         int256 output = fx(args, root);
-        if (output == 0) break; // Found the root.
-        lowerOutput = fx(args, lower); // Lower point could have changed in the previous iteration.
 
         // If the product is negative, the root is between the lower and root.
         // If the product is positive, the root is between the root and upper.
-        if (output * lowerOutput < 0) {
+        if (output * lowerOutput <= 0) {
             upper = root; // Set the new upper bound to the root because we know its between the lower and root.
         } else {
             lower = root; // Set the new lower bound to the root because we know its between the upper and root.
+            lowerOutput = output; // root function value becomes new lower output value
         }
 
         // Update the distance with the new bounds.
@@ -69,5 +68,5 @@ function bisection(
         unchecked {
             iterations++; // Increment the iterator.
         }
-    } while (distance >= epsilon && iterations != maxIterations);
+    } while (distance > epsilon && iterations < maxIterations);
 }

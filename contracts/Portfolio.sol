@@ -228,11 +228,20 @@ abstract contract PortfolioVirtual is Objective {
             // A positive net balance is a surplus of tokens in the accounting state that can be used to mint liquidity.
             int256 surplusAsset = getNetBalance(pair.tokenAsset);
             int256 surplusQuote = getNetBalance(pair.tokenQuote);
+
             if (surplusAsset < 0) surplusAsset = 0;
             if (surplusQuote < 0) surplusQuote = 0;
+
+            (uint128 surplusAssetWad, uint128 surplusQuoteWad) =
+            _scaleAmountsToWad({
+                poolId: poolId,
+                amountAssetDec: uint256(surplusAsset),
+                amountQuoteDec: uint256(surplusQuote)
+            });
+
             deltaLiquidity = pools[poolId].getPoolMaxLiquidity({
-                deltaAsset: uint256(surplusAsset),
-                deltaQuote: uint256(surplusQuote)
+                deltaAsset: surplusAssetWad,
+                deltaQuote: surplusQuoteWad
             });
         }
 
@@ -272,7 +281,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaAsset,
             deltaQuote,
             deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -334,7 +343,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -398,6 +407,9 @@ abstract contract PortfolioVirtual is Objective {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
+        // --- Checks --- //
+        if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
+
         PortfolioPool storage pool = pools[args.poolId];
 
         // Scale amounts from native token decimals to WAD.
@@ -427,9 +439,6 @@ abstract contract PortfolioVirtual is Objective {
             info.tokenOutput = pool.pair.tokenAsset;
         }
 
-        // --- Checks --- //
-        if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
-
         (bool success, int256 invariant) =
             _beforeSwapEffects(args.poolId, args.sellAsset);
         if (!success) revert PoolExpired();
@@ -444,7 +453,18 @@ abstract contract PortfolioVirtual is Objective {
         if (args.useMax) {
             // Net balance is the surplus of tokens in the accounting state that can be spent.
             int256 netBalance = getNetBalance(info.tokenInput);
-            if (netBalance > 0) iteration.input = uint256(netBalance);
+
+            if (netBalance > 0) {
+                (uint128 netBalanceAssetWad, uint128 netBalanceAssetQuote) =
+                _scaleAmountsToWad({
+                    poolId: poolId,
+                    amountAssetDec: uint256(netBalance),
+                    amountQuoteDec: uint256(netBalance)
+                });
+
+                iteration.input =
+                    args.sellAsset ? netBalanceAssetWad : netBalanceAssetQuote;
+            }
         }
 
         if (iteration.output == 0) revert ZeroOutput();
@@ -489,22 +509,15 @@ abstract contract PortfolioVirtual is Objective {
             if (args.sellAsset) {
                 adjustedVirtualX +=
                     (deltaIndependentReserveWad - iteration.feeAmount);
-                adjustedVirtualX =
-                    adjustedVirtualX.divWadDown(iteration.liquidity);
-
                 adjustedVirtualY -= iteration.output;
-                adjustedVirtualY =
-                    adjustedVirtualY.divWadUp(iteration.liquidity);
             } else {
                 adjustedVirtualX -= iteration.output;
-                adjustedVirtualX =
-                    adjustedVirtualX.divWadUp(iteration.liquidity);
-
                 adjustedVirtualY +=
                     (deltaIndependentReserveWad - iteration.feeAmount);
-                adjustedVirtualY =
-                    adjustedVirtualY.divWadDown(iteration.liquidity);
             }
+
+            adjustedVirtualX = adjustedVirtualX.divWadDown(iteration.liquidity);
+            adjustedVirtualY = adjustedVirtualY.divWadDown(iteration.liquidity);
 
             // --- Invariant Check --- //
 
@@ -559,7 +572,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -686,7 +699,7 @@ abstract contract PortfolioVirtual is Objective {
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
-        );
+            );
 
         _postLock();
     }
@@ -887,10 +900,9 @@ abstract contract PortfolioVirtual is Objective {
         protocolFees[token] -= amountWad;
         _decreaseReserves(token, amountWad);
 
-        _settlement();
-
         emit ClaimFees(token, amount);
 
+        if (_currentMulticall == false) _settlement();
         _postLock();
     }
 

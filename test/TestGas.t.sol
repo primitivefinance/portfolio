@@ -82,9 +82,8 @@ contract TestGas is Setup {
         bool sellAsset = true;
         uint128 amountIn = uint128(0.01 ether);
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(
-                ghost().poolId, sellAsset, amountIn, 0, actor()
-            ) * 95 / 100
+            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, actor())
+                * 95 / 100
         );
         bytes[] memory data = new bytes[](1);
 
@@ -625,7 +624,7 @@ contract TestGas is Setup {
             // discrepencies in the invariant which will throw the InvalidInvariant error.
             // To properly get all the amounts out, the getAmountOut needs to take into account the invariant change as well.
             uint128 estimatedAmountOut = uint128(
-                _subject.getAmountOut(poolId, sellAsset, amountIn, 0, actor())
+                _subject.getAmountOut(poolId, sellAsset, amountIn, actor())
             );
 
             // For now, we use a slightly underestimated amount out so that we can test the multi swaps.
@@ -683,7 +682,7 @@ contract TestGas is Setup {
     ) internal view returns (bytes memory) {
         uint128 amountIn = uint128(0.05 ether);
         uint128 amountOut = subject().getAmountOut(
-            poolId, direction, amountIn, 0, actor()
+            poolId, direction, amountIn, actor()
         ).safeCastTo128();
 
         Order memory order = Order({

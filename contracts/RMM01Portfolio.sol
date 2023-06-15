@@ -18,6 +18,8 @@ contract RMM01Portfolio is PortfolioVirtual {
     using FixedPointMathLib for uint128;
     using FixedPointMathLib for uint256;
 
+    int256 internal constant MINIMUM_INVARIANT_DELTA = 1;
+
     constructor(
         address weth,
         address registry
@@ -40,7 +42,6 @@ contract RMM01Portfolio is PortfolioVirtual {
         (iteration, tau) = pool.getSwapData({
             sellAsset: sellAsset,
             amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
-            liquidityDelta: 0, // Uses unmodified pool liquidity to compute invariant.
             timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
             swapper: address(0) // Setting the swap effects the swap fee %, which is not used in this function.
         });
@@ -96,7 +97,9 @@ contract RMM01Portfolio is PortfolioVirtual {
             R_y: reserveY,
             timeRemainingSec: tau
         });
-        return (nextInvariant >= invariant, nextInvariant);
+        return (
+            nextInvariant - invariant >= MINIMUM_INVARIANT_DELTA, nextInvariant
+        );
     }
 
     /// @inheritdoc Objective
@@ -108,13 +111,12 @@ contract RMM01Portfolio is PortfolioVirtual {
     ) public view override returns (uint256) {
         uint256 maxInput;
         if (sellAsset) {
-            maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity); // There can be maximum 1:1 ratio
-                // between assets and liqudiity.
+            // invariant: x reserve < 1E18
+            maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity);
         } else {
-            maxInput = (pools[poolId].params.strikePrice - reserveIn).mulWadDown(
-                liquidity
-            ); // There can be maximum
-                // strike:1 liquidity ratio between quote and liquidity.
+            // invariant: y reserve < strikePrice
+            maxInput = (pools[poolId].params.strikePrice - reserveIn - 1)
+                .mulWadDown(liquidity);
         }
 
         return maxInput;
@@ -137,14 +139,12 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
-        int256 liquidityDelta,
         address swapper
     ) public view override(Objective) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
-            liquidityDelta: liquidityDelta,
             timestamp: block.timestamp,
             swapper: swapper
         });
