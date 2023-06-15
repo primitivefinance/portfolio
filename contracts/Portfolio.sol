@@ -281,7 +281,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaAsset,
             deltaQuote,
             deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -343,7 +343,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -509,22 +509,15 @@ abstract contract PortfolioVirtual is Objective {
             if (args.sellAsset) {
                 adjustedVirtualX +=
                     (deltaIndependentReserveWad - iteration.feeAmount);
-                adjustedVirtualX =
-                    adjustedVirtualX.divWadDown(iteration.liquidity);
-
                 adjustedVirtualY -= iteration.output;
-                adjustedVirtualY =
-                    adjustedVirtualY.divWadUp(iteration.liquidity);
             } else {
                 adjustedVirtualX -= iteration.output;
-                adjustedVirtualX =
-                    adjustedVirtualX.divWadUp(iteration.liquidity);
-
                 adjustedVirtualY +=
                     (deltaIndependentReserveWad - iteration.feeAmount);
-                adjustedVirtualY =
-                    adjustedVirtualY.divWadDown(iteration.liquidity);
             }
+
+            adjustedVirtualX = adjustedVirtualX.divWadDown(iteration.liquidity);
+            adjustedVirtualY = adjustedVirtualY.divWadDown(iteration.liquidity);
 
             // --- Invariant Check --- //
 
@@ -579,7 +572,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
-        );
+            );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -706,7 +699,7 @@ abstract contract PortfolioVirtual is Objective {
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
-        );
+            );
 
         _postLock();
     }

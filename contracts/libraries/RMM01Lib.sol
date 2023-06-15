@@ -11,10 +11,11 @@ import {
 } from "../libraries/PortfolioLib.sol";
 import "./BisectionLib.sol";
 
+uint256 constant WAD = 1e18;
 uint256 constant SQRT_WAD = 1e9;
-uint256 constant WAD = 1 ether;
 uint256 constant YEAR = 31556953 seconds;
-uint256 constant BISECTION_EPSILON = 1;
+uint256 constant BISECTION_EPSILON = 0;
+int256 constant BISECTION_ERROR = 2;
 
 /**
  * @title   RMM01Lib
@@ -28,6 +29,147 @@ library RMM01Lib {
 
     error UndefinedPrice();
     error OverflowWad(int256 wad);
+
+    /**
+     * @notice
+     * Computes the invariant of the RMM-01 trading function.
+     *
+     * @dev
+     * Re-arranges the trading function to remove the use of Φ (cdf).
+     * By removing Φ and only using Φ⁻¹ (inverse cdf), the invariant is at least monotonic but non-strict.
+     * While the Φ and Φ⁻¹ are theoretical inverses with strict monotonicity,
+     * using these functions in practice requires approximations,
+     * which has enough error to potentially lose monotonicity.
+     *
+     * @custom:math
+     * ```
+     * Original trading function
+     * { 0    KΦ(Φ⁻¹(1-x) - σ√τ) >= y
+     * { -∞   otherwise
+     *
+     * k = y - KΦ(Φ⁻¹(1-x) - σ√τ)
+     * y = KΦ(Φ⁻¹(1-x) - σ√τ) - k
+     * x = 1 - Φ(Φ⁻¹((y + k)/K) + σ√τ)
+     *
+     * Adjusted trading function
+     * { 0    Φ⁻¹(1-x) - σ√τ >= Φ⁻¹(y/K)
+     * { -∞   otherwise
+     *
+     * k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
+     * y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
+     * x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
+     * ```
+     *
+     * @param reserveXPerWad    x; Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
+     * @param reserveYPerWad    y; Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
+     * @param strikePriceWad    K; Strike price of the pool, scaled to WAD units.
+     * @param volatilityWad     σ; Volatility of the pool, scaled to WAD units.
+     * @param timeRemainingSec  τ; Amount of time in seconds until the pool is matured.
+     * @return invariant        k; Signed invariant of the pool.
+     */
+    function tradingFunction(
+        uint256 reserveXPerWad,
+        uint256 reserveYPerWad,
+        uint256 strikePriceWad,
+        uint256 volatilityWad,
+        uint256 timeRemainingSec
+    ) internal pure returns (int256 invariant) {
+        uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
+        // √τ, √τ is scaled to WAD by multiplying by 1E9.
+        uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
+        // σ√τ
+        uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
+        // y / K
+        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad); // todo: review rounding direction. Avoids scenarios division truncates to 0.
+        // Φ⁻¹(y/K)
+        int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
+        // 1 - x
+        uint256 differenceWad = WAD - reserveXPerWad;
+        // Φ⁻¹(1-x)
+        int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
+        // k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
+        invariant =
+            inverseCdfQuotient - inverseCdfDifference + int256(volSqrtYearsWad);
+    }
+
+    /**
+     * @notice
+     * Computes the x reserves given y reserves.
+     *
+     * @dev
+     * Uses the adjusted trading function.
+     *
+     * @custom:math
+     * x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
+     *
+     * @param reserveYPerWad    y; Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
+     * @param strikePriceWad    K; Strike price of the pool, scaled to WAD units.
+     * @param volatilityWad     σ; Volatility of the pool, scaled to WAD units.
+     * @param timeRemainingSec  τ; Amount of time in seconds until the pool is matured.
+     * @param invariant         k; Signed invariant of the pool.
+     */
+    function getReserveXPerWad(
+        uint256 reserveYPerWad,
+        uint256 strikePriceWad,
+        uint256 volatilityWad,
+        uint256 timeRemainingSec,
+        int256 invariant
+    ) internal pure returns (uint256 reserveXPerWad) {
+        uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
+        // √τ, √τ is scaled to WAD by multiplying by 1E9.
+        uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
+        // σ√τ
+        uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
+        // y / K
+        uint256 quotientWad = reserveYPerWad.divWadDown(strikePriceWad);
+        // Φ⁻¹(y/K)
+        int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
+        // Φ⁻¹(y/K) + σ√τ - k
+        int256 independent =
+            inverseCdfQuotient + int256(volSqrtYearsWad) - invariant;
+        // x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
+        reserveXPerWad = WAD - uint256(Gaussian.cdf(independent));
+    }
+
+    /**
+     * @notice
+     * Computes the y reserves given x reserves.
+     *
+     * @dev
+     * Uses the adjusted trading function.
+     *
+     * @custom:math
+     * y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
+     *
+     * @param reserveXPerWad    x; Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
+     * @param strikePriceWad    K; Strike price of the pool, scaled to WAD units.
+     * @param volatilityWad     σ; Volatility of the pool, scaled to WAD units.
+     * @param timeRemainingSec  τ; Amount of time in seconds until the pool is matured.
+     * @param invariant         k; Signed invariant of the pool. Truncated.
+     */
+    function getReserveYPerWad(
+        uint256 reserveXPerWad,
+        uint256 strikePriceWad,
+        uint256 volatilityWad,
+        uint256 timeRemainingSec,
+        int256 invariant
+    ) internal pure returns (uint256 reserveYPerWad) {
+        uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
+        // √τ, √τ is scaled to WAD by multiplying by 1E9.
+        uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
+        // σ√τ
+        uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
+        // 1 - x
+        uint256 differenceWad = WAD - reserveXPerWad;
+        // Φ⁻¹(1-x)
+        int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
+        // Φ⁻¹(1-x) - σ√τ + k
+        int256 independent =
+            inverseCdfDifference - int256(volSqrtYearsWad) + invariant;
+        // y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
+        reserveYPerWad =
+            uint256(Gaussian.cdf(independent)).mulWadDown(strikePriceWad);
+    }
 
     /**
      * @dev Computes the invariant of the RMM-01 trading function.
@@ -45,12 +187,13 @@ library RMM01Lib {
         uint256 R_y,
         uint256 timeRemainingSec
     ) internal pure returns (int256 invariantWad) {
-        return Invariant.invariant({
-            R_y: R_y,
-            R_x: R_x,
-            stk: self.params.strikePrice,
-            vol: convertPercentageToWad(self.params.volatility),
-            tau: timeRemainingSec
+        uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
+        return tradingFunction({
+            reserveXPerWad: R_x,
+            reserveYPerWad: R_y,
+            strikePriceWad: self.params.strikePrice,
+            volatilityWad: volatilityWad,
+            timeRemainingSec: timeRemainingSec
         });
     }
 
@@ -108,6 +251,12 @@ library RMM01Lib {
         iteration.liquidity = self.liquidity;
         (iteration.virtualX, iteration.virtualY) = self.getVirtualReservesWad();
 
+        // Computes the existing invariant of the pool with
+        // rounded up virtual reserves for the output reserve of a trade.
+        // This is to make it advantageous for Portfolio
+        // by overestimating the current invariant.
+        // Since an invariant must increase in a swap to be a valid trade,
+        // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
         uint256 reserveXPerLiquidity;
         uint256 reserveYPerLiquidity;
         if (sellAsset) {
@@ -167,20 +316,20 @@ library RMM01Lib {
         // 3. Compute the approximated dependent pool reserve using the adjusted independent reserve per 1E18 liquidity.
         uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
         if (sellAsset) {
-            adjustedDependentReserve = Invariant.getY({
-                R_x: adjustedIndependentReserve,
-                stk: self.params.strikePrice,
-                vol: volatilityWad,
-                tau: tau,
-                inv: data.prevInvariant
+            adjustedDependentReserve = getReserveYPerWad({
+                reserveXPerWad: adjustedIndependentReserve,
+                strikePriceWad: self.params.strikePrice,
+                volatilityWad: volatilityWad,
+                timeRemainingSec: tau,
+                invariant: data.prevInvariant
             });
         } else {
-            adjustedDependentReserve = Invariant.getX({
-                R_y: adjustedIndependentReserve,
-                stk: self.params.strikePrice,
-                vol: volatilityWad,
-                tau: tau,
-                inv: data.prevInvariant
+            adjustedDependentReserve = getReserveXPerWad({
+                reserveYPerWad: adjustedIndependentReserve,
+                strikePriceWad: self.params.strikePrice,
+                volatilityWad: volatilityWad,
+                timeRemainingSec: tau,
+                invariant: data.prevInvariant
             });
         }
 
@@ -224,13 +373,17 @@ library RMM01Lib {
         Bisection memory args,
         uint256 optimized
     ) internal pure returns (int256) {
-        return Invariant.invariant({
-            R_y: args.optimizeQuoteReserve ? optimized : args.reserveWadPerLiquidity,
-            R_x: args.optimizeQuoteReserve ? args.reserveWadPerLiquidity : optimized,
-            stk: args.terminalPriceWad,
-            vol: args.volatilityWad,
-            tau: args.tauSeconds
-        }) - args.prevInvariant;
+        return tradingFunction({
+            reserveXPerWad: args.optimizeQuoteReserve
+                ? args.reserveWadPerLiquidity
+                : optimized,
+            reserveYPerWad: args.optimizeQuoteReserve
+                ? optimized
+                : args.reserveWadPerLiquidity,
+            strikePriceWad: args.terminalPriceWad,
+            volatilityWad: args.volatilityWad,
+            timeRemainingSec: args.tauSeconds
+        }) - (args.prevInvariant + BISECTION_ERROR);
     }
 
     /**
