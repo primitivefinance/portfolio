@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
-import "solstat/Invariant.sol";
+import "solstat/Gaussian.sol";
 import {
     PortfolioPool,
     Iteration,
@@ -124,6 +124,11 @@ library RMM01Lib {
         uint256 timeRemainingSec,
         int256 invariant
     ) internal pure returns (uint256 reserveXPerWad) {
+        // If y reserves has reached upper bound, x reserves is zero.
+        if (reserveYPerWad >= strikePriceWad) return 0;
+        // If y reserves has reached lower bound, x reserves is one.
+        if (reserveYPerWad == 0) return WAD;
+
         uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
         // √τ, √τ is scaled to WAD by multiplying by 1E9.
         uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
@@ -131,9 +136,6 @@ library RMM01Lib {
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // y / K
         uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad);
-        if (quotientWad == 0 || quotientWad == WAD) {
-            revert InvalidQuotient(quotientWad);
-        }
         // Φ⁻¹(y/K)
         int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
         // Φ⁻¹(y/K) + σ√τ - k
@@ -166,6 +168,11 @@ library RMM01Lib {
         uint256 timeRemainingSec,
         int256 invariant
     ) internal pure returns (uint256 reserveYPerWad) {
+        // If x reserves has reached upper bound, y reserves is zero.
+        if (reserveXPerWad >= WAD) return 0;
+        // If x reserves has reached lower bound, y reserves is equal to the strike price.
+        if (reserveXPerWad == 0) return strikePriceWad;
+
         uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
         // √τ, √τ is scaled to WAD by multiplying by 1E9.
         uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
@@ -173,9 +180,6 @@ library RMM01Lib {
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // 1 - x
         uint256 differenceWad = WAD - reserveXPerWad;
-        if (differenceWad == 0 || differenceWad == WAD) {
-            revert InvalidDifference(differenceWad);
-        }
         // Φ⁻¹(1-x)
         int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
         // Φ⁻¹(1-x) - σ√τ + k
@@ -443,22 +447,20 @@ library RMM01Lib {
         uint256 priceWad,
         int128 invariantWad
     ) internal pure returns (uint256 R_x, uint256 R_y) {
-        uint256 terminalPriceWad = self.params.strikePrice;
-        uint256 volatilityFactorWad =
-            convertPercentageToWad(self.params.volatility);
+        uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
         uint256 timeRemainingSec = self.lastTau(); // Uses self.lastTimestamp; must be set before calling this function.
         R_x = getXWithPrice({
             prc: priceWad,
-            stk: terminalPriceWad,
+            stk: self.params.strikePrice,
             vol: self.params.volatility,
             tau: timeRemainingSec
         });
-        R_y = Invariant.getY({
-            R_x: R_x,
-            stk: terminalPriceWad,
-            vol: volatilityFactorWad,
-            tau: timeRemainingSec,
-            inv: invariantWad
+        R_y = getReserveYPerWad({
+            reserveXPerWad: R_x,
+            strikePriceWad: self.params.strikePrice,
+            volatilityWad: volatilityWad,
+            timeRemainingSec: timeRemainingSec,
+            invariant: invariantWad
         });
     }
 
