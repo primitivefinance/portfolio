@@ -29,6 +29,8 @@ library RMM01Lib {
 
     error UndefinedPrice();
     error OverflowWad(int256 wad);
+    error InvalidQuotient(uint256 quotient);
+    error InvalidDifference(uint256 difference);
 
     /**
      * @notice
@@ -80,11 +82,17 @@ library RMM01Lib {
         // σ√τ
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // y / K
-        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad); // todo: review rounding direction. Avoids scenarios division truncates to 0.
+        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad);
+        if (quotientWad == 0 || quotientWad == WAD) {
+            revert InvalidQuotient(quotientWad);
+        }
         // Φ⁻¹(y/K)
         int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
         // 1 - x
         uint256 differenceWad = WAD - reserveXPerWad;
+        if (differenceWad == 0 || differenceWad == WAD) {
+            revert InvalidDifference(differenceWad);
+        }
         // Φ⁻¹(1-x)
         int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
         // k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
@@ -121,7 +129,10 @@ library RMM01Lib {
         // σ√τ
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // y / K
-        uint256 quotientWad = reserveYPerWad.divWadDown(strikePriceWad);
+        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad);
+        if (quotientWad == 0 || quotientWad == WAD) {
+            revert InvalidQuotient(quotientWad);
+        }
         // Φ⁻¹(y/K)
         int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
         // Φ⁻¹(y/K) + σ√τ - k
@@ -161,6 +172,9 @@ library RMM01Lib {
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // 1 - x
         uint256 differenceWad = WAD - reserveXPerWad;
+        if (differenceWad == 0 || differenceWad == WAD) {
+            revert InvalidDifference(differenceWad);
+        }
         // Φ⁻¹(1-x)
         int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
         // Φ⁻¹(1-x) - σ√τ + k
@@ -172,14 +186,17 @@ library RMM01Lib {
     }
 
     /**
-     * @dev Computes the invariant of the RMM-01 trading function.
+     * @notice
+     * Computes the invariant of the RMM-01 trading function.
+     *
+     * @dev
+     * k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
+     *
      * @param self Pool instance.
      * @param R_x Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
      * @param R_y Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
      * @param timeRemainingSec Amount of time in seconds until the `self` PortfolioPool is matured.
      * @return invariantWad Signed invariant denominated in `quote` tokens, scaled to WAD units.
-     * @custom:math k = y - KΦ(Φ⁻¹(1-x) - σ√τ)
-     * @custom:dependency https://github.com/primitivefinance/solstat
      */
     function invariantOf(
         PortfolioPool memory self,
