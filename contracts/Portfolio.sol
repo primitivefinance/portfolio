@@ -6,7 +6,7 @@ import "./Objective.sol";
 /**
  * @title   Portfolio
  * @author  Primitive™
- * @dev Note: All tokens sent to this contract will be lost.
+ * @dev     All directly transferred tokens to this contract are lost.
  * @custom:contributor TomAFrench
  */
 abstract contract PortfolioVirtual is Objective {

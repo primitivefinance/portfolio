@@ -112,7 +112,8 @@ contract RMM01Portfolio is PortfolioVirtual {
         uint256 maxInput;
         if (sellAsset) {
             // invariant: x reserve < 1E18
-            maxInput = (FixedPointMathLib.WAD - reserveIn).mulWadDown(liquidity);
+            maxInput =
+                (FixedPointMathLib.WAD - reserveIn - 1).mulWadDown(liquidity);
         } else {
             // invariant: y reserve < strikePrice
             maxInput = (pools[poolId].params.strikePrice - reserveIn - 1)
