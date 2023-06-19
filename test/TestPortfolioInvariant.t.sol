@@ -69,7 +69,7 @@ contract TestPortfolioInvariant is Setup {
             inverseCdfQuotient - inverseCdfDifference + int256(volSqrtYearsWad);
     }
 
-    function test_trading_function() public {
+    function test_trading_function() public view {
         uint256 reserveXPerWad = 0.308537538726 ether;
         uint256 reserveYPerWad = 0.308537538726 ether;
         uint256 strikePriceWad = 1 ether;
@@ -89,7 +89,7 @@ contract TestPortfolioInvariant is Setup {
 
     /// Sanity check console log. Returns an invariant close to 0.
     /// The result is about 1e-7.
-    function test_invariant_initial() public {
+    function test_invariant_initial() public view {
         uint256 reserveXPerWad = 0.308537538726 ether;
         uint256 reserveYPerWad = 0.308537538726 ether;
         uint256 strikePriceWad = 1 ether;
@@ -442,7 +442,7 @@ contract TestPortfolioInvariant is Setup {
         uint256 strikePriceWad,
         uint256 volatilityWad,
         uint256 timeRemainingSec
-    ) internal returns (uint256, uint256, uint256, uint256, uint256) {
+    ) internal view returns (uint256, uint256, uint256, uint256, uint256) {
         // Need to make sure to bound the arguments to values that will be used.
         // min x + min delta <= x <= max - delta + min x - 1
         reserveXPerWad = bound(
@@ -510,7 +510,7 @@ contract TestPortfolioInvariant is Setup {
         uint256 timeRemainingSec,
         int256 previousResult,
         int256 result
-    ) internal {
+    ) internal view {
         uint256 postReserve = applyDeltaToX
             ? uint256(int256(reserveXPerWad) + delta)
             : uint256(int256(reserveYPerWad) + delta);

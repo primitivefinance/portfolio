@@ -493,7 +493,7 @@ contract TestPortfolioAllocate is Setup {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
 
-        (uint256 amount0, uint256 amount1) =
+        (uint256 amount0,) =
             subject().getLiquidityDeltas(ghost().poolId, int128(amount));
         uint256 fee0 = amount0 * 1 / 100;
         // uint256 fee1 = amount1 * 1 / 100;
@@ -749,11 +749,9 @@ contract TestPortfolioAllocate is Setup {
 
         bytes[] memory res = subject().multicall(data);
 
-        (uint256 assetDeallocate, uint256 quoteDeallocate) =
-            abi.decode(res[0], (uint256, uint256));
+        (uint256 assetDeallocate,) = abi.decode(res[0], (uint256, uint256));
 
-        (uint256 assetAllocate, uint256 quoteAllocate) =
-            abi.decode(res[1], (uint256, uint256));
+        (uint256 assetAllocate,) = abi.decode(res[1], (uint256, uint256));
 
         uint256 postAssetBalance =
             ghost().asset().to_token().balanceOf(address(actor()));
