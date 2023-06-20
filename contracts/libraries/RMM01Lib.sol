@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
-import "solstat/Invariant.sol";
+import "solstat/Gaussian.sol";
 import {
     PortfolioPool,
     Iteration,
@@ -15,6 +15,7 @@ uint256 constant WAD = 1e18;
 uint256 constant SQRT_WAD = 1e9;
 uint256 constant YEAR = 31556953 seconds;
 uint256 constant BISECTION_EPSILON = 0;
+uint256 constant BISECTION_ITERATIONS = 256;
 int256 constant BISECTION_ERROR = 2;
 
 /**
@@ -29,6 +30,8 @@ library RMM01Lib {
 
     error UndefinedPrice();
     error OverflowWad(int256 wad);
+    error InvalidQuotient(uint256 quotient);
+    error InvalidDifference(uint256 difference);
 
     /**
      * @notice
@@ -80,11 +83,17 @@ library RMM01Lib {
         // σ√τ
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // y / K
-        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad); // todo: review rounding direction. Avoids scenarios division truncates to 0.
+        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad);
+        if (quotientWad == 0 || quotientWad == WAD) {
+            revert InvalidQuotient(quotientWad);
+        }
         // Φ⁻¹(y/K)
         int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
         // 1 - x
         uint256 differenceWad = WAD - reserveXPerWad;
+        if (differenceWad == 0 || differenceWad == WAD) {
+            revert InvalidDifference(differenceWad);
+        }
         // Φ⁻¹(1-x)
         int256 inverseCdfDifference = Gaussian.ppf(int256(differenceWad));
         // k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
@@ -115,13 +124,18 @@ library RMM01Lib {
         uint256 timeRemainingSec,
         int256 invariant
     ) internal pure returns (uint256 reserveXPerWad) {
+        // If y reserves has reached upper bound, x reserves is zero.
+        if (reserveYPerWad >= strikePriceWad) return 0;
+        // If y reserves has reached lower bound, x reserves is one.
+        if (reserveYPerWad == 0) return WAD;
+
         uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
         // √τ, √τ is scaled to WAD by multiplying by 1E9.
         uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
         // σ√τ
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // y / K
-        uint256 quotientWad = reserveYPerWad.divWadDown(strikePriceWad);
+        uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad);
         // Φ⁻¹(y/K)
         int256 inverseCdfQuotient = Gaussian.ppf(int256(quotientWad));
         // Φ⁻¹(y/K) + σ√τ - k
@@ -154,6 +168,11 @@ library RMM01Lib {
         uint256 timeRemainingSec,
         int256 invariant
     ) internal pure returns (uint256 reserveYPerWad) {
+        // If x reserves has reached upper bound, y reserves is zero.
+        if (reserveXPerWad >= WAD) return 0;
+        // If x reserves has reached lower bound, y reserves is equal to the strike price.
+        if (reserveXPerWad == 0) return strikePriceWad;
+
         uint256 yearsWad = timeRemainingSec.divWadDown(uint256(YEAR));
         // √τ, √τ is scaled to WAD by multiplying by 1E9.
         uint256 sqrtTauWad = yearsWad.sqrt() * SQRT_WAD;
@@ -172,14 +191,17 @@ library RMM01Lib {
     }
 
     /**
-     * @dev Computes the invariant of the RMM-01 trading function.
+     * @notice
+     * Computes the invariant of the RMM-01 trading function.
+     *
+     * @dev
+     * k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
+     *
      * @param self Pool instance.
      * @param R_x Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
      * @param R_y Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
      * @param timeRemainingSec Amount of time in seconds until the `self` PortfolioPool is matured.
-     * @return invariantWad Signed invariant denominated in `quote` tokens, scaled to WAD units.
-     * @custom:math k = y - KΦ(Φ⁻¹(1-x) - σ√τ)
-     * @custom:dependency https://github.com/primitivefinance/solstat
+     * @return invariantWad Invariant of the pool. Does not have an explicit unit denomination.
      */
     function invariantOf(
         PortfolioPool memory self,
@@ -198,11 +220,18 @@ library RMM01Lib {
     }
 
     /**
-     * @dev Approximation of amount out of tokens given a swap `amountIn`.
-     * It is not exactly precise to the optimal amount.
+     * @notice
+     * Gets the total tokens out given an amount of tokens in for a swap.
+     *
+     * @dev
+     * Approximation of amount out of tokens given a swap of `amountIn`.
+     *
+     * @param self PortfolioPool instance.
+     * @param sellAsset True if `asset` tokens are being sold for `quote` tokens.
      * @param amountIn Quantity of tokens in, units are native token decimals.
-     * @param timestamp Timestamp to use to compute the remaining duration in the Portfolio.
-     * @custom:error Maximum absolute error of 1e-6.
+     * @param timestamp Expected timestamp of the swap's execution.
+     * @param swapper Address of the account that is swapping.
+     * @return amountOut Quantity of tokens out, units are native token decimals.
      */
     function getAmountOut(
         PortfolioPool memory self,
@@ -235,8 +264,14 @@ library RMM01Lib {
     }
 
     /**
-     * @notice Fetches the data needed to simulate a swap to compute the output of tokens.
-     * @dev Does not consider protocol fees, therefore feeAmount could be overestimated since protocol fees are not subtracted.
+     * @notice
+     * Fetches the data needed to simulate a swap to compute the output of tokens.
+     *
+     * @dev
+     * Does not consider protocol fees, therefore feeAmount could be overestimated since protocol fees are not subtracted.
+     * Computes the invariant of the pool with rounded up virtual reserves for the output reserve of a trade.
+     * This is on purpose so that the invariant is slightly overestimated, which will make sure any rounding errors
+     * during swaps are advantageous to Portfolio rather than swappers.
      */
     function getSwapData(
         PortfolioPool memory self,
@@ -356,18 +391,26 @@ library RMM01Lib {
             lower,
             upper,
             BISECTION_EPSILON, // Set to 0 to find the exact dependent reserve which sets the invariant to 0.
-            256, // Maximum amount of loops to run in bisection.
+            BISECTION_ITERATIONS, // Maximum amount of loops to run in bisection.
             optimizeDependentReserve
         );
         // Increase dependent reserve per liquidity by 1 to account for precision loss.
         adjustedDependentReserve++;
         // Return the total adjusted dependent pool reserve for all the liquidity.
-        nextDep = adjustedDependentReserve.mulWadDown(data.liquidity);
+        nextDep = adjustedDependentReserve.mulWadDown(data.liquidity); // Truncates product.
     }
 
     /**
-     * @dev Optimized function used in the bisection method to compute the precise dependent reserve.
+     * @notice
+     * Function used in the bisection method to compute the precise dependent reserve.
+     *
+     * @dev
+     * Optimizes for the case in which `optimized` is the dependent reserve
+     * which produces an invariant equal to the previous invariant plus a small error.
+     * Effectively, finds the dependent reserve which positively changes the invariant by `BISECTION_ERROR`.
+     *
      * @param optimized Dependent reserve in WAD units per 1E18 liquidity.
+     * @return error The difference between the invariant and the previous invariant plus a small error.
      */
     function optimizeDependentReserve(
         Bisection memory args,
@@ -387,31 +430,37 @@ library RMM01Lib {
     }
 
     /**
-     * @dev Computes the amount of `asset` and `quote` tokens scaled to WAD units to track per WAD units of liquidity.
+     * @notice
+     * Computes the x and y reserves given a price.
+     *
+     * @dev
+     * Computes the amount of `asset` and `quote` tokens per one liquidity unit.
+     *
+     * @param self PortfolioPool instance.
      * @param priceWad Price of `asset` token scaled to WAD units.
-     * @param invariantWad Current invariant of the pool in its native WAD units.
+     * @param invariantWad Current invariant of the pool.
+     * @return R_x Quantity of `asset` reserves scaled to WAD units per WAD of liquidity.
+     * @return R_y Quantity of `quote` reserves scaled to WAD units per WAD of liquidity.
      */
     function computeReservesWithPrice(
         PortfolioPool memory self,
         uint256 priceWad,
         int128 invariantWad
     ) internal pure returns (uint256 R_x, uint256 R_y) {
-        uint256 terminalPriceWad = self.params.strikePrice;
-        uint256 volatilityFactorWad =
-            convertPercentageToWad(self.params.volatility);
-        uint256 timeRemainingSec = self.lastTau(); // uses self.lastTimestamp, is it set?
+        uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
+        uint256 timeRemainingSec = self.lastTau(); // Uses self.lastTimestamp; must be set before calling this function.
         R_x = getXWithPrice({
             prc: priceWad,
-            stk: terminalPriceWad,
+            stk: self.params.strikePrice,
             vol: self.params.volatility,
             tau: timeRemainingSec
         });
-        R_y = Invariant.getY({
-            R_x: R_x,
-            stk: terminalPriceWad,
-            vol: volatilityFactorWad,
-            tau: timeRemainingSec,
-            inv: invariantWad
+        R_y = getReserveYPerWad({
+            reserveXPerWad: R_x,
+            strikePriceWad: self.params.strikePrice,
+            volatilityWad: volatilityWad,
+            timeRemainingSec: timeRemainingSec,
+            invariant: invariantWad
         });
     }
 

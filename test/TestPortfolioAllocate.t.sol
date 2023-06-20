@@ -69,7 +69,7 @@ contract TestPortfolioAllocate is Setup {
             )
         );
 
-        subject().multicall{ value: 250 ether }(data);
+        subject().multicall{value: 250 ether}(data);
     }
 
     function test_allocate_recipient_weth()
@@ -81,7 +81,7 @@ contract TestPortfolioAllocate is Setup {
     {
         vm.deal(actor(), 250 ether);
 
-        subject().allocate{ value: 250 ether }(
+        subject().allocate{value: 250 ether}(
             false,
             address(0xbeef),
             ghost().poolId,
@@ -693,14 +693,13 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY))
         isArmed
     {
         uint128 liquidity = 1 ether;
 
         subject().allocate(
             false,
-            address(this),
+            actor(),
             ghost().poolId,
             liquidity,
             type(uint128).max,
@@ -739,7 +738,7 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.allocate,
             (
                 true,
-                address(this),
+                actor(),
                 poolId,
                 maxLiquidity,
                 type(uint128).max,
@@ -749,9 +748,11 @@ contract TestPortfolioAllocate is Setup {
 
         bytes[] memory res = subject().multicall(data);
 
-        (uint256 assetDeallocate,) = abi.decode(res[0], (uint256, uint256));
+        (uint256 assetDeallocate, uint256 quoteDeallocate) =
+            abi.decode(res[0], (uint256, uint256));
 
-        (uint256 assetAllocate,) = abi.decode(res[1], (uint256, uint256));
+        (uint256 assetAllocate, uint256 quoteAllocate) =
+            abi.decode(res[1], (uint256, uint256));
 
         uint256 postAssetBalance =
             ghost().asset().to_token().balanceOf(address(actor()));
@@ -764,6 +765,10 @@ contract TestPortfolioAllocate is Setup {
             preAssetBalance + assetDeallocate - assetAllocate,
             "asset balance"
         );
-        assertEq(postQuoteBalance, preQuoteBalance, "quote balance");
+        assertEq(
+            postQuoteBalance,
+            preQuoteBalance + quoteDeallocate - quoteAllocate,
+            "quote balance"
+        );
     }
 }
