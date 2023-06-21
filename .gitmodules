@@ -9,3 +9,6 @@
 	path = lib/solstat
 	url = https://github.com/primitivefinance/solstat
 	branch = main
+[submodule "lib/nugu"]
+	path = lib/nugu
+	url = https://github.com/primitivefinance/nugu
