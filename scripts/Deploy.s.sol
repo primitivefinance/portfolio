@@ -26,14 +26,13 @@ contract Deploy is Script {
 
         // If no WETH address is provided, we deploy a new contract
         if (weth == address(0)) {
-            weth =
-                factory.deploy(keccak256("WETH2"), type(WETH).creationCode, 0);
+            weth = factory.deploy(keccak256("WETH"), type(WETH).creationCode, 0);
         }
 
         // Same thing for the Portfolio registry
         if (registry == address(0)) {
             registry = factory.deploy(
-                keccak256("SimpleRegistry2"),
+                keccak256("SimpleRegistry"),
                 type(SimpleRegistry).creationCode,
                 0
             );
@@ -41,7 +40,7 @@ contract Deploy is Script {
 
         // Then we can deploy the Portfolio contract
         address portfolio = factory.deploy(
-            keccak256("RMM01Portfolio2"),
+            keccak256("RMM01Portfolio"),
             abi.encodePacked(
                 type(RMM01Portfolio).creationCode, abi.encode(weth, registry)
             ),
