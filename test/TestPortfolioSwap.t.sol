@@ -407,7 +407,7 @@ contract TestPortfolioSwap is Setup {
         });
         data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
 
-        subject().multicall{value: tokenIn == subject().WETH() ? amountIn : 0}(
+        subject().multicall{ value: tokenIn == subject().WETH() ? amountIn : 0 }(
             data
         );
 
@@ -596,7 +596,7 @@ contract TestPortfolioSwap is Setup {
             reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
         }
 
-        uint256 maxIn = Objective(address(subject())).computeMaxInput(
+        uint256 maxIn = Portfolio(payable(address(subject()))).computeMaxInput(
             ghost().poolId,
             sellAsset,
             sellAsset ? reserveXPerL : reserveYPerL,

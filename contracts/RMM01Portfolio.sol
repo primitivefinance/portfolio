@@ -9,7 +9,7 @@ import "./libraries/BisectionLib.sol";
  * @title   RMM-01 Portfolio
  * @author  Primitive™
  */
-contract RMM01Portfolio is PortfolioVirtual {
+contract RMM01Portfolio is Portfolio {
     using RMM01Lib for PortfolioPool;
     using AssemblyLib for int256;
     using AssemblyLib for uint256;
@@ -20,10 +20,7 @@ contract RMM01Portfolio is PortfolioVirtual {
 
     int256 internal constant MINIMUM_INVARIANT_DELTA = 1;
 
-    constructor(
-        address weth,
-        address registry
-    ) PortfolioVirtual(weth, registry) { }
+    constructor(address weth, address registry) Portfolio(weth, registry) { }
 
     /**
      * @dev Computes the latest invariant and spot price of the pool using the latest timestamp.
@@ -44,7 +41,7 @@ contract RMM01Portfolio is PortfolioVirtual {
             amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
             timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
             swapper: address(0) // Setting the swap effects the swap fee %, which is not used in this function.
-        });
+         });
 
         invariant = iteration.prevInvariant;
 
@@ -57,7 +54,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         });
     }
 
-    /// @inheritdoc Objective
+    /// @inheritdoc Portfolio
     function _beforeSwapEffects(
         uint64 poolId,
         bool sellAsset
@@ -76,12 +73,12 @@ contract RMM01Portfolio is PortfolioVirtual {
         return (true, invariant);
     }
 
-    /// @inheritdoc Objective
+    /// @inheritdoc Portfolio
     function checkPool(uint64 poolId) public view override returns (bool) {
         return pools[poolId].exists();
     }
 
-    /// @inheritdoc Objective
+    /// @inheritdoc Portfolio
     function checkInvariant(
         uint64 poolId,
         int256 invariant,
@@ -102,7 +99,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         );
     }
 
-    /// @inheritdoc Objective
+    /// @inheritdoc Portfolio
     function computeMaxInput(
         uint64 poolId,
         bool sellAsset,
@@ -123,7 +120,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         return maxInput;
     }
 
-    /// @inheritdoc Objective
+    /// @inheritdoc Portfolio
     function computeReservesFromPrice(
         uint64 poolId,
         uint256 price
@@ -135,13 +132,13 @@ contract RMM01Portfolio is PortfolioVirtual {
         });
     }
 
-    /// @inheritdoc Objective
+    /// @inheritdoc Portfolio
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
         address swapper
-    ) public view override(Objective) returns (uint256 output) {
+    ) public view override(Portfolio) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
         output = pool.getAmountOut({
             sellAsset: sellAsset,
@@ -151,7 +148,7 @@ contract RMM01Portfolio is PortfolioVirtual {
         });
     }
 
-    /// @inheritdoc Objective
+    /// @inheritdoc Portfolio
     function getSpotPrice(uint64 poolId)
         public
         view
