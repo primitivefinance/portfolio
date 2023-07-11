@@ -25,11 +25,11 @@ abstract contract PortfolioVirtual is Objective {
             mstore(0x00, 0x20)
 
             // We load the length of our string (11 bytes, 0x0b in hex) and its
-            // actual hex value (0x76312e332e302d62657461) using the offset 0x2b.
+            // actual hex value (0x76312e342e302d62657461) using the offset 0x2b.
             // Using this particular offset value will right pad the length at
             // the end of the slot and left pad the string at the beginning of
             // the next slot, assuring the right ABI format to return a string.
-            mstore(0x2b, 0x0b76312e332e302d62657461) // "v1.3.0-beta"
+            mstore(0x2b, 0x0b76312e342e302d62657461) // "v1.4.0-beta"
 
             // Return all the 96 bytes (0x60) of data that was loaded into
             // the memory.
@@ -282,7 +282,7 @@ abstract contract PortfolioVirtual is Objective {
             deltaAsset,
             deltaQuote,
             deltaLiquidity
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -344,7 +344,7 @@ abstract contract PortfolioVirtual is Objective {
 
         emit Deallocate(
             poolId, asset, quote, deltaAsset, deltaQuote, deltaLiquidity
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -573,7 +573,7 @@ abstract contract PortfolioVirtual is Objective {
             iteration.output,
             iteration.feeAmount,
             iteration.nextInvariant
-            );
+        );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
@@ -700,7 +700,7 @@ abstract contract PortfolioVirtual is Objective {
             pool.params.duration,
             pool.params.volatility,
             pool.params.priorityFee
-            );
+        );
 
         _postLock();
     }
