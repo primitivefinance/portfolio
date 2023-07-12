@@ -52,7 +52,7 @@ function __balanceOf__(address token, address account) view returns (uint256) {
 /// @dev Must validate `weth` is real weth.
 function __wrapEther__(AccountSystem storage self, address weth) {
     self.touch(weth);
-    IWETH(weth).deposit{value: msg.value}();
+    IWETH(weth).deposit{ value: msg.value }();
 }
 
 /**
