@@ -3,7 +3,6 @@ pragma solidity 0.8.19;
 
 import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeCastLib.sol";
-
 import "./AssemblyLib.sol";
 
 using AssemblyLib for uint256;
@@ -181,6 +180,8 @@ function getPoolReserves(PortfolioPool memory self)
  * @dev
  * Computes the amount of tokens needed to allocate a given amount of liquidity, rounding up.
  * Computes the amount of tokens deallocated from a given amount of liquidity, rounding down.
+ *
+ * @note
  * Rounding direction is important because it affects the inflows and outflows of tokens.
  * The rounding direction is chosen to favor the pool, not the user. This prevents
  * users from taking advantage of the rounding to extract tokens from the pool.
