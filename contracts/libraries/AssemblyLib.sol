@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
+import { WAD, BASIS_POINT_DIVISOR } from "./ConstantsLib.sol";
+
 error InvalidDays();
 
 uint256 constant SECONDS_PER_YEAR = 31556953 seconds;
@@ -178,6 +180,16 @@ library AssemblyLib {
     ) internal pure returns (uint64 poolId) {
         assembly {
             poolId := or(or(shl(40, pairId), shl(32, isMutable)), poolNonce)
+        }
+    }
+
+    function bpsToPercentWad(uint256 bps)
+        internal
+        pure
+        returns (uint256 percentage)
+    {
+        assembly {
+            percentage := div(mul(bps, WAD), BASIS_POINT_DIVISOR)
         }
     }
 }

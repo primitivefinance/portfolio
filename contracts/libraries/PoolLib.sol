@@ -29,8 +29,20 @@ uint256 constant BURNED_LIQUIDITY = 1e9;
 /// @dev Used as the pool's liquidity on the first `allocate()` call, because pool's are initialized without liquidity.
 uint256 constant INIT_LIQUIDITY = 1e18;
 
+/// @dev Minimum fee and priority fee denominated in basis points.
+uint256 constant MIN_FEE = 1; // 0.01%
+
+/// @dev Maximum fee and priority fee denominated in basis points.
+uint256 constant MAX_FEE = 1000; // 10%
+
 /// @dev A pool's maximum liquidity cannot exceed 2^127 - 1.
-error UpperLiquidityLimit();
+error PoolLib_UpperLiquidityLimit();
+
+error PoolLib_AlreadyCreated();
+error PoolLib_InvalidPriorityFee();
+error PoolLib_InvalidFee();
+error PoolLib_InvalidReserveX();
+error PoolLib_InvalidReserveY();
 
 // ----------------- //
 
@@ -40,6 +52,9 @@ error UpperLiquidityLimit();
  *
  * @dev
  * This is the most important data structure since it handles the token amounts of a pool.
+ *
+ * @note
+ * Optimized to fit in two storage slots.
  *
  * @note Reserves:
  * Pool's reserves are virtual because they track amounts in WAD units (one = 1E18),
@@ -69,15 +84,57 @@ error UpperLiquidityLimit();
  * @param virtualY Total quote token reserves in WAD units for all liquidity.
  * @param liquidity Total supply of liquidity.
  * @param lastTimestamp The block.timestamp of the last `swap()` call.
+ * @param feeBasisPoints The swap fee denominated in basis points, where 1 basis point = 0.01%.
+ * @param priorityFeeBasisPoints Fee paid by the `controller` if the controller swaps, denominated in basis points.
+ * @param controller Address that can change the swap fees.
  */
 struct PortfolioPool {
     uint128 virtualX; // Total X reserves in WAD units for all liquidity.
     uint128 virtualY; // Total Y reserves in WAD units for all liquidity.
     uint128 liquidity; // Total supply of liquidity.
     uint32 lastTimestamp; // Updated __only__ on `swap()`.
+    uint16 feeBasisPoints;
+    uint16 priorityFeeBasisPoints;
+    address controller; // Address that can call `changeParameters()`.
 }
 
 // ----------------- //
+
+/// @dev Used in `createPool()` to initialize a pool's state.
+function createPool(
+    PortfolioPool storage self,
+    uint256 reserveX,
+    uint256 reserveY,
+    uint256 feeBasisPoints,
+    uint256 priorityFeeBasisPoints,
+    address controller
+) {
+    // Check if the pool has already been created.
+    if (self.exists()) revert PoolLib_AlreadyCreated();
+    self.syncPoolTimestamp(block.timestamp);
+
+    if (self.virtualX == 0) revert PoolLib_InvalidReserveX();
+    self.virtualX = reserveX.safeCastTo128();
+
+    if (self.virtualY == 0) revert PoolLib_InvalidReserveY();
+    self.virtualY = reserveY.safeCastTo128();
+
+    if (!feeBasisPoints.isBetween(MIN_FEE, MAX_FEE)) {
+        revert PoolLib_InvalidFee();
+    }
+    self.feeBasisPoints = feeBasisPoints.safeCastTo32();
+
+    // Controller is not required, so it can remain uninitialized at the zero address.
+    bool controlled = controller != address(0);
+    if (controlled) {
+        if (!priorityFeeBasisPoints.isBetween(MIN_FEE, MAX_FEE)) {
+            revert PoolLib_InvalidPriorityFee();
+        }
+
+        self.controller = controller;
+        self.priorityFeeBasisPoints = priorityFeeBasisPoints.safeCastTo32();
+    }
+}
 
 /// @dev Used in `swap()` to update the pool's timestamp.
 function syncPoolTimestamp(PortfolioPool storage self, uint256 timestamp) {
@@ -168,7 +225,7 @@ function getPoolReserves(PortfolioPool memory self)
     returns (uint128 reserveAsset, uint128 reserveQuote)
 {
     // Check if -`self.liquidity` fits within an int128.
-    if (self.liquidity > 2 ** 127 - 1) revert UpperLiquidityLimit();
+    if (self.liquidity > 2 ** 127 - 1) revert PoolLib_UpperLiquidityLimit();
     // Removing liquidity will round down the output amounts, giving us a floor on the reserves.
     return self.getPoolLiquidityDeltas(-int128(self.liquidity));
 }

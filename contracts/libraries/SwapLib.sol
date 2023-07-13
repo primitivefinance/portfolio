@@ -3,15 +3,15 @@ pragma solidity 0.8.19;
 
 import "solmate/utils/FixedPointMathLib.sol";
 import "./AssemblyLib.sol";
-import { PERCENTAGE_DIVISOR } from "./ConstantsLib.sol";
+import { BASIS_POINT_DIVISOR } from "./ConstantsLib.sol";
 
 using { computeAdjustedSwapReserves, computeFeeAmounts } for Order global;
 
 using FixedPointMathLib for uint128;
 
-error Swap_FeeTooHigh();
-error Swap_ProtocolFeeTooHigh();
-error Swap_OutputExceedsReserves();
+error SwapLib_FeeTooHigh();
+error SwapLib_ProtocolFeeTooHigh();
+error SwapLib_OutputExceedsReserves();
 
 /**
  * @notice
@@ -64,7 +64,7 @@ function computeFeeAmounts(
     uint256 protocolFeeProportion
 ) pure returns (uint256 feeAmount, uint256 protocolFeeAmount) {
     // Fee amount cannot be zero, so we can use the `mulDivUp` function to round up.
-    feeAmount = self.input.mulDivUp(feeBasisPoints, PERCENTAGE_DIVISOR);
+    feeAmount = self.input.mulDivUp(feeBasisPoints, BASIS_POINT_DIVISOR);
 
     if (protocolFeeProportion != 0) {
         // Protocol fee is a proportion of the fee amount.
@@ -105,14 +105,14 @@ function computeAdjustedSwapReserves(
     // Input amount is added to the reserves for the swap.
     adjustedInputReserve += self.input;
     // Fee amount is reinvested into the pool, but it's not considered in the invariant check, so we subtract it.
-    if (feeAmount > adjustedInputReserve) revert Swap_FeeTooHigh();
+    if (feeAmount > adjustedInputReserve) revert SwapLib_FeeTooHigh();
     adjustedInputReserve -= feeAmount;
     // Protocol fee is subtracted, even though it's included in the fee, because protocol fees
     // do not get added to the pool's reserves.
-    if (protocolFeeAmount > adjustedInputReserve) revert Swap_ProtocolFeeTooHigh(); // forgefmt: disable-line
+    if (protocolFeeAmount > adjustedInputReserve) revert SwapLib_ProtocolFeeTooHigh(); // forgefmt: disable-line
     adjustedInputReserve -= protocolFeeAmount;
     // Output amount is removed from the reserves for the swap.
-    if (self.output > adjustedOutputReserve) revert Swap_OutputExceedsReserves(); // forgefmt: disable-line
+    if (self.output > adjustedOutputReserve) revert SwapLib_OutputExceedsReserves(); // forgefmt: disable-line
     adjustedOutputReserve -= self.output;
 
     // Use these adjusted reserves in the invariant check.
