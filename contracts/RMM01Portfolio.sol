@@ -2,7 +2,7 @@
 pragma solidity 0.8.19;
 
 import "./Portfolio.sol";
-import "./libraries/RMM01Lib.sol";
+import "./libraries/CurveLib.sol";
 import "./libraries/BisectionLib.sol";
 
 /**
@@ -10,9 +10,11 @@ import "./libraries/BisectionLib.sol";
  * @author  Primitive™
  */
 contract RMM01Portfolio is Portfolio {
-    using RMM01Lib for PortfolioPool;
+    using CurveLib for PortfolioPool;
+    using CurveLib for PortfolioConfig;
     using AssemblyLib for int256;
     using AssemblyLib for uint256;
+    using AssemblyLib for uint32;
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint128;
@@ -21,6 +23,37 @@ contract RMM01Portfolio is Portfolio {
     int256 internal constant MINIMUM_INVARIANT_DELTA = 1;
 
     constructor(address weth, address registry) Portfolio(weth, registry) { }
+
+    mapping(uint64 => PortfolioConfig) public configs;
+
+    function createPool(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint128 strikePrice,
+        uint128 price
+    ) external payable override returns (uint64 poolId) {
+        /* poolId = super.createPool(
+            pairId,
+            controller,
+            priorityFee,
+            fee,
+            volatility,
+            duration,
+            strikePrice,
+            price
+        ); */
+
+        configs[poolId].createConfig({
+            strikePriceWad: strikePrice,
+            volatilityBasisPoints: volatility,
+            durationSeconds: duration,
+            isPerpetual: duration == type(uint16).max
+        });
+    }
 
     /**
      * @dev Computes the latest invariant and spot price of the pool using the latest timestamp.
@@ -36,7 +69,7 @@ contract RMM01Portfolio is Portfolio {
         PortfolioPool storage pool = pools[poolId];
 
         Iteration memory iteration;
-        (iteration, tau) = pool.getSwapData({
+        /* (iteration, tau) = pool.getSwapData({
             sellAsset: sellAsset,
             amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
             timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
@@ -51,7 +84,7 @@ contract RMM01Portfolio is Portfolio {
             stk: pool.params.strikePrice,
             vol: pool.params.volatility,
             tau: tau
-        });
+        }); */
     }
 
     /// @inheritdoc Portfolio
@@ -68,7 +101,9 @@ contract RMM01Portfolio is Portfolio {
         // Buffer for post-maturity swaps would go here.
         // Without a buffer, it's never possible to take trades at tau == 0.
         // This is acceptable.
-        if (pools[poolId].lastTau() == 0) return (false, invariant);
+        if (pools[poolId].computeLatestTau(configs[poolId]) == 0) {
+            return (false, invariant);
+        }
 
         return (true, invariant);
     }
@@ -87,13 +122,8 @@ contract RMM01Portfolio is Portfolio {
         uint256 timestamp
     ) public view override returns (bool, int256 nextInvariant) {
         // Computes the time until pool maturity or zero if expired.
-        uint256 tau = pools[poolId].computeTau(timestamp);
-        nextInvariant = RMM01Lib.invariantOf({
-            self: pools[poolId],
-            R_x: reserveX,
-            R_y: reserveY,
-            timeRemainingSec: tau
-        });
+        uint256 tau = pools[poolId].computeTau(configs[poolId], timestamp);
+        nextInvariant = pools[poolId].getInvariant(configs[poolId]);
         return (
             nextInvariant - invariant >= MINIMUM_INVARIANT_DELTA, nextInvariant
         );
@@ -113,7 +143,7 @@ contract RMM01Portfolio is Portfolio {
                 (FixedPointMathLib.WAD - reserveIn - 1).mulWadDown(liquidity);
         } else {
             // invariant: y reserve < strikePrice
-            maxInput = (pools[poolId].params.strikePrice - reserveIn - 1)
+            maxInput = (configs[poolId].strikePriceWad - reserveIn - 1)
                 .mulWadDown(liquidity);
         }
 
@@ -125,10 +155,18 @@ contract RMM01Portfolio is Portfolio {
         uint64 poolId,
         uint256 price
     ) public view override returns (uint256 reserveX, uint256 reserveY) {
-        (reserveX, reserveY) = RMM01Lib.computeReservesWithPrice({
-            self: pools[poolId],
-            priceWad: price,
-            invariantWad: 0
+        PortfolioPool storage pool = pools[poolId];
+        PortfolioConfig memory config = configs[poolId];
+
+        (reserveX, reserveY) = approximateReservesGivenPrice({
+            self: NormalCurve({
+                reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity),
+                reserveYPerWad: pool.virtualY.divWadDown(pool.liquidity),
+                strikePriceWad: config.strikePriceWad,
+                standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
+                timeRemainingSeconds: pool.computeLatestTau(config)
+            }),
+            priceWad: price
         });
     }
 
@@ -140,12 +178,12 @@ contract RMM01Portfolio is Portfolio {
         address swapper
     ) public view override(Portfolio) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
-        output = pool.getAmountOut({
+        /* output = pool.getAmountOut({
             sellAsset: sellAsset,
             amountIn: amountIn,
             timestamp: block.timestamp,
             swapper: swapper
-        });
+        }); */
     }
 
     /// @inheritdoc Portfolio

@@ -1,18 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
+import "solstat/Gaussian.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeCastLib.sol";
 import "./AssemblyLib.sol";
 
 import { PortfolioPool } from "./PoolLib.sol";
 import { Order } from "./SwapLib.sol";
-import { SQRT_WAD, SECONDS_PER_YEAR, SECONDS_PER_DAY } from "./ConstantsLib.sol";
+import {
+    SQRT_WAD,
+    SECONDS_PER_YEAR,
+    SECONDS_PER_DAY,
+    DOUBLE_WAD
+} from "./ConstantsLib.sol";
 
 using FixedPointMathLib for uint256;
+using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
 using AssemblyLib for uint256;
 using AssemblyLib for uint32;
+using AssemblyLib for uint128;
+using SafeCastLib for uint256;
 
 using {
     computeStdDevSqrtTau,
@@ -21,8 +30,6 @@ using {
     tradingFunction
 } for NormalCurve global;
 
-using { CurveLib } for PortfolioConfig global;
-
 uint256 constant MIN_STRIKE_PRICE = 1;
 uint256 constant MAX_STRIKE_PRICE = type(uint128).max;
 uint256 constant MIN_VOLATILITY = 1; // 0.01%
@@ -30,6 +37,7 @@ uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = SECONDS_PER_DAY; // Miniumum duration is one day.
 uint256 constant MAX_DURATION = SECONDS_PER_YEAR * 3; // Maximum duration is three years.
 
+error CurveLib_ConfigExists();
 error CurveLib_UpperPriceLimitReached();
 error CurveLib_LowerPriceLimitReached();
 error CurveLib_NonExpiringPool();
@@ -79,7 +87,7 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
     // √τ, √τ is scaled to WAD by multiplying by 1E9.
     uint256 sqrtTauWad = timeRemainingYearsWad.sqrt() * SQRT_WAD;
     // σ√τ
-    uint256 stdDevSqrtTau = standardDeviationWad.mulWadDown(sqrtTauWad);
+    uint256 stdDevSqrtTau = self.standardDeviationWad.mulWadDown(sqrtTauWad);
     return stdDevSqrtTau;
 }
 
@@ -129,18 +137,19 @@ function tradingFunction(NormalCurve memory self)
     // Check if the reserves are within the boundary before computing its respective invariant term.
     // This is required because the invariant term for x approaches 0 or 1 as x approaches its bounds.
     // Taking the percent point function of 0 or 1 will result in an error, which we purposefully avoid.
-    uint256 invariantTermX; // Φ⁻¹(1-x)
-    if (self.reserveX.isBetween(lowerBoundX + 1, upperBoundX - 1)) {
+    int256 invariantTermX; // Φ⁻¹(1-x)
+    if (self.reserveXPerWad.isBetween(lowerBoundX + 1, upperBoundX - 1)) {
         invariantTermX = Gaussian.ppf(int256(WAD - self.reserveXPerWad));
     }
-    uint256 invariantTermY; // Φ⁻¹(y/K)
-    if (self.reserveY.isBetween(lowerBoundY + 1, upperBoundY - 1)) {
-        invariantTermY =
-            Gaussian.ppf(int256(reserveYPerWad.divWadUp(strikePriceWad)));
+    int256 invariantTermY; // Φ⁻¹(y/K)
+    if (self.reserveYPerWad.isBetween(lowerBoundY + 1, upperBoundY - 1)) {
+        invariantTermY = Gaussian.ppf(
+            int256(self.reserveYPerWad.divWadUp(self.strikePriceWad))
+        );
     }
 
     // k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
-    invariant = invariantTermY - invariantTermX + int256(stdSqrtTau);
+    invariant = invariantTermY - invariantTermX + int256(stdDevSqrtTau);
 }
 
 /**
@@ -168,7 +177,7 @@ function approximateXGivenY(
     // σ√τ
     uint256 stdDevSqrtTau = self.computeStdDevSqrtTau();
     // y / K, rounded up to avoid truncating the result to 0, which is out of bounds.
-    uint256 quotientWad = self.reserveYPerWad.divWadUp(strikePriceWad);
+    uint256 quotientWad = self.reserveYPerWad.divWadUp(self.strikePriceWad);
     // Φ⁻¹(y/K)
     int256 invariantTermY = Gaussian.ppf(int256(quotientWad));
     // Φ⁻¹(y/K) + σ√τ - k
@@ -196,20 +205,20 @@ function approximateYGivenX(
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
     (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
     // If x reserves has reached upper bound, y reserves is zero.
-    if (reserveXPerWad >= upperBoundX) return lowerBoundY;
+    if (self.reserveXPerWad >= upperBoundX) return lowerBoundY;
     // If x reserves has reached lower bound, y reserves is equal to the strike price.
-    if (reserveXPerWad <= lowerBoundX) return upperBoundY;
+    if (self.reserveXPerWad <= lowerBoundX) return upperBoundY;
     // σ√τ
     uint256 stdDevSqrtTau = self.computeStdDevSqrtTau();
     // 1 - x
-    uint256 differenceWad = WAD - reserveXPerWad;
+    uint256 differenceWad = WAD - self.reserveXPerWad;
     // Φ⁻¹(1-x)
     int256 invariantTermX = Gaussian.ppf(int256(differenceWad));
     // Φ⁻¹(1-x) - σ√τ + k
-    int256 independent = invariantTermX - int256(volSqrtYearsWad) + invariant;
+    int256 independent = invariantTermX - int256(stdDevSqrtTau) + invariant;
     // y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
     reserveYPerWad =
-        uint256(Gaussian.cdf(independent)).mulWadDown(strikePriceWad);
+        uint256(Gaussian.cdf(independent)).mulWadDown(self.strikePriceWad);
 }
 
 /**
@@ -219,19 +228,18 @@ function approximateYGivenX(
  * @dev
  * Derived from the original trading function using approximations that have small error.
  *
- * @note
+ * note
  * x = 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ),
  * where S = price, K = strike, σ = volatility, τ = time remaining, Φ = cdf.
  *
  *
- * @param self
  * @param priceWad Price of y asset per x asset, in WAD units.
  * @return reserveXPerWad Approximated x reserves per WAD at `priceWad`.
  */
 function approximateXGivenPrice(
     NormalCurve memory self,
     uint256 priceWad
-) pure returns (uint256 reserveX) {
+) pure returns (uint256 reserveXPerWad) {
     uint256 quotient = priceWad.divWadDown(self.strikePriceWad);
 
     if (quotient != 0) {
@@ -248,15 +256,15 @@ function approximateXGivenPrice(
         uint256 stdDevSqrtTau = self.computeStdDevSqrtTau();
 
         // ( ln(S/K) + (σ²/2)τ ) / σ√τ
-        uint256 cdfInput = logarithm * WAD; // In units of 1E36.
-        cdfInput += varianceHalved * timeRemainingYearsWad; // Product is in units of 1E36.
-        cdfInput = cdfInput / stdDevSqrtTau; // Divides by units of 1E18 so quotient is in units of 1E18.
+        int256 cdfInput = logarithm * int256(WAD); // In units of 1E36.
+        cdfInput += int256(varianceHalved) * int256(timeRemainingYearsWad); // Product is in units of 1E36.
+        cdfInput = cdfInput / int256(stdDevSqrtTau); // Divides by units of 1E18 so quotient is in units of 1E18.
 
         // Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
         int256 result = Gaussian.cdf(int256(cdfInput));
 
         // todo: handle case where result is > WAD
-        reserveX = uint256(int256(WAD) - result);
+        reserveXPerWad = uint256(int256(WAD) - result);
     }
 }
 
@@ -267,7 +275,7 @@ function approximateXGivenPrice(
  * @dev
  * Derived from the original trading function using approximations that have error.
  *
- * @note
+ * note
  * price(R_x) = Ke^(Φ^-1(1 - R_x)σ√τ - 1/2σ^2τ)
  * As lim_x->0, S(x) = +infinity for all tau > 0 and vol > 0.
  * As lim_x->1, S(x) = 0 for all tau > 0 and vol > 0.
@@ -298,7 +306,7 @@ function approximatePriceGivenX(
     int256 firstTerm = invariantTermX * int256(stdDevSqrtTau);
     // σ^2τ/2
     int256 secondTerm =
-        self.standardDeviationWad ** 2 * int256(timeRemainingYearsWad);
+        int256(self.standardDeviationWad ** 2) * int256(timeRemainingYearsWad);
     secondTerm = secondTerm / (int256(DOUBLE_WAD) * int256(WAD));
     // e^(Φ^-1(1 - R_x)σ√τ - 1/2σ^2τ)
     int256 result = (firstTerm - secondTerm).expWad();
@@ -312,7 +320,8 @@ function approximateReservesGivenPrice(
     uint256 priceWad
 ) pure returns (uint256 reserveXPerWad, uint256 reserveYPerWad) {
     reserveXPerWad = approximateXGivenPrice(self, priceWad);
-    reserveYPerWad = approximateYGivenX(self, reserveXPerWad);
+    self.reserveXPerWad = reserveXPerWad;
+    reserveYPerWad = approximateYGivenX(self, 0);
 }
 
 /**
@@ -383,6 +392,8 @@ library CurveLib {
         uint256 durationSeconds,
         bool isPerpetual
     ) internal {
+        if (config.creationTimestamp != 0) revert CurveLib_ConfigExists();
+
         if (isPerpetual) {
             config.isPerpetual = isPerpetual;
             config.durationSeconds = SECONDS_PER_YEAR.safeCastTo32();
@@ -416,8 +427,6 @@ library CurveLib {
      * This invariant result is used in Portfolio's __critical__ invariant check.
      * A swap will revert if this result has not increased since the last swap.
      *
-     * @param self
-     * @param config
      */
     function getInvariant(
         PortfolioPool memory self,
@@ -468,14 +477,14 @@ library CurveLib {
         // by overestimating the current invariant.
         // Since an invariant must increase in a swap to be a valid trade,
         // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
-        uint256 reserveXPerLiquidity;
-        uint256 reserveYPerLiquidity;
-        if (sellAsset) {
-            reserveXPerLiquidity = self.virtualX.divWadDown(self.liquidity);
-            reserveYPerLiquidity = self.virtualY.divWadUp(self.liquidity);
+        uint256 reserveXPerWad;
+        uint256 reserveYPerWad;
+        if (order.sellAsset) {
+            reserveXPerWad = self.virtualX.divWadDown(self.liquidity);
+            reserveYPerWad = self.virtualY.divWadUp(self.liquidity);
         } else {
-            reserveXPerLiquidity = self.virtualX.divWadUp(self.liquidity);
-            reserveYPerLiquidity = self.virtualY.divWadDown(self.liquidity);
+            reserveXPerWad = self.virtualX.divWadUp(self.liquidity);
+            reserveYPerWad = self.virtualY.divWadDown(self.liquidity);
         }
 
         NormalCurve memory curve = NormalCurve({
@@ -498,11 +507,7 @@ library CurveLib {
 
         (uint256 adjustedX, uint256 adjustedY) = order
             .computeAdjustedSwapReserves(
-            self.virtualX,
-            self.virtualY,
-            feeAmount,
-            protocolFeeAmount,
-            sellAsset
+            self.virtualX, self.virtualY, feeAmount, protocolFeeAmount
         );
 
         curve.reserveXPerWad = adjustedX.divWadDown(self.liquidity);
@@ -515,8 +520,12 @@ library CurveLib {
     // ----------------- //
 
     /// @dev Returns true if last timestamp is beyond maturity and its not a perpetual pool.
-    function expired(PortfolioPool memory self) internal view returns (bool) {
-        return self.config.isPerpetual || self.lastTimestamp >= getMaturity();
+    function expired(
+        PortfolioPool memory self,
+        PortfolioConfig memory config
+    ) internal view returns (bool) {
+        return config.isPerpetual
+            || self.lastTimestamp >= getMaturity(self, config);
     }
 
     /**
@@ -526,14 +535,12 @@ library CurveLib {
      * @dev
      * If the pool is perpetual, the time remaining is permanently equal to one year.
      *
-     * @param self
-     * @param config
      */
     function computeLatestTau(
         PortfolioPool memory self,
         PortfolioConfig memory config
     ) internal view returns (uint256) {
-        return computeTau(self.lastTimestamp);
+        return computeTau(self, config, self.lastTimestamp);
     }
 
     /**
@@ -555,7 +562,7 @@ library CurveLib {
         uint256 endTimestamp = getMaturity(self, config);
         unchecked {
             // Cannot underflow as LHS is either equal to `timestamp` or greater.
-            return AssemblyLib.max(timestamp, end) - timestamp;
+            return AssemblyLib.max(timestamp, endTimestamp) - timestamp;
         }
     }
 

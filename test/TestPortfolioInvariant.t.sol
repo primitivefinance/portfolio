@@ -502,20 +502,12 @@ contract TestPortfolioInvariant is Setup {
 
         // Volatility should be between the Portfolio bounds.
         // Portfolio bounds are in basis points, which must be scaled to percentages then WAD.
-        volatilityWad = bound(
-            volatilityWad,
-            PortfolioLib.MIN_VOLATILITY,
-            PortfolioLib.MAX_VOLATILITY
-        );
+        volatilityWad = bound(volatilityWad, MIN_VOLATILITY, MAX_VOLATILITY);
         volatilityWad = volatilityWad * WAD / BASIS_POINTS_DEN;
 
         // Time remaining should be first bounded by the Portfolio bounds then scaled to the proper units.
         // Porfolio bounds are in days, which must be scaled to seconds.
-        timeRemainingSec = bound(
-            timeRemainingSec,
-            PortfolioLib.MIN_DURATION,
-            PortfolioLib.MAX_DURATION
-        );
+        timeRemainingSec = bound(timeRemainingSec, MIN_DURATION, MAX_DURATION);
         timeRemainingSec = timeRemainingSec * SECONDS_PER_DAY;
 
         // Need to make sure the computations in the function are valid.

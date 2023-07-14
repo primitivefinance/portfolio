@@ -4,6 +4,8 @@ pragma solidity ^0.8.4;
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/libraries/PortfolioLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
+import "contracts/libraries/CurveLib.sol";
+import "contracts/RMM01Portfolio.sol";
 import { Coin } from "./HelperUtils.sol";
 
 using Ghost for GhostState global;
@@ -31,7 +33,7 @@ library Ghost {
         view
         returns (PortfolioPair memory)
     {
-        return self.pool().pair;
+        return IPortfolioStruct(self.subject).pairs(uint16(self.poolId >> 48));
     }
 
     function pool(GhostState memory self)
@@ -61,6 +63,13 @@ library Ghost {
         uint64 poolId
     ) internal view returns (PortfolioPool memory) {
         return IPortfolioStruct(self.subject).pools(poolId);
+    }
+
+    function configOf(
+        GhostState memory self,
+        uint64 poolId
+    ) internal view returns (PortfolioConfig memory) {
+        return IPortfolioStruct(self.subject).configs(poolId);
     }
 
     function file(
@@ -103,9 +112,9 @@ library Ghost {
     function config(GhostState memory self)
         internal
         view
-        returns (PortfolioCurve memory)
+        returns (PortfolioConfig memory)
     {
-        return self.pool().params;
+        return IPortfolioStruct(self.subject).configs(self.poolId);
     }
 
     function asset(GhostState memory self) internal view returns (Coin) {
@@ -127,4 +136,9 @@ interface IPortfolioStruct {
         external
         view
         returns (PortfolioPool memory);
+
+    function configs(uint64 poolId)
+        external
+        view
+        returns (PortfolioConfig memory);
 }

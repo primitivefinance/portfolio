@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import {
-    PortfolioCurve, PortfolioPair, Order
-} from "../libraries/PortfolioLib.sol";
+import { PortfolioPair, Order } from "../libraries/PortfolioLib.sol";
 
 interface IPortfolioEvents {
     /// @dev Ether transfers into Portfolio via a payable function.
@@ -210,9 +208,9 @@ interface IPortfolioGetters {
             uint128 virtualY,
             uint128 liquidity,
             uint32 lastTimestamp,
-            address controller,
-            PortfolioCurve memory,
-            PortfolioPair memory
+            uint16 feeBasisPoints,
+            uint16 priorityFeeBasisPoints,
+            address controller
         );
 
     /**

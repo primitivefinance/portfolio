@@ -13,9 +13,9 @@ contract TestPortfolioChangeParameters is Setup {
         priorityFee = uint16(bound(priorityFee, 1, fee));
 
         subject().changeParameters(poolId, priorityFee, fee);
-        PortfolioCurve memory actual = ghost().pool().params;
-        assertEq(actual.priorityFee, priorityFee, "priorityFee");
-        assertEq(actual.fee, fee, "fee");
+        PortfolioPool memory actual = ghost().pool();
+        assertEq(actual.priorityFeeBasisPoints, priorityFee, "priorityFee");
+        assertEq(actual.feeBasisPoints, fee, "fee");
     }
 
     function test_changeParameters_priority_fee_success()
@@ -24,11 +24,11 @@ contract TestPortfolioChangeParameters is Setup {
         isArmed
     {
         uint64 poolId = ghost().poolId;
-        uint16 prev = ghost().pool().params.priorityFee;
+        uint16 prev = ghost().pool().priorityFeeBasisPoints;
         subject().changeParameters(
             poolId, DEFAULT_PRIORITY_FEE + 10, DEFAULT_FEE + 20
         );
-        uint16 post = ghost().pool().params.priorityFee;
+        uint16 post = ghost().pool().priorityFeeBasisPoints;
         assertEq(post, prev + 10, "priority-fee-change");
     }
 
@@ -49,21 +49,18 @@ contract TestPortfolioChangeParameters is Setup {
         isArmed
     {
         uint64 poolId = ghost().poolId;
-        PortfolioCurve memory curve = PortfolioCurve({
-            strikePrice: DEFAULT_STRIKE,
-            fee: 55,
-            duration: DEFAULT_DURATION,
-            volatility: DEFAULT_VOLATILITY,
-            priorityFee: 56,
-            createdAt: 100000000
-        });
+
+        uint16 priorityFeeBasisPoints = 56;
+        uint16 feeBasisPoints = 55;
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                InvalidPriorityFee.selector, curve.priorityFee
+                PoolLib_InvalidPriorityFee.selector, priorityFeeBasisPoints
             )
         );
-        subject().changeParameters(poolId, curve.priorityFee, curve.fee);
+        subject().changeParameters(
+            poolId, priorityFeeBasisPoints, feeBasisPoints
+        );
     }
 
     function test_revert_changeParameters_invalid_fee()
@@ -73,7 +70,9 @@ contract TestPortfolioChangeParameters is Setup {
     {
         uint16 failureArg = 2 ** 16 - 10;
         uint64 poolId = ghost().poolId;
-        vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, failureArg));
+        vm.expectRevert(
+            abi.encodeWithSelector(PoolLib_InvalidFee.selector, failureArg)
+        );
         subject().changeParameters(poolId, DEFAULT_FEE, failureArg);
     }
 }

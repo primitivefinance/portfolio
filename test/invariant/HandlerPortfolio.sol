@@ -152,7 +152,7 @@ contract HandlerPortfolio is HandlerBase {
     {
         uint128 position = ctx.ghost().position(ctx.actor());
         PortfolioPool memory pool = ctx.ghost().pool();
-        PortfolioPair memory pair = pool.pair;
+        PortfolioPair memory pair = ctx.ghost().pair();
 
         address asset = pair.tokenAsset;
         address quote = pair.tokenQuote;
@@ -200,10 +200,10 @@ contract HandlerPortfolio is HandlerBase {
 
         // Preconditions
         PortfolioPool memory pool = ctx.ghost().pool();
-        uint256 lowerDecimals = pool.pair.decimalsAsset
-            > pool.pair.decimalsQuote
-            ? pool.pair.decimalsQuote
-            : pool.pair.decimalsAsset;
+        PortfolioPair memory pair = ctx.ghost().pair();
+        uint256 lowerDecimals = pair.decimalsAsset > pair.decimalsQuote
+            ? pair.decimalsQuote
+            : pair.decimalsAsset;
         uint256 minLiquidity = 10 ** (18 - lowerDecimals);
         vm.assume(deltaLiquidity > minLiquidity);
         require(pool.lastTimestamp != 0, "Pool not initialized");

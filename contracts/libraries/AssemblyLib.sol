@@ -5,8 +5,6 @@ import { WAD, BASIS_POINT_DIVISOR } from "./ConstantsLib.sol";
 
 error InvalidDays();
 
-uint256 constant SECONDS_PER_YEAR = 31556953 seconds;
-uint256 constant SECONDS_PER_DAY = 86_400 seconds;
 uint8 constant MIN_DECIMALS = 6;
 uint8 constant MAX_DECIMALS = 18;
 
@@ -80,26 +78,6 @@ library AssemblyLib {
             output = input + uint128(delta);
         } else {
             output = input - uint128(-delta);
-        }
-    }
-
-    /**
-     * @notice Days units are used in Portfolio because they fit into an unsigned 16-bit integer and they
-     * are human readable.
-     * @dev Reverts on overflow.
-     */
-    function convertDaysToSeconds(uint256 amountDays)
-        internal
-        pure
-        returns (uint256 amountSeconds)
-    {
-        bytes memory revertData = abi.encodeWithSelector(InvalidDays.selector);
-        assembly {
-            amountSeconds := mul(amountDays, SECONDS_PER_DAY)
-            // Reverts on overflow.
-            if gt(amountSeconds, 0xffffffffffffffffffffffffffffffff) {
-                revert(add(32, revertData), mload(revertData))
-            }
         }
     }
 
@@ -191,5 +169,11 @@ library AssemblyLib {
         assembly {
             percentage := div(mul(bps, WAD), BASIS_POINT_DIVISOR)
         }
+    }
+
+    function safeCastTo16(uint256 x) internal pure returns (uint16 y) {
+        require(x < 1 << 16);
+
+        y = uint16(x);
     }
 }

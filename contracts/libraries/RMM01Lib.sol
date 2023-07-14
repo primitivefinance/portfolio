@@ -6,12 +6,15 @@ import {
     PortfolioPool,
     Iteration,
     SwapInputTooSmall,
-    AssemblyLib,
-    PERCENTAGE
+    AssemblyLib
 } from "../libraries/PortfolioLib.sol";
 import "./BisectionLib.sol";
 
-import { WAD, SQRT_WAD } from "../libraries/ConstantsLib.sol";
+import {
+    WAD,
+    SQRT_WAD,
+    BASIS_POINT_DIVISOR as PERCENTAGE
+} from "../libraries/ConstantsLib.sol";
 
 uint256 constant YEAR = 31556953 seconds;
 uint256 constant BISECTION_EPSILON = 0;
@@ -209,14 +212,14 @@ library RMM01Lib {
         uint256 R_y,
         uint256 timeRemainingSec
     ) internal pure returns (int256 invariantWad) {
-        uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
+        /* uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
         return tradingFunction({
             reserveXPerWad: R_x,
             reserveYPerWad: R_y,
             strikePriceWad: self.params.strikePrice,
             volatilityWad: volatilityWad,
             timeRemainingSec: timeRemainingSec
-        });
+        }); */
     }
 
     /**
@@ -240,7 +243,7 @@ library RMM01Lib {
         uint256 timestamp,
         address swapper
     ) internal pure returns (uint256 amountOut) {
-        uint256 amountInWad = amountIn.scaleToWad(
+        /* uint256 amountInWad = amountIn.scaleToWad(
             sellAsset ? self.pair.decimalsAsset : self.pair.decimalsQuote
         );
 
@@ -260,7 +263,7 @@ library RMM01Lib {
         // Scale down amounts from WAD.
         uint256 outputDec =
             sellAsset ? self.pair.decimalsQuote : self.pair.decimalsAsset;
-        amountOut = data.output.scaleFromWadDown(outputDec);
+        amountOut = data.output.scaleFromWadDown(outputDec); */
     }
 
     /**
@@ -280,7 +283,7 @@ library RMM01Lib {
         uint256 timestamp,
         address swapper
     ) internal pure returns (Iteration memory iteration, uint256 tau) {
-        tau = self.computeTau(timestamp);
+        /* tau = self.computeTau(timestamp);
 
         iteration.input = amountInWad;
         iteration.liquidity = self.liquidity;
@@ -318,7 +321,7 @@ library RMM01Lib {
             : self.params.fee;
 
         iteration.feeAmount = (iteration.input * feePercentage) / PERCENTAGE;
-        if (iteration.feeAmount == 0) iteration.feeAmount = 1;
+        if (iteration.feeAmount == 0) iteration.feeAmount = 1; */
     }
 
     /**
@@ -330,7 +333,7 @@ library RMM01Lib {
         bool sellAsset,
         uint256 tau
     ) internal pure returns (uint256 prevDep, uint256 nextDep) {
-        // Independent reserves are being adjusted with the input amount.
+        /* // Independent reserves are being adjusted with the input amount.
         // Dependent reserves are being adjusted based on the output amount.
         uint256 adjustedIndependentReserve;
         uint256 adjustedDependentReserve;
@@ -397,7 +400,7 @@ library RMM01Lib {
         // Increase dependent reserve per liquidity by 1 to account for precision loss.
         adjustedDependentReserve++;
         // Return the total adjusted dependent pool reserve for all the liquidity.
-        nextDep = adjustedDependentReserve.mulWadDown(data.liquidity); // Truncates product.
+        nextDep = adjustedDependentReserve.mulWadDown(data.liquidity); // Truncates product. */
     }
 
     /**
@@ -447,7 +450,7 @@ library RMM01Lib {
         uint256 priceWad,
         int128 invariantWad
     ) internal pure returns (uint256 R_x, uint256 R_y) {
-        uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
+        /*  uint256 volatilityWad = convertPercentageToWad(self.params.volatility);
         uint256 timeRemainingSec = self.lastTau(); // Uses self.lastTimestamp; must be set before calling this function.
         R_x = getXWithPrice({
             prc: priceWad,
@@ -461,7 +464,7 @@ library RMM01Lib {
             volatilityWad: volatilityWad,
             timeRemainingSec: timeRemainingSec,
             invariant: invariantWad
-        });
+        }); */
     }
 
     // ===== Raw Functions ===== //

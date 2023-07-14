@@ -27,7 +27,8 @@ contract HandlerExternal is HandlerBase {
 
     function warpAfterMaturity(uint256 amount) external {
         amount = bound(amount, 1 days, 700 days);
-        uint256 maturity = ctx.ghost().pool().params.maturity();
+        uint256 maturity =
+            CurveLib.getMaturity(ctx.ghost().pool(), ctx.ghost().config());
         vm.warp(maturity + amount);
     }
 }

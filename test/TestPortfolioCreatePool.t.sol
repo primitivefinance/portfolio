@@ -4,6 +4,8 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioCreatePool is Setup {
+    using CurveLib for PortfolioPool;
+
     uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 4;
     uint256 internal constant POOL_NONCE_STORAGE_SLOT = 6;
 
@@ -46,14 +48,14 @@ contract TestPortfolioCreatePool is Setup {
         setGhostPoolId(poolId);
 
         PortfolioPool memory pool = ghost().pool();
-        PortfolioCurve memory actual = pool.params;
+        PortfolioConfig memory config = ghost().config();
 
         assertEq(pool.controller, address(this), "controller");
-        assertEq(actual.priorityFee, priorityFee, "priorityFee");
-        assertEq(actual.fee, fee, "fee");
-        assertEq(actual.volatility, volatility, "volatility");
-        assertEq(actual.duration, duration, "duration");
-        assertEq(actual.strikePrice, strikePrice, "strikePrice");
+        assertEq(pool.priorityFeeBasisPoints, priorityFee, "priorityFee");
+        assertEq(pool.feeBasisPoints, fee, "fee");
+        assertEq(config.volatilityBasisPoints, volatility, "volatility");
+        assertEq(config.durationSeconds, duration, "duration");
+        assertEq(config.strikePriceWad, strikePrice, "strikePrice");
     }
 
     function test_revert_createPool_zero_price() public {
@@ -139,17 +141,17 @@ contract TestPortfolioCreatePool is Setup {
             pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
         );
         assertEq(
-            ghost().poolOf(poolId).params.duration,
+            ghost().configOf(poolId).durationSeconds,
             perpetualMagicVariable,
             "duration != perpetualMagicVariable"
         );
         assertEq(
-            ghost().poolOf(poolId).computeTau(0),
+            ghost().poolOf(poolId).computeTau(ghost().configOf(poolId), 0),
             SECONDS_PER_YEAR,
             "tau != year"
         );
         assertEq(
-            ghost().poolOf(poolId).lastTau(),
+            ghost().poolOf(poolId).computeLatestTau(ghost().configOf(poolId)),
             SECONDS_PER_YEAR,
             "lastTau != year"
         );

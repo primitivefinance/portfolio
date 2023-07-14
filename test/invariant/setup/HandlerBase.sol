@@ -13,17 +13,11 @@ import "contracts/interfaces/IPortfolio.sol";
 import { GhostState } from "../../HelperGhostLib.sol";
 import { ActorsState } from "../../HelperActorsLib.sol";
 import {
-    PortfolioPool,
     PortfolioPair,
-    PortfolioCurve,
     AssemblyLib,
-    MIN_VOLATILITY,
-    MAX_VOLATILITY,
-    MIN_FEE,
-    MAX_FEE,
-    MIN_DURATION,
-    MAX_DURATION
+    ConstantsLib
 } from "contracts/libraries/PortfolioLib.sol";
+import "contracts/libraries/CurveLib.sol";
 
 interface Context {
     // Manipulate ghost environment

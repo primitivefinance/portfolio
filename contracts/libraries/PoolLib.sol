@@ -13,6 +13,7 @@ using SafeCastLib for uint256;
 
 /// Free functions exposed via `global` give any PortfolioPool instance access to the methods.
 using {
+    createPool,
     changePoolLiquidity,
     exists,
     getPoolLiquidityDeltas,
@@ -53,15 +54,15 @@ error PoolLib_InvalidReserveY();
  * @dev
  * This is the most important data structure since it handles the token amounts of a pool.
  *
- * @note
+ * note
  * Optimized to fit in two storage slots.
  *
- * @note Reserves:
+ * note Reserves:
  * Pool's reserves are virtual because they track amounts in WAD units (one = 1E18),
  * regardless of tokens' decimals that underly the reserves.
  * This is to keep internal unit denominations consistent throughout the codebase.
  *
- * @note Pool State:
+ * note Pool State:
  * Pools can implictly be in one of three states and can only transition into the next state:
  * 1. Non-existent: the pool has not been created via `createPool()`.
  * 2. Empty: the pool has been created with `createPool()`, but has no liquidity.
@@ -70,10 +71,10 @@ error PoolLib_InvalidReserveY();
  * Once a pool is active, it can never be empty again because a small amount of liquidity is burned.
  * This is to prevent pools from being created and destroyed, or being monopolized by a single user.
  *
- * @note Liquidity:
+ * note Liquidity:
  * Liquidity is tracked in WAD units (one = 1E18). It represents the ownership of a pool's reserves.
  *
- * @note Timestamp:
+ * note Timestamp:
  * The pool's timestamp is updated __only__ on `swap()`.
  * This is to prevent the timestamp from being updated on `allocate()` and `deallocate()`.
  * Updating the timestamp __CAN__ affect the prices offered by the pool.
@@ -122,7 +123,7 @@ function createPool(
     if (!feeBasisPoints.isBetween(MIN_FEE, MAX_FEE)) {
         revert PoolLib_InvalidFee();
     }
-    self.feeBasisPoints = feeBasisPoints.safeCastTo32();
+    self.feeBasisPoints = feeBasisPoints.safeCastTo16();
 
     // Controller is not required, so it can remain uninitialized at the zero address.
     bool controlled = controller != address(0);
@@ -132,7 +133,7 @@ function createPool(
         }
 
         self.controller = controller;
-        self.priorityFeeBasisPoints = priorityFeeBasisPoints.safeCastTo32();
+        self.priorityFeeBasisPoints = priorityFeeBasisPoints.safeCastTo16();
     }
 }
 
@@ -214,7 +215,7 @@ function getPoolMaxLiquidity(
  * Computes the real amount of asset and quote tokens in a pool's reserves by getting
  * the amounts removed from the pool if all liquidity was deallocated.
  *
- * @note All reserves for all tokens are in WAD units.
+ * note All reserves for all tokens are in WAD units.
  * Scale the output by the token's decimals to get the real amount of tokens in the pool.
  *
  * @return reserveAsset Real `asset` tokens removed from pool, denominated in WAD.
@@ -238,7 +239,7 @@ function getPoolReserves(PortfolioPool memory self)
  * Computes the amount of tokens needed to allocate a given amount of liquidity, rounding up.
  * Computes the amount of tokens deallocated from a given amount of liquidity, rounding down.
  *
- * @note
+ * note
  * Rounding direction is important because it affects the inflows and outflows of tokens.
  * The rounding direction is chosen to favor the pool, not the user. This prevents
  * users from taking advantage of the rounding to extract tokens from the pool.

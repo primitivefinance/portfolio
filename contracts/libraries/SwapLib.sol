@@ -20,7 +20,7 @@ error SwapLib_OutputExceedsReserves();
  * @dev
  * Arguments required to execute a swap transaction.
  *
- * @note
+ * note
  * Input and output amounts are recommended to be computed offchain. This is because
  * the pool's reserves may change between the time the order is created and executed.
  * Additionally, the input and output should be optimized to pass the invariant check.
@@ -48,7 +48,7 @@ struct Order {
  * Fee amount is rounded up to the nearest integer, it should never be zero.
  * Protocol fee amount is a proportion of the fee amount.
  *
- * @note
+ * note
  * Fee amount is "reinvested" into the pool by adding it to the pool's reserves.
  * Protocol fee amount must never be added to the pool's reserves.
  *
@@ -81,7 +81,7 @@ function computeFeeAmounts(
  * @dev
  * Use this method to compute reserves after a swap which will be passed to the invariant check.
  *
- * @note
+ * note
  * If the swap output exceeds the output reserves, it means a price limit has been reached for the pool.
  *
  * @param self Swap order to compute adjusted reserves for.
@@ -98,7 +98,7 @@ function computeAdjustedSwapReserves(
     uint256 reserveY,
     uint256 feeAmount,
     uint256 protocolFeeAmount
-) returns (uint256 adjustedX, uint256 adjustedY) {
+) pure returns (uint256 adjustedX, uint256 adjustedY) {
     uint256 adjustedInputReserve = self.sellAsset ? reserveX : reserveY;
     uint256 adjustedOutputReserve = self.sellAsset ? reserveY : reserveX;
 

@@ -64,7 +64,7 @@ contract TestPortfolioSwap is Setup {
 
         vm.warp(
             block.timestamp
-                + (uint256(ghost().pool().params.duration) / 2 * 60 * 60 * 24)
+                + (uint256(ghost().config().durationSeconds) / 2 * 60 * 60 * 24)
         );
 
         bytes[] memory data = new bytes[](1);
@@ -166,7 +166,7 @@ contract TestPortfolioSwap is Setup {
         uint128 amountOut
     ) internal {
         PortfolioPool memory pool = ghost().pool();
-        (uint256 prevXPerL, uint256 prevYPerL) = pool.getVirtualReservesWad();
+        (uint256 prevXPerL, uint256 prevYPerL) = (pool.virtualX, pool.virtualY);
 
         // Pre-invariant check will round the output token reserve up when computing
         // how much is in the reserve per liquidity.
@@ -192,7 +192,7 @@ contract TestPortfolioSwap is Setup {
             pool = ghost().pool();
 
             (uint256 postXPerL, uint256 postYPerL) =
-                pool.getVirtualReservesWad();
+                (pool.virtualX, pool.virtualY);
             postXPerL = postXPerL.divWadDown(pool.liquidity);
             postYPerL = postYPerL.divWadDown(pool.liquidity);
 
@@ -357,6 +357,7 @@ contract TestPortfolioSwap is Setup {
         uint256 reserveIn;
 
         PortfolioPool memory pool = ghost().pool();
+        PortfolioPair memory pair = ghost().pair();
         if (sellAsset) {
             reserveIn = pool.virtualX;
         } else {
@@ -370,9 +371,9 @@ contract TestPortfolioSwap is Setup {
             );
 
             uint256 decimalsIn =
-                sellAsset ? pool.pair.decimalsAsset : pool.pair.decimalsQuote;
+                sellAsset ? pair.decimalsAsset : pair.decimalsQuote;
 
-            // uint256 decimalsOut = sellAsset ? pool.pair.decimalsQuote : pool.pair.decimalsAsset;
+            // uint256 decimalsOut = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
 
             maxAmountIn = maxAmountIn.scaleFromWadDown(decimalsIn);
             vm.assume(maxAmountIn > amountIn);
@@ -387,11 +388,11 @@ contract TestPortfolioSwap is Setup {
         address tokenIn;
         address tokenOut;
         if (sellAsset) {
-            tokenIn = pool.pair.tokenAsset;
-            tokenOut = pool.pair.tokenQuote;
+            tokenIn = pair.tokenAsset;
+            tokenOut = pair.tokenQuote;
         } else {
-            tokenIn = pool.pair.tokenQuote;
-            tokenOut = pool.pair.tokenAsset;
+            tokenIn = pair.tokenQuote;
+            tokenOut = pair.tokenAsset;
         }
 
         uint256 prevPhysicalOut =
@@ -529,6 +530,7 @@ contract TestPortfolioSwap is Setup {
         isArmed
     {
         PortfolioPool memory pool = ghost().pool();
+        PortfolioPair memory pair = ghost().pair();
 
         uint256 reserveXPerL;
         uint256 reserveYPerL;
@@ -558,10 +560,10 @@ contract TestPortfolioSwap is Setup {
             );
 
             amountIn = amountIn.scaleFromWadDown(
-                sellAsset ? pool.pair.decimalsAsset : pool.pair.decimalsQuote
+                sellAsset ? pair.decimalsAsset : pair.decimalsQuote
             );
             amountOut = amountOut.scaleFromWadDown(
-                sellAsset ? pool.pair.decimalsQuote : pool.pair.decimalsAsset
+                sellAsset ? pair.decimalsQuote : pair.decimalsAsset
             );
 
             _swap_check_invariant(
@@ -699,13 +701,14 @@ contract TestPortfolioSwap is Setup {
         // We need to figure out how to properly handle that case.
         try subject().multicall(data) {
             PortfolioPool memory pool = ghost().pool();
+            PortfolioConfig memory config = ghost().config();
             reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
             reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
-            uint256 quotient = reserveYPerL.divWadUp(pool.params.strikePrice);
+            uint256 quotient = reserveYPerL.divWadUp(config.strikePriceWad);
             uint256 difference = 1 ether - reserveXPerL;
             console.log("reserveXPerL", reserveXPerL);
             console.log("reserveYPerL", reserveYPerL);
-            console.log("strikePrice", pool.params.strikePrice);
+            console.log("strikePrice", config.strikePriceWad);
             console.log("quotient", quotient);
             console.log("difference", difference);
 
