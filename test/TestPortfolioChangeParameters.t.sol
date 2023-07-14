@@ -7,7 +7,7 @@ contract TestPortfolioChangeParameters is Setup {
     function testFuzz_changeParameters(
         uint16 priorityFee,
         uint16 fee
-    ) public defaultControlledConfig isArmed {
+    ) public defaultControlledConfig {
         uint64 poolId = ghost().poolId;
         fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
         priorityFee = uint16(bound(priorityFee, 1, fee));
@@ -21,12 +21,11 @@ contract TestPortfolioChangeParameters is Setup {
     function test_changeParameters_priority_fee_success()
         public
         defaultControlledConfig
-        isArmed
     {
         uint64 poolId = ghost().poolId;
         uint16 prev = ghost().pool().priorityFeeBasisPoints;
         subject().changeParameters(
-            poolId, DEFAULT_PRIORITY_FEE + 10, DEFAULT_FEE + 20
+            poolId, Setup_DEFAULT_PRIORITY_FEE + 10, Setup_DEFAULT_FEE + 20
         );
         uint16 post = ghost().pool().priorityFeeBasisPoints;
         assertEq(post, prev + 10, "priority-fee-change");
@@ -35,18 +34,18 @@ contract TestPortfolioChangeParameters is Setup {
     function test_revert_changeParameters_not_controller()
         public
         defaultControlledConfig
-        isArmed
     {
         uint64 poolId = ghost().poolId;
         vm.expectRevert(NotController.selector);
         vm.prank(address(0x0006));
-        subject().changeParameters(poolId, DEFAULT_PRIORITY_FEE, DEFAULT_FEE);
+        subject().changeParameters(
+            poolId, Setup_DEFAULT_PRIORITY_FEE, Setup_DEFAULT_FEE
+        );
     }
 
     function test_revert_changeParameters_priority_fee_above_max()
         public
         defaultControlledConfig
-        isArmed
     {
         uint64 poolId = ghost().poolId;
 
@@ -66,13 +65,12 @@ contract TestPortfolioChangeParameters is Setup {
     function test_revert_changeParameters_invalid_fee()
         public
         defaultControlledConfig
-        isArmed
     {
         uint16 failureArg = 2 ** 16 - 10;
         uint64 poolId = ghost().poolId;
         vm.expectRevert(
             abi.encodeWithSelector(PoolLib_InvalidFee.selector, failureArg)
         );
-        subject().changeParameters(poolId, DEFAULT_FEE, failureArg);
+        subject().changeParameters(poolId, Setup_DEFAULT_FEE, failureArg);
     }
 }

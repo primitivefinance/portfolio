@@ -17,4 +17,4 @@ jobs:
           version: nightly
 
       - name: Run tests RMM01Portfolio
-        run: FOUNDRY_PROFILE=test forge test --gas-report --match-contract TestRMM01
+        run: FOUNDRY_PROFILE=test forge test --gas-report

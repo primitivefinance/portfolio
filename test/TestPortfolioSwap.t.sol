@@ -20,7 +20,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether)
-        isArmed
     {
         // Estimate amount out.
         bool sellAsset = true;
@@ -55,7 +54,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
@@ -91,7 +89,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether)
-        isArmed
     {
         // Set fee
         SimpleRegistry(subjects().registry).setFee(address(subject()), 5);
@@ -136,7 +133,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether)
-        isArmed
     {
         vm.assume(amountIn > 0);
         vm.assume(amountOut > 0);
@@ -153,7 +149,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether)
-        isArmed
     {
         vm.assume(amountIn > 0);
         vm.assume(amountOut > 0);
@@ -219,7 +214,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = seed % 2 == 0;
         _fuzz_swap(sellAsset, amountIn);
@@ -237,7 +231,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = seed % 2 == 0;
         _fuzz_swap(sellAsset, amountIn);
@@ -253,7 +246,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = seed % 2 == 0;
         _fuzz_swap(sellAsset, amountIn);
@@ -269,7 +261,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         _fuzz_random_args(seed % 2 == 0, amountIn, amountOut);
     }
@@ -284,7 +275,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         amountIn = bound(amountIn, 1, 1000).safeCastTo64();
         amountOut = bound(amountOut, 1, 1000).safeCastTo64();
@@ -301,7 +291,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         amountIn = bound(amountIn, type(uint128).max - 1e18, type(uint128).max)
             .safeCastTo128();
@@ -433,7 +422,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = true;
         uint256 amountIn = 0.01 ether;
@@ -464,7 +452,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = false;
         uint256 amountIn = 0.01 ether;
@@ -480,7 +467,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = true;
         uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
@@ -498,7 +484,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = false;
         uint256 amountIn = uint256(0.01 ether).scaleFromWadDown(
@@ -546,7 +531,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(10 ether)
-        isArmed
     {
         PortfolioPool memory pool = ghost().pool();
         PortfolioPair memory pair = ghost().pair();
@@ -600,7 +584,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(10 ether)
-        isArmed
     {
         vm.assume(amountIn > 100);
 
@@ -639,7 +622,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(10 ether)
-        isArmed
     {
         bytes[] memory data = new bytes[](2);
         data[0] = abi.encodeCall(
@@ -670,7 +652,6 @@ contract TestPortfolioSwap is Setup {
         useActor
         usePairTokens(100 ether)
         allocateSome(10 ether)
-        isArmed
     {
         subject().deallocate(false, ghost().poolId, 1 ether, 0, 0);
 

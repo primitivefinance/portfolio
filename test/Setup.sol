@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-// Test subjects
-import "contracts/RMM01Portfolio.sol";
-import "solmate/tokens/WETH.sol";
-
 // Test utils
 import "forge-std/Test.sol";
-import "./HelperActorsLib.sol";
-import "./HelperConfigsLib.sol";
-import "./HelperGhostLib.sol";
-import "./HelperSubjectsLib.sol";
-import "./HelperUtils.sol" as Utils;
+import { deploy as deployCoin, Coin } from "./utils/CoinType.sol";
+import { ConfigType, safeCastTo16 } from "./utils/ConfigType.sol";
+import { GhostType, IPortfolioStruct } from "./utils/GhostType.sol";
 
+// Contracts to test
+import "solmate/tokens/WETH.sol";
+import "solmate/utils/SafeCastLib.sol";
+import "solmate/test/utils/mocks/MockERC20.sol";
+import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
+import "contracts/interfaces/IPortfolio.sol";
+import "contracts/test/FeeOnTransferToken.sol";
+import "contracts/test/SimpleRegistry.sol";
+import "contracts/RMM01Portfolio.sol";
+
+// todo: fix and remove
 function encodeCreate(
     uint24 pairId,
     address controller,
@@ -46,147 +51,139 @@ function encodeCreate(
     );
 }
 
-/**
- * @dev Portfolio's test environment is setup to easily extend the tests with new configurations, actors, or environment
- * states.
- *
- * For every test:
- * Do you have the `useActor` modifier?
- * Do you use a config modifier, like `defaultConfig`?
- * Do you check if the test is ready with the `isArmed` modifier?
- *
- * | Problem                                                 | Solution                                                                  |
- * | ------------------------------------------------------- |
- * ------------------------------------------------------------------------- |
- * | Different contracts with same interface                 | Internal virtual function in test setup that returns test
- * subject.        |
- * | Pools with different configurations                     | Virtual function in setup that overrides config.                          |
- * | Redundant inputs per test, e.g. poolId, tokens, actors. | Ghost variable state accessed via a virtual internal
- * function.            |
- * | Multiple tokens and actors                              | Managed via a registry lib with easy ways to fetch, add,
- * and remove them. |
- * | Time based test scenarios                               | Cheatcodes, and maybe a library to manage the time with
- * more granularity. |
- */
-contract Setup is Test {
+// Types
+struct SubjectsType {
+    address deployer;
+    address registry;
+    address weth;
+    address portfolio;
+}
+
+// Interfaces
+
+interface ISetup {
+    /// @dev Returns the current targets for the tests.
+    function ghost() external view returns (GhostType memory);
+
+    /// @dev Returns the current subjects for the tests.
+    function subjects() external view returns (SubjectsType memory);
+
+    /// @dev Returns the target smart contract being called in tests.
+    function subject() external view returns (IPortfolio);
+
+    /// @dev Returns the caller of the unit tests.
+    function actor() external view returns (address);
+
+    /// @dev Returns the specific pool of the unit test.
+    function poolId() external view returns (uint256);
+
+    /// @dev Returns the WETH token.
+    function weth() external view returns (address);
+
+    /// @dev Returns the registry contract used in the subject.
+    function registry() external view returns (address);
+
+    /// @dev Returns the portfolio contract as an address, which is also the subject.
+    function portfolio() external view returns (address);
+}
+
+// Constants and Storage
+contract SetupStorage {
+    GhostType internal _ghost_state;
+    SubjectsType internal _subjects;
+}
+
+contract SetupConstants {
+    uint16 constant Setup_DEFAULT_FEE = 30;
+    uint16 constant Setup_DEFAULT_PRIORITY_FEE = 10;
+}
+
+library RMM01Strategy {
     using SafeCastLib for uint256;
 
-    /**
-     * @dev Manages the addresses calling the subjects in the environment.
-     */
+    uint256 constant RMM01Strategy_DEFAULT_STRIKE = 1e18;
+    uint256 constant RMM01Strategy_DEFAULT_VOLATILITY = 1000;
+    uint256 constant RMM01Strategy_DEFAULT_DURATION = 1 days;
+    uint256 constant RMM01Strategy_DEFAULT_PRICE = 1e18;
 
-    ActorsState private _actors;
-    /**
-     * @dev Manages the contextual state in the environment. Includes subjects/actors.
-     */
-    GhostState private _ghost;
-    /**
-     * @dev Manages all the contracts in the environment.
-     */
-    SubjectsState private _subjects;
-
-    receive() external payable { }
-
-    /**
-     * @notice Deploys WETH, subject, and three tokens. Creates a default pool.
-     * @dev Initializes the actor, subject, and poolId ghost state.
-     */
-    function setUp() public virtual {
-        _subjects.startDeploy(vm).wrapper().registrar().subject().token(
-            "token", abi.encode("Asset-Std", "A-STD-18", uint8(18))
-        ).token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
-            "token", abi.encode("USDC", "USDC-6", uint8(6))
-        ).token("FOT", abi.encode("Asset-FOT", "A-FOT-18", uint8(18))).token(
-            "FOT", abi.encode("Quote-FOT", "Q-FOT-18", uint8(18))
-        ).stopDeploy();
-
-        _ghost = GhostState({
-            actor: _subjects.deployer,
-            subject: address(_subjects.last),
-            poolId: 0
-        });
+    function defaultConfig() internal view returns (bytes memory) {
+        return encodeConfig(0, 0, 0, false, 0);
     }
 
-    function setGhostPoolId(uint64 poolId) public virtual {
-        require(poolId != 0, "invalid-poolId");
-        _ghost.file("poolId", abi.encode(poolId));
+    function encodeConfig(
+        uint256 strikePriceWad,
+        uint256 volatilityBasisPoints,
+        uint256 durationSeconds,
+        bool isPerpetual,
+        uint256 priceWad
+    ) internal view returns (bytes memory) {
+        if (strikePriceWad == 0) strikePriceWad = RMM01Strategy_DEFAULT_STRIKE;
+        if (volatilityBasisPoints == 0) {
+            volatilityBasisPoints = RMM01Strategy_DEFAULT_VOLATILITY;
+        }
+        if (durationSeconds == 0) {
+            durationSeconds = RMM01Strategy_DEFAULT_DURATION;
+        }
+        if (priceWad == 0) priceWad = RMM01Strategy_DEFAULT_PRICE;
+
+        return abi.encode(
+            PortfolioConfig(
+                strikePriceWad.safeCastTo128(),
+                volatilityBasisPoints.safeCastTo32(),
+                durationSeconds.safeCastTo32(),
+                uint32(block.timestamp),
+                isPerpetual
+            ),
+            priceWad
+        );
     }
+}
 
-    function setGhostActor(address actor) public virtual {
-        require(actor != address(0), "invalid-actor");
-        _ghost.file("actor", abi.encode(actor));
-    }
+contract Setup is ISetup, SetupStorage, SetupConstants, Test {
+    using SafeCastLib for uint256;
+    using RMM01Strategy for ConfigType;
 
-    function addGhostActor(address actor) public virtual {
-        actors().add(actor);
-    }
-
-    /**
-     * @dev Fetches the ghost state to get information or manipulate it.
-     */
-    function ghost() public view virtual returns (GhostState memory) {
-        return _ghost;
-    }
-
-    /**
-     * @dev Actors can be this test contract or helper contracts like RevertCatcher, which
-     * bubbles errors up using try/catch.
-     */
-    function actors() internal virtual returns (ActorsState storage) {
-        return _actors;
-    }
-
-    /**
-     * @dev Subjects are the contracts being tested on or used in testing.
-     */
-    function subjects() internal virtual returns (SubjectsState storage) {
-        return _subjects;
-    }
-
-    function getTokens() public view virtual returns (MockERC20[] memory) {
-        return _subjects.tokens;
-    }
-
-    /**
-     * @notice Contract that is being tested.
-     * @dev Target subject is a ghost variable because it changes in the environment.
-     */
-    function subject() public view virtual returns (IPortfolio) {
-        return IPortfolio(_ghost.subject);
-    }
-
-    /**
-     * @notice Address that is calling the test subject contract.
-     * @dev Uses the existing actor that is being pranked via `useActor` modifier.
-     * It uses the `_ghost.actor` instead of `_actor.last` because it can
-     * change in the environment.
-     */
-    function actor() public view virtual returns (address) {
-        return _ghost.actor;
-    }
-
-    function getActors() public view virtual returns (address[] memory) {
-        address[] memory actors = _actors.active;
-        return actors;
-    }
-
-    function getRandomActor(uint256 index)
-        public
-        view
-        virtual
-        returns (address)
-    {
-        return _actors.rand(index);
-    }
-
-    // === Modifiers for Tests === //
-
-    modifier isArmed() {
-        require(ghost().poolId != 0, "did you forget to use a config modifier?");
+    // Important for making sure the setup went smoothly!
+    modifier verifySetup() {
+        _;
         require(
             ghost().subject != address(0), "did you forget to deploy a subject?"
         );
         require(ghost().actor != address(0), "did you forget to set an actor?");
+    }
+
+    // Setup
+    function setUp() public virtual verifySetup {
+        _subjects.deployer = address(this);
+        vm.label(_subjects.deployer, "deployer");
+
+        _subjects.registry = address(new SimpleRegistry());
+        vm.label(_subjects.registry, "registry");
+
+        _subjects.weth = address(new WETH());
+        vm.label(_subjects.weth, "weth");
+
+        _subjects.portfolio =
+            address(new RMM01Portfolio(_subjects.weth, _subjects.registry));
+        vm.label(_subjects.portfolio, "portfolio");
+
+        _ghost_state = GhostType({
+            actor: address(this),
+            subject: _subjects.portfolio,
+            poolId: 0
+        });
+
+        assertEq(subject().VERSION(), "v1.4.0-beta", "version-not-equal");
+    }
+
+    function setGhostPoolId(uint64 id_) internal {
+        _ghost_state.poolId = id_;
+    }
+
+    // Modifiers for interacting with the test environment
+
+    modifier pauseGas() {
+        vm.pauseGasMetering();
         _;
     }
 
@@ -194,6 +191,11 @@ contract Setup is Test {
         vm.startPrank(actor());
         _;
         vm.stopPrank();
+    }
+
+    modifier setActor(address actor_) {
+        _ghost_state.actor = actor_;
+        _;
     }
 
     modifier usePairTokens(uint256 amount) {
@@ -212,110 +214,6 @@ contract Setup is Test {
                 amount: amount
             });
         }
-        _;
-    }
-
-    /**
-     * @dev Uses a default parameter set to create a pool.
-     * @custom:example
-     * ```
-     * function test_basic_deposit() public defaultConfig {...}
-     * ```
-     */
-    modifier defaultConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier defaultControlledConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
-            "controller", abi.encode(address(this))
-        ).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier stablecoinPortfolioConfig() {
-        uint16 duration = type(uint16).max;
-        uint16 volatility = uint16(MIN_VOLATILITY);
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[1]))
-        ).edit("quote", abi.encode(address(subjects().tokens[2]))).edit(
-            "duration", abi.encode(duration)
-        ).edit("volatility", abi.encode(volatility)).edit(
-            "fee", abi.encode(uint16(MIN_FEE))
-        ).edit("price", abi.encode(uint128(1e18))).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier sixDecimalQuoteConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[2]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier feeOnTokenTransferConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[3]))
-        ).edit("quote", abi.encode(address(subjects().tokens[4]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier wethConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().weth))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier durationConfig(uint16 duration) {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
-            "duration", abi.encode(duration)
-        ).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier volatilityConfig(uint16 volatility) {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
-            "volatility", abi.encode(volatility)
-        ).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier pauseGas() {
-        vm.pauseGasMetering();
         _;
     }
 
@@ -386,16 +284,175 @@ contract Setup is Test {
         _;
     }
 
-    modifier setActor(address actor) {
-        _ghost.file("actor", abi.encode(actor));
+    // Modifier configs
+
+    function deployDefaultTokenPair() internal returns (address, address) {
+        Coin asset = deployCoin("token", abi.encode("asset", "ASSET", 18));
+        Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
+
+        return (asset.to_addr(), quote.to_addr());
+    }
+
+    modifier defaultConfig() {
+        ConfigType memory config;
+        (config.asset, config.quote) = deployDefaultTokenPair();
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()), RMM01Strategy.defaultConfig()
+        );
+
         _;
     }
 
-    // === Gas Utils === //
-    function wasteGas(uint256 slots) internal pure {
-        assembly {
-            let memPtr := mload(0x40)
-            mstore(add(memPtr, mul(32, slots)), 1) // Expand memory
-        }
+    modifier defaultControlledConfig() {
+        ConfigType memory config;
+        (config.asset, config.quote) = deployDefaultTokenPair();
+        config.controller = address(this);
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()), RMM01Strategy.defaultConfig()
+        );
+        _;
     }
+
+    modifier stablecoinPortfolioConfig() {
+        uint16 duration = type(uint16).max;
+        uint16 volatility = uint16(MIN_VOLATILITY);
+
+        ConfigType memory config;
+        (config.asset, config.quote) = deployDefaultTokenPair();
+        config.controller = address(this);
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()),
+            RMM01Strategy.encodeConfig({
+                strikePriceWad: 1e18,
+                volatilityBasisPoints: volatility,
+                durationSeconds: duration, // todo: fix
+                isPerpetual: true,
+                priceWad: 1e18
+            })
+        );
+        _;
+    }
+
+    modifier sixDecimalQuoteConfig() {
+        Coin asset = deployCoin("token", abi.encode("asset", "ASSET", 18));
+        vm.label(asset.to_addr(), "asset-18");
+        Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 6));
+        vm.label(quote.to_addr(), "quote-6");
+
+        ConfigType memory config;
+        (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
+        config.controller = address(this);
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()), RMM01Strategy.defaultConfig()
+        );
+        _;
+    }
+
+    modifier feeOnTokenTransferConfig() {
+        Coin asset = deployCoin("FOT", abi.encode("asset", "ASSET", 18));
+        vm.label(asset.to_addr(), "asset-fot-18");
+        Coin quote = deployCoin("FOT", abi.encode("quote", "QUOTE", 18));
+        vm.label(quote.to_addr(), "quote-fot-18");
+
+        ConfigType memory config;
+        (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()), RMM01Strategy.defaultConfig()
+        );
+        _;
+    }
+
+    modifier wethConfig() {
+        ConfigType memory config;
+        Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
+        (config.asset, config.quote) = (weth(), quote.to_addr());
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()), RMM01Strategy.defaultConfig()
+        );
+        _;
+    }
+
+    modifier durationConfig(uint16 duration) {
+        ConfigType memory config;
+        (config.asset, config.quote) = deployDefaultTokenPair();
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()),
+            RMM01Strategy.encodeConfig({
+                strikePriceWad: 0,
+                volatilityBasisPoints: 0,
+                durationSeconds: duration, // todo: fix
+                isPerpetual: false,
+                priceWad: 0
+            })
+        );
+        _;
+    }
+
+    modifier volatilityConfig(uint16 volatility) {
+        ConfigType memory config;
+        (config.asset, config.quote) = deployDefaultTokenPair();
+
+        _ghost_state.poolId = config.instantiate(
+            address(subject()),
+            RMM01Strategy.encodeConfig({
+                strikePriceWad: 0,
+                volatilityBasisPoints: volatility,
+                durationSeconds: 0, // todo: fix
+                isPerpetual: false,
+                priceWad: 0
+            })
+        );
+        _;
+    }
+
+    // Methods for interacting with the test environment
+
+    /// @inheritdoc ISetup
+    function ghost() public view override returns (GhostType memory) {
+        return _ghost_state;
+    }
+
+    /// @inheritdoc ISetup
+    function subjects() public view returns (SubjectsType memory) {
+        return _subjects;
+    }
+
+    /// @inheritdoc ISetup
+    function actor() public view override returns (address) {
+        return _ghost_state.actor;
+    }
+
+    /// @inheritdoc ISetup
+    function subject() public view override returns (IPortfolio) {
+        return IPortfolio(payable(_ghost_state.subject));
+    }
+
+    /// @inheritdoc ISetup
+    function poolId() public view override returns (uint256) {
+        return _ghost_state.poolId;
+    }
+
+    /// @inheritdoc ISetup
+    function weth() public view override returns (address) {
+        return _subjects.weth;
+    }
+
+    /// @inheritdoc ISetup
+    function registry() public view override returns (address) {
+        return _subjects.registry;
+    }
+
+    /// @inheritdoc ISetup
+    function portfolio() public view override returns (address) {
+        return _subjects.portfolio;
+    }
+
+    receive() external payable { }
 }

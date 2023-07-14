@@ -10,24 +10,34 @@ contract TestGas is Setup {
     using FixedPointMathLib for uint128;
     using FixedPointMathLib for uint256;
 
+    address token_a;
+    address token_b;
+    address token_c;
+
     // helpers
     modifier usePools(uint256 amount) {
         _create_pools(amount);
         _;
     }
 
-    function _getTokens() internal returns (address, address) {
-        return (address(subjects().tokens[0]), address(subjects().tokens[1]));
+    function _getTokens() internal view returns (address, address) {
+        return (token_a, token_b);
     }
 
     uint256 internal constant POOLS_LIMIT = 100;
 
     IPortfolio _subject;
 
-    // setup
     function setUp() public override {
         super.setUp();
         _subject = subject(); // We use the same subject in this contract.
+
+        token_a =
+            deployCoin("token", abi.encode("token a", "A", uint8(18))).to_addr();
+        token_b =
+            deployCoin("token", abi.encode("token b", "B", uint8(18))).to_addr();
+        token_c =
+            deployCoin("token", abi.encode("token c", "C", uint8(18))).to_addr();
     }
 
     function test_gas_single_allocate()
@@ -36,7 +46,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
@@ -61,7 +70,6 @@ contract TestGas is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether + uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
@@ -78,7 +86,6 @@ contract TestGas is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = true;
         uint128 amountIn = uint128(0.01 ether);
@@ -107,11 +114,9 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         // Create another pair and pool.
-        (address token0, address token1) =
-            (address(subjects().tokens[1]), address(subjects().tokens[2]));
+        (address token0, address token1) = (token_b, token_c);
 
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
@@ -157,7 +162,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, false);
     }
@@ -168,7 +172,6 @@ contract TestGas is Setup {
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(5, false);
     }
@@ -179,7 +182,6 @@ contract TestGas is Setup {
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(10, false);
     }
@@ -190,7 +192,6 @@ contract TestGas is Setup {
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(25, false);
     }
@@ -201,7 +202,6 @@ contract TestGas is Setup {
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(50, false);
     }
@@ -212,7 +212,6 @@ contract TestGas is Setup {
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(100, false);
     }
@@ -223,11 +222,9 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         // Create another pair and pool.
-        (address token0, address token1) =
-            (address(subjects().tokens[1]), address(subjects().tokens[2]));
+        (address token0, address token1) = (token_b, token_c);
 
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
@@ -279,7 +276,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, true);
         _multi_deallocate(2, false);
@@ -291,7 +287,6 @@ contract TestGas is Setup {
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(5, true);
         _multi_deallocate(5, false);
@@ -303,7 +298,6 @@ contract TestGas is Setup {
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(10, true);
         _multi_deallocate(10, false);
@@ -315,7 +309,6 @@ contract TestGas is Setup {
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(25, true);
         _multi_deallocate(25, false);
@@ -327,7 +320,6 @@ contract TestGas is Setup {
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(50, true);
         _multi_deallocate(50, false);
@@ -339,7 +331,6 @@ contract TestGas is Setup {
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(100, true);
         _multi_deallocate(100, false);
@@ -351,7 +342,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, true);
         _multi_deallocate(2, false);
@@ -364,7 +354,7 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
+        
     {
         // Create another pair and pool.
         (address token0, address token1) =
@@ -431,7 +421,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, true);
         _multi_swap(2, false);
@@ -443,7 +432,6 @@ contract TestGas is Setup {
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(5, true);
         _multi_swap(5, false);
@@ -455,7 +443,6 @@ contract TestGas is Setup {
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(10, true);
         _multi_swap(10, false);
@@ -467,7 +454,6 @@ contract TestGas is Setup {
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(25, true);
         _multi_swap(25, false);
@@ -479,7 +465,6 @@ contract TestGas is Setup {
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(50, true);
         _multi_swap(50, false);
@@ -491,7 +476,6 @@ contract TestGas is Setup {
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(100, true);
         _multi_swap(100, false);
@@ -500,8 +484,7 @@ contract TestGas is Setup {
     function _create_pools(uint256 amount) internal {
         require(amount <= POOLS_LIMIT);
         address controller = address(0);
-        (address a0, address q0) =
-            (address(subjects().tokens[0]), address(subjects().tokens[1]));
+        (address a0, address q0) = _getTokens();
         bytes[] memory instructions = new bytes[](amount + 1);
         for (uint256 i; i != (amount + 1); ++i) {
             if (i == 0) {
@@ -777,7 +760,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(100 ether)
-        isArmed
     {
         // Allocate to first pool
         uint24 pairId = 1;
@@ -815,7 +797,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = _allocateInstruction(ghost().poolId);
@@ -829,7 +810,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = _allocateInstruction(ghost().poolId);
@@ -876,7 +856,6 @@ contract TestGas is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         bytes[] memory instructions = new bytes[](2);
         instructions[0] = _allocateInstruction(ghost().poolId);
@@ -892,7 +871,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory instructions = new bytes[](1);
 

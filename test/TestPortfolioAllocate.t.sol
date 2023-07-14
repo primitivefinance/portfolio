@@ -53,7 +53,6 @@ contract TestPortfolioAllocate is Setup {
         wethConfig
         useActor
         usePairTokens(500 ether)
-        isArmed
     {
         vm.deal(actor(), 250 ether);
 
@@ -78,7 +77,6 @@ contract TestPortfolioAllocate is Setup {
         wethConfig
         useActor
         usePairTokens(500 ether)
-        isArmed
     {
         vm.deal(actor(), 250 ether);
 
@@ -100,7 +98,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         subject().allocate(
             false,
@@ -120,7 +117,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         // Arguments for test.
         uint128 amount = 0.1 ether;
@@ -161,7 +157,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         // Arguments for test.
         uint128 amount = 0.1 ether;
@@ -198,7 +193,7 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
+        
     {
         // Deposit tokens which will be used to compute max liquidity.
         subject().fund(ghost().asset().to_addr(), type(uint256).max);
@@ -226,7 +221,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -257,7 +251,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -295,7 +288,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -315,7 +307,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -338,7 +329,6 @@ contract TestPortfolioAllocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -377,7 +367,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -440,7 +429,6 @@ contract TestPortfolioAllocate is Setup {
         public
         defaultConfig
         useActor
-        isArmed
     {
         uint256 failureArg = 0;
         vm.expectRevert(ZeroLiquidity.selector);
@@ -464,7 +452,6 @@ contract TestPortfolioAllocate is Setup {
         public
         defaultConfig
         useActor
-        isArmed
     {
         uint256 failureArg = uint256(type(uint128).max) + 1;
         vm.expectRevert(); // safeCastTo128 reverts with no message, so it's just an "Evm Error".
@@ -489,7 +476,6 @@ contract TestPortfolioAllocate is Setup {
         feeOnTokenTransferConfig
         usePairTokens(10 ether)
         useActor
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -533,7 +519,6 @@ contract TestPortfolioAllocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
-        isArmed
     {
         vm.assume(liquidity > 10 ** (18 - 6));
         _simple_allocate_check_liquidity(liquidity);
@@ -554,7 +539,6 @@ contract TestPortfolioAllocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -577,7 +561,6 @@ contract TestPortfolioAllocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -600,7 +583,6 @@ contract TestPortfolioAllocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -615,7 +597,6 @@ contract TestPortfolioAllocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -632,7 +613,6 @@ contract TestPortfolioAllocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -649,7 +629,6 @@ contract TestPortfolioAllocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -716,7 +695,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 liquidity = 1 ether;
 
@@ -730,22 +708,13 @@ contract TestPortfolioAllocate is Setup {
         );
 
         uint64 poolId = subject().createPool(
-            1,
-            0,
-            0,
-            DEFAULT_FEE,
-            DEFAULT_PRIORITY_FEE,
+            1, // pair id
+            0, //x
+            0, // y
+            30, // fee
+            0, // priority fee
             address(0),
-            abi.encode(
-                PortfolioConfig(
-                    DEFAULT_STRIKE,
-                    DEFAULT_VOLATILITY,
-                    DEFAULT_DURATION,
-                    uint32(block.timestamp),
-                    false
-                ),
-                DEFAULT_PRICE
-            )
+            RMM01Strategy.defaultConfig()
         );
 
         uint128 liq = subject().positions(actor(), ghost().poolId);

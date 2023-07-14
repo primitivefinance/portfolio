@@ -6,11 +6,13 @@ import "contracts/libraries/PortfolioLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import "contracts/libraries/CurveLib.sol";
 import "contracts/RMM01Portfolio.sol";
-import { Coin } from "./HelperUtils.sol";
 
-using Ghost for GhostState global;
+import { Coin } from "./CoinType.sol";
 
-struct GhostState {
+using Ghost for GhostType global;
+
+/// @dev Universal state for unit tests.
+struct GhostType {
     address actor;
     address subject;
     uint64 poolId;
@@ -28,7 +30,7 @@ struct GhostState {
 library Ghost {
     error InvalidFileKey(bytes32 what);
 
-    function pair(GhostState memory self)
+    function pair(GhostType memory self)
         internal
         view
         returns (PortfolioPair memory)
@@ -36,7 +38,7 @@ library Ghost {
         return IPortfolioStruct(self.subject).pairs(uint16(self.poolId));
     }
 
-    function pool(GhostState memory self)
+    function pool(GhostType memory self)
         internal
         view
         returns (PortfolioPool memory)
@@ -45,35 +47,35 @@ library Ghost {
     }
 
     function position(
-        GhostState memory self,
+        GhostType memory self,
         address owner
     ) internal view returns (uint128) {
         return IPortfolio(self.subject).positions(owner, self.poolId);
     }
 
     function pairOf(
-        GhostState memory self,
+        GhostType memory self,
         uint24 pairId
     ) internal view returns (PortfolioPair memory) {
         return IPortfolioStruct(self.subject).pairs(pairId);
     }
 
     function poolOf(
-        GhostState memory self,
+        GhostType memory self,
         uint64 poolId
     ) internal view returns (PortfolioPool memory) {
         return IPortfolioStruct(self.subject).pools(poolId);
     }
 
     function configOf(
-        GhostState memory self,
+        GhostType memory self,
         uint64 poolId
     ) internal view returns (PortfolioConfig memory) {
         return IPortfolioStruct(self.subject).configs(poolId);
     }
 
     function file(
-        GhostState storage self,
+        GhostType storage self,
         bytes32 what,
         bytes memory data
     ) internal {
@@ -89,27 +91,27 @@ library Ghost {
     }
 
     function net(
-        GhostState memory self,
+        GhostType memory self,
         address token
     ) internal view returns (int256) {
         return IPortfolioGetters(self.subject).getNetBalance(token);
     }
 
     function physicalBalance(
-        GhostState memory self,
+        GhostType memory self,
         address token
     ) internal view returns (uint256) {
         return MockERC20(token).balanceOf(self.subject);
     }
 
     function reserve(
-        GhostState memory self,
+        GhostType memory self,
         address token
     ) internal view returns (uint256) {
         return IPortfolioGetters(self.subject).getReserve(token);
     }
 
-    function config(GhostState memory self)
+    function config(GhostType memory self)
         internal
         view
         returns (PortfolioConfig memory)
@@ -117,11 +119,11 @@ library Ghost {
         return IPortfolioStruct(self.subject).configs(self.poolId);
     }
 
-    function asset(GhostState memory self) internal view returns (Coin) {
+    function asset(GhostType memory self) internal view returns (Coin) {
         return Coin.wrap(self.pair().tokenAsset);
     }
 
-    function quote(GhostState memory self) internal view returns (Coin) {
+    function quote(GhostType memory self) internal view returns (Coin) {
         return Coin.wrap(self.pair().tokenQuote);
     }
 }

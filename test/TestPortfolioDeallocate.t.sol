@@ -10,7 +10,6 @@ contract TestPortfolioDeallocate is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         uint128 liquidity = 1 ether;
 
@@ -51,7 +50,6 @@ contract TestPortfolioDeallocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
-        isArmed
     {
         vm.assume(liquidity > 10 ** (18 - 6));
         bytes[] memory data = new bytes[](1);
@@ -79,7 +77,6 @@ contract TestPortfolioDeallocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         bytes[] memory data = new bytes[](1);
@@ -107,7 +104,6 @@ contract TestPortfolioDeallocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         bytes[] memory data = new bytes[](1);
@@ -131,7 +127,6 @@ contract TestPortfolioDeallocate is Setup {
         wethConfig
         useActor
         usePairTokens(500 ether)
-        isArmed
     {
         vm.assume(liquidity > BURNED_LIQUIDITY);
         vm.deal(actor(), 250 ether);
@@ -161,7 +156,6 @@ contract TestPortfolioDeallocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         bytes[] memory data = new bytes[](1);
@@ -186,7 +180,6 @@ contract TestPortfolioDeallocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -218,7 +211,6 @@ contract TestPortfolioDeallocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
