@@ -40,8 +40,8 @@ uint256 constant MAX_FEE = 1000; // 10%
 error PoolLib_UpperLiquidityLimit();
 
 error PoolLib_AlreadyCreated();
-error PoolLib_InvalidPriorityFee();
-error PoolLib_InvalidFee();
+error PoolLib_InvalidPriorityFee(uint256);
+error PoolLib_InvalidFee(uint256);
 error PoolLib_InvalidReserveX();
 error PoolLib_InvalidReserveY();
 
@@ -114,22 +114,22 @@ function createPool(
     if (self.exists()) revert PoolLib_AlreadyCreated();
     self.syncPoolTimestamp(block.timestamp);
 
-    if (self.virtualX == 0) revert PoolLib_InvalidReserveX();
+    if (reserveX == 0) revert PoolLib_InvalidReserveX();
     self.virtualX = reserveX.safeCastTo128();
 
-    if (self.virtualY == 0) revert PoolLib_InvalidReserveY();
+    if (reserveY == 0) revert PoolLib_InvalidReserveY();
     self.virtualY = reserveY.safeCastTo128();
 
     if (!feeBasisPoints.isBetween(MIN_FEE, MAX_FEE)) {
-        revert PoolLib_InvalidFee();
+        revert PoolLib_InvalidFee(feeBasisPoints);
     }
     self.feeBasisPoints = feeBasisPoints.safeCastTo16();
 
     // Controller is not required, so it can remain uninitialized at the zero address.
     bool controlled = controller != address(0);
     if (controlled) {
-        if (!priorityFeeBasisPoints.isBetween(MIN_FEE, MAX_FEE)) {
-            revert PoolLib_InvalidPriorityFee();
+        if (!priorityFeeBasisPoints.isBetween(MIN_FEE, feeBasisPoints)) {
+            revert PoolLib_InvalidPriorityFee(priorityFeeBasisPoints);
         }
 
         self.controller = controller;

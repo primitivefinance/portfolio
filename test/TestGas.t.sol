@@ -121,18 +121,8 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (
-                uint24(0),
-                address(0),
-                0,
-                hundred,
-                1e4,
-                hundred,
-                10 ether,
-                10 ether
-            )
+        data[0] = encodeCreate(
+            uint24(0), address(0), 0, hundred, 1e4, hundred, 10 ether, 10 ether
         );
 
         subject().multicall(data);
@@ -247,19 +237,10 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (
-                uint24(0),
-                address(0),
-                0,
-                hundred,
-                1e4,
-                hundred,
-                10 ether,
-                10 ether
-            )
+        data[0] = encodeCreate(
+            uint24(0), address(0), 0, hundred, 1e4, hundred, 10 ether, 10 ether
         );
+
         subject().multicall(data);
 
         bytes[] memory instructions = new bytes[](2);
@@ -527,18 +508,15 @@ contract TestGas is Setup {
                 instructions[i] =
                     abi.encodeCall(IPortfolioActions.createPair, (a0, q0));
             } else {
-                instructions[i] = abi.encodeCall(
-                    IPortfolioActions.createPool,
-                    (
-                        0, // magic pair id to use the nonce, which is the createPairId!
-                        controller,
-                        0,
-                        uint16(100 + 100 / i),
-                        uint16(1000 + 1000 / i),
-                        uint16(1 + 100 / i),
-                        uint128(1 ether * i),
-                        uint128(1 ether * i)
-                    )
+                instructions[i] = encodeCreate(
+                    0, // magic pair id to use the nonce, which is the createPairId!
+                    controller,
+                    0,
+                    uint16(100 + 100 / i),
+                    uint16(1000 + 1000 / i),
+                    uint16(1 + 100 / i),
+                    uint128(1 ether * i),
+                    uint128(1 ether * i)
                 );
             }
         }
@@ -657,21 +635,18 @@ contract TestGas is Setup {
 
     function _createInstruction(uint24 pairId)
         internal
-        pure
+        view
         returns (bytes memory)
     {
-        return abi.encodeCall(
-            IPortfolioActions.createPool,
-            (
-                pairId,
-                address(0),
-                uint16(10),
-                uint16(100),
-                uint16(1000),
-                uint16(100),
-                uint128(1 ether),
-                uint128(1 ether)
-            )
+        return encodeCreate(
+            pairId,
+            address(0),
+            uint16(10),
+            uint16(100),
+            uint16(1000),
+            uint16(100),
+            uint128(1 ether),
+            uint128(1 ether)
         );
     }
 

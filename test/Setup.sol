@@ -13,6 +13,39 @@ import "./HelperGhostLib.sol";
 import "./HelperSubjectsLib.sol";
 import "./HelperUtils.sol" as Utils;
 
+function encodeCreate(
+    uint24 pairId,
+    address controller,
+    uint16 priorityFee,
+    uint16 fee,
+    uint16 volatility,
+    uint16 duration,
+    uint128 strikePrice,
+    uint128 price
+) view returns (bytes memory) {
+    return abi.encodeCall(
+        IPortfolioActions.createPool,
+        (
+            pairId,
+            0,
+            0,
+            fee,
+            priorityFee,
+            controller,
+            abi.encode(
+                PortfolioConfig(
+                    strikePrice,
+                    volatility,
+                    uint32(duration) * 1 days,
+                    uint32(block.timestamp),
+                    false
+                ),
+                price
+                )
+        )
+    );
+}
+
 /**
  * @dev Portfolio's test environment is setup to easily extend the tests with new configurations, actors, or environment
  * states.

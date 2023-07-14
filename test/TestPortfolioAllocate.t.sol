@@ -6,6 +6,9 @@ import "./Setup.sol";
 contract TestPortfolioAllocate is Setup {
     using AssemblyLib for uint256;
 
+    uint256 constant TEST_ALLOCATE_MIN_DURATION = 1;
+    uint256 constant TEST_ALLOCATE_MAX_DURATION = 720;
+
     function test_multicall_create_pair_pool_allocate() public useActor {
         MockERC20 tokenA = new MockERC20("TokenA", "AAA", 18);
         MockERC20 tokenB = new MockERC20("TokenB", "BBB", 18);
@@ -21,10 +24,8 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.createPair, (address(tokenA), address(tokenB))
         );
 
-        data[1] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (0, address(0), 1, 100, 100, 100, 1 ether, 1 ether)
-        );
+        data[1] =
+            encodeCreate(0, address(0), 1, 100, 100, 100, 1 ether, 1 ether);
 
         uint64 poolId = AssemblyLib.encodePoolId(1, false, 1);
 
@@ -69,7 +70,7 @@ contract TestPortfolioAllocate is Setup {
             )
         );
 
-        subject().multicall{value: 250 ether}(data);
+        subject().multicall{ value: 250 ether }(data);
     }
 
     function test_allocate_recipient_weth()
@@ -81,7 +82,7 @@ contract TestPortfolioAllocate is Setup {
     {
         vm.deal(actor(), 250 ether);
 
-        subject().allocate{value: 250 ether}(
+        subject().allocate{ value: 250 ether }(
             false,
             address(0xbeef),
             ghost().poolId,
@@ -543,7 +544,13 @@ contract TestPortfolioAllocate is Setup {
         uint64 liquidity
     )
         public
-        durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
+        durationConfig(
+            uint16(
+                bound(
+                    duration, TEST_ALLOCATE_MIN_DURATION, TEST_ALLOCATE_MAX_DURATION
+                )
+            )
+        )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -558,7 +565,15 @@ contract TestPortfolioAllocate is Setup {
         uint64 liquidity
     )
         public
-        durationConfig(uint16(bound(duration, MIN_DURATION, MIN_DURATION + 100)))
+        durationConfig(
+            uint16(
+                bound(
+                    duration,
+                    TEST_ALLOCATE_MIN_DURATION,
+                    TEST_ALLOCATE_MIN_DURATION + 100
+                )
+            )
+        )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -573,7 +588,15 @@ contract TestPortfolioAllocate is Setup {
         uint64 liquidity
     )
         public
-        durationConfig(uint16(bound(duration, MAX_DURATION - 100, MAX_DURATION)))
+        durationConfig(
+            uint16(
+                bound(
+                    duration,
+                    TEST_ALLOCATE_MAX_DURATION - 100,
+                    TEST_ALLOCATE_MAX_DURATION
+                )
+            )
+        )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -708,13 +731,21 @@ contract TestPortfolioAllocate is Setup {
 
         uint64 poolId = subject().createPool(
             1,
-            address(0),
-            DEFAULT_PRIORITY_FEE,
+            0,
+            0,
             DEFAULT_FEE,
-            DEFAULT_VOLATILITY,
-            DEFAULT_DURATION,
-            DEFAULT_STRIKE,
-            DEFAULT_PRICE
+            DEFAULT_PRIORITY_FEE,
+            address(0),
+            abi.encode(
+                PortfolioConfig(
+                    DEFAULT_STRIKE,
+                    DEFAULT_VOLATILITY,
+                    DEFAULT_DURATION,
+                    uint32(block.timestamp),
+                    false
+                ),
+                DEFAULT_PRICE
+            )
         );
 
         uint128 liq = subject().positions(actor(), ghost().poolId);

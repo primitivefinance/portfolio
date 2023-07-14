@@ -11,6 +11,9 @@ contract TestPortfolioSwap is Setup {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for uint128;
 
+    uint256 constant TEST_SWAP_MIN_DURATION = 1;
+    uint256 constant TEST_SWAP_MAX_DURATION = 700;
+
     function test_swap_increases_user_balance_token_out()
         public
         defaultConfig
@@ -63,8 +66,7 @@ contract TestPortfolioSwap is Setup {
         uint256 prev = ghost().quote().to_token().balanceOf(actor());
 
         vm.warp(
-            block.timestamp
-                + (uint256(ghost().config().durationSeconds) / 2 * 60 * 60 * 24)
+            block.timestamp + (uint256(ghost().config().durationSeconds) / 2)
         );
 
         bytes[] memory data = new bytes[](1);
@@ -229,7 +231,9 @@ contract TestPortfolioSwap is Setup {
         uint16 dur
     )
         public
-        durationConfig(uint16(bound(dur, MIN_DURATION, MAX_DURATION)))
+        durationConfig(
+            uint16(bound(dur, TEST_SWAP_MIN_DURATION, TEST_SWAP_MAX_DURATION))
+        )
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
@@ -435,6 +439,21 @@ contract TestPortfolioSwap is Setup {
         uint256 amountIn = 0.01 ether;
         uint256 amountOut =
             subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+
+        (int256 prev, int256 post) = RMM01Portfolio(payable(address(subject())))
+            .getInvariants(
+            Order({
+                useMax: false,
+                poolId: ghost().poolId,
+                input: amountIn.safeCastTo128(),
+                output: amountOut.safeCastTo128(),
+                sellAsset: sellAsset
+            })
+        );
+
+        console.log("ivnariants");
+        console.logInt(prev);
+        console.logInt(post);
 
         _swap_assert_price(sellAsset, amountIn, amountOut);
     }

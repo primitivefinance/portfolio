@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 import "solmate/utils/SafeCastLib.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/libraries/AssemblyLib.sol";
+import { PortfolioConfig } from "contracts/libraries/CurveLib.sol";
 
 using Configs for ConfigState global;
 
@@ -13,7 +14,7 @@ struct ConfigState {
     address controller;
     uint16 feeBps;
     uint16 priorityFeeBps;
-    uint16 durationDays;
+    uint16 durationSeconds;
     uint16 volatilityBps;
     uint128 terminalPriceWad;
     uint128 reportedPriceWad;
@@ -22,6 +23,7 @@ struct ConfigState {
 uint16 constant DEFAULT_PRIORITY_FEE = 10;
 uint16 constant DEFAULT_FEE = 100; // 100 bps = 1%
 uint16 constant DEFAULT_VOLATILITY = 10_000;
+// 1 day in seconds
 uint16 constant DEFAULT_DURATION = 365;
 uint128 constant DEFAULT_STRIKE = 10 ether;
 uint128 constant DEFAULT_PRICE = 10 ether;
@@ -46,6 +48,39 @@ library Configs {
     using SafeCastLib for uint256;
     using { safeCastTo16 } for uint256;
 
+    function encodeCreate(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint128 strikePrice,
+        uint128 price
+    ) internal view returns (bytes memory) {
+        return abi.encodeCall(
+            IPortfolioActions.createPool,
+            (
+                pairId,
+                0,
+                0,
+                fee,
+                priorityFee,
+                controller,
+                abi.encode(
+                    PortfolioConfig(
+                        strikePrice,
+                        volatility,
+                        uint32(duration) * 1 days,
+                        uint32(block.timestamp),
+                        false
+                    ),
+                    price
+                    )
+            )
+        );
+    }
+
     /**
      * @dev Creates a new config with defaults.
      * @custom:example
@@ -64,7 +99,7 @@ library Configs {
             controller: address(0),
             feeBps: DEFAULT_FEE,
             priorityFeeBps: DEFAULT_PRIORITY_FEE,
-            durationDays: DEFAULT_DURATION,
+            durationSeconds: DEFAULT_DURATION,
             volatilityBps: DEFAULT_VOLATILITY,
             terminalPriceWad: DEFAULT_STRIKE,
             reportedPriceWad: DEFAULT_PRICE
@@ -91,7 +126,7 @@ library Configs {
         } else if (what == "quote") {
             self.quote = abi.decode(data, (address));
         } else if (what == "duration") {
-            self.durationDays = abi.decode(data, (uint16));
+            self.durationSeconds = abi.decode(data, (uint16));
         } else if (what == "volatility") {
             self.volatilityBps = abi.decode(data, (uint16));
         } else if (what == "controller") {
@@ -129,18 +164,15 @@ library Configs {
             data[0] = abi.encodeCall(
                 IPortfolioActions.createPair, (self.asset, self.quote)
             );
-            data[1] = abi.encodeCall(
-                IPortfolioActions.createPool,
-                (
-                    pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
-                    self.controller,
-                    self.priorityFeeBps,
-                    self.feeBps,
-                    self.volatilityBps,
-                    self.durationDays,
-                    self.terminalPriceWad,
-                    self.reportedPriceWad
-                )
+            data[1] = encodeCreate(
+                pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
+                self.controller,
+                self.priorityFeeBps,
+                self.feeBps,
+                self.volatilityBps,
+                self.durationSeconds,
+                self.terminalPriceWad,
+                self.reportedPriceWad
             );
 
             IPortfolio(Portfolio).multicall(data);
@@ -156,18 +188,15 @@ library Configs {
         } else {
             bytes[] memory data = new bytes[](1);
 
-            data[0] = abi.encodeCall(
-                IPortfolioActions.createPool,
-                (
-                    pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
-                    self.controller,
-                    self.priorityFeeBps,
-                    self.feeBps,
-                    self.volatilityBps,
-                    self.durationDays,
-                    self.terminalPriceWad,
-                    self.reportedPriceWad
-                )
+            data[0] = encodeCreate(
+                pairId, // uses 0 pairId as magic variable. todo: maybe change to max uint24?
+                self.controller,
+                self.priorityFeeBps,
+                self.feeBps,
+                self.volatilityBps,
+                self.durationSeconds,
+                self.terminalPriceWad,
+                self.reportedPriceWad
             );
 
             IPortfolio(Portfolio).multicall(data);

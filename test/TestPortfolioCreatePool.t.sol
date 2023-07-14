@@ -30,13 +30,21 @@ contract TestPortfolioCreatePool is Setup {
             IPortfolioActions.createPool,
             (
                 pairId,
-                address(this),
-                priorityFee,
+                0,
+                0,
                 fee,
-                volatility,
-                duration,
-                strikePrice,
-                price
+                priorityFee,
+                address(this),
+                abi.encode(
+                    PortfolioConfig(
+                        strikePrice,
+                        volatility,
+                        duration,
+                        uint32(block.timestamp),
+                        false
+                    ),
+                    price
+                    )
             )
         );
 
@@ -60,21 +68,18 @@ contract TestPortfolioCreatePool is Setup {
 
     function test_revert_createPool_zero_price() public {
         bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (uint24(1), address(this), 1, 1, 1, 1, 1, 0)
-        );
+        data[0] = encodeCreate(uint24(1), address(this), 1, 1, 1, 1, 1, 0);
+
         vm.expectRevert(ZeroPrice.selector);
         subject().multicall(data);
     }
 
     function test_revert_createPool_priority_fee_invalid_fee() public {
         bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (uint24(1), address(this), 0, 1, 1, 1, 1, 1)
+        data[0] = encodeCreate(uint24(1), address(this), 0, 1, 1, 1, 1, 1);
+        vm.expectRevert(
+            abi.encodeWithSelector(PoolLib_InvalidPriorityFee.selector, 0)
         );
-        vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, 0));
         subject().multicall(data);
     }
 
@@ -110,10 +115,8 @@ contract TestPortfolioCreatePool is Setup {
         );
 
         bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (pairNonce, address(0), 1, 100, 100, 100, 100, 1001)
-        );
+        data[0] =
+            encodeCreate(pairNonce, address(0), 1, 100, 100, 100, 100, 1001);
         vm.expectRevert(arithmeticError);
         subject().multicall(data);
     }
@@ -122,18 +125,8 @@ contract TestPortfolioCreatePool is Setup {
         uint16 perpetualMagicVariable = type(uint16).max;
         uint24 pairNonce = uint24(1);
         bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (
-                pairNonce,
-                address(0),
-                1,
-                100,
-                100,
-                perpetualMagicVariable,
-                100,
-                100
-            )
+        data[0] = encodeCreate(
+            pairNonce, address(0), 1, 100, 100, perpetualMagicVariable, 100, 100
         );
 
         subject().multicall(data);

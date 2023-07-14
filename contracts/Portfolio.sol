@@ -198,14 +198,14 @@ abstract contract Portfolio is IPortfolio {
 
         if (fee != 0) {
             if (!fee.isBetween(MIN_FEE, MAX_FEE)) {
-                revert PoolLib_InvalidFee();
+                revert PoolLib_InvalidFee(fee);
             }
             pool.feeBasisPoints = fee;
         }
 
         if (priorityFee != 0) {
-            if (!priorityFee.isBetween(MIN_FEE, MAX_FEE)) {
-                revert PoolLib_InvalidPriorityFee();
+            if (!priorityFee.isBetween(MIN_FEE, pool.feeBasisPoints)) {
+                revert PoolLib_InvalidPriorityFee(priorityFee);
             }
             pool.priorityFeeBasisPoints = priorityFee;
         }
@@ -235,7 +235,7 @@ abstract contract Portfolio is IPortfolio {
             amountQuoteDec: maxDeltaQuote
         });
 
-        PortfolioPair memory pair = pairs[uint16(poolId >> 48)];
+        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
 
         if (useMax) {
             // A positive net balance is a surplus of tokens in the accounting state that can be used to mint liquidity.
@@ -320,7 +320,7 @@ abstract contract Portfolio is IPortfolio {
             amountQuoteDec: minDeltaQuote
         });
 
-        PortfolioPair memory pair = pairs[uint16(poolId >> 48)];
+        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
 
         if (useMax) {
@@ -428,7 +428,7 @@ abstract contract Portfolio is IPortfolio {
         // Scale amounts from native token decimals to WAD.
         // Load input and output token information with respective pair tokens.
         SwapState memory info;
-        PortfolioPair memory pair = pairs[uint16(args.poolId >> 48)];
+        PortfolioPair memory pair = pairs[uint16(args.poolId >> 40)];
         if (args.sellAsset) {
             (args.input, args.output) = _scaleAmountsToWad({
                 poolId: args.poolId,
@@ -645,53 +645,48 @@ abstract contract Portfolio is IPortfolio {
     /// @inheritdoc IPortfolioActions
     function createPool(
         uint24 pairId,
+        uint256 reserveXPerWad,
+        uint256 reserveYPerWad,
+        uint16 feeBasisPoints,
+        uint16 priorityFeeBasisPoints,
         address controller,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint128 strikePrice,
-        uint128 price
-    ) external payable virtual returns (uint64 poolId) {
+        bytes calldata data
+    ) public payable virtual returns (uint64 poolId) {
         _preLock();
 
-        if (price == 0) revert ZeroPrice();
-        uint24 pairNonce = pairId == 0 ? getPairNonce : pairId; // magic variable
+        // Use a 0 `pairId` to create a pool with the last created pair.
+        uint24 pairNonce = pairId == 0 ? getPairNonce : pairId;
         if (pairNonce == 0) revert InvalidPairNonce();
 
-        PortfolioPair memory pair = pairs[pairNonce];
+        // Increment the pool nonce.
+        uint32 poolNonce = ++getPoolNonce[pairNonce];
 
+        // Compute the poolId, which is a packed 64-bit integer.
         bool hasController = controller != address(0);
-        {
-            uint32 poolNonce = ++getPoolNonce[pairNonce];
-            poolId =
-                AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
-            _getLastPoolId = poolId;
-        }
+        poolId = AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
 
-        (uint256 x, uint256 y) = computeReservesFromPrice(poolId, price);
-
-        PortfolioPool storage pool = pools[poolId];
-        pool.createPool({
-            reserveX: x,
-            reserveY: y,
-            feeBasisPoints: fee,
-            priorityFeeBasisPoints: priorityFee,
+        // Instantiate the pool.
+        pools[poolId].createPool({
+            reserveX: reserveXPerWad,
+            reserveY: reserveYPerWad,
+            feeBasisPoints: feeBasisPoints,
+            priorityFeeBasisPoints: priorityFeeBasisPoints,
             controller: controller
         });
 
+        // Store the last created poolId for the multicall, to make sure the user is not frontrun.
+        _getLastPoolId = poolId;
+
         emit CreatePool(
             poolId,
-            pair.tokenAsset,
-            pair.tokenQuote,
-            pool.controller,
-            strikePrice,
-            fee,
-            duration,
-            volatility,
-            priorityFee
+            pairs[pairNonce].tokenAsset,
+            pairs[pairNonce].tokenQuote,
+            reserveXPerWad,
+            reserveYPerWad,
+            feeBasisPoints,
+            priorityFeeBasisPoints,
+            controller
         );
-
         _postLock();
     }
 
@@ -747,7 +742,7 @@ abstract contract Portfolio is IPortfolio {
         uint256 amountAssetDec,
         uint256 amountQuoteDec
     ) internal view returns (uint128 amountAssetWad, uint128 amountQuoteWad) {
-        PortfolioPair memory pair = pairs[uint16(poolId >> 48)];
+        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
 
         amountAssetWad = amountAssetDec.safeCastTo128();
         if (amountAssetDec != type(uint128).max) {
@@ -924,7 +919,7 @@ abstract contract Portfolio is IPortfolio {
         (uint256 deltaAssetWad, uint256 deltaQuoteWad) =
             pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
 
-        PortfolioPair memory pair = pairs[uint16(poolId >> 48)];
+        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
 
         if (deltaLiquidity < 0) {
             // If deallocating, round amounts down to ensure credits are not overestimated.
@@ -947,7 +942,7 @@ abstract contract Portfolio is IPortfolio {
         uint256 amount0,
         uint256 amount1
     ) public view returns (uint128 deltaLiquidity) {
-        PortfolioPair memory pair = pairs[uint16(poolId >> 48)];
+        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
 
         (amount0, amount1) = (
             amount0.scaleToWad(pair.decimalsAsset),
@@ -967,26 +962,10 @@ abstract contract Portfolio is IPortfolio {
         (uint256 deltaAssetWad, uint256 deltaQuoteWad) =
             pools[poolId].getPoolReserves();
 
-        PortfolioPair memory pair = pairs[uint16(poolId >> 48)];
+        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
 
         deltaAsset = deltaAssetWad.scaleFromWadDown(pair.decimalsAsset);
         deltaQuote = deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote);
-    }
-
-    /// @inheritdoc IPortfolioGetters
-    function getVirtualReservesDec(uint64 poolId)
-        public
-        view
-        override
-        returns (uint128 deltaAsset, uint128 deltaQuote)
-    {
-        (uint256 deltaAssetWad, uint256 deltaQuoteWad) =
-            (pools[poolId].virtualX, pools[poolId].virtualY);
-
-        PortfolioPair memory pair = pairs[uint16(poolId >> 48)];
-
-        deltaAsset = deltaAssetWad.scaleFromWadDown(pair.decimalsAsset).safeCastTo128();// forgefmt: disable-line
-        deltaQuote = deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();// forgefmt: disable-line
     }
 
     // ===== Virtual Functions ===== //
@@ -1061,4 +1040,22 @@ abstract contract Portfolio is IPortfolio {
         view
         virtual
         returns (uint256 price);
+
+    /// @inheritdoc IPortfolioGetters
+    function getMaxOrder(
+        uint64 poolId,
+        bool sellAsset,
+        address swapper
+    ) external view virtual returns (Order memory);
+
+    /// @inheritdoc IPortfolioGetters
+    function simulateSwap(
+        Order memory args,
+        uint256 timestamp,
+        address swapper
+    )
+        external
+        view
+        virtual
+        returns (bool success, int256 prevInvariant, int256 postInvariant);
 }

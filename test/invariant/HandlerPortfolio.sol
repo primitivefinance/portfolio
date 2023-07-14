@@ -9,6 +9,39 @@ contract HandlerPortfolio is HandlerBase {
     using SafeCastLib for uint256;
     using AssemblyLib for uint256;
 
+    function encodeCreate(
+        uint24 pairId,
+        address controller,
+        uint16 priorityFee,
+        uint16 fee,
+        uint16 volatility,
+        uint16 duration,
+        uint128 strikePrice,
+        uint128 price
+    ) internal view returns (bytes memory) {
+        return abi.encodeCall(
+            IPortfolioActions.createPool,
+            (
+                pairId,
+                0,
+                0,
+                fee,
+                priorityFee,
+                controller,
+                abi.encode(
+                    PortfolioConfig(
+                        strikePrice,
+                        volatility,
+                        duration * 1 days,
+                        uint32(block.timestamp),
+                        false
+                    ),
+                    price
+                    )
+            )
+        );
+    }
+
     function callSummary() external view {
         console.log("create", calls["create"]);
         console.log("allocate", calls["allocate"]);
@@ -107,18 +140,15 @@ contract HandlerPortfolio is HandlerBase {
 
             // Push create pool to stack
             data.push(
-                abi.encodeCall(
-                    IPortfolioActions.createPool,
-                    (
-                        pairId,
-                        controller,
-                        args.priorityFee, // priorityFee
-                        args.fee, // fee
-                        args.volatility, // vol
-                        args.duration, // dur
-                        args.terminalPrice,
-                        args.price
-                    )
+                encodeCreate(
+                    pairId,
+                    controller,
+                    args.priorityFee, // priorityFee
+                    args.fee, // fee
+                    args.volatility, // vol
+                    args.duration, // dur
+                    args.terminalPrice,
+                    args.price
                 )
             );
         }

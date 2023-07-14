@@ -26,12 +26,12 @@ error InvalidBounds(uint256 lower, uint256 upper);
  * @return root The root of the function `fx`.
  */
 function bisection(
-    Bisection memory args,
+    bytes memory args,
     uint256 lower,
     uint256 upper,
     uint256 epsilon,
     uint256 maxIterations,
-    function(Bisection memory,uint256) pure returns (int256) fx
+    function(bytes memory,uint256) pure returns (int256) fx
 ) pure returns (uint256 root) {
     if (lower > upper) revert InvalidBounds(lower, upper);
     // Passes the lower and upper bounds to the optimized function.

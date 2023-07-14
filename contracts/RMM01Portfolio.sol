@@ -26,32 +26,39 @@ contract RMM01Portfolio is Portfolio {
 
     mapping(uint64 => PortfolioConfig) public configs;
 
+    // todo: clean up
     function createPool(
         uint24 pairId,
+        uint256 reserveXPerWad,
+        uint256 reserveYPerWad,
+        uint16 feeBasisPoints,
+        uint16 priorityFeeBasisPoints,
         address controller,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint128 strikePrice,
-        uint128 price
-    ) external payable override returns (uint64 poolId) {
-        /* poolId = super.createPool(
+        bytes calldata data
+    ) public payable override returns (uint64 poolId) {
+        (PortfolioConfig memory config, uint256 priceWad) =
+            abi.decode(data, (PortfolioConfig, uint256));
+
+        if (reserveXPerWad == 0 && reserveYPerWad == 0) {
+            (reserveXPerWad, reserveYPerWad) =
+                config.transform().approximateReservesGivenPrice(priceWad);
+        }
+
+        poolId = super.createPool(
             pairId,
+            reserveXPerWad,
+            reserveYPerWad,
+            feeBasisPoints,
+            priorityFeeBasisPoints,
             controller,
-            priorityFee,
-            fee,
-            volatility,
-            duration,
-            strikePrice,
-            price
-        ); */
+            data
+        );
 
         configs[poolId].createConfig({
-            strikePriceWad: strikePrice,
-            volatilityBasisPoints: volatility,
-            durationSeconds: duration,
-            isPerpetual: duration == type(uint16).max
+            strikePriceWad: config.strikePriceWad,
+            volatilityBasisPoints: config.volatilityBasisPoints,
+            durationSeconds: config.durationSeconds,
+            isPerpetual: false
         });
     }
 
@@ -69,22 +76,25 @@ contract RMM01Portfolio is Portfolio {
         PortfolioPool storage pool = pools[poolId];
 
         Iteration memory iteration;
-        /* (iteration, tau) = pool.getSwapData({
-            sellAsset: sellAsset,
-            amountInWad: 0, // Sets iteration.input to 0, which is not used in this function.
-            timestamp: block.timestamp, // Latest timestamp to compute the latest invariant.
-            swapper: address(0) // Setting the swap effects the swap fee %, which is not used in this function.
-         });
 
-        invariant = iteration.prevInvariant;
+        (, invariant,) = pool.getSwapInvariants({
+            config: configs[poolId],
+            order: Order({
+                input: 0,
+                output: 0,
+                useMax: false,
+                poolId: poolId,
+                sellAsset: sellAsset
+            }),
+            timestamp: block.timestamp,
+            protocolFee: 0,
+            swapper: address(0)
+        });
 
-        // Approximated and rounded down in all cases via rounding down of virtualX.
-        price = RMM01Lib.getPriceWithX({
-            R_x: iteration.virtualX.divWadDown(iteration.liquidity),
-            stk: pool.params.strikePrice,
-            vol: pool.params.volatility,
-            tau: tau
-        }); */
+        // todo: price
+        price = configs[poolId].transform().approximatePriceGivenX({
+            reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity)
+        });
     }
 
     /// @inheritdoc Portfolio
@@ -110,6 +120,7 @@ contract RMM01Portfolio is Portfolio {
 
     /// @inheritdoc Portfolio
     function checkPool(uint64 poolId) public view override returns (bool) {
+        // todo: refactor
         return pools[poolId].exists();
     }
 
@@ -121,9 +132,14 @@ contract RMM01Portfolio is Portfolio {
         uint256 reserveY,
         uint256 timestamp
     ) public view override returns (bool, int256 nextInvariant) {
+        // todo: refactor with better invariant standardiation
+
         // Computes the time until pool maturity or zero if expired.
-        uint256 tau = pools[poolId].computeTau(configs[poolId], timestamp);
-        nextInvariant = pools[poolId].getInvariant(configs[poolId]);
+        PortfolioPool memory pool = pools[poolId];
+        pool.virtualX = reserveX.safeCastTo128();
+        pool.virtualY = reserveY.safeCastTo128();
+
+        nextInvariant = pool.getInvariant(configs[poolId]);
         return (
             nextInvariant - invariant >= MINIMUM_INVARIANT_DELTA, nextInvariant
         );
@@ -136,6 +152,8 @@ contract RMM01Portfolio is Portfolio {
         uint256 reserveIn,
         uint256 liquidity
     ) public view override returns (uint256) {
+        // todo: refactor to new getMaximiumOrder method
+
         uint256 maxInput;
         if (sellAsset) {
             // invariant: x reserve < 1E18
@@ -160,14 +178,32 @@ contract RMM01Portfolio is Portfolio {
 
         (reserveX, reserveY) = approximateReservesGivenPrice({
             self: NormalCurve({
-                reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity),
-                reserveYPerWad: pool.virtualY.divWadDown(pool.liquidity),
+                reserveXPerWad: 0,
+                reserveYPerWad: 0,
                 strikePriceWad: config.strikePriceWad,
                 standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
-                timeRemainingSeconds: pool.computeLatestTau(config)
+                timeRemainingSeconds: pool.computeLatestTau(config),
+                invariant: 0
             }),
             priceWad: price
         });
+    }
+
+    function getInvariants(Order memory order)
+        public
+        view
+        returns (int256, int256)
+    {
+        PortfolioPool storage pool = pools[order.poolId];
+        (, int256 invariant, int256 postInvariant) = pool.getSwapInvariants({
+            config: configs[order.poolId],
+            order: order,
+            timestamp: block.timestamp,
+            protocolFee: protocolFee,
+            swapper: msg.sender
+        });
+
+        return (invariant, postInvariant);
     }
 
     /// @inheritdoc Portfolio
@@ -178,12 +214,28 @@ contract RMM01Portfolio is Portfolio {
         address swapper
     ) public view override(Portfolio) returns (uint256 output) {
         PortfolioPool memory pool = pools[poolId];
-        /* output = pool.getAmountOut({
-            sellAsset: sellAsset,
-            amountIn: amountIn,
+
+        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
+        amountIn = amountIn.scaleToWad(
+            sellAsset ? pair.decimalsAsset : pair.decimalsQuote
+        );
+
+        output = pool.approximateAmountOut({
+            config: configs[poolId],
+            order: Order({
+                input: amountIn.safeCastTo128(),
+                output: 0,
+                useMax: false,
+                poolId: poolId,
+                sellAsset: sellAsset
+            }),
             timestamp: block.timestamp,
+            protocolFee: protocolFee,
             swapper: swapper
-        }); */
+        });
+
+        uint256 outputDec = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
+        output = output.scaleFromWadDown(outputDec);
     }
 
     /// @inheritdoc Portfolio
@@ -194,5 +246,26 @@ contract RMM01Portfolio is Portfolio {
         returns (uint256 price)
     {
         (price,,) = _getLatestInvariantAndVirtualPrice(poolId, true);
+    }
+
+    function getMaxOrder(
+        uint64 poolId,
+        bool sellAsset,
+        address swapper
+    ) external view override returns (Order memory) {
+        // todo: implement
+    }
+
+    function simulateSwap(
+        Order memory args,
+        uint256 timestamp,
+        address swapper
+    )
+        external
+        view
+        override
+        returns (bool success, int256 prevInvariant, int256 postInvariant)
+    {
+        // todo: implement
     }
 }

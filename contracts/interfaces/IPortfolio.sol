@@ -97,23 +97,16 @@ interface IPortfolioEvents {
      * @param poolId Unique identifier for the pool that is being created.
      * @param asset Token that is being paired.
      * @param quote Token that is being paired.
-     * @param controller Address that can call `changeParameters` on the pool.
-     * @param strikePrice The terminal price reached upon the end of the duration.
-     * @param fee Fee percentage paid by swappers.
-     * @param duration Days until the pool cannot be swapped in anymore.
-     * @param volatility Volatility in basis points which determines price impact of swaps.
-     * @param priorityFee Fee percentage paid by the pool controller (if any).
      */
     event CreatePool(
         uint64 indexed poolId,
         address indexed asset,
         address indexed quote,
-        address controller,
-        uint128 strikePrice,
-        uint16 fee,
-        uint16 duration,
-        uint16 volatility,
-        uint16 priorityFee
+        uint256 reserveXPerWad,
+        uint256 reserveYPerWad,
+        uint16 feeBasisPoints,
+        uint16 priorityFeeBasisPoints,
+        address controller
     );
 
     /**
@@ -261,18 +254,6 @@ interface IPortfolioGetters {
         returns (uint256 deltaAsset, uint256 deltaQuote);
 
     /**
-     * @dev Amount of tokens in native token decimals that are in the virtually tracked reserves.
-     * @return deltaAsset Quantity of `asset` tokens in native decimal units.
-     * @return deltaQuote Quantity of `quote` tokens in native decimal units.
-     */
-    function getVirtualReservesDec(uint64 poolId)
-        external
-        view
-        returns (uint128 deltaAsset, uint128 deltaQuote);
-
-    // ===== Objective View ===== //
-
-    /**
      * @dev Computes an amount out of tokens given an `amountIn`.
      * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
@@ -295,6 +276,41 @@ interface IPortfolioGetters {
         external
         view
         returns (uint256 price);
+
+    /**
+     * @notice
+     * Gets the maximum swap input and output amounts for a given `poolId`.
+     *
+     * @dev
+     * The maximum input amount is the amount of `asset` tokens that can be sold.
+     * The maximum output amount is the amount of `quote` tokens that can be bought.
+     *
+     * note
+     * The maximum input and output amounts should most likely not be used in a swap.
+     *
+     */
+    function getMaxOrder(
+        uint64 poolId,
+        bool sellAsset,
+        address swapper
+    ) external view returns (Order memory);
+
+    /**
+     * @notice
+     * Gets the invariants pre- and post- swap for a given swap order.
+     *
+     * @dev
+     * The pre- and post- swap invariants are used to check if the swap is valid.
+     * The post- invariant must grow by at least 1 wei.
+     */
+    function simulateSwap(
+        Order memory args,
+        uint256 timestamp,
+        address swapper
+    )
+        external
+        view
+        returns (bool success, int256 prevInvariant, int256 postInvariant);
 }
 
 interface IPortfolioActions {
@@ -389,23 +405,15 @@ interface IPortfolioActions {
 
     /**
      * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
-     * @param controller An address that can change the `fee`, `priorityFee` parameters of the created pool.
-     * @param priorityFee Priority fee for the pool (10,000 being 100%). This is a percentage of fees paid by the controller when swapping.
-     * @param fee Fee for the pool (10,000 being 100%). This is a percentage of fees paid by the users when swapping.
-     * @param volatility Expected volatility of the pool in basis points, minimum of 1 (0.01%) and maximum of 25,000 (250%).
-     * @param duration Quantity of days (in units of days) until the pool "expires". Uses `type(uint16).max` as a magic variable to set `perpetual = true`.
-     * @param strikePrice Terminal price of the pool once maturity is reached (expressed in the quote token), in WAD units.
-     * @param price Initial price of the pool (expressed in the quote token), in WAD units.
      */
     function createPool(
         uint24 pairId,
+        uint256 reserveXPerWad,
+        uint256 reserveYPerWad,
+        uint16 feeBasisPoints,
+        uint16 priorityFeeBasisPoints,
         address controller,
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 volatility,
-        uint16 duration,
-        uint128 strikePrice,
-        uint128 price
+        bytes calldata data
     ) external payable returns (uint64 poolId);
 
     /**

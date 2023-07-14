@@ -33,7 +33,7 @@ library Ghost {
         view
         returns (PortfolioPair memory)
     {
-        return IPortfolioStruct(self.subject).pairs(uint16(self.poolId >> 48));
+        return IPortfolioStruct(self.subject).pairs(uint16(self.poolId));
     }
 
     function pool(GhostState memory self)

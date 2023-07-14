@@ -5,6 +5,7 @@ import "solstat/Gaussian.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeCastLib.sol";
 import "./AssemblyLib.sol";
+import "./BisectionLib.sol";
 
 import { PortfolioPool } from "./PoolLib.sol";
 import { Order } from "./SwapLib.sol";
@@ -24,11 +25,17 @@ using AssemblyLib for uint128;
 using SafeCastLib for uint256;
 
 using {
+    approximatePriceGivenX,
+    approximateReservesGivenPrice,
+    approximateXGivenY,
+    approximateYGivenX,
     computeStdDevSqrtTau,
     getReserveXBounds,
     getReserveYBounds,
     tradingFunction
 } for NormalCurve global;
+
+using { createConfig, transform } for PortfolioConfig global;
 
 uint256 constant MIN_STRIKE_PRICE = 1;
 uint256 constant MAX_STRIKE_PRICE = type(uint128).max;
@@ -59,6 +66,7 @@ struct NormalCurve {
     uint256 strikePriceWad;
     uint256 standardDeviationWad;
     uint256 timeRemainingSeconds;
+    int256 invariant;
 }
 
 /// @dev Gets the exclusive bounds of the x reserves.
@@ -305,11 +313,14 @@ function approximatePriceGivenX(
     // Φ^-1(1 - R_x)σ√τ
     int256 firstTerm = invariantTermX * int256(stdDevSqrtTau);
     // σ^2τ/2
-    int256 secondTerm =
-        int256(self.standardDeviationWad ** 2) * int256(timeRemainingYearsWad);
-    secondTerm = secondTerm / (int256(DOUBLE_WAD) * int256(WAD));
+    int256 secondTerm = int256(
+        (
+            self.standardDeviationWad * self.standardDeviationWad
+                * timeRemainingYearsWad
+        ) / DOUBLE_WAD
+    );
     // e^(Φ^-1(1 - R_x)σ√τ - 1/2σ^2τ)
-    int256 result = (firstTerm - secondTerm).expWad();
+    int256 result = ((firstTerm - secondTerm) / int256(WAD)).expWad();
     // Ke^(Φ^-1(1 - R_x)σ√τ - 1/2σ^2τ)
     priceWad = uint256(result).mulWadDown(self.strikePriceWad);
 }
@@ -345,6 +356,64 @@ struct PortfolioConfig {
     bool isPerpetual;
 }
 
+function transform(PortfolioConfig memory config)
+    pure
+    returns (NormalCurve memory)
+{
+    return NormalCurve({
+        reserveXPerWad: 0,
+        reserveYPerWad: 0,
+        strikePriceWad: config.strikePriceWad,
+        standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
+        timeRemainingSeconds: config.durationSeconds,
+        invariant: 0
+    });
+}
+
+/**
+ * @notice
+ * Instantiates a PortfolioPool's configuration.
+ *
+ * @dev
+ * Duration argument can be zero if `isPerpetual` is true.
+ *
+ * @param strikePriceWad Strike price of the pool in WAD units, used as the terminal upper price limit.
+ * @param volatilityBasisPoints Standard deviation used to compute the normal liquidity distribution, in basis points.
+ * @param durationSeconds Duration of the pool in seconds until swaps are no longer allowed.
+ * @param isPerpetual Whether the pool is perpetual or not. Non-perpetual pools cannot be swapped in after reaching maturity.
+ */
+function createConfig(
+    PortfolioConfig storage config,
+    uint256 strikePriceWad,
+    uint256 volatilityBasisPoints,
+    uint256 durationSeconds,
+    bool isPerpetual
+) {
+    if (config.creationTimestamp != 0) revert CurveLib_ConfigExists();
+
+    if (isPerpetual) {
+        config.isPerpetual = isPerpetual;
+        config.durationSeconds = SECONDS_PER_YEAR.safeCastTo32();
+    } else {
+        if (!durationSeconds.isBetween(MIN_DURATION, MAX_DURATION)) {
+            revert CurveLib_InvalidDuration();
+        }
+        config.durationSeconds = durationSeconds.safeCastTo32();
+    }
+
+    if (!volatilityBasisPoints.isBetween(MIN_VOLATILITY, MAX_VOLATILITY)) {
+        revert CurveLib_InvalidVolatility();
+    }
+    config.volatilityBasisPoints = volatilityBasisPoints.safeCastTo32();
+
+    if (!strikePriceWad.isBetween(MIN_STRIKE_PRICE, MAX_STRIKE_PRICE)) {
+        revert CurveLib_InvalidStrikePrice();
+    }
+    config.strikePriceWad = strikePriceWad.safeCastTo128();
+
+    config.creationTimestamp = uint32(block.timestamp);
+}
+
 /**
  * @title
  * CurveLib.sol
@@ -375,52 +444,6 @@ library CurveLib {
 
     /**
      * @notice
-     * Instantiates a PortfolioPool's configuration.
-     *
-     * @dev
-     * Duration argument can be zero if `isPerpetual` is true.
-     *
-     * @param strikePriceWad Strike price of the pool in WAD units, used as the terminal upper price limit.
-     * @param volatilityBasisPoints Standard deviation used to compute the normal liquidity distribution, in basis points.
-     * @param durationSeconds Duration of the pool in seconds until swaps are no longer allowed.
-     * @param isPerpetual Whether the pool is perpetual or not. Non-perpetual pools cannot be swapped in after reaching maturity.
-     */
-    function createConfig(
-        PortfolioConfig storage config,
-        uint256 strikePriceWad,
-        uint256 volatilityBasisPoints,
-        uint256 durationSeconds,
-        bool isPerpetual
-    ) internal {
-        if (config.creationTimestamp != 0) revert CurveLib_ConfigExists();
-
-        if (isPerpetual) {
-            config.isPerpetual = isPerpetual;
-            config.durationSeconds = SECONDS_PER_YEAR.safeCastTo32();
-        } else {
-            if (!durationSeconds.isBetween(MIN_DURATION, MAX_DURATION)) {
-                revert CurveLib_InvalidDuration();
-            }
-            config.durationSeconds = durationSeconds.safeCastTo32();
-        }
-
-        if (!volatilityBasisPoints.isBetween(MIN_VOLATILITY, MAX_VOLATILITY)) {
-            revert CurveLib_InvalidVolatility();
-        }
-        config.volatilityBasisPoints = volatilityBasisPoints.safeCastTo32();
-
-        if (!strikePriceWad.isBetween(MIN_STRIKE_PRICE, MAX_STRIKE_PRICE)) {
-            revert CurveLib_InvalidStrikePrice();
-        }
-        config.strikePriceWad = strikePriceWad.safeCastTo128();
-
-        config.creationTimestamp = uint32(block.timestamp);
-    }
-
-    // ----------------- //
-
-    /**
-     * @notice
      * Get the invariant of the pool, computed on its last swap.
      *
      * @dev
@@ -445,7 +468,8 @@ library CurveLib {
             reserveYPerWad: reserveYPerWad,
             strikePriceWad: config.strikePriceWad,
             standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
-            timeRemainingSeconds: computeLatestTau(self, config)
+            timeRemainingSeconds: computeLatestTau(self, config),
+            invariant: 0
         });
 
         return tradingFunction(curve);
@@ -470,51 +494,142 @@ library CurveLib {
         uint256 timestamp,
         uint256 protocolFee,
         address swapper
-    ) internal view returns (int256 prevInvariant, int256 postInvariant) {
-        // Computes the existing invariant of the pool with
-        // rounded up virtual reserves for the output reserve of a trade.
-        // This is to make it advantageous for Portfolio
-        // by overestimating the current invariant.
-        // Since an invariant must increase in a swap to be a valid trade,
-        // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
-        uint256 reserveXPerWad;
-        uint256 reserveYPerWad;
-        if (order.sellAsset) {
-            reserveXPerWad = self.virtualX.divWadDown(self.liquidity);
-            reserveYPerWad = self.virtualY.divWadUp(self.liquidity);
-        } else {
-            reserveXPerWad = self.virtualX.divWadUp(self.liquidity);
-            reserveYPerWad = self.virtualY.divWadDown(self.liquidity);
-        }
+    )
+        internal
+        view
+        returns (
+            uint256 adjustedIndependentReserve,
+            int256 prevInvariant,
+            int256 postInvariant
+        )
+    {
+        NormalCurve memory curve;
 
-        NormalCurve memory curve = NormalCurve({
-            reserveXPerWad: reserveXPerWad,
-            reserveYPerWad: reserveYPerWad,
-            strikePriceWad: config.strikePriceWad,
-            standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
-            timeRemainingSeconds: computeTau(self, config, timestamp)
-        });
+        {
+            // Computes the existing invariant of the pool with
+            // rounded up virtual reserves for the output reserve of a trade.
+            // This is to make it advantageous for Portfolio
+            // by overestimating the current invariant.
+            // Since an invariant must increase in a swap to be a valid trade,
+            // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
+            uint256 reserveXPerWad;
+            uint256 reserveYPerWad;
+            if (order.sellAsset) {
+                reserveXPerWad = self.virtualX.divWadDown(self.liquidity);
+                reserveYPerWad = self.virtualY.divWadUp(self.liquidity);
+            } else {
+                reserveXPerWad = self.virtualX.divWadUp(self.liquidity);
+                reserveYPerWad = self.virtualY.divWadDown(self.liquidity);
+            }
+
+            curve = NormalCurve({
+                reserveXPerWad: reserveXPerWad,
+                reserveYPerWad: reserveYPerWad,
+                strikePriceWad: config.strikePriceWad,
+                standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
+                timeRemainingSeconds: computeTau(self, config, timestamp),
+                invariant: 0
+            });
+        }
 
         // This invariant uses the rounded up input reserves and start `timestamp`.
         prevInvariant = tradingFunction(curve);
 
-        uint256 feeBps = swapper == msg.sender
-            ? self.priorityFeeBasisPoints
-            : self.feeBasisPoints;
+        // Compute the next invariant if the swap amounts are non zero.
+        (uint256 reserveX, uint256 reserveY) = (self.virtualX, self.virtualY);
 
-        (uint256 feeAmount, uint256 protocolFeeAmount) =
-            order.computeFeeAmounts(feeBps, protocolFee);
+        {
+            Order memory orderCopy = order; // avoid stack too deep
+            uint256 feeBps = swapper == self.controller
+                ? self.priorityFeeBasisPoints
+                : self.feeBasisPoints;
 
-        (uint256 adjustedX, uint256 adjustedY) = order
-            .computeAdjustedSwapReserves(
-            self.virtualX, self.virtualY, feeAmount, protocolFeeAmount
-        );
+            (uint256 feeAmount, uint256 protocolFeeAmount) =
+                orderCopy.computeFeeAmounts(feeBps, protocolFee);
 
-        curve.reserveXPerWad = adjustedX.divWadDown(self.liquidity);
-        curve.reserveYPerWad = adjustedY.divWadDown(self.liquidity);
+            (reserveX, reserveY) = orderCopy.computeAdjustedSwapReserves(
+                reserveX, reserveY, feeAmount, protocolFeeAmount
+            );
+        }
+
+        curve.reserveXPerWad = reserveX.divWadDown(self.liquidity);
+        curve.reserveYPerWad = reserveY.divWadDown(self.liquidity);
 
         // This invariant uses the rounded down reserves after the swap is done.
         postInvariant = tradingFunction(curve);
+        adjustedIndependentReserve =
+            order.sellAsset ? curve.reserveXPerWad : curve.reserveYPerWad;
+    }
+
+    function approximateAmountOut(
+        PortfolioPool memory self,
+        PortfolioConfig memory config,
+        Order memory order,
+        uint256 timestamp,
+        uint256 protocolFee,
+        address swapper
+    ) internal view returns (uint256 amountOutWad) {
+        (uint256 independentReserve, int256 prevInv, int256 postInv) =
+        getSwapInvariants(self, config, order, timestamp, protocolFee, swapper);
+
+        NormalCurve memory curve = transform(config);
+        curve.invariant = prevInv;
+
+        uint256 dependentReserve;
+        bool sellAsset = order.sellAsset;
+
+        // Approximate the output reserve per liquidity using the math functions.
+        if (sellAsset) {
+            curve.reserveXPerWad = independentReserve;
+            curve.reserveYPerWad = curve.approximateYGivenX(prevInv);
+            dependentReserve = curve.reserveYPerWad;
+        } else {
+            curve.reserveYPerWad = independentReserve;
+            curve.reserveXPerWad = curve.approximateXGivenY(prevInv);
+            dependentReserve = curve.reserveXPerWad;
+        }
+
+        uint256 lower = dependentReserve.mulDivDown(98, 100);
+        uint256 upper = dependentReserve.mulDivUp(102, 100);
+        amountOutWad = dependentReserve;
+
+        // Output reserve is approximated with the derived math functions,
+        // but to get it precise it needs a root finding algorithm.
+        amountOutWad = bisection(
+            abi.encode(curve),
+            lower,
+            upper,
+            0, // Set to 0 to find the exact dependent reserve which sets the invariant to 0.
+            256, // Maximum amount of loops to run in bisection.
+            sellAsset ? findRootForSwappingInX : findRootForSwappingInY
+        );
+
+        amountOutWad++;
+        amountOutWad = amountOutWad.mulWadDown(self.liquidity);
+        amountOutWad =
+            (sellAsset ? self.virtualY : self.virtualX) - amountOutWad;
+    }
+
+    function findRootForSwappingInX(
+        bytes memory args,
+        uint256 value
+    ) internal pure returns (int256) {
+        // Optimize the trading function such that it is strictly monotonically increasing.
+        // Find the root: f(x) - invariant + 2 = 0
+        NormalCurve memory curve = abi.decode(args, (NormalCurve));
+        curve.reserveYPerWad = value;
+        return tradingFunction(curve) - (curve.invariant + 1);
+    }
+
+    function findRootForSwappingInY(
+        bytes memory args,
+        uint256 value
+    ) internal pure returns (int256) {
+        // Optimize the trading function such that it is strictly monotonically increasing.
+        // Find the root: f(x) - invariant + 2 = 0
+        NormalCurve memory curve = abi.decode(args, (NormalCurve));
+        curve.reserveXPerWad = value;
+        return tradingFunction(curve) - (curve.invariant + 1);
     }
 
     // ----------------- //
