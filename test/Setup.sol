@@ -15,41 +15,7 @@ import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/test/FeeOnTransferToken.sol";
 import "contracts/test/SimpleRegistry.sol";
-import "contracts/RMM01Portfolio.sol";
-
-// todo: fix and remove
-function encodeCreate(
-    uint24 pairId,
-    address controller,
-    uint16 priorityFee,
-    uint16 fee,
-    uint16 volatility,
-    uint16 duration,
-    uint128 strikePrice,
-    uint128 price
-) view returns (bytes memory) {
-    return abi.encodeCall(
-        IPortfolioActions.createPool,
-        (
-            pairId,
-            0,
-            0,
-            fee,
-            priorityFee,
-            controller,
-            abi.encode(
-                PortfolioConfig(
-                    strikePrice,
-                    volatility,
-                    uint32(duration) * 1 days,
-                    uint32(block.timestamp),
-                    false
-                ),
-                price
-                )
-        )
-    );
-}
+import "contracts/Portfolio.sol";
 
 // Types
 struct SubjectsType {
@@ -98,16 +64,83 @@ contract SetupConstants {
     uint16 constant Setup_DEFAULT_PRIORITY_FEE = 10;
 }
 
-library RMM01Strategy {
+interface GetStrategy {
+    function defaultStrategy() external view returns (address);
+}
+
+// todo: cleanup config/strategy testing stuff
+library DefaultStrategy {
     using SafeCastLib for uint256;
 
-    uint256 constant RMM01Strategy_DEFAULT_STRIKE = 1e18;
-    uint256 constant RMM01Strategy_DEFAULT_VOLATILITY = 1000;
-    uint256 constant RMM01Strategy_DEFAULT_DURATION = 1 days;
-    uint256 constant RMM01Strategy_DEFAULT_PRICE = 1e18;
+    uint256 constant DefaultStrategy_DEFAULT_STRIKE = 1e18;
+    uint256 constant DefaultStrategy_DEFAULT_VOLATILITY = 1000;
+    uint256 constant DefaultStrategy_DEFAULT_DURATION = 1 days;
+    uint256 constant DefaultStrategy_DEFAULT_PRICE = 1e18;
 
-    function defaultConfig() internal view returns (bytes memory) {
-        return encodeConfig(0, 0, 0, false, 0);
+    function getDefaultTestConfig(address portfolio)
+        internal
+        view
+        returns (ConfigType memory config)
+    {
+        (config.data, config.reserveXPerWad, config.reserveYPerWad) = IStrategy(
+            GetStrategy(portfolio).defaultStrategy()
+        ).getStrategyData({
+            strikePriceWad: DefaultStrategy_DEFAULT_STRIKE,
+            volatilityBasisPoints: DefaultStrategy_DEFAULT_VOLATILITY,
+            durationSeconds: DefaultStrategy_DEFAULT_DURATION,
+            isPerpetual: false,
+            priceWad: DefaultStrategy_DEFAULT_PRICE
+        });
+
+        return config;
+    }
+
+    function getTestConfig(
+        address portfolio,
+        uint256 strikePriceWad,
+        uint256 volatilityBasisPoints,
+        uint256 durationSeconds,
+        bool isPerpetual,
+        uint256 priceWad
+    ) internal view returns (ConfigType memory config) {
+        if (strikePriceWad == 0) {
+            strikePriceWad = DefaultStrategy_DEFAULT_STRIKE;
+        }
+        if (volatilityBasisPoints == 0) {
+            volatilityBasisPoints = DefaultStrategy_DEFAULT_VOLATILITY;
+        }
+        if (durationSeconds == 0) {
+            durationSeconds = DefaultStrategy_DEFAULT_DURATION;
+        }
+        if (priceWad == 0) priceWad = DefaultStrategy_DEFAULT_PRICE;
+
+        (config.data, config.reserveXPerWad, config.reserveYPerWad) = IStrategy(
+            GetStrategy(portfolio).defaultStrategy()
+        ).getStrategyData({
+            strikePriceWad: strikePriceWad,
+            volatilityBasisPoints: volatilityBasisPoints,
+            durationSeconds: durationSeconds,
+            isPerpetual: isPerpetual,
+            priceWad: priceWad
+        });
+
+        return config;
+    }
+
+    function defaultConfig(address strategy)
+        internal
+        view
+        returns (bytes memory, uint256, uint256)
+    {
+        return IStrategy(strategy).getStrategyData(0, 0, 0, false, 0);
+    }
+
+    function getReservesFromStrategyArgs(
+        address strategy,
+        bytes memory strategyArgs
+    ) internal view returns (uint256 reserveX, uint256 reserveY) {
+        (reserveX, reserveY) =
+            IStrategy(strategy).approximateReservesGivenPrice(strategyArgs);
     }
 
     function encodeConfig(
@@ -117,14 +150,16 @@ library RMM01Strategy {
         bool isPerpetual,
         uint256 priceWad
     ) internal view returns (bytes memory) {
-        if (strikePriceWad == 0) strikePriceWad = RMM01Strategy_DEFAULT_STRIKE;
+        if (strikePriceWad == 0) {
+            strikePriceWad = DefaultStrategy_DEFAULT_STRIKE;
+        }
         if (volatilityBasisPoints == 0) {
-            volatilityBasisPoints = RMM01Strategy_DEFAULT_VOLATILITY;
+            volatilityBasisPoints = DefaultStrategy_DEFAULT_VOLATILITY;
         }
         if (durationSeconds == 0) {
-            durationSeconds = RMM01Strategy_DEFAULT_DURATION;
+            durationSeconds = DefaultStrategy_DEFAULT_DURATION;
         }
-        if (priceWad == 0) priceWad = RMM01Strategy_DEFAULT_PRICE;
+        if (priceWad == 0) priceWad = DefaultStrategy_DEFAULT_PRICE;
 
         return abi.encode(
             PortfolioConfig(
@@ -141,7 +176,7 @@ library RMM01Strategy {
 
 contract Setup is ISetup, SetupStorage, SetupConstants, Test {
     using SafeCastLib for uint256;
-    using RMM01Strategy for ConfigType;
+    using DefaultStrategy for ConfigType;
 
     // Important for making sure the setup went smoothly!
     modifier verifySetup() {
@@ -164,7 +199,7 @@ contract Setup is ISetup, SetupStorage, SetupConstants, Test {
         vm.label(_subjects.weth, "weth");
 
         _subjects.portfolio =
-            address(new RMM01Portfolio(_subjects.weth, _subjects.registry));
+            address(new Portfolio(_subjects.weth, _subjects.registry));
         vm.label(_subjects.portfolio, "portfolio");
 
         _ghost_state = GhostType({
@@ -294,24 +329,22 @@ contract Setup is ISetup, SetupStorage, SetupConstants, Test {
     }
 
     modifier defaultConfig() {
-        ConfigType memory config;
+        ConfigType memory config =
+            DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()), RMM01Strategy.defaultConfig()
-        );
+        _ghost_state.poolId = config.instantiate(address(subject()));
 
         _;
     }
 
     modifier defaultControlledConfig() {
-        ConfigType memory config;
+        ConfigType memory config =
+            DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = deployDefaultTokenPair();
-        config.controller = address(this);
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()), RMM01Strategy.defaultConfig()
-        );
+        config.controller = address(this);
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 
@@ -319,20 +352,18 @@ contract Setup is ISetup, SetupStorage, SetupConstants, Test {
         uint16 duration = type(uint16).max;
         uint16 volatility = uint16(MIN_VOLATILITY);
 
-        ConfigType memory config;
-        (config.asset, config.quote) = deployDefaultTokenPair();
-        config.controller = address(this);
+        ConfigType memory config = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 1e18,
+            volatilityBasisPoints: volatility,
+            durationSeconds: duration, // todo: fix
+            isPerpetual: true,
+            priceWad: 1e18
+        });
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()),
-            RMM01Strategy.encodeConfig({
-                strikePriceWad: 1e18,
-                volatilityBasisPoints: volatility,
-                durationSeconds: duration, // todo: fix
-                isPerpetual: true,
-                priceWad: 1e18
-            })
-        );
+        (config.asset, config.quote) = deployDefaultTokenPair();
+
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 
@@ -342,13 +373,11 @@ contract Setup is ISetup, SetupStorage, SetupConstants, Test {
         Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 6));
         vm.label(quote.to_addr(), "quote-6");
 
-        ConfigType memory config;
+        ConfigType memory config =
+            DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
-        config.controller = address(this);
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()), RMM01Strategy.defaultConfig()
-        );
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 
@@ -358,57 +387,51 @@ contract Setup is ISetup, SetupStorage, SetupConstants, Test {
         Coin quote = deployCoin("FOT", abi.encode("quote", "QUOTE", 18));
         vm.label(quote.to_addr(), "quote-fot-18");
 
-        ConfigType memory config;
+        ConfigType memory config =
+            DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()), RMM01Strategy.defaultConfig()
-        );
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 
     modifier wethConfig() {
-        ConfigType memory config;
         Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
+        ConfigType memory config =
+            DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = (weth(), quote.to_addr());
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()), RMM01Strategy.defaultConfig()
-        );
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 
     modifier durationConfig(uint16 duration) {
-        ConfigType memory config;
+        ConfigType memory config = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 0,
+            volatilityBasisPoints: 0,
+            durationSeconds: uint32(duration) * 1 days, // todo: fix
+            isPerpetual: false,
+            priceWad: 0
+        });
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()),
-            RMM01Strategy.encodeConfig({
-                strikePriceWad: 0,
-                volatilityBasisPoints: 0,
-                durationSeconds: duration, // todo: fix
-                isPerpetual: false,
-                priceWad: 0
-            })
-        );
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 
     modifier volatilityConfig(uint16 volatility) {
-        ConfigType memory config;
+        ConfigType memory config = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 0,
+            volatilityBasisPoints: volatility,
+            durationSeconds: 0, // todo: fix
+            isPerpetual: false,
+            priceWad: 0
+        });
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(
-            address(subject()),
-            RMM01Strategy.encodeConfig({
-                strikePriceWad: 0,
-                volatilityBasisPoints: volatility,
-                durationSeconds: 0, // todo: fix
-                isPerpetual: false,
-                priceWad: 0
-            })
-        );
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 

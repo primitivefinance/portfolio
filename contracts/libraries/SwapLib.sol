@@ -5,7 +5,11 @@ import "solmate/utils/FixedPointMathLib.sol";
 import "./AssemblyLib.sol";
 import { BASIS_POINT_DIVISOR } from "./ConstantsLib.sol";
 
-using { computeAdjustedSwapReserves, computeFeeAmounts } for Order global;
+using {
+    computeAdjustedSwapReserves,
+    computeFeeAmounts,
+    computeSwapResult
+} for Order global;
 
 using FixedPointMathLib for uint128;
 
@@ -118,4 +122,43 @@ function computeAdjustedSwapReserves(
     // Use these adjusted reserves in the invariant check.
     adjustedX = self.sellAsset ? adjustedInputReserve : adjustedOutputReserve;
     adjustedY = self.sellAsset ? adjustedOutputReserve : adjustedInputReserve;
+}
+
+/**
+ * @notice
+ * Get the new reserves and fee amounts paid after a swap.
+ *
+ * @dev
+ * Use this method to compute the new reserves for the invariant check,
+ * to confirm a swap will be validated.
+ *
+ * @param self Swap order to compute swap result for.
+ * @param reserveX Total asset tokens in reserves of pool, scaled to WAD units.
+ * @param reserveY Total quote tokens in reserves of pool, scaled to WAD units.
+ * @param feeBps Fee denominated in basis points, where 1 basis point = 0.01%.
+ * @param protocolFee Proportion of the fee amount to charge as a protocol fee.
+ * @return feeAmount Quantity of input tokens which are considered the fee amount.
+ * @return protocolFeeAmount Quantity of input tokens which are paid as the protocol fee amount.
+ * @return adjustedX Swap & fee adjusted reserve of asset tokens.
+ * @return adjustedY Swap & fee adjusted reserve of quote tokens.
+ */
+function computeSwapResult(
+    Order memory self,
+    uint256 reserveX,
+    uint256 reserveY,
+    uint256 feeBps,
+    uint256 protocolFee
+)
+    pure
+    returns (
+        uint256 feeAmount,
+        uint256 protocolFeeAmount,
+        uint256 adjustedX,
+        uint256 adjustedY
+    )
+{
+    (feeAmount, protocolFeeAmount) = self.computeFeeAmounts(feeBps, protocolFee);
+    (adjustedX, adjustedY) = self.computeAdjustedSwapReserves(
+        reserveX, reserveY, feeAmount, protocolFeeAmount
+    );
 }

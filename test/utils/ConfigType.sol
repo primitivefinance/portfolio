@@ -5,6 +5,7 @@ import {
     IPortfolioActions,
     IPortfolioGetters
 } from "contracts/interfaces/IPortfolio.sol";
+import { IStrategy } from "contracts/interfaces/IStrategy.sol";
 
 /// @dev Universal configuration of a pool in Portfolio to test.
 struct ConfigType {
@@ -23,27 +24,25 @@ using ConfigLib for ConfigType global;
 uint256 constant ConfigLib_DEFAULT_FEE = 30;
 uint256 constant ConfigLib_DEFAULT_PRIORITY_FEE = 10;
 
-interface PortfolioStrategy {
-    function getArguments() external view returns (bytes memory);
-}
-
 function safeCastTo16(uint256 x) pure returns (uint16 y) {
     require(x < 1 << 16);
 
     y = uint16(x);
 }
 
+// todo: fix testing config so its more clear its for test setup.
 /// @dev Instantiate a pool in Portfolio using a config.
 library ConfigLib {
     using { safeCastTo16 } for uint256;
 
     function instantiate(
         ConfigType memory config,
-        address target,
-        bytes memory strategyArgs
+        address target
     ) internal returns (uint64 id) {
-        require(config.asset != address(0), "did you set asset in config?");
-        require(config.quote != address(0), "did you set quote in config?");
+        require(config.asset != address(0), "ConfigType_Asset");
+        require(config.quote != address(0), "ConfigType_Quote");
+        require(config.reserveXPerWad != 0, "ConfigType_ReserveX");
+        require(config.reserveYPerWad != 0, "ConfigType_ReserveY");
 
         if (config.feeBasisPoints == 0) {
             config.feeBasisPoints = ConfigLib_DEFAULT_FEE;
@@ -72,7 +71,7 @@ library ConfigLib {
                     config.feeBasisPoints.safeCastTo16(),
                     config.priorityFeeBasisPoints.safeCastTo16(),
                     config.controller,
-                    strategyArgs
+                    config.data
                 )
             );
 
@@ -94,7 +93,7 @@ library ConfigLib {
                 feeBasisPoints: config.feeBasisPoints.safeCastTo16(),
                 priorityFeeBasisPoints: config.priorityFeeBasisPoints.safeCastTo16(),
                 controller: config.controller,
-                data: strategyArgs
+                data: config.data
             }) returns (uint64 _id) {
                 id = _id;
             } catch (bytes memory err) {

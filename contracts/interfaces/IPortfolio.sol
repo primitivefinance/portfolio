@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity >=0.8.0;
 
-import { PortfolioPair, Order } from "../libraries/PortfolioLib.sol";
+import {
+    PortfolioPool, PortfolioPair, Order
+} from "../libraries/PortfolioLib.sol";
+import { IStrategy } from "./IStrategy.sol";
 
 interface IPortfolioEvents {
     /// @dev Ether transfers into Portfolio via a payable function.
@@ -311,6 +314,10 @@ interface IPortfolioGetters {
         external
         view
         returns (bool success, int256 prevInvariant, int256 postInvariant);
+
+    function getInvariant(uint64 poolId) external view returns (int256);
+
+    function getStrategy(uint64 poolId) external view returns (IStrategy);
 }
 
 interface IPortfolioActions {
@@ -433,6 +440,18 @@ interface IPortfolioActions {
         external
         payable
         returns (bytes[] memory results);
+}
+
+interface IPortfolioStruct {
+    function pairs(uint24 pairId)
+        external
+        view
+        returns (PortfolioPair memory);
+
+    function pools(uint64 poolId)
+        external
+        view
+        returns (PortfolioPool memory);
 }
 
 interface IPortfolio is

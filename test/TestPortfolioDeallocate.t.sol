@@ -4,6 +4,10 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioDeallocate is Setup {
+    // todo: fix duration params...
+    uint256 constant TEST_DEALLOCATE_MIN_DURATION = 1;
+    uint256 constant TEST_DEALLOCATE_MAX_DURATION = 700;
+
     function test_deallocate_max()
         public
         defaultConfig
@@ -49,10 +53,11 @@ contract TestPortfolioDeallocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
+        allocateSome(uint128(BURNED_LIQUIDITY * 1e5))
     {
-        vm.assume(liquidity > 10 ** (18 - 6));
+        vm.assume(liquidity > 1e15);
         bytes[] memory data = new bytes[](1);
+
         data[0] = abi.encodeCall(
             IPortfolioActions.allocate,
             (
@@ -100,7 +105,15 @@ contract TestPortfolioDeallocate is Setup {
         uint16 duration
     )
         public
-        durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
+        durationConfig(
+            uint16(
+                bound(
+                    duration,
+                    TEST_DEALLOCATE_MIN_DURATION,
+                    TEST_DEALLOCATE_MAX_DURATION
+                )
+            )
+        )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))

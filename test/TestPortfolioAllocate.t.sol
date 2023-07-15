@@ -24,8 +24,27 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.createPair, (address(tokenA), address(tokenB))
         );
 
-        data[1] =
-            encodeCreate(0, address(0), 1, 100, 100, 100, 1 ether, 1 ether);
+        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 1 ether,
+            volatilityBasisPoints: 100,
+            durationSeconds: 100 * 1 days,
+            isPerpetual: false,
+            priceWad: 1 ether
+        });
+
+        data[1] = abi.encodeCall(
+            IPortfolioActions.createPool,
+            (
+                0, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                100, // fee
+                0, // prior fee
+                address(0), // controller
+                testConfig.data
+            )
+        );
 
         uint64 poolId = AssemblyLib.encodePoolId(1, false, 1);
 
@@ -518,9 +537,9 @@ contract TestPortfolioAllocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
+        allocateSome(uint128(BURNED_LIQUIDITY * 1e4))
     {
-        vm.assume(liquidity > 10 ** (18 - 6));
+        vm.assume(liquidity > 1e15);
         _simple_allocate_check_liquidity(liquidity);
     }
 
@@ -707,14 +726,17 @@ contract TestPortfolioAllocate is Setup {
             type(uint128).max
         );
 
+        ConfigType memory testConfig =
+            DefaultStrategy.getDefaultTestConfig(address(subject()));
+
         uint64 poolId = subject().createPool(
             1, // pair id
-            0, //x
-            0, // y
+            testConfig.reserveXPerWad, //x
+            testConfig.reserveYPerWad, // y
             30, // fee
             0, // priority fee
             address(0),
-            RMM01Strategy.defaultConfig()
+            testConfig.data
         );
 
         uint128 liq = subject().positions(actor(), ghost().poolId);

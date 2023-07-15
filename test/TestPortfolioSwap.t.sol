@@ -11,6 +11,7 @@ contract TestPortfolioSwap is Setup {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for uint128;
 
+    // todo: fix duration params...
     uint256 constant TEST_SWAP_MIN_DURATION = 1;
     uint256 constant TEST_SWAP_MAX_DURATION = 700;
 
@@ -307,15 +308,8 @@ contract TestPortfolioSwap is Setup {
     ) internal {
         PortfolioPool memory pool = ghost().pool();
 
-        (, int256 prevInvariant) = RMM01Portfolio(
-            payable(address(ghost().subject))
-        ).checkInvariant(
-            ghost().poolId,
-            int256(0),
-            pool.virtualX.divWadDown(pool.liquidity),
-            pool.virtualY.divWadDown(pool.liquidity),
-            block.timestamp
-        );
+        // todo: do getSwapInvariants
+        int256 prevInvariant = subject().getInvariant(ghost().poolId);
 
         bytes[] memory data = new bytes[](1);
         Order memory order = Order({
@@ -330,15 +324,7 @@ contract TestPortfolioSwap is Setup {
         try subject().multicall(data) {
             pool = ghost().pool();
 
-            (, int256 invariant) = RMM01Portfolio(
-                payable(address(ghost().subject))
-            ).checkInvariant(
-                ghost().poolId,
-                prevInvariant,
-                pool.virtualX.divWadDown(pool.liquidity),
-                pool.virtualY.divWadDown(pool.liquidity),
-                block.timestamp
-            );
+            int256 invariant = subject().getInvariant(ghost().poolId);
             // assertTrue(invariant >= 0, "invariant-negative"); todo: review if we need this?
             assertTrue(invariant >= prevInvariant, "invariant-decreased");
         } catch { }
@@ -357,11 +343,9 @@ contract TestPortfolioSwap is Setup {
             reserveIn = pool.virtualY;
         }
         {
-            uint256 maxAmountIn = RMM01Portfolio(
-                payable(address(ghost().subject))
-            ).computeMaxInput(
-                ghost().poolId, sellAsset, reserveIn, pool.liquidity
-            );
+            Order memory maxOrder =
+                subject().getMaxOrder(ghost().poolId, sellAsset, actor());
+            uint256 maxAmountIn = maxOrder.input;
 
             uint256 decimalsIn =
                 sellAsset ? pair.decimalsAsset : pair.decimalsQuote;
@@ -428,8 +412,8 @@ contract TestPortfolioSwap is Setup {
         uint256 amountOut =
             subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
-        (int256 prev, int256 post) = RMM01Portfolio(payable(address(subject())))
-            .getInvariants(
+        (int256 prev, int256 post) = subject().getStrategy(ghost().poolId)
+            .getSwapInvariants(
             Order({
                 useMax: false,
                 poolId: ghost().poolId,
@@ -548,14 +532,8 @@ contract TestPortfolioSwap is Setup {
 
         {
             // bound the amounts to be within the max amount in and max amount out
-            uint256 maxAmountIn = RMM01Portfolio(
-                payable(address(ghost().subject))
-            ).computeMaxInput(
-                ghost().poolId,
-                sellAsset,
-                sellAsset ? reserveXPerL : reserveYPerL,
-                pool.liquidity
-            );
+            uint256 maxAmountIn =
+                subject().getMaxOrder(ghost().poolId, sellAsset, actor()).input;
 
             amountIn = bound(amountIn, 1, maxAmountIn);
             amountOut = bound(
@@ -600,12 +578,11 @@ contract TestPortfolioSwap is Setup {
             reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
         }
 
-        uint256 maxIn = Portfolio(payable(address(subject()))).computeMaxInput(
-            ghost().poolId,
-            sellAsset,
-            sellAsset ? reserveXPerL : reserveYPerL,
-            pool.liquidity
-        );
+        Order memory maxOrder =
+            subject().getMaxOrder(ghost().poolId, sellAsset, actor());
+
+        uint256 maxIn = maxOrder.input;
+
         vm.assume(maxIn > amountIn);
 
         uint256 amountOut =
@@ -676,14 +653,8 @@ contract TestPortfolioSwap is Setup {
         uint256 reserveXPerL,
         uint256 reserveYPerL
     ) internal {
-        (, int256 prev) = RMM01Portfolio(payable(address(ghost().subject)))
-            .checkInvariant({
-            poolId: ghost().poolId,
-            invariant: 0,
-            reserveX: reserveXPerL,
-            reserveY: reserveYPerL,
-            timestamp: block.timestamp
-        });
+        // todo: fix with getSwapInvariants...
+        int256 prev = subject().getInvariant(ghost().poolId);
 
         bytes[] memory data = new bytes[](1);
         Order memory order = Order({
@@ -721,14 +692,7 @@ contract TestPortfolioSwap is Setup {
             if (quotient >= 1 ether || quotient == 0) return; // Exits before checking invariant.
             if (difference >= 1 ether || difference == 0) return; // Exits before checking invariant.
 
-            (, int256 post) = RMM01Portfolio(payable(address(ghost().subject)))
-                .checkInvariant({
-                poolId: ghost().poolId,
-                invariant: prev,
-                reserveX: reserveXPerL,
-                reserveY: reserveYPerL,
-                timestamp: block.timestamp
-            });
+            int256 post = subject().getInvariant(ghost().poolId);
 
             assertTrue(post >= prev, "post-invariant-not-gte-prev");
         } catch {

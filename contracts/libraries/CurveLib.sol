@@ -117,16 +117,23 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
  * { -∞   otherwise
  *
  * k = y - KΦ(Φ⁻¹(1-x) - σ√τ)
- * y = KΦ(Φ⁻¹(1-x) - σ√τ) - k
- * x = 1 - Φ(Φ⁻¹((y + k)/K) + σ√τ)
+ * y = KΦ(Φ⁻¹(1-x) - σ√τ) + k
+ * x = 1 - Φ(Φ⁻¹((y - k)/K) + σ√τ)
  *
  * Adjusted trading function
  * { 0    Φ⁻¹(1-x) - σ√τ >= Φ⁻¹(y/K)
  * { -∞   otherwise
  *
  * k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
- * y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
- * x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
+ *  -> Φ⁻¹(y/K) = Φ⁻¹(1-x) - σ√τ + k
+ *      -> y/K = Φ(Φ⁻¹(1-x) - σ√τ + k)
+ *          -> y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
+ *  -> Φ⁻¹(1-x) = Φ⁻¹(y/K) + σ√τ - k
+ *      -> 1-x = Φ(Φ⁻¹(y/K) + σ√τ - k)
+ *          -> x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
+ *
+ * note
+ * Slightly different from original trading function because invariant is different.
  * ```
  *
  * @return invariant        k; Signed invariant of the pool.
@@ -170,12 +177,11 @@ function tradingFunction(NormalCurve memory self)
  * @custom:math
  * x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
  *
- * @param invariant         k; Signed invariant of the pool.
  */
-function approximateXGivenY(
-    NormalCurve memory self,
-    int256 invariant
-) pure returns (uint256 reserveXPerWad) {
+function approximateXGivenY(NormalCurve memory self)
+    pure
+    returns (uint256 reserveXPerWad)
+{
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
     (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
     // If y reserves has reached upper bound, x reserves is zero.
@@ -189,7 +195,7 @@ function approximateXGivenY(
     // Φ⁻¹(y/K)
     int256 invariantTermY = Gaussian.ppf(int256(quotientWad));
     // Φ⁻¹(y/K) + σ√τ - k
-    int256 independent = invariantTermY + int256(stdDevSqrtTau) - invariant;
+    int256 independent = invariantTermY + int256(stdDevSqrtTau) - self.invariant;
     // x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
     reserveXPerWad = WAD - uint256(Gaussian.cdf(independent));
 }
@@ -204,12 +210,11 @@ function approximateXGivenY(
  * @custom:math
  * y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
  *
- * @param invariant         k; Signed invariant of the pool. Truncated.
  */
-function approximateYGivenX(
-    NormalCurve memory self,
-    int256 invariant
-) pure returns (uint256 reserveYPerWad) {
+function approximateYGivenX(NormalCurve memory self)
+    pure
+    returns (uint256 reserveYPerWad)
+{
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
     (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
     // If x reserves has reached upper bound, y reserves is zero.
@@ -223,7 +228,7 @@ function approximateYGivenX(
     // Φ⁻¹(1-x)
     int256 invariantTermX = Gaussian.ppf(int256(differenceWad));
     // Φ⁻¹(1-x) - σ√τ + k
-    int256 independent = invariantTermX - int256(stdDevSqrtTau) + invariant;
+    int256 independent = invariantTermX - int256(stdDevSqrtTau) + self.invariant;
     // y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
     reserveYPerWad =
         uint256(Gaussian.cdf(independent)).mulWadDown(self.strikePriceWad);
@@ -332,7 +337,7 @@ function approximateReservesGivenPrice(
 ) pure returns (uint256 reserveXPerWad, uint256 reserveYPerWad) {
     reserveXPerWad = approximateXGivenPrice(self, priceWad);
     self.reserveXPerWad = reserveXPerWad;
-    reserveYPerWad = approximateYGivenX(self, 0);
+    reserveYPerWad = approximateYGivenX(self);
 }
 
 /**
@@ -512,14 +517,14 @@ library CurveLib {
             // by overestimating the current invariant.
             // Since an invariant must increase in a swap to be a valid trade,
             // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
-            uint256 reserveXPerWad;
-            uint256 reserveYPerWad;
+            uint256 reserveXPerWad = self.virtualX;
+            uint256 reserveYPerWad = self.virtualY;
             if (order.sellAsset) {
-                reserveXPerWad = self.virtualX.divWadDown(self.liquidity);
-                reserveYPerWad = self.virtualY.divWadUp(self.liquidity);
+                reserveXPerWad = reserveXPerWad.divWadDown(self.liquidity);
+                reserveYPerWad = reserveYPerWad.divWadUp(self.liquidity);
             } else {
-                reserveXPerWad = self.virtualX.divWadUp(self.liquidity);
-                reserveYPerWad = self.virtualY.divWadDown(self.liquidity);
+                reserveXPerWad = reserveXPerWad.divWadUp(self.liquidity);
+                reserveYPerWad = reserveYPerWad.divWadDown(self.liquidity);
             }
 
             curve = NormalCurve({
@@ -544,11 +549,9 @@ library CurveLib {
                 ? self.priorityFeeBasisPoints
                 : self.feeBasisPoints;
 
-            (uint256 feeAmount, uint256 protocolFeeAmount) =
-                orderCopy.computeFeeAmounts(feeBps, protocolFee);
-
-            (reserveX, reserveY) = orderCopy.computeAdjustedSwapReserves(
-                reserveX, reserveY, feeAmount, protocolFeeAmount
+            // Compute the adjusted reserves.
+            (,, reserveX, reserveY) = orderCopy.computeSwapResult(
+                reserveX, reserveY, feeBps, protocolFee
             );
         }
 
@@ -581,11 +584,11 @@ library CurveLib {
         // Approximate the output reserve per liquidity using the math functions.
         if (sellAsset) {
             curve.reserveXPerWad = independentReserve;
-            curve.reserveYPerWad = curve.approximateYGivenX(prevInv);
+            curve.reserveYPerWad = curve.approximateYGivenX();
             dependentReserve = curve.reserveYPerWad;
         } else {
             curve.reserveYPerWad = independentReserve;
-            curve.reserveXPerWad = curve.approximateXGivenY(prevInv);
+            curve.reserveXPerWad = curve.approximateXGivenY();
             dependentReserve = curve.reserveXPerWad;
         }
 

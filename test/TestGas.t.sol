@@ -126,8 +126,26 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
-        data[0] = encodeCreate(
-            uint24(0), address(0), 0, hundred, 1e4, hundred, 10 ether, 10 ether
+        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 10 ether,
+            volatilityBasisPoints: 1e4,
+            durationSeconds: hundred * 1 days,
+            isPerpetual: false,
+            priceWad: 10 ether
+        });
+
+        data[0] = abi.encodeCall(
+            IPortfolioActions.createPool,
+            (
+                0, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                hundred, // fee
+                0, // prior fee
+                address(0), // controller
+                testConfig.data
+            )
         );
 
         subject().multicall(data);
@@ -234,8 +252,27 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
-        data[0] = encodeCreate(
-            uint24(0), address(0), 0, hundred, 1e4, hundred, 10 ether, 10 ether
+
+        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 10 ether,
+            volatilityBasisPoints: 1e4,
+            durationSeconds: hundred * 1 days,
+            isPerpetual: false,
+            priceWad: 10 ether
+        });
+
+        data[0] = abi.encodeCall(
+            IPortfolioActions.createPool,
+            (
+                0, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                hundred, // fee
+                0, // prior fee
+                address(0), // controller
+                testConfig.data
+            )
         );
 
         subject().multicall(data);
@@ -491,15 +528,26 @@ contract TestGas is Setup {
                 instructions[i] =
                     abi.encodeCall(IPortfolioActions.createPair, (a0, q0));
             } else {
-                instructions[i] = encodeCreate(
-                    0, // magic pair id to use the nonce, which is the createPairId!
-                    controller,
-                    0,
-                    uint16(100 + 100 / i),
-                    uint16(1000 + 1000 / i),
-                    uint16(1 + 100 / i),
-                    uint128(1 ether * i),
-                    uint128(1 ether * i)
+                ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+                    portfolio: address(subject()),
+                    strikePriceWad: uint128(1 ether * i),
+                    volatilityBasisPoints: uint16(1000 + 1000 / i),
+                    durationSeconds: uint16(1 + 100 / i) * 1 days,
+                    isPerpetual: false,
+                    priceWad: uint128(1 ether * i)
+                });
+
+                instructions[i] = abi.encodeCall(
+                    IPortfolioActions.createPool,
+                    (
+                        0, // magic pair id to use the nonce, which is the createPairId!
+                        testConfig.reserveXPerWad,
+                        testConfig.reserveYPerWad,
+                        uint16(100 + 100 / i), // fee
+                        0, // prior fee
+                        controller,
+                        testConfig.data
+                    )
                 );
             }
         }
@@ -581,14 +629,9 @@ contract TestGas is Setup {
             uint64 poolId = uint64(ghost().poolId + i); // We can do this because we create pools from one nonce.
 
             bool sellAsset = i % 2 == 0;
-            uint256 reserveIn = sellAsset ? pool.virtualX : pool.virtualY;
-            uint128 amountIn = RMM01Portfolio(payable(address(_subject)))
-                .computeMaxInput({
-                poolId: poolId,
-                sellAsset: sellAsset,
-                reserveIn: reserveIn.divWadDown(pool.liquidity),
-                liquidity: pool.liquidity
-            }).safeCastTo128() / 10;
+            Order memory maxOrder =
+                subject().getMaxOrder(poolId, sellAsset, actor());
+            uint128 amountIn = maxOrder.input;
 
             // This estimated amount is accurate, however, each getAmountOut computation uses the current invariant.
             // Since all the computed output amounts use the current invariant, once these are executed there will be small
@@ -621,16 +664,29 @@ contract TestGas is Setup {
         view
         returns (bytes memory)
     {
-        return encodeCreate(
-            pairId,
-            address(0),
-            uint16(10),
-            uint16(100),
-            uint16(1000),
-            uint16(100),
-            uint128(1 ether),
-            uint128(1 ether)
+        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: uint128(1 ether),
+            volatilityBasisPoints: uint16(1000),
+            durationSeconds: uint16(100) * 1 days,
+            isPerpetual: false,
+            priceWad: uint128(1 ether)
+        });
+
+        bytes memory payload = abi.encodeCall(
+            IPortfolioActions.createPool,
+            (
+                pairId, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                uint16(100), // fee
+                uint16(10), // prior fee
+                address(0), // controller
+                testConfig.data
+            )
         );
+
+        return payload;
     }
 
     function _allocateInstruction(uint64 poolId)

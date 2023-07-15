@@ -5,6 +5,8 @@ import "./libraries/PortfolioLib.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IPortfolioRegistry.sol";
+import "./interfaces/IStrategy.sol";
+import "./NormalStrategy.sol";
 
 /**
  * @title   Portfolio
@@ -12,7 +14,7 @@ import "./interfaces/IPortfolioRegistry.sol";
  * @dev     All directly transferred tokens to this contract are lost.
  * @custom:contributor TomAFrench
  */
-abstract contract Portfolio is IPortfolio {
+contract Portfolio is IPortfolio {
     using SafeCastLib for uint256;
     using FixedPointMathLib for int256;
     using FixedPointMathLib for uint256;
@@ -92,6 +94,8 @@ abstract contract Portfolio is IPortfolio {
      */
     uint64 private _getLastPoolId;
 
+    address public immutable defaultStrategy; // todo: implement fully, is this the best approach?
+
     /**
      * @dev Protects against reentrancy and getting to invalid settlement states.
      * This lock works in pair with `_postLock` and both should be used on all
@@ -129,6 +133,7 @@ abstract contract Portfolio is IPortfolio {
         WETH = weth;
         REGISTRY = registry;
         __account__.settled = true;
+        defaultStrategy = address(new NormalStrategy(address(this)));
     }
 
     receive() external payable {
@@ -227,7 +232,9 @@ abstract contract Portfolio is IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         if (poolId == 0) poolId = _getLastPoolId;
-        if (!checkPool(poolId)) revert NonExistentPool(poolId);
+        if (!getStrategy(poolId).verifyPool(poolId)) {
+            revert NonExistentPool(poolId);
+        }
 
         (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
             poolId: poolId,
@@ -312,7 +319,9 @@ abstract contract Portfolio is IPortfolio {
 
         if (_currentMulticall == false) _deposit();
 
-        if (!checkPool(poolId)) revert NonExistentPool(poolId);
+        if (!getStrategy(poolId).verifyPool(poolId)) {
+            revert NonExistentPool(poolId);
+        }
 
         (minDeltaAsset, minDeltaQuote) = _scaleAmountsToWad({
             poolId: poolId,
@@ -421,9 +430,14 @@ abstract contract Portfolio is IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         // --- Checks --- //
-        if (!checkPool(args.poolId)) revert NonExistentPool(args.poolId);
+        if (!getStrategy(args.poolId).verifyPool(args.poolId)) {
+            revert NonExistentPool(args.poolId);
+        }
 
         PortfolioPool storage pool = pools[args.poolId];
+
+        // Sets the pool's lastTimestamp to the current block timestamp, in storage.
+        pool.syncPoolTimestamp(block.timestamp);
 
         // Scale amounts from native token decimals to WAD.
         // Load input and output token information with respective pair tokens.
@@ -453,8 +467,9 @@ abstract contract Portfolio is IPortfolio {
             info.tokenOutput = pair.tokenAsset;
         }
 
-        (bool success, int256 invariant) =
-            _beforeSwapEffects(args.poolId, args.sellAsset);
+        (bool success, int256 invariant) = getStrategy(args.poolId).beforeSwap(
+            args.poolId, args.sellAsset, msg.sender
+        );
         if (!success) revert PoolExpired();
 
         Iteration memory iteration;
@@ -502,30 +517,28 @@ abstract contract Portfolio is IPortfolio {
                     : pool.feeBasisPoints;
 
                 // Compute the respective fee and protocol fee amounts.
-                (iteration.feeAmount, iteration.protocolFeeAmount) =
-                    order.computeFeeAmounts(feeBps, protocolFee);
-
-                // Take the protocol fee from the input amount, so that protocol fee is not re-invested into pool.
-                deltaIndependentReserveWad -= iteration.protocolFeeAmount;
-
                 // Compute the reserves after applying the desired swap amounts and fees.
-                (uint256 adjustedVirtualX, uint256 adjustedVirtualY) = order
-                    .computeAdjustedSwapReserves(
-                    iteration.virtualX,
-                    iteration.virtualY,
+                uint256 adjustedVirtualX;
+                uint256 adjustedVirtualY;
+                (
                     iteration.feeAmount,
-                    iteration.protocolFeeAmount
+                    iteration.protocolFeeAmount,
+                    adjustedVirtualX,
+                    adjustedVirtualY
+                ) = order.computeSwapResult(
+                    iteration.virtualX, iteration.virtualY, feeBps, protocolFee
                 );
 
                 // --- Invariant Check --- //
 
                 bool validInvariant;
-                (validInvariant, iteration.nextInvariant) = checkInvariant(
+                (validInvariant, iteration.nextInvariant) = getStrategy(
+                    order.poolId
+                ).verifySwap(
                     order.poolId,
                     iteration.prevInvariant,
                     adjustedVirtualX,
-                    adjustedVirtualY,
-                    block.timestamp
+                    adjustedVirtualY
                 );
 
                 if (!validInvariant) {
@@ -534,6 +547,9 @@ abstract contract Portfolio is IPortfolio {
                     );
                 }
             }
+
+            // Take the protocol fee from the input amount, so that protocol fee is not re-invested into pool.
+            deltaIndependentReserveWad -= iteration.protocolFeeAmount;
 
             // Increases the independent pool reserve by the input amount, including fee and excluding protocol fee.
             // Decrease the dependent pool reserve by the output amount.
@@ -676,6 +692,9 @@ abstract contract Portfolio is IPortfolio {
 
         // Store the last created poolId for the multicall, to make sure the user is not frontrun.
         _getLastPoolId = poolId;
+
+        // todo: fix with proper controller/conditional. Should this be called all the time?
+        try getStrategy(poolId).afterCreate(poolId, data) { } catch { }
 
         emit CreatePool(
             poolId,
@@ -968,59 +987,6 @@ abstract contract Portfolio is IPortfolio {
         deltaQuote = deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote);
     }
 
-    // ===== Virtual Functions ===== //
-
-    /**
-     * @dev Used to apply changes to a `pool`, like it's timestamp, before a swap occurs.
-     * @param sellAsset Determines rounding direction for reserves to compute invariant, round Y up (true) or round X up (false).
-     * @return success True if pool can be swapped in.
-     * @return invariant Current invariant value of the pool in WAD units.
-     */
-    function _beforeSwapEffects(
-        uint64 poolId,
-        bool sellAsset
-    ) internal virtual returns (bool success, int256 invariant);
-
-    /**
-     * @dev Conditional check before interacting with a pool.
-     * @return True if pool exists and is ready to be interacted with.
-     */
-    function checkPool(uint64 poolId) public view virtual returns (bool);
-
-    /**
-     * @dev Computes the invariant given `reserveX` and `reserveY` and returns the invariant condition status.
-     * @param invariant Last invariant value of the pool in WAD units.
-     * @param reserveX Amount of "asset" reserves in WAD units per WAD of liquidity.
-     * @param reserveY Amount of "quote" reserves in WAD units per WAD of liquidity.
-     * @param timestamp Timestamp at which the invariant condition will be checked. Used to compute time until maturity.
-     */
-    function checkInvariant(
-        uint64 poolId,
-        int256 invariant,
-        uint256 reserveX,
-        uint256 reserveY,
-        uint256 timestamp
-    ) public view virtual returns (bool success, int256 nextInvariant);
-
-    /**
-     * @dev Computes the max amount of tokens that can be swapped into the pool.
-     */
-    function computeMaxInput(
-        uint64 poolId,
-        bool sellAsset,
-        uint256 reserveIn,
-        uint256 liquidity
-    ) public view virtual returns (uint256);
-
-    /**
-     * @dev Computes the reserves in WAD units using a `price` in WAD units.
-     * @param price Quote tokens per Asset token in WAD units.
-     */
-    function computeReservesFromPrice(
-        uint64 poolId,
-        uint256 price
-    ) public view virtual returns (uint256 reserveX, uint256 reserveY);
-
     /// @inheritdoc IPortfolioGetters
     function getAmountOut(
         uint64 poolId,
@@ -1032,23 +998,38 @@ abstract contract Portfolio is IPortfolio {
         view
         virtual
         override(IPortfolioGetters)
-        returns (uint256 output);
+        returns (uint256 output)
+    {
+        return getStrategy(poolId).getAmountOut(
+            poolId, sellAsset, amountIn, swapper
+        );
+    }
 
     /// @inheritdoc IPortfolioGetters
     function getSpotPrice(uint64 poolId)
         public
         view
         virtual
-        returns (uint256 price);
+        returns (uint256 price)
+    {
+        return getStrategy(poolId).getSpotPrice(poolId);
+    }
 
     /// @inheritdoc IPortfolioGetters
     function getMaxOrder(
         uint64 poolId,
         bool sellAsset,
         address swapper
-    ) external view virtual returns (Order memory);
+    ) external view virtual returns (Order memory) {
+        return getStrategy(poolId).getMaxOrder(poolId, sellAsset);
+    }
 
-    /// @inheritdoc IPortfolioGetters
+    // todo: properly implement using pool's controller or the default strategy.
+    function getStrategy(uint64 poolId) public view returns (IStrategy) {
+        return IStrategy(defaultStrategy);
+    }
+
+    // todo: implement
     function simulateSwap(
         Order memory args,
         uint256 timestamp,
@@ -1057,5 +1038,11 @@ abstract contract Portfolio is IPortfolio {
         external
         view
         virtual
-        returns (bool success, int256 prevInvariant, int256 postInvariant);
+        override
+        returns (bool success, int256 prevInvariant, int256 postInvariant)
+    { }
+
+    function getInvariant(uint64 poolId) external view returns (int256) {
+        return getStrategy(poolId).getInvariant(poolId);
+    }
 }

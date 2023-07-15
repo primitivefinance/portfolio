@@ -1,15 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
+import "contracts/interfaces/IStrategy.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/libraries/PortfolioLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import "contracts/libraries/CurveLib.sol";
-import "contracts/RMM01Portfolio.sol";
+import "contracts/Portfolio.sol";
 
 import { Coin } from "./CoinType.sol";
 
 using Ghost for GhostType global;
+
+interface ConfigLike {
+    function defaultStrategy() external view returns (address);
+    function configs(uint64 poolId)
+        external
+        view
+        returns (PortfolioConfig memory);
+}
 
 /// @dev Universal state for unit tests.
 struct GhostType {
@@ -71,7 +80,10 @@ library Ghost {
         GhostType memory self,
         uint64 poolId
     ) internal view returns (PortfolioConfig memory) {
-        return IPortfolioStruct(self.subject).configs(poolId);
+        address target = ConfigLike(self.subject).defaultStrategy(); // todo: fix with controller...
+
+        require(target != address(0), "no config/strategy/controller config!");
+        return ConfigLike(target).configs(poolId);
     }
 
     function file(
@@ -116,7 +128,7 @@ library Ghost {
         view
         returns (PortfolioConfig memory)
     {
-        return IPortfolioStruct(self.subject).configs(self.poolId);
+        return configOf(self, self.poolId);
     }
 
     function asset(GhostType memory self) internal view returns (Coin) {
@@ -126,21 +138,20 @@ library Ghost {
     function quote(GhostType memory self) internal view returns (Coin) {
         return Coin.wrap(self.pair().tokenQuote);
     }
-}
 
-interface IPortfolioStruct {
-    function pairs(uint24 pairId)
-        external
+    function strategy(GhostType memory self)
+        internal
         view
-        returns (PortfolioPair memory);
+        returns (IStrategy)
+    {
+        return IStrategy(ConfigLike(self.subject).defaultStrategy());
+    }
 
-    function pools(uint64 poolId)
-        external
+    function defaultStrategy(GhostType memory self)
+        internal
         view
-        returns (PortfolioPool memory);
-
-    function configs(uint64 poolId)
-        external
-        view
-        returns (PortfolioConfig memory);
+        returns (IStrategy)
+    {
+        return IStrategy(ConfigLike(self.subject).defaultStrategy());
+    }
 }
