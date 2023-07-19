@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
+import "solmate/tokens/ERC1155.sol";
 import "./libraries/PortfolioLib.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
@@ -20,7 +21,7 @@ import "./strategies/NormalStrategy.sol";
  *
  * @custom:contributor TomAFrench
  */
-contract Portfolio is IPortfolio {
+contract Portfolio is ERC1155, IPortfolio {
     using AssemblyLib for *;
     using FixedPointMathLib for *;
     using SafeCastLib for *;
@@ -148,7 +149,7 @@ contract Portfolio is IPortfolio {
      * transactions with Portfolio to fail once `address(this).balance > 0`.
      * @param registry Address of a contract that implements the `IRegistry` interface.
      */
-    constructor(address weth, address registry) {
+    constructor(address weth, address registry) ERC1155() {
         WETH = weth;
         REGISTRY = registry;
         DEFAULT_STRATEGY = address(new NormalStrategy(address(this)));
@@ -157,6 +158,10 @@ contract Portfolio is IPortfolio {
 
     receive() external payable {
         if (msg.sender != WETH) revert();
+    }
+
+    function uri(uint256 id) public view override returns (string memory) {
+        return "";
     }
 
     // ===== Account Getters ===== //
