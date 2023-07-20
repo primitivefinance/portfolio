@@ -233,7 +233,7 @@ contract Portfolio is IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         if (poolId == 0) poolId = _getLastPoolId;
-        if (!getStrategy(poolId).verifyPool(poolId)) {
+        if (!getStrategy(poolId).validatePool(poolId)) {
             revert NonExistentPool(poolId);
         }
 
@@ -320,7 +320,7 @@ contract Portfolio is IPortfolio {
 
         if (_currentMulticall == false) _deposit();
 
-        if (!getStrategy(poolId).verifyPool(poolId)) {
+        if (!getStrategy(poolId).validatePool(poolId)) {
             revert NonExistentPool(poolId);
         }
 
@@ -431,7 +431,7 @@ contract Portfolio is IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         // --- Checks --- //
-        if (!getStrategy(args.poolId).verifyPool(args.poolId)) {
+        if (!getStrategy(args.poolId).validatePool(args.poolId)) {
             revert NonExistentPool(args.poolId);
         }
 
@@ -535,7 +535,7 @@ contract Portfolio is IPortfolio {
                 bool validInvariant;
                 (validInvariant, iteration.nextInvariant) = getStrategy(
                     order.poolId
-                ).verifySwap(
+                ).validateSwap(
                     order.poolId,
                     iteration.prevInvariant,
                     adjustedVirtualX,

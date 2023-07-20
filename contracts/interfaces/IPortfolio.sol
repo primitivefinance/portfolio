@@ -379,7 +379,7 @@ interface IPortfolioView {
      *
      * @dev
      * Strategy contracts implement the `beforeSwap` and `afterCreate` state changing hooks.
-     * Along with the `verifySwap` and `verifyPool` hooks that handle critical validations.
+     * Along with the `validateSwap` and `validatePool` hooks that handle critical validations.
      *
      * @return strategy Address of the external strategy contract.
      */

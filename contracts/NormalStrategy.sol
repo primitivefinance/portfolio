@@ -69,7 +69,7 @@ contract NormalStrategy is IStrategy {
         return (true, invariant);
     }
 
-    function verifySwap(
+    function validateSwap(
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
@@ -98,7 +98,7 @@ contract NormalStrategy is IStrategy {
         return true;
     }
 
-    function verifyPool(uint64 poolId) public view override returns (bool) {
+    function validatePool(uint64 poolId) public view override returns (bool) {
         // todo: refactor
         return IPortfolioStruct(portfolio).pools(poolId).exists();
     }

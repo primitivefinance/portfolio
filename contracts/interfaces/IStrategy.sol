@@ -43,7 +43,7 @@ interface IStrategy is IPortfolioStrategy {
      * @param sellAsset Whether the asset being sold is the input asset.
      * @param swapper Address executing the swap.
      * @return success Whether the swap should proceed.
-     * @return invariant Pre-swap invariant used in `verifySwap`.
+     * @return invariant Pre-swap invariant used in `validateSwap`.
      */
     function beforeSwap(
         uint64 poolId,
@@ -60,7 +60,7 @@ interface IStrategy is IPortfolioStrategy {
      *
      * @return success Whether the pool is in the instantiated or active states.
      */
-    function verifyPool(uint64 poolId) external view returns (bool);
+    function validatePool(uint64 poolId) external view returns (bool);
 
     /**
      * @notice
@@ -75,7 +75,7 @@ interface IStrategy is IPortfolioStrategy {
      * @return success Whether the swap is valid.
      * @return postInvariant Post-swap invariant after the reserves are adjusted from the swap.
      */
-    function verifySwap(
+    function validateSwap(
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
