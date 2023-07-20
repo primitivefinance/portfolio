@@ -9,20 +9,21 @@ import "./interfaces/IStrategy.sol";
 import "./strategies/NormalStrategy.sol";
 
 /**
- * @title   Portfolio
- * @author  Primitive™
- * @dev     All directly transferred tokens to this contract are lost.
+ * @title
+ * Portfolio
+ *
+ * @author
+ * Primitive™
+ *
+ * @dev
+ * All directly transferred tokens to this contract are lost.
+ *
  * @custom:contributor TomAFrench
  */
 contract Portfolio is IPortfolio {
-    using SafeCastLib for uint256;
-    using FixedPointMathLib for int256;
-    using FixedPointMathLib for uint256;
-    using AssemblyLib for uint8;
-    using AssemblyLib for uint16;
-    using AssemblyLib for uint32;
-    using AssemblyLib for int256;
-    using AssemblyLib for uint256;
+    using AssemblyLib for *;
+    using FixedPointMathLib for *;
+    using SafeCastLib for *;
 
     /// @inheritdoc IPortfolioState
     function VERSION() public pure returns (string memory) {
@@ -44,6 +45,7 @@ contract Portfolio is IPortfolio {
         }
     }
 
+    /// @dev Stores the accounting state of Portfolio.
     AccountLib.AccountSystem internal __account__;
 
     /// @inheritdoc IPortfolioState
@@ -83,8 +85,14 @@ contract Portfolio is IPortfolio {
     uint256 public protocolFee;
 
     /**
-     * @dev Manipulated in `_settlement` only.
-     * @custom:invariant MUST be deleted after every transaction that uses it.
+     * @notice
+     * Credit and debits that are cleared during settlement.
+     *
+     * @dev
+     * Manipulated in `_settlement` only.
+     *
+     * @custom:invariant
+     * MUST be deleted after every transaction that uses it.
      */
     Payment[] private _payments;
 
@@ -92,17 +100,23 @@ contract Portfolio is IPortfolio {
     bool private _currentMulticall;
 
     /**
-     * @dev Tracks the id of the last pool that was created, quite useful during
+     * @notice
+     * Used in `allocate` to prevent pool creation frontrunning.
+     *
+     * @dev
+     * Tracks the id of the last pool that was created, quite useful during
      * a multicall to avoid being tricked into allocating into the wrong pool.
      */
     uint64 private _getLastPoolId;
 
     /**
-     * @dev Protects against reentrancy and getting to invalid settlement states.
+     * @dev
+     * Protects against reentrancy and getting to invalid settlement states.
      * This lock works in pair with `_postLock` and both should be used on all
      * external non-view functions (except the restricted ones).
      *
-     * Note: Private functions are used instead of modifiers to reduce the size
+     * note
+     * Private functions are used instead of modifiers to reduce the size
      * of the bytecode.
      */
     function _preLock() private {
@@ -125,6 +139,10 @@ contract Portfolio is IPortfolio {
     }
 
     /**
+     * @dev
+     * Portfolio relies on the security of the NormalStrategy implementation,
+     * since all pools created without a strategy default to this one.
+     *
      * @param weth Address of the WETH contract. Failing to pass a valid WETH
      * contract that implements the `deposit()` function will cause all
      * transactions with Portfolio to fail once `address(this).balance > 0`.
@@ -373,7 +391,10 @@ contract Portfolio is IPortfolio {
     }
 
     /**
-     * @dev Manipulates reserves depending on if liquidity is being allocated or deallocated.
+     * @dev
+     * Manipulates reserves depending on if liquidity is being allocated or deallocated.
+     * If allocating to an instantiated pool, a minimum amount of liquidity is permanently
+     * burned to prevent the pool from reaching 0 liquidity.
      */
     function _changeLiquidity(ChangeLiquidityParams memory args) internal {
         PortfolioPool storage pool = pools[args.poolId];
@@ -553,11 +574,8 @@ contract Portfolio is IPortfolio {
 
             // Increases the independent pool reserve by the input amount, including fee and excluding protocol fee.
             // Decrease the dependent pool reserve by the output amount.
-            _syncPool(
-                order.poolId,
-                order.sellAsset,
-                deltaIndependentReserveWad,
-                iteration.output
+            pool.adjustReserves(
+                order.sellAsset, deltaIndependentReserveWad, iteration.output
             );
 
             _increaseReserves(info.tokenInput, iteration.input); // Increasing global reserves creates a debit that must be paid from `msg.sender`.
@@ -593,33 +611,6 @@ contract Portfolio is IPortfolio {
             _postLock();
         }
         return (args.poolId, iteration.input, iteration.output);
-    }
-
-    /**
-     * @dev Effects on a pool after a successful swap.
-     * @param deltaInWad Amount of input tokens in WAD units to increase the independent reserve by.
-     * @param deltaOutWad Amount of output tokens in WAD units to decrease the dependent reserve by.
-     */
-    function _syncPool(
-        uint64 poolId,
-        bool sellAsset,
-        uint256 deltaInWad,
-        uint256 deltaOutWad
-    ) internal {
-        PortfolioPool storage pool = pools[poolId];
-
-        if (sellAsset) {
-            pool.virtualX += deltaInWad.safeCastTo128();
-            pool.virtualY -= deltaOutWad.safeCastTo128();
-        } else {
-            pool.virtualX -= deltaOutWad.safeCastTo128();
-            pool.virtualY += deltaInWad.safeCastTo128();
-        }
-
-        // If not updated in the other swap hooks, update the timestamp.
-        if (pool.lastTimestamp != block.timestamp) {
-            pool.syncPoolTimestamp(block.timestamp);
-        }
     }
 
     /// @inheritdoc IPortfolioActions
@@ -888,11 +879,11 @@ contract Portfolio is IPortfolio {
 
     /// @inheritdoc IPortfolioRegistryActions
     function claimFee(address token, uint256 amount) external override {
+        _preLock();
+
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
         }
-
-        _preLock();
 
         uint256 amountWad;
         uint8 decimals = IERC20(token).decimals();

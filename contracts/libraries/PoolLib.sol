@@ -13,6 +13,7 @@ using SafeCastLib for uint256;
 
 /// Free functions exposed via `global` give any PortfolioPool instance access to the methods.
 using {
+    adjustReserves,
     createPool,
     changePoolLiquidity,
     exists,
@@ -148,6 +149,22 @@ function changePoolLiquidity(
     int128 liquidityDelta
 ) {
     self.liquidity = AssemblyLib.addSignedDelta(self.liquidity, liquidityDelta);
+}
+
+/// @dev Applies reserve adjustments after a swap.
+function adjustReserves(
+    PortfolioPool storage self,
+    bool sellAsset,
+    uint256 deltaInWad,
+    uint256 deltaOutWad
+) {
+    if (sellAsset) {
+        self.virtualX += deltaInWad.safeCastTo128();
+        self.virtualY -= deltaOutWad.safeCastTo128();
+    } else {
+        self.virtualX -= deltaOutWad.safeCastTo128();
+        self.virtualY += deltaInWad.safeCastTo128();
+    }
 }
 
 // ----------------- //
