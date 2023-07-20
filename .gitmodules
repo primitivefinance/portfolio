@@ -9,3 +9,6 @@
 	path = lib/solstat
 	url = https://github.com/primitivefinance/solstat
 	branch = main
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
