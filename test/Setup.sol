@@ -16,6 +16,7 @@ import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/test/FeeOnTransferToken.sol";
 import "contracts/test/SimpleRegistry.sol";
+import "contracts/test/SimplePositionRenderer.sol";
 import "contracts/Portfolio.sol";
 
 // Types
@@ -24,6 +25,7 @@ struct SubjectsType {
     address registry;
     address weth;
     address portfolio;
+    address renderer;
 }
 
 // Interfaces
@@ -52,6 +54,8 @@ interface ISetup {
 
     /// @dev Returns the portfolio contract as an address, which is also the subject.
     function portfolio() external view returns (address);
+
+    function renderer() external view returns (address);
 }
 
 // Constants and Storage
@@ -205,8 +209,9 @@ contract Setup is
         _subjects.weth = address(new WETH());
         vm.label(_subjects.weth, "weth");
 
-        _subjects.portfolio =
-            address(new Portfolio(_subjects.weth, _subjects.registry));
+        _subjects.portfolio = address(
+            new Portfolio(_subjects.weth, _subjects.registry, _subjects.renderer)
+        );
         vm.label(_subjects.portfolio, "portfolio");
 
         _ghost_state = GhostType({
@@ -482,6 +487,10 @@ contract Setup is
     /// @inheritdoc ISetup
     function portfolio() public view override returns (address) {
         return _subjects.portfolio;
+    }
+
+    function renderer() public view override returns (address) {
+        return _subjects.renderer;
     }
 
     receive() external payable { }
