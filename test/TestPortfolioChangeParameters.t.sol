@@ -36,7 +36,7 @@ contract TestPortfolioChangeParameters is Setup {
         defaultControlledConfig
     {
         uint64 poolId = ghost().poolId;
-        vm.expectRevert(NotController.selector);
+        vm.expectRevert(Portfolio_NotController.selector);
         vm.prank(address(0x0006));
         subject().changeParameters(
             poolId, Setup_DEFAULT_PRIORITY_FEE, Setup_DEFAULT_FEE

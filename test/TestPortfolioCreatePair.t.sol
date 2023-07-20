@@ -18,7 +18,7 @@ contract TestPortfolioCreatePair is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] =
             abi.encodeCall(IPortfolioActions.createPair, (token0, token0));
-        vm.expectRevert(SameTokenError.selector);
+        vm.expectRevert(Portfolio_DuplicateToken.selector);
         subject().multicall(instructions);
     }
 
@@ -29,7 +29,9 @@ contract TestPortfolioCreatePair is Setup {
             (ghost().asset().to_addr(), ghost().quote().to_addr())
         );
         uint24 pairId = uint24(ghost().poolId >> 40);
-        vm.expectRevert(abi.encodeWithSelector(PairExists.selector, pairId));
+        vm.expectRevert(
+            abi.encodeWithSelector(Portfolio_PairExists.selector, pairId)
+        );
         subject().multicall(instructions);
     }
 
@@ -40,7 +42,9 @@ contract TestPortfolioCreatePair is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] =
             abi.encodeCall(IPortfolioActions.createPair, (token0, token1));
-        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 5));
+        vm.expectRevert(
+            abi.encodeWithSelector(Portfolio_InvalidDecimals.selector, 5)
+        );
         subject().multicall(instructions);
     }
 
@@ -51,7 +55,9 @@ contract TestPortfolioCreatePair is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] =
             abi.encodeCall(IPortfolioActions.createPair, (token0, token1));
-        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 5));
+        vm.expectRevert(
+            abi.encodeWithSelector(Portfolio_InvalidDecimals.selector, 5)
+        );
         subject().multicall(instructions);
     }
 
@@ -62,7 +68,9 @@ contract TestPortfolioCreatePair is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] =
             abi.encodeCall(IPortfolioActions.createPair, (token0, token1));
-        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 24));
+        vm.expectRevert(
+            abi.encodeWithSelector(Portfolio_InvalidDecimals.selector, 24)
+        );
         subject().multicall(instructions);
     }
 
@@ -73,7 +81,9 @@ contract TestPortfolioCreatePair is Setup {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] =
             abi.encodeCall(IPortfolioActions.createPair, (token0, token1));
-        vm.expectRevert(abi.encodeWithSelector(InvalidDecimals.selector, 24));
+        vm.expectRevert(
+            abi.encodeWithSelector(Portfolio_InvalidDecimals.selector, 24)
+        );
         subject().multicall(instructions);
     }
 

@@ -621,7 +621,7 @@ contract TestPortfolioSwap is Setup {
 
         data[1] = abi.encodeCall(IPortfolioActions.swap, (order));
 
-        // Reverts with an InvalidInvariant error
+        // Reverts with an Portfolio_InvalidInvariant error
         vm.expectRevert();
         subject().multicall(data);
     }

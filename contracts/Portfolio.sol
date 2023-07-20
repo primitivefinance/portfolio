@@ -122,7 +122,7 @@ contract Portfolio is IPortfolio {
     function _preLock() private {
         // Reverts if the lock was already set and the current call is not a multicall.
         if (_locked != 1 && !_currentMulticall) {
-            revert InvalidReentrancy();
+            revert Portfolio_InvalidReentrancy();
         }
 
         _locked = 2;
@@ -134,7 +134,7 @@ contract Portfolio is IPortfolio {
 
         // Reverts if the account system was not settled after a normal call.
         if (!__account__.settled && !_currentMulticall) {
-            revert InvalidSettlement();
+            revert Portfolio_InvalidSettlement();
         }
     }
 
@@ -180,7 +180,7 @@ contract Portfolio is IPortfolio {
         returns (bytes[] memory results)
     {
         // Prevents multicall reentrancy.
-        if (_currentMulticall) revert InvalidMulticall();
+        if (_currentMulticall) revert Portfolio_InvalidMulticall();
 
         _preLock();
         _currentMulticall = true;
@@ -218,7 +218,7 @@ contract Portfolio is IPortfolio {
     ) external {
         _preLock();
         PortfolioPool storage pool = pools[poolId];
-        if (pool.controller != msg.sender) revert NotController();
+        if (pool.controller != msg.sender) revert Portfolio_NotController();
 
         if (fee != 0) {
             if (!fee.isBetween(MIN_FEE, MAX_FEE)) {
@@ -252,7 +252,7 @@ contract Portfolio is IPortfolio {
 
         if (poolId == 0) poolId = _getLastPoolId;
         if (!IStrategy(getStrategy(poolId)).validatePool(poolId)) {
-            revert NonExistentPool(poolId);
+            revert Portfolio_NonExistentPool(poolId);
         }
 
         (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
@@ -284,14 +284,13 @@ contract Portfolio is IPortfolio {
             });
         }
 
-        if (deltaLiquidity == 0) revert ZeroLiquidity();
+        if (deltaLiquidity == 0) revert Portfolio_ZeroLiquidityAllocate();
         (deltaAsset, deltaQuote) = pools[poolId].getPoolLiquidityDeltas(
             AssemblyLib.toInt128(deltaLiquidity)
         ); // note: Rounds up.
 
-        if (deltaAsset > maxDeltaAsset || deltaQuote > maxDeltaQuote) {
-            revert MaxDeltaReached();
-        }
+        if (deltaAsset > maxDeltaAsset) revert Portfolio_MaxAssetExceeded();
+        if (deltaQuote > maxDeltaQuote) revert Portfolio_MaxQuoteExceeded();
 
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: recipient,
@@ -312,7 +311,9 @@ contract Portfolio is IPortfolio {
             deltaQuote.scaleFromWadDown(pair.decimalsQuote)
         );
 
-        if (deltaAsset == 0 || deltaQuote == 0) revert ZeroAmounts(); // Make sure to prevent allocates which provide fractional token amounts.
+        if (deltaAsset == 0) revert Portfolio_ZeroAssetAllocate();
+        if (deltaQuote == 0) revert Portfolio_ZeroQuoteAllocate();
+
         emit Allocate(
             poolId,
             pair.tokenAsset,
@@ -339,7 +340,7 @@ contract Portfolio is IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         if (!IStrategy(getStrategy(poolId)).validatePool(poolId)) {
-            revert NonExistentPool(poolId);
+            revert Portfolio_NonExistentPool(poolId);
         }
 
         (minDeltaAsset, minDeltaQuote) = _scaleAmountsToWad({
@@ -355,14 +356,14 @@ contract Portfolio is IPortfolio {
             deltaLiquidity = positions[msg.sender][poolId];
         }
 
-        if (deltaLiquidity == 0) revert ZeroLiquidity();
+        if (deltaLiquidity == 0) revert Portfolio_ZeroLiquidityDeallocate();
         (deltaAsset, deltaQuote) = pools[poolId].getPoolLiquidityDeltas(
             -AssemblyLib.toInt128(deltaLiquidity)
         ); // note: Rounds down.
 
-        if (deltaAsset < minDeltaAsset || deltaQuote < minDeltaQuote) {
-            revert MinDeltaUnmatched();
-        }
+        if (deltaAsset < minDeltaAsset) revert Portfolio_MinAssetExceeded();
+        if (deltaQuote < minDeltaQuote) revert Portfolio_MinQuoteExceeded();
+
         ChangeLiquidityParams memory args = ChangeLiquidityParams({
             owner: msg.sender,
             poolId: poolId,
@@ -418,7 +419,7 @@ contract Portfolio is IPortfolio {
             // Small amount of liquidity is removed from initial position to permanently burn it.
             // This prevents the pool from reaching 0 in both virtual reserves if all liquidity is removed.
             if (positionLiquidity < int128(uint128(BURNED_LIQUIDITY))) {
-                revert InsufficientLiquidity();
+                revert Portfolio_InsufficientLiquidity();
             }
             positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
         }
@@ -453,7 +454,7 @@ contract Portfolio is IPortfolio {
 
         // --- Checks --- //
         if (!IStrategy(getStrategy(args.poolId)).validatePool(args.poolId)) {
-            revert NonExistentPool(args.poolId);
+            revert Portfolio_NonExistentPool(args.poolId);
         }
 
         PortfolioPool storage pool = pools[args.poolId];
@@ -491,7 +492,7 @@ contract Portfolio is IPortfolio {
 
         (bool success, int256 invariant) = IStrategy(getStrategy(args.poolId))
             .beforeSwap(args.poolId, args.sellAsset, msg.sender);
-        if (!success) revert PoolExpired();
+        if (!success) revert Portfolio_BeforeSwapFail();
 
         Iteration memory iteration;
         iteration.input = args.input;
@@ -518,9 +519,9 @@ contract Portfolio is IPortfolio {
             }
         }
 
-        if (iteration.output == 0) revert ZeroOutput();
-        if (iteration.input == 0) revert ZeroInput();
-        if (iteration.liquidity == 0) revert ZeroLiquidity();
+        if (iteration.output == 0) revert Portfolio_ZeroSwapOutput();
+        if (iteration.input == 0) revert Portfolio_ZeroSwapInput();
+        if (iteration.liquidity == 0) revert Portfolio_ZeroSwapLiquidity();
 
         // --- Effects --- //
 
@@ -563,7 +564,7 @@ contract Portfolio is IPortfolio {
                 );
 
                 if (!validInvariant) {
-                    revert InvalidInvariant(
+                    revert Portfolio_InvalidInvariant(
                         iteration.prevInvariant, iteration.nextInvariant
                     );
                 }
@@ -620,18 +621,18 @@ contract Portfolio is IPortfolio {
     ) external payable returns (uint24 pairId) {
         _preLock();
 
-        if (asset == quote) revert SameTokenError();
+        if (asset == quote) revert Portfolio_DuplicateToken();
 
         pairId = getPairId[asset][quote];
-        if (pairId != 0) revert PairExists(pairId);
+        if (pairId != 0) revert Portfolio_PairExists(pairId);
 
         (uint8 decimalsAsset, uint8 decimalsQuote) =
             (IERC20(asset).decimals(), IERC20(quote).decimals());
         if (!decimalsAsset.isBetween(MIN_DECIMALS, MAX_DECIMALS)) {
-            revert InvalidDecimals(decimalsAsset);
+            revert Portfolio_InvalidDecimals(decimalsAsset);
         }
         if (!decimalsQuote.isBetween(MIN_DECIMALS, MAX_DECIMALS)) {
-            revert InvalidDecimals(decimalsQuote);
+            revert Portfolio_InvalidDecimals(decimalsQuote);
         }
 
         pairId = ++getPairNonce;
@@ -663,7 +664,7 @@ contract Portfolio is IPortfolio {
 
         // Use a 0 `pairId` to create a pool with the last created pair.
         uint24 pairNonce = pairId == 0 ? getPairNonce : pairId;
-        if (pairNonce == 0) revert InvalidPairNonce();
+        if (pairNonce == 0) revert Portfolio_InvalidPairNonce();
 
         // Increment the pool nonce.
         uint32 poolNonce = ++getPoolNonce[pairNonce];
@@ -847,7 +848,7 @@ contract Portfolio is IPortfolio {
                 uint256 post = AccountLib.__balanceOf__(token, address(this));
                 uint256 expected = prev - amountTransferTo;
                 if (post < expected) {
-                    revert NegativeBalance(
+                    revert Portfolio_Insolvent(
                         token, int256(post) - int256(expected)
                     );
                 }
@@ -862,7 +863,7 @@ contract Portfolio is IPortfolio {
                 uint256 post = AccountLib.__balanceOf__(token, address(this));
                 uint256 expected = prev + amountTransferFrom;
                 if (post < expected) {
-                    revert NegativeBalance(
+                    revert Portfolio_Insolvent(
                         token, int256(post) - int256(expected)
                     );
                 }
@@ -882,7 +883,7 @@ contract Portfolio is IPortfolio {
         _preLock();
 
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
-            revert NotController();
+            revert Portfolio_NotController();
         }
 
         uint256 amountWad;
@@ -908,9 +909,11 @@ contract Portfolio is IPortfolio {
         _preLock();
 
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
-            revert NotController();
+            revert Portfolio_NotController();
         }
-        if (fee > 20 || fee < 4) revert InvalidFee(uint16(fee));
+        if (fee > 20 || fee < 4) {
+            revert Portfolio_InvalidProtocolFee(uint16(fee));
+        }
 
         uint256 prevFee = protocolFee;
         protocolFee = fee;

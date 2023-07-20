@@ -635,7 +635,7 @@ contract TestGas is Setup {
 
             // This estimated amount is accurate, however, each getAmountOut computation uses the current invariant.
             // Since all the computed output amounts use the current invariant, once these are executed there will be small
-            // discrepencies in the invariant which will throw the InvalidInvariant error.
+            // discrepencies in the invariant which will throw the Portfolio_InvalidInvariant error.
             // To properly get all the amounts out, the getAmountOut needs to take into account the invariant change as well.
             uint128 estimatedAmountOut = uint128(
                 _subject.getAmountOut(poolId, sellAsset, amountIn, actor())

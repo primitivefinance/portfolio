@@ -426,7 +426,9 @@ contract TestPortfolioAllocate is Setup {
     function test_allocate_non_existent_pool_reverts() public useActor {
         uint64 failureArg = 51;
         vm.expectRevert(
-            abi.encodeWithSelector(NonExistentPool.selector, failureArg)
+            abi.encodeWithSelector(
+                Portfolio_NonExistentPool.selector, failureArg
+            )
         );
 
         bytes[] memory instructions = new bytes[](1);
@@ -450,7 +452,7 @@ contract TestPortfolioAllocate is Setup {
         useActor
     {
         uint256 failureArg = 0;
-        vm.expectRevert(ZeroLiquidity.selector);
+        vm.expectRevert(Portfolio_ZeroLiquidityAllocate.selector);
 
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = abi.encodeCall(
@@ -506,7 +508,7 @@ contract TestPortfolioAllocate is Setup {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                NegativeBalance.selector,
+                Portfolio_Insolvent.selector,
                 ghost().asset().to_addr(),
                 -int256(fee0)
             )
