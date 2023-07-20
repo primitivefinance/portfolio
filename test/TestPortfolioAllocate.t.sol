@@ -741,7 +741,7 @@ contract TestPortfolioAllocate is Setup {
             testConfig.strategyArgs
         );
 
-        uint128 liq = subject().positions(actor(), ghost().poolId);
+        uint128 liq = ghost().position(actor());
         (uint128 deltaAsset, uint128 deltaQuote) =
             subject().getLiquidityDeltas(ghost().poolId, int128(liq));
 
