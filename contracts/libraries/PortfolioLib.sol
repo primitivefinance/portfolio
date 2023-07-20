@@ -9,6 +9,9 @@ import "./ConstantsLib.sol" as ConstantsLib;
 import "./PoolLib.sol";
 import "./SwapLib.sol";
 
+error Portfolio_BeforeSwapFail();
+error Portfolio_DuplicateToken();
+error Portfolio_Insolvent(address token, int256 net);
 error Portfolio_InsufficientLiquidity();
 error Portfolio_InvalidDecimals(uint8 decimals);
 error Portfolio_InvalidProtocolFee(uint16 fee);
@@ -17,23 +20,20 @@ error Portfolio_InvalidPairNonce();
 error Portfolio_InvalidReentrancy();
 error Portfolio_InvalidMulticall();
 error Portfolio_InvalidSettlement();
-error Portfolio_Insolvent(address token, int256 net);
-error Portfolio_NotController();
-error Portfolio_NonExistentPool(uint64 poolId);
-error Portfolio_PairExists(uint24 pairId);
-error Portfolio_BeforeSwapFail();
-error Portfolio_DuplicateToken();
-error Portfolio_ZeroAssetAllocate();
-error Portfolio_ZeroQuoteAllocate();
-error Portfolio_ZeroSwapInput();
-error Portfolio_ZeroLiquidityAllocate();
-error Portfolio_ZeroLiquidityDeallocate();
-error Portfolio_ZeroSwapLiquidity();
-error Portfolio_ZeroSwapOutput();
 error Portfolio_MaxAssetExceeded();
 error Portfolio_MaxQuoteExceeded();
 error Portfolio_MinAssetExceeded();
 error Portfolio_MinQuoteExceeded();
+error Portfolio_NonExistentPool(uint64 poolId);
+error Portfolio_NotController();
+error Portfolio_PairExists(uint24 pairId);
+error Portfolio_ZeroAssetAllocate();
+error Portfolio_ZeroLiquidityAllocate();
+error Portfolio_ZeroLiquidityDeallocate();
+error Portfolio_ZeroSwapLiquidity();
+error Portfolio_ZeroSwapInput();
+error Portfolio_ZeroSwapOutput();
+error Portfolio_ZeroQuoteAllocate();
 
 struct PortfolioPair {
     address tokenAsset; // Base asset, referred to as "X" reserve.
