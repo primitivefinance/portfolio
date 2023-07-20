@@ -24,7 +24,7 @@ contract Portfolio is IPortfolio {
     using AssemblyLib for int256;
     using AssemblyLib for uint256;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     function VERSION() public pure returns (string memory) {
         assembly ("memory-safe") {
             // Load 0x20 (32) in memory at slot 0x00, this corresponds to the
@@ -46,37 +46,40 @@ contract Portfolio is IPortfolio {
 
     AccountLib.AccountSystem internal __account__;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     address public immutable WETH;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     address public immutable REGISTRY;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
+    address public immutable DEFAULT_STRATEGY;
+
+    /// @inheritdoc IPortfolioState
     uint24 public getPairNonce;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     mapping(address => uint256) public protocolFees;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     mapping(uint24 => uint32) public getPoolNonce;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     mapping(uint24 => PortfolioPair) public pairs;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     mapping(uint64 => PortfolioPool) public pools;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     mapping(address => mapping(address => uint24)) public getPairId;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     mapping(address => mapping(uint64 => uint128)) public positions;
 
     /// @dev Part of the reentrancy guard, 1 = unlocked, 2 = locked.
     uint256 internal _locked = 1;
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioState
     uint256 public protocolFee;
 
     /**
@@ -93,8 +96,6 @@ contract Portfolio is IPortfolio {
      * a multicall to avoid being tricked into allocating into the wrong pool.
      */
     uint64 private _getLastPoolId;
-
-    address public immutable defaultStrategy; // todo: implement fully, is this the best approach?
 
     /**
      * @dev Protects against reentrancy and getting to invalid settlement states.
@@ -132,8 +133,8 @@ contract Portfolio is IPortfolio {
     constructor(address weth, address registry) {
         WETH = weth;
         REGISTRY = registry;
+        DEFAULT_STRATEGY = address(new NormalStrategy(address(this)));
         __account__.settled = true;
-        defaultStrategy = address(new NormalStrategy(address(this)));
     }
 
     receive() external payable {
@@ -142,12 +143,12 @@ contract Portfolio is IPortfolio {
 
     // ===== Account Getters ===== //
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioAccounting
     function getNetBalance(address token) public view returns (int256) {
         return __account__.getNetBalance(token, address(this));
     }
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioAccounting
     function getReserve(address token) public view returns (uint256) {
         return __account__.reserves[token];
     }
@@ -885,7 +886,7 @@ contract Portfolio is IPortfolio {
         delete _payments;
     }
 
-    /// @inheritdoc IPortfolioActions
+    /// @inheritdoc IPortfolioRegistryActions
     function claimFee(address token, uint256 amount) external override {
         if (msg.sender != IPortfolioRegistry(REGISTRY).controller()) {
             revert NotController();
@@ -911,7 +912,7 @@ contract Portfolio is IPortfolio {
         _postLock();
     }
 
-    /// @inheritdoc IPortfolioActions
+    /// @inheritdoc IPortfolioRegistryActions
     function setProtocolFee(uint256 fee) external override {
         _preLock();
 
@@ -930,7 +931,7 @@ contract Portfolio is IPortfolio {
 
     // ===== Public View ===== //
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioView
     function getLiquidityDeltas(
         uint64 poolId,
         int128 deltaLiquidity
@@ -955,7 +956,7 @@ contract Portfolio is IPortfolio {
         }
     }
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioView
     function getMaxLiquidity(
         uint64 poolId,
         uint256 amount0,
@@ -971,7 +972,7 @@ contract Portfolio is IPortfolio {
         return pools[poolId].getPoolMaxLiquidity(amount0, amount1);
     }
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioView
     function getPoolReserves(uint64 poolId)
         public
         view
@@ -987,25 +988,19 @@ contract Portfolio is IPortfolio {
         deltaQuote = deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote);
     }
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioStrategy
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
         uint256 amountIn,
         address swapper
-    )
-        public
-        view
-        virtual
-        override(IPortfolioGetters)
-        returns (uint256 output)
-    {
+    ) public view virtual returns (uint256 output) {
         return getStrategy(poolId).getAmountOut(
             poolId, sellAsset, amountIn, swapper
         );
     }
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioStrategy
     function getSpotPrice(uint64 poolId)
         public
         view
@@ -1015,21 +1010,22 @@ contract Portfolio is IPortfolio {
         return getStrategy(poolId).getSpotPrice(poolId);
     }
 
-    /// @inheritdoc IPortfolioGetters
+    /// @inheritdoc IPortfolioStrategy
     function getMaxOrder(
         uint64 poolId,
         bool sellAsset,
         address swapper
     ) external view virtual returns (Order memory) {
-        return getStrategy(poolId).getMaxOrder(poolId, sellAsset);
+        return getStrategy(poolId).getMaxOrder(poolId, sellAsset, swapper);
     }
 
     // todo: properly implement using pool's controller or the default strategy.
+    /// @inheritdoc IPortfolioView
     function getStrategy(uint64 poolId) public view returns (IStrategy) {
-        return IStrategy(defaultStrategy);
+        return IStrategy(DEFAULT_STRATEGY);
     }
 
-    // todo: implement
+    /// @inheritdoc IPortfolioStrategy
     function simulateSwap(
         Order memory args,
         uint256 timestamp,
@@ -1042,6 +1038,7 @@ contract Portfolio is IPortfolio {
         returns (bool success, int256 prevInvariant, int256 postInvariant)
     { }
 
+    /// @inheritdoc IPortfolioStrategy
     function getInvariant(uint64 poolId) external view returns (int256) {
         return getStrategy(poolId).getInvariant(poolId);
     }

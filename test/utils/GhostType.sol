@@ -13,7 +13,7 @@ import { Coin } from "./CoinType.sol";
 using Ghost for GhostType global;
 
 interface ConfigLike {
-    function defaultStrategy() external view returns (address);
+    function DEFAULT_STRATEGY() external view returns (address);
     function configs(uint64 poolId)
         external
         view
@@ -80,7 +80,7 @@ library Ghost {
         GhostType memory self,
         uint64 poolId
     ) internal view returns (PortfolioConfig memory) {
-        address target = ConfigLike(self.subject).defaultStrategy(); // todo: fix with controller...
+        address target = ConfigLike(self.subject).DEFAULT_STRATEGY(); // todo: fix with controller...
 
         require(target != address(0), "no config/strategy/controller config!");
         return ConfigLike(target).configs(poolId);
@@ -144,14 +144,14 @@ library Ghost {
         view
         returns (IStrategy)
     {
-        return IStrategy(ConfigLike(self.subject).defaultStrategy());
+        return IStrategy(ConfigLike(self.subject).DEFAULT_STRATEGY());
     }
 
-    function defaultStrategy(GhostType memory self)
+    function DEFAULT_STRATEGY(GhostType memory self)
         internal
         view
         returns (IStrategy)
     {
-        return IStrategy(ConfigLike(self.subject).defaultStrategy());
+        return IStrategy(ConfigLike(self.subject).DEFAULT_STRATEGY());
     }
 }

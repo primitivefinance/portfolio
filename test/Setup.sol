@@ -65,7 +65,7 @@ contract SetupConstants {
 }
 
 interface GetStrategy {
-    function defaultStrategy() external view returns (address);
+    function DEFAULT_STRATEGY() external view returns (address);
 }
 
 // todo: cleanup config/strategy testing stuff
@@ -83,7 +83,7 @@ library DefaultStrategy {
         returns (ConfigType memory config)
     {
         (config.data, config.reserveXPerWad, config.reserveYPerWad) = IStrategy(
-            GetStrategy(portfolio).defaultStrategy()
+            GetStrategy(portfolio).DEFAULT_STRATEGY()
         ).getStrategyData({
             strikePriceWad: DefaultStrategy_DEFAULT_STRIKE,
             volatilityBasisPoints: DefaultStrategy_DEFAULT_VOLATILITY,
@@ -115,7 +115,7 @@ library DefaultStrategy {
         if (priceWad == 0) priceWad = DefaultStrategy_DEFAULT_PRICE;
 
         (config.data, config.reserveXPerWad, config.reserveYPerWad) = IStrategy(
-            GetStrategy(portfolio).defaultStrategy()
+            GetStrategy(portfolio).DEFAULT_STRATEGY()
         ).getStrategyData({
             strikePriceWad: strikePriceWad,
             volatilityBasisPoints: volatilityBasisPoints,

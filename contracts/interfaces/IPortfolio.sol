@@ -166,9 +166,7 @@ interface IPortfolioEvents {
     event ClaimFees(address indexed token, uint256 amount);
 }
 
-interface IPortfolioGetters {
-    // ===== Account Getters ===== //
-
+interface IPortfolioAccounting {
     /**
      * @notice
      * Portfolio's balance of a `token`.
@@ -201,9 +199,9 @@ interface IPortfolioGetters {
      * @return Net balance held in native token decimals.
      */
     function getNetBalance(address token) external view returns (int256);
+}
 
-    // ===== State Getters ===== //
-
+interface IPortfolioState {
     /// @notice Current semantic version of the Portfolio smart contract.
     function VERSION() external pure returns (string memory);
 
@@ -212,6 +210,9 @@ interface IPortfolioGetters {
 
     /// @notice Contract for storing canonical Portfolio deployments.
     function REGISTRY() external view returns (address);
+
+    /// @notice Default strategy contract used in pool creation.
+    function DEFAULT_STRATEGY() external view returns (address);
 
     /// @notice Proportion of swap fee allocated to the Registry controller.
     function protocolFee() external view returns (uint256);
@@ -277,70 +278,9 @@ interface IPortfolioGetters {
         address owner,
         uint64 poolId
     ) external view returns (uint128 liquidity);
+}
 
-    // ===== Portfolio View ===== //
-
-    /**
-     * @notice
-     * Get amount of tokens that underly a given amount of liquidity.
-     *
-     * @dev
-     * Computes the amount of tokens needed to allocate a given amount of liquidity, rounding up.
-     * Computes the amount of tokens deallocated from a given amount of liquidity, rounding down.
-     *
-     * note
-     * Rounding direction is important because it affects the inflows and outflows of tokens.
-     * The rounding direction is chosen to favor the pool, not the user. This prevents
-     * users from taking advantage of the rounding to extract tokens from the pool.
-     *
-     * @param deltaLiquidity Quantity of liquidity to allocate (+) or deallocate (-),  in WAD.
-     * @return deltaAsset Real `asset` tokens underlying `deltaLiquidity`, denominated in WAD.
-     * @return deltaQuote Real `quote` tokens underlying `deltaLiquidity`, denominated in WAD.
-     */
-    function getLiquidityDeltas(
-        uint64 poolId,
-        int128 deltaLiquidity
-    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
-
-    /**
-     * @notice
-     * Get the amount of liquidity that can be allocated with a given amount of tokens.
-     *
-     * @dev
-     * Computes the maximum amount of liquidity that can be allocated given an amount of asset and quote tokens.
-     * Must be used offchain, or else the pool's reserves can be manipulated to
-     * take advantage of this function's reliance on the reserves.
-     * This function can be used in conjuction with `getPoolLiquidityDeltas` to compute the maximum `allocate()` for a user.
-     *
-     * @param deltaAsset Desired amount of `asset` to allocate, denominated in WAD.
-     * @param deltaQuote Desired amount of `quote` to allocate, denominated in WAD.
-     * @return deltaLiquidity Maximum amount of liquidity that can be minted, denominated in WAD.
-     */
-    function getMaxLiquidity(
-        uint64 poolId,
-        uint256 deltaAsset,
-        uint256 deltaQuote
-    ) external view returns (uint128 deltaLiquidity);
-
-    /**
-     * @notice
-     * Get reserves of a pool.
-     *
-     * @dev
-     * Computes the real amount of asset and quote tokens in a pool's reserves by getting
-     * the amounts removed from the pool if all liquidity was deallocated.
-     *
-     * note All reserves for all tokens are in WAD units.
-     * Scale the output by the token's decimals to get the real amount of tokens in the pool.
-     *
-     * @return deltaAsset Real `asset` tokens removed from pool, denominated in WAD.
-     * @return deltaQuote Real `quote` tokens removed from pool, denominated in WAD.
-     */
-    function getPoolReserves(uint64 poolId)
-        external
-        view
-        returns (uint256 deltaAsset, uint256 deltaQuote);
-
+interface IPortfolioStrategy {
     /**
      * @notice
      * Get amount of tokens out in a swap given amount of tokens in.
@@ -430,7 +370,9 @@ interface IPortfolioGetters {
      * @return invariant Signed invariant value of the pool.
      */
     function getInvariant(uint64 poolId) external view returns (int256);
+}
 
+interface IPortfolioView {
     /**
      * @notice
      * Get the external strategy contract a pool relies on to verify swaps and pool creation.
@@ -442,9 +384,86 @@ interface IPortfolioGetters {
      * @return strategy Address of the external strategy contract.
      */
     function getStrategy(uint64 poolId) external view returns (IStrategy);
+
+    /**
+     * @notice
+     * Get amount of tokens that underly a given amount of liquidity.
+     *
+     * @dev
+     * Computes the amount of tokens needed to allocate a given amount of liquidity, rounding up.
+     * Computes the amount of tokens deallocated from a given amount of liquidity, rounding down.
+     *
+     * note
+     * Rounding direction is important because it affects the inflows and outflows of tokens.
+     * The rounding direction is chosen to favor the pool, not the user. This prevents
+     * users from taking advantage of the rounding to extract tokens from the pool.
+     *
+     * @param deltaLiquidity Quantity of liquidity to allocate (+) or deallocate (-),  in WAD.
+     * @return deltaAsset Real `asset` tokens underlying `deltaLiquidity`, denominated in WAD.
+     * @return deltaQuote Real `quote` tokens underlying `deltaLiquidity`, denominated in WAD.
+     */
+    function getLiquidityDeltas(
+        uint64 poolId,
+        int128 deltaLiquidity
+    ) external view returns (uint128 deltaAsset, uint128 deltaQuote);
+
+    /**
+     * @notice
+     * Get the amount of liquidity that can be allocated with a given amount of tokens.
+     *
+     * @dev
+     * Computes the maximum amount of liquidity that can be allocated given an amount of asset and quote tokens.
+     * Must be used offchain, or else the pool's reserves can be manipulated to
+     * take advantage of this function's reliance on the reserves.
+     * This function can be used in conjuction with `getPoolLiquidityDeltas` to compute the maximum `allocate()` for a user.
+     *
+     * @param deltaAsset Desired amount of `asset` to allocate, denominated in WAD.
+     * @param deltaQuote Desired amount of `quote` to allocate, denominated in WAD.
+     * @return deltaLiquidity Maximum amount of liquidity that can be minted, denominated in WAD.
+     */
+    function getMaxLiquidity(
+        uint64 poolId,
+        uint256 deltaAsset,
+        uint256 deltaQuote
+    ) external view returns (uint128 deltaLiquidity);
+
+    /**
+     * @notice
+     * Get reserves of a pool.
+     *
+     * @dev
+     * Computes the real amount of asset and quote tokens in a pool's reserves by getting
+     * the amounts removed from the pool if all liquidity was deallocated.
+     *
+     * note All reserves for all tokens are in WAD units.
+     * Scale the output by the token's decimals to get the real amount of tokens in the pool.
+     *
+     * @return deltaAsset Real `asset` tokens removed from pool, denominated in WAD.
+     * @return deltaQuote Real `quote` tokens removed from pool, denominated in WAD.
+     */
+    function getPoolReserves(uint64 poolId)
+        external
+        view
+        returns (uint256 deltaAsset, uint256 deltaQuote);
 }
 
-interface IPortfolioActions {
+interface IPortfolioRegistryActions {
+    /// @notice Transfers fees earned in `amount` of `token` to `REGISTRY` address.
+    function claimFee(address token, uint256 amount) external;
+
+    /**
+     * @notice
+     * Sets the `protocolFee`.
+     *
+     * @dev
+     * Proportion of the swap fee that can be withdrawn by the REGISTRY contract.
+     *
+     * @param fee Must be within the range: 4 <= x <= 20.
+     */
+    function setProtocolFee(uint256 fee) external;
+}
+
+interface IPortfolioActions is IPortfolioRegistryActions {
     /**
      * @notice
      * Updates the priority fee and/or fee of a pool.
@@ -461,20 +480,6 @@ interface IPortfolioActions {
         uint16 priorityFee,
         uint16 fee
     ) external;
-
-    /**
-     * @notice
-     * Sets the `protocolFee`.
-     *
-     * @dev
-     * Proportion of the swap fee that can be withdrawn by the REGISTRY contract.
-     *
-     * @param fee Must be within the range: 4 <= x <= 20.
-     */
-    function setProtocolFee(uint256 fee) external;
-
-    /// @notice Transfers fees earned in `amount` of `token` to `REGISTRY` address.
-    function claimFee(address token, uint256 amount) external;
 
     /**
      * @notice
@@ -620,6 +625,17 @@ interface IPortfolioStruct {
         view
         returns (PortfolioPool memory);
 }
+
+/**
+ * @notice
+ * Portfolio state, helpers, and strategy information.
+ */
+interface IPortfolioGetters is
+    IPortfolioAccounting,
+    IPortfolioState,
+    IPortfolioStrategy,
+    IPortfolioView
+{ }
 
 /**
  * @notice

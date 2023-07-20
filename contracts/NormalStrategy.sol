@@ -28,6 +28,21 @@ contract NormalStrategy is IStrategy {
         portfolio = portfolio_;
     }
 
+    function afterCreate(
+        uint64 poolId,
+        bytes calldata data
+    ) public override returns (bool success) {
+        (PortfolioConfig memory config, uint256 priceWad) =
+            abi.decode(data, (PortfolioConfig, uint256));
+
+        configs[poolId].createConfig({
+            strikePriceWad: config.strikePriceWad,
+            volatilityBasisPoints: config.volatilityBasisPoints,
+            durationSeconds: config.durationSeconds,
+            isPerpetual: config.isPerpetual
+        });
+    }
+
     function beforeSwap(
         uint64 poolId,
         bool sellAsset,
@@ -52,18 +67,6 @@ contract NormalStrategy is IStrategy {
         if (pool.expired(configs[poolId])) return (false, invariant);
 
         return (true, invariant);
-    }
-
-    function afterCreate(uint64 poolId, bytes calldata data) public override {
-        (PortfolioConfig memory config, uint256 priceWad) =
-            abi.decode(data, (PortfolioConfig, uint256));
-
-        configs[poolId].createConfig({
-            strikePriceWad: config.strikePriceWad,
-            volatilityBasisPoints: config.volatilityBasisPoints,
-            durationSeconds: config.durationSeconds,
-            isPerpetual: config.isPerpetual
-        });
     }
 
     function verifySwap(
@@ -102,7 +105,8 @@ contract NormalStrategy is IStrategy {
 
     function getMaxOrder(
         uint64 poolId,
-        bool sellAsset
+        bool sellAsset,
+        address swapper
     ) public view override returns (Order memory) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
         PortfolioConfig memory config = configs[poolId];
@@ -252,4 +256,14 @@ contract NormalStrategy is IStrategy {
         NormalCurve memory curve = config.transform();
         return curve.approximateReservesGivenPrice(priceWad);
     }
+
+    function simulateSwap(
+        Order memory order,
+        uint256 timestamp,
+        address swapper
+    )
+        external
+        view
+        returns (bool success, int256 prevInvariant, int256 postInvariant)
+    { }
 }
