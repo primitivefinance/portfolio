@@ -25,13 +25,16 @@ interface IStrategy is IPortfolioStrategy {
      *
      * @dev
      * This function MUST return a boolean value to indicate success or failure.
+     * The standard for encoding `strategyArgs` is to use abi.encode on a struct that defines
+     * the configuration of the strategy. This is a straightforward way to have
+     * customize structs for each strategy while maintaining a standard function signature.
      *
-     * @param data Data used in the pool instatiation process for a strategy.
+     * @param strategyArgs Data used in the pool instatiation process for a strategy.
      * @return success Whether the pool creation was successful.
      */
     function afterCreate(
         uint64 poolId,
-        bytes calldata data
+        bytes calldata strategyArgs
     ) external returns (bool success);
 
     /**
@@ -82,29 +85,4 @@ interface IStrategy is IPortfolioStrategy {
         uint256 reserveX,
         uint256 reserveY
     ) external view returns (bool, int256);
-
-    // ====== Optional ====== //
-
-    function approximateReservesGivenPrice(bytes memory data)
-        external
-        view
-        returns (uint256 reserveX, uint256 reserveY);
-
-    function getFees(uint64 poolId)
-        external
-        view
-        returns (uint256 swapFee, uint256 priorityFee, uint256 protocolFee);
-
-    function getSwapInvariants(Order memory order)
-        external
-        view
-        returns (int256, int256);
-
-    function getStrategyData(
-        uint256 strikePriceWad,
-        uint256 volatilityBasisPoints,
-        uint256 durationSeconds,
-        bool isPerpetual,
-        uint256 priceWad
-    ) external view returns (bytes memory strategyData, uint256, uint256);
 }

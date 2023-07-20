@@ -144,7 +144,7 @@ contract TestGas is Setup {
                 hundred, // fee
                 0, // prior fee
                 address(0), // controller
-                testConfig.data
+                testConfig.strategyArgs
             )
         );
 
@@ -271,7 +271,7 @@ contract TestGas is Setup {
                 hundred, // fee
                 0, // prior fee
                 address(0), // controller
-                testConfig.data
+                testConfig.strategyArgs
             )
         );
 
@@ -546,7 +546,7 @@ contract TestGas is Setup {
                         uint16(100 + 100 / i), // fee
                         0, // prior fee
                         controller,
-                        testConfig.data
+                        testConfig.strategyArgs
                     )
                 );
             }
@@ -682,7 +682,7 @@ contract TestGas is Setup {
                 uint16(100), // fee
                 uint16(10), // prior fee
                 address(0), // controller
-                testConfig.data
+                testConfig.strategyArgs
             )
         );
 

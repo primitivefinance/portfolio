@@ -42,7 +42,7 @@ contract TestPortfolioAllocate is Setup {
                 100, // fee
                 0, // prior fee
                 address(0), // controller
-                testConfig.data
+                testConfig.strategyArgs
             )
         );
 
@@ -736,7 +736,7 @@ contract TestPortfolioAllocate is Setup {
             30, // fee
             0, // priority fee
             address(0),
-            testConfig.data
+            testConfig.strategyArgs
         );
 
         uint128 liq = subject().positions(actor(), ghost().poolId);

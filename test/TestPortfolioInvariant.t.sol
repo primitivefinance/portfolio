@@ -35,7 +35,7 @@ contract TestPortfolioInvariant is Setup {
     using FixedPointMathLib for int256;
 
     /// Trading function is pure so here's a hack to test the intermediate values.
-    /// Make sure this is IDENTICAL to the actual tradingFunction() in CurveLib.
+    /// Make sure this is IDENTICAL to the actual tradingFunction() in NormalStrategyLib.
     function logTradingFunctionIntermediateValues(
         uint256 reserveXPerWad,
         uint256 reserveYPerWad,

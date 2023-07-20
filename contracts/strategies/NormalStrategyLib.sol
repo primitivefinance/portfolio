@@ -4,17 +4,16 @@ pragma solidity 0.8.19;
 import "solstat/Gaussian.sol";
 import "solmate/utils/FixedPointMathLib.sol";
 import "solmate/utils/SafeCastLib.sol";
-import "./AssemblyLib.sol";
-import "./BisectionLib.sol";
-
-import { PortfolioPool } from "./PoolLib.sol";
-import { Order } from "./SwapLib.sol";
+import "../libraries/AssemblyLib.sol";
+import "../libraries/BisectionLib.sol";
+import { PortfolioPool } from "../libraries/PoolLib.sol";
+import { Order } from "../libraries/SwapLib.sol";
 import {
     SQRT_WAD,
     SECONDS_PER_YEAR,
     SECONDS_PER_DAY,
     DOUBLE_WAD
-} from "./ConstantsLib.sol";
+} from "../libraries/ConstantsLib.sol";
 
 using FixedPointMathLib for uint256;
 using FixedPointMathLib for uint128;
@@ -35,22 +34,22 @@ using {
     tradingFunction
 } for NormalCurve global;
 
-using { createConfig, transform } for PortfolioConfig global;
+using { encode, modify, transform } for PortfolioConfig global;
 
-uint256 constant MIN_STRIKE_PRICE = 1;
+uint256 constant MIN_STRIKE_PRICE = 1; // 1 wei
 uint256 constant MAX_STRIKE_PRICE = type(uint128).max;
 uint256 constant MIN_VOLATILITY = 1; // 0.01%
 uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = SECONDS_PER_DAY; // Miniumum duration is one day.
 uint256 constant MAX_DURATION = SECONDS_PER_YEAR * 3; // Maximum duration is three years.
 
-error CurveLib_ConfigExists();
-error CurveLib_UpperPriceLimitReached();
-error CurveLib_LowerPriceLimitReached();
-error CurveLib_NonExpiringPool();
-error CurveLib_InvalidDuration();
-error CurveLib_InvalidStrikePrice();
-error CurveLib_InvalidVolatility();
+error NormalStrategyLib_ConfigExists();
+error NormalStrategyLib_UpperPriceLimitReached();
+error NormalStrategyLib_LowerPriceLimitReached();
+error NormalStrategyLib_NonExpiringPool();
+error NormalStrategyLib_InvalidDuration();
+error NormalStrategyLib_InvalidStrikePrice();
+error NormalStrategyLib_InvalidVolatility();
 
 /**
  * @notice
@@ -342,7 +341,7 @@ function approximateReservesGivenPrice(
 
 /**
  * @notice
- * Data structure for storing a pool's configuration.
+ * Normal Strategy configuration.
  *
  * @dev
  * Configuration variables are immutable and packed into a single storage slot.
@@ -361,6 +360,7 @@ struct PortfolioConfig {
     bool isPerpetual;
 }
 
+/// @dev Transforms the normal strategy configuration into a class with methods for its math.
 function transform(PortfolioConfig memory config)
     pure
     returns (NormalCurve memory)
@@ -375,6 +375,11 @@ function transform(PortfolioConfig memory config)
     });
 }
 
+/// @dev Transforms the normal strategy configuration into `strategyArgs` for `createPool`.
+function encode(PortfolioConfig memory config) pure returns (bytes memory) {
+    return abi.encode(config);
+}
+
 /**
  * @notice
  * Instantiates a PortfolioPool's configuration.
@@ -387,32 +392,32 @@ function transform(PortfolioConfig memory config)
  * @param durationSeconds Duration of the pool in seconds until swaps are no longer allowed.
  * @param isPerpetual Whether the pool is perpetual or not. Non-perpetual pools cannot be swapped in after reaching maturity.
  */
-function createConfig(
+function modify(
     PortfolioConfig storage config,
     uint256 strikePriceWad,
     uint256 volatilityBasisPoints,
     uint256 durationSeconds,
     bool isPerpetual
 ) {
-    if (config.creationTimestamp != 0) revert CurveLib_ConfigExists();
+    if (config.creationTimestamp != 0) revert NormalStrategyLib_ConfigExists();
 
     if (isPerpetual) {
         config.isPerpetual = isPerpetual;
         config.durationSeconds = SECONDS_PER_YEAR.safeCastTo32();
     } else {
         if (!durationSeconds.isBetween(MIN_DURATION, MAX_DURATION)) {
-            revert CurveLib_InvalidDuration();
+            revert NormalStrategyLib_InvalidDuration();
         }
         config.durationSeconds = durationSeconds.safeCastTo32();
     }
 
     if (!volatilityBasisPoints.isBetween(MIN_VOLATILITY, MAX_VOLATILITY)) {
-        revert CurveLib_InvalidVolatility();
+        revert NormalStrategyLib_InvalidVolatility();
     }
     config.volatilityBasisPoints = volatilityBasisPoints.safeCastTo32();
 
     if (!strikePriceWad.isBetween(MIN_STRIKE_PRICE, MAX_STRIKE_PRICE)) {
-        revert CurveLib_InvalidStrikePrice();
+        revert NormalStrategyLib_InvalidStrikePrice();
     }
     config.strikePriceWad = strikePriceWad.safeCastTo128();
 
@@ -421,7 +426,7 @@ function createConfig(
 
 /**
  * @title
- * CurveLib.sol
+ * NormalStrategyLib.sol
  *
  * @notice
  * Customized trading curve which distributes liquidity over a normal curve.
@@ -441,11 +446,20 @@ function createConfig(
  *
  * @custom:example
  * ```
- * use CurveLib for PortfolioPool;
+ * use NormalStrategyLib for PortfolioPool;
  * ```
  */
-library CurveLib {
+library NormalStrategyLib {
     // ----------------- //
+
+    /// @dev Transforms encoded strategy arguments into the normal strategy configuration.
+    function decode(bytes memory strategyArgs)
+        internal
+        pure
+        returns (PortfolioConfig memory)
+    {
+        return abi.decode(strategyArgs, (PortfolioConfig));
+    }
 
     /**
      * @notice
@@ -689,7 +703,7 @@ library CurveLib {
         PortfolioPool memory self,
         PortfolioConfig memory config
     ) internal pure returns (uint32) {
-        if (config.isPerpetual) revert CurveLib_NonExpiringPool();
+        if (config.isPerpetual) revert NormalStrategyLib_NonExpiringPool();
 
         // Portfolio duration is limited such that this addition will never overflow uint32.
         unchecked {

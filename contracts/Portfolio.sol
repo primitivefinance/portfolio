@@ -6,7 +6,7 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IPortfolioRegistry.sol";
 import "./interfaces/IStrategy.sol";
-import "./NormalStrategy.sol";
+import "./strategies/NormalStrategy.sol";
 
 /**
  * @title   Portfolio
@@ -233,7 +233,7 @@ contract Portfolio is IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         if (poolId == 0) poolId = _getLastPoolId;
-        if (!getStrategy(poolId).validatePool(poolId)) {
+        if (!IStrategy(getStrategy(poolId)).validatePool(poolId)) {
             revert NonExistentPool(poolId);
         }
 
@@ -320,7 +320,7 @@ contract Portfolio is IPortfolio {
 
         if (_currentMulticall == false) _deposit();
 
-        if (!getStrategy(poolId).validatePool(poolId)) {
+        if (!IStrategy(getStrategy(poolId)).validatePool(poolId)) {
             revert NonExistentPool(poolId);
         }
 
@@ -431,7 +431,7 @@ contract Portfolio is IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         // --- Checks --- //
-        if (!getStrategy(args.poolId).validatePool(args.poolId)) {
+        if (!IStrategy(getStrategy(args.poolId)).validatePool(args.poolId)) {
             revert NonExistentPool(args.poolId);
         }
 
@@ -468,9 +468,8 @@ contract Portfolio is IPortfolio {
             info.tokenOutput = pair.tokenAsset;
         }
 
-        (bool success, int256 invariant) = getStrategy(args.poolId).beforeSwap(
-            args.poolId, args.sellAsset, msg.sender
-        );
+        (bool success, int256 invariant) = IStrategy(getStrategy(args.poolId))
+            .beforeSwap(args.poolId, args.sellAsset, msg.sender);
         if (!success) revert PoolExpired();
 
         Iteration memory iteration;
@@ -533,8 +532,8 @@ contract Portfolio is IPortfolio {
                 // --- Invariant Check --- //
 
                 bool validInvariant;
-                (validInvariant, iteration.nextInvariant) = getStrategy(
-                    order.poolId
+                (validInvariant, iteration.nextInvariant) = IStrategy(
+                    getStrategy(order.poolId)
                 ).validateSwap(
                     order.poolId,
                     iteration.prevInvariant,
@@ -667,7 +666,7 @@ contract Portfolio is IPortfolio {
         uint16 feeBasisPoints,
         uint16 priorityFeeBasisPoints,
         address controller,
-        bytes calldata data
+        bytes calldata strategyArgs
     ) public payable virtual returns (uint64 poolId) {
         _preLock();
 
@@ -695,7 +694,8 @@ contract Portfolio is IPortfolio {
         _getLastPoolId = poolId;
 
         // todo: fix with proper controller/conditional. Should this be called all the time?
-        try getStrategy(poolId).afterCreate(poolId, data) { } catch { }
+        try IStrategy(getStrategy(poolId)).afterCreate(poolId, strategyArgs) { }
+            catch { }
 
         emit CreatePool(
             poolId,
@@ -995,7 +995,7 @@ contract Portfolio is IPortfolio {
         uint256 amountIn,
         address swapper
     ) public view virtual returns (uint256 output) {
-        return getStrategy(poolId).getAmountOut(
+        return IStrategy(getStrategy(poolId)).getAmountOut(
             poolId, sellAsset, amountIn, swapper
         );
     }
@@ -1007,7 +1007,7 @@ contract Portfolio is IPortfolio {
         virtual
         returns (uint256 price)
     {
-        return getStrategy(poolId).getSpotPrice(poolId);
+        return IStrategy(getStrategy(poolId)).getSpotPrice(poolId);
     }
 
     /// @inheritdoc IPortfolioStrategy
@@ -1016,13 +1016,15 @@ contract Portfolio is IPortfolio {
         bool sellAsset,
         address swapper
     ) external view virtual returns (Order memory) {
-        return getStrategy(poolId).getMaxOrder(poolId, sellAsset, swapper);
+        return IStrategy(getStrategy(poolId)).getMaxOrder(
+            poolId, sellAsset, swapper
+        );
     }
 
     // todo: properly implement using pool's controller or the default strategy.
     /// @inheritdoc IPortfolioView
-    function getStrategy(uint64 poolId) public view returns (IStrategy) {
-        return IStrategy(DEFAULT_STRATEGY);
+    function getStrategy(uint64 poolId) public view returns (address) {
+        return DEFAULT_STRATEGY;
     }
 
     /// @inheritdoc IPortfolioStrategy
@@ -1036,10 +1038,14 @@ contract Portfolio is IPortfolio {
         virtual
         override
         returns (bool success, int256 prevInvariant, int256 postInvariant)
-    { }
+    {
+        return IStrategy(getStrategy(args.poolId)).simulateSwap(
+            args, timestamp, swapper
+        );
+    }
 
     /// @inheritdoc IPortfolioStrategy
     function getInvariant(uint64 poolId) external view returns (int256) {
-        return getStrategy(poolId).getInvariant(poolId);
+        return IStrategy(getStrategy(poolId)).getInvariant(poolId);
     }
 }

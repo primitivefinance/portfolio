@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioCreatePool is Setup {
-    using CurveLib for PortfolioPool;
+    using NormalStrategyLib for PortfolioPool;
 
     uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 4;
     uint256 internal constant POOL_NONCE_STORAGE_SLOT = 6;
@@ -49,7 +49,7 @@ contract TestPortfolioCreatePool is Setup {
                 fee, // fee
                 priorityFee, // prior fee
                 address(this), // controller
-                testConfig.data
+                testConfig.strategyArgs
             )
         );
 
@@ -99,7 +99,7 @@ contract TestPortfolioCreatePool is Setup {
                 1, // fee
                 0, // prior fee
                 address(this), // controller
-                testConfig.data
+                testConfig.strategyArgs
             )
         );
 
@@ -159,7 +159,7 @@ contract TestPortfolioCreatePool is Setup {
                 100, // fee
                 0, // prior fee
                 address(0), // controller
-                testConfig.data
+                testConfig.strategyArgs
             )
         );
 

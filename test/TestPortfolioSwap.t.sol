@@ -412,15 +412,18 @@ contract TestPortfolioSwap is Setup {
         uint256 amountOut =
             subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
-        (int256 prev, int256 post) = subject().getStrategy(ghost().poolId)
-            .getSwapInvariants(
+        (, int256 prev, int256 post) = IStrategy(
+            subject().getStrategy(ghost().poolId)
+        ).simulateSwap(
             Order({
                 useMax: false,
                 poolId: ghost().poolId,
                 input: amountIn.safeCastTo128(),
                 output: amountOut.safeCastTo128(),
                 sellAsset: sellAsset
-            })
+            }),
+            block.timestamp,
+            actor()
         );
 
         console.log("ivnariants");

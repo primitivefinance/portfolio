@@ -25,8 +25,15 @@ struct SubjectsType {
     address portfolio;
 }
 
-// Interfaces
+// Constants
+uint16 constant Setup_DEFAULT_FEE = 30;
+uint16 constant Setup_DEFAULT_PRIORITY_FEE = 10;
+uint256 constant DefaultStrategy_DEFAULT_STRIKE = 1e18;
+uint256 constant DefaultStrategy_DEFAULT_VOLATILITY = 1000;
+uint256 constant DefaultStrategy_DEFAULT_DURATION = 1 days;
+uint256 constant DefaultStrategy_DEFAULT_PRICE = 1e18;
 
+// Interfaces
 interface ISetup {
     /// @dev Returns the current targets for the tests.
     function ghost() external view returns (GhostType memory);
@@ -53,48 +60,26 @@ interface ISetup {
     function portfolio() external view returns (address);
 }
 
-// Constants and Storage
+// Test State
 contract SetupStorage {
     GhostType internal _ghost_state;
     SubjectsType internal _subjects;
 }
 
-contract SetupConstants {
-    uint16 constant Setup_DEFAULT_FEE = 30;
-    uint16 constant Setup_DEFAULT_PRIORITY_FEE = 10;
-}
-
-interface GetStrategy {
-    function DEFAULT_STRATEGY() external view returns (address);
-}
-
-// todo: cleanup config/strategy testing stuff
+/// Normal strategy test helper
 library DefaultStrategy {
     using SafeCastLib for uint256;
 
-    uint256 constant DefaultStrategy_DEFAULT_STRIKE = 1e18;
-    uint256 constant DefaultStrategy_DEFAULT_VOLATILITY = 1000;
-    uint256 constant DefaultStrategy_DEFAULT_DURATION = 1 days;
-    uint256 constant DefaultStrategy_DEFAULT_PRICE = 1e18;
-
+    /// @dev Gets the test configuration with default values.
     function getDefaultTestConfig(address portfolio)
         internal
         view
         returns (ConfigType memory config)
     {
-        (config.data, config.reserveXPerWad, config.reserveYPerWad) = IStrategy(
-            GetStrategy(portfolio).DEFAULT_STRATEGY()
-        ).getStrategyData({
-            strikePriceWad: DefaultStrategy_DEFAULT_STRIKE,
-            volatilityBasisPoints: DefaultStrategy_DEFAULT_VOLATILITY,
-            durationSeconds: DefaultStrategy_DEFAULT_DURATION,
-            isPerpetual: false,
-            priceWad: DefaultStrategy_DEFAULT_PRICE
-        });
-
-        return config;
+        return getTestConfig(portfolio, 0, 0, 0, false, 0);
     }
 
+    /// @dev Transforms the necessary parameters and strategy config to a common config.
     function getTestConfig(
         address portfolio,
         uint256 strikePriceWad,
@@ -114,9 +99,9 @@ library DefaultStrategy {
         }
         if (priceWad == 0) priceWad = DefaultStrategy_DEFAULT_PRICE;
 
-        (config.data, config.reserveXPerWad, config.reserveYPerWad) = IStrategy(
-            GetStrategy(portfolio).DEFAULT_STRATEGY()
-        ).getStrategyData({
+        (config.strategyArgs, config.reserveXPerWad, config.reserveYPerWad) =
+        INormalStrategy(IPortfolio(portfolio).DEFAULT_STRATEGY())
+            .getStrategyData({
             strikePriceWad: strikePriceWad,
             volatilityBasisPoints: volatilityBasisPoints,
             durationSeconds: durationSeconds,
@@ -126,55 +111,9 @@ library DefaultStrategy {
 
         return config;
     }
-
-    function defaultConfig(address strategy)
-        internal
-        view
-        returns (bytes memory, uint256, uint256)
-    {
-        return IStrategy(strategy).getStrategyData(0, 0, 0, false, 0);
-    }
-
-    function getReservesFromStrategyArgs(
-        address strategy,
-        bytes memory strategyArgs
-    ) internal view returns (uint256 reserveX, uint256 reserveY) {
-        (reserveX, reserveY) =
-            IStrategy(strategy).approximateReservesGivenPrice(strategyArgs);
-    }
-
-    function encodeConfig(
-        uint256 strikePriceWad,
-        uint256 volatilityBasisPoints,
-        uint256 durationSeconds,
-        bool isPerpetual,
-        uint256 priceWad
-    ) internal view returns (bytes memory) {
-        if (strikePriceWad == 0) {
-            strikePriceWad = DefaultStrategy_DEFAULT_STRIKE;
-        }
-        if (volatilityBasisPoints == 0) {
-            volatilityBasisPoints = DefaultStrategy_DEFAULT_VOLATILITY;
-        }
-        if (durationSeconds == 0) {
-            durationSeconds = DefaultStrategy_DEFAULT_DURATION;
-        }
-        if (priceWad == 0) priceWad = DefaultStrategy_DEFAULT_PRICE;
-
-        return abi.encode(
-            PortfolioConfig(
-                strikePriceWad.safeCastTo128(),
-                volatilityBasisPoints.safeCastTo32(),
-                durationSeconds.safeCastTo32(),
-                uint32(block.timestamp),
-                isPerpetual
-            ),
-            priceWad
-        );
-    }
 }
 
-contract Setup is ISetup, SetupStorage, SetupConstants, Test {
+contract Setup is ISetup, SetupStorage, Test {
     using SafeCastLib for uint256;
     using DefaultStrategy for ConfigType;
 

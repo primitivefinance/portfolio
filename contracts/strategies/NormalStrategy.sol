@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
-import "./interfaces/IStrategy.sol";
-import "./interfaces/IPortfolio.sol";
-import "./libraries/CurveLib.sol";
-import "./libraries/BisectionLib.sol";
-import "./libraries/PortfolioLib.sol";
+import "../interfaces/IPortfolio.sol";
+import "../libraries/BisectionLib.sol";
+import "../libraries/PortfolioLib.sol";
+import "./INormalStrategy.sol";
+import "./NormalStrategyLib.sol";
 
 /**
  * @title
@@ -17,12 +17,13 @@ import "./libraries/PortfolioLib.sol";
  * @notice
  * Distributes liquidity across a normal distribution.
  */
-contract NormalStrategy is IStrategy {
+contract NormalStrategy is INormalStrategy {
     using AssemblyLib for *;
     using FixedPointMathLib for *;
     using SafeCastLib for uint256;
-    using CurveLib for PortfolioPool;
-    using CurveLib for PortfolioConfig;
+    using NormalStrategyLib for bytes;
+    using NormalStrategyLib for PortfolioPool;
+    using NormalStrategyLib for PortfolioConfig;
 
     address public immutable portfolio;
 
@@ -39,12 +40,11 @@ contract NormalStrategy is IStrategy {
     /// @inheritdoc IStrategy
     function afterCreate(
         uint64 poolId,
-        bytes calldata data
+        bytes calldata strategyArgs
     ) public override returns (bool success) {
-        (PortfolioConfig memory config, uint256 priceWad) =
-            abi.decode(data, (PortfolioConfig, uint256));
+        PortfolioConfig memory config = strategyArgs.decode();
 
-        configs[poolId].createConfig({
+        configs[poolId].modify({
             strikePriceWad: config.strikePriceWad,
             volatilityBasisPoints: config.volatilityBasisPoints,
             durationSeconds: config.durationSeconds,
@@ -100,12 +100,12 @@ contract NormalStrategy is IStrategy {
 
         // Compute the new invariant.
         int256 invariantAfterSwap = pool.getInvariant(configs[poolId]);
-        bool valid = _validate(invariant, invariantAfterSwap);
+        bool valid = _validateSwap(invariant, invariantAfterSwap);
 
         return (valid, invariantAfterSwap);
     }
 
-    function _validate(
+    function _validateSwap(
         int256 invariantBefore,
         int256 invariantAfter
     ) internal pure returns (bool) {
@@ -206,7 +206,20 @@ contract NormalStrategy is IStrategy {
         external
         view
         returns (bool success, int256 prevInvariant, int256 postInvariant)
-    { }
+    {
+        PortfolioPool memory pool =
+            IPortfolioStruct(portfolio).pools(order.poolId);
+
+        (, prevInvariant, postInvariant) = pool.getSwapInvariants({
+            config: configs[order.poolId],
+            order: order,
+            timestamp: timestamp,
+            protocolFee: IPortfolio(portfolio).protocolFee(),
+            swapper: swapper
+        });
+
+        success = _validateSwap(prevInvariant, postInvariant);
+    }
 
     /// @inheritdoc IPortfolioStrategy
     function getInvariant(uint64 poolId)
@@ -221,44 +234,13 @@ contract NormalStrategy is IStrategy {
 
     // ====== Optional ====== //
 
-    function approximateReservesGivenPrice(bytes memory data)
-        public
-        view
-        override
-        returns (uint256, uint256)
-    {
-        (PortfolioConfig memory config, uint256 priceWad) =
-            abi.decode(data, (PortfolioConfig, uint256));
+    function approximateReservesGivenPrice(
+        uint256 priceWad,
+        bytes memory strategyArgs
+    ) public view override returns (uint256, uint256) {
+        PortfolioConfig memory config = strategyArgs.decode();
         NormalCurve memory curve = config.transform();
         return curve.approximateReservesGivenPrice(priceWad);
-    }
-
-    function getFees(uint64)
-        public
-        view
-        override
-        returns (uint256, uint256, uint256)
-    {
-        return (0, 0, 0);
-    }
-
-    function getSwapInvariants(Order memory order)
-        public
-        view
-        override
-        returns (int256, int256)
-    {
-        PortfolioPool memory pool =
-            IPortfolioStruct(portfolio).pools(order.poolId);
-        (, int256 invariant, int256 postInvariant) = pool.getSwapInvariants({
-            config: configs[order.poolId],
-            order: order,
-            timestamp: block.timestamp,
-            protocolFee: IPortfolio(portfolio).protocolFee(),
-            swapper: msg.sender
-        });
-
-        return (invariant, postInvariant);
     }
 
     function getStrategyData(
@@ -280,7 +262,7 @@ contract NormalStrategy is IStrategy {
             0, // creationTimestamp isnt set, its set to block.timestamp
             isPerpetual
         );
-        strategyData = abi.encode(config, priceWad);
+        strategyData = config.encode();
 
         (initialX, initialY) =
             config.transform().approximateReservesGivenPrice(priceWad);

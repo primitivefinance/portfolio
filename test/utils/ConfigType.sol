@@ -16,7 +16,7 @@ struct ConfigType {
     uint256 feeBasisPoints;
     uint256 priorityFeeBasisPoints;
     address controller;
-    bytes data;
+    bytes strategyArgs;
 }
 
 using ConfigLib for ConfigType global;
@@ -71,7 +71,7 @@ library ConfigLib {
                     config.feeBasisPoints.safeCastTo16(),
                     config.priorityFeeBasisPoints.safeCastTo16(),
                     config.controller,
-                    config.data
+                    config.strategyArgs
                 )
             );
 
@@ -93,7 +93,7 @@ library ConfigLib {
                 feeBasisPoints: config.feeBasisPoints.safeCastTo16(),
                 priorityFeeBasisPoints: config.priorityFeeBasisPoints.safeCastTo16(),
                 controller: config.controller,
-                data: config.data
+                strategyArgs: config.strategyArgs
             }) returns (uint64 _id) {
                 id = _id;
             } catch (bytes memory err) {

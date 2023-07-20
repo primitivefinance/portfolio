@@ -4,7 +4,6 @@ pragma solidity >=0.8.0;
 import {
     PortfolioPool, PortfolioPair, Order
 } from "../libraries/PortfolioLib.sol";
-import { IStrategy } from "./IStrategy.sol";
 
 interface IPortfolioEvents {
     /// @dev Ether transfers into Portfolio via a payable function.
@@ -379,11 +378,11 @@ interface IPortfolioView {
      *
      * @dev
      * Strategy contracts implement the `beforeSwap` and `afterCreate` state changing hooks.
-     * Along with the `validateSwap` and `validatePool` hooks that handle critical validations.
+     * Along with the `verifySwap` and `verifyPool` hooks that handle critical validations.
      *
      * @return strategy Address of the external strategy contract.
      */
-    function getStrategy(uint64 poolId) external view returns (IStrategy);
+    function getStrategy(uint64 poolId) external view returns (address);
 
     /**
      * @notice
@@ -579,7 +578,7 @@ interface IPortfolioActions is IPortfolioRegistryActions {
         uint16 feeBasisPoints,
         uint16 priorityFeeBasisPoints,
         address controller,
-        bytes calldata data
+        bytes calldata strategyArgs
     ) external payable returns (uint64 poolId);
 
     /**
