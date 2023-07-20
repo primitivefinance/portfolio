@@ -93,7 +93,7 @@ interface IStrategy is IPortfolioStrategy {
     function getFees(uint64 poolId)
         external
         view
-        returns (uint256 fee, uint256 priorityFee, uint256 protocolFee);
+        returns (uint256 swapFee, uint256 priorityFee, uint256 protocolFee);
 
     function getSwapInvariants(Order memory order)
         external

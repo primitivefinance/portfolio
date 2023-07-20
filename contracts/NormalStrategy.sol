@@ -7,16 +7,22 @@ import "./libraries/CurveLib.sol";
 import "./libraries/BisectionLib.sol";
 import "./libraries/PortfolioLib.sol";
 
+/**
+ * @title
+ * Normal Strategy
+ *
+ * @author
+ * Primitive
+ *
+ * @notice
+ * Distributes liquidity across a normal distribution.
+ */
 contract NormalStrategy is IStrategy {
+    using AssemblyLib for *;
+    using FixedPointMathLib for *;
+    using SafeCastLib for uint256;
     using CurveLib for PortfolioPool;
     using CurveLib for PortfolioConfig;
-    using AssemblyLib for int256;
-    using AssemblyLib for uint256;
-    using AssemblyLib for uint32;
-    using SafeCastLib for uint256;
-    using FixedPointMathLib for int256;
-    using FixedPointMathLib for uint128;
-    using FixedPointMathLib for uint256;
 
     address public immutable portfolio;
 
@@ -30,6 +36,7 @@ contract NormalStrategy is IStrategy {
 
     // ====== Required ====== //
 
+    /// @inheritdoc IStrategy
     function afterCreate(
         uint64 poolId,
         bytes calldata data
@@ -45,6 +52,7 @@ contract NormalStrategy is IStrategy {
         });
     }
 
+    /// @inheritdoc IStrategy
     function beforeSwap(
         uint64 poolId,
         bool sellAsset,
@@ -71,11 +79,13 @@ contract NormalStrategy is IStrategy {
         return (true, invariant);
     }
 
+    /// @inheritdoc IStrategy
     function validatePool(uint64 poolId) public view override returns (bool) {
         // todo: refactor
         return IPortfolioStruct(portfolio).pools(poolId).exists();
     }
 
+    /// @inheritdoc IStrategy
     function validateSwap(
         uint64 poolId,
         int256 invariant,
@@ -105,6 +115,7 @@ contract NormalStrategy is IStrategy {
         return true;
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
@@ -137,6 +148,7 @@ contract NormalStrategy is IStrategy {
         output = output.scaleFromWadDown(outputDec);
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function getSpotPrice(uint64 poolId)
         public
         view
@@ -149,6 +161,7 @@ contract NormalStrategy is IStrategy {
         });
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function getMaxOrder(
         uint64 poolId,
         bool sellAsset,
@@ -184,6 +197,7 @@ contract NormalStrategy is IStrategy {
         return order;
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function simulateSwap(
         Order memory order,
         uint256 timestamp,
@@ -194,6 +208,7 @@ contract NormalStrategy is IStrategy {
         returns (bool success, int256 prevInvariant, int256 postInvariant)
     { }
 
+    /// @inheritdoc IPortfolioStrategy
     function getInvariant(uint64 poolId)
         public
         view
