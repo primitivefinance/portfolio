@@ -212,7 +212,7 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        
+
     {
         // Deposit tokens which will be used to compute max liquidity.
         subject().fund(ghost().asset().to_addr(), type(uint256).max);

@@ -391,7 +391,7 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        
+
     {
         // Create another pair and pool.
         (address token0, address token1) =
