@@ -1,27 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.4;
 
-struct Bisection {
-    bool optimizeQuoteReserve;
-    uint256 terminalPriceWad;
-    uint256 volatilityWad;
-    uint256 tauSeconds;
-    uint256 reserveWadPerLiquidity;
-    int256 prevInvariant;
-}
-
-error NotInsideBounds(uint256 lower, uint256 upper);
-error InvalidBounds(uint256 lower, uint256 upper);
+/// @dev Thrown when the lower bound is greater than the upper bound.
+error BisectionLib_InvalidBounds(uint256 lower, uint256 upper);
+/// @dev Thrown when the result of the function `fx` for each input, `upper` and `lower`, is the same sign.
+error BisectionLib_RootOutsideBounds(uint256 lower, uint256 upper);
 
 /**
- * @dev Bisection is a method of finding the root of a function.
+ * @notice
+ * The function `fx` must be continuous and monotonic.
+ *
+ * @dev
+ * Bisection is a method of finding the root of a function.
  * The root is the point where the function crosses the x-axis.
- * @notice The function `fx` must be continuous and monotonic.
+ *
  * @param args The arguments to pass to the function `fx`.
- * @param lower The lower bound of the root.
- * @param upper The upper bound of the root.
- * @param epsilon The distance between the lower and upper bounds.
- * @param maxIterations The maximum amount of iterations to run.
+ * @param lower The lower bound of the root to find.
+ * @param upper The upper bound of the root to find.
+ * @param epsilon The maximum distance between the lower and upper results.
+ * @param maxIterations The maximum amount of loop iterations to run.
  * @param fx The function to find the root of.
  * @return root The root of the function `fx`.
  */
@@ -33,14 +30,16 @@ function bisection(
     uint256 maxIterations,
     function(bytes memory,uint256) pure returns (int256) fx
 ) pure returns (uint256 root) {
-    if (lower > upper) revert InvalidBounds(lower, upper);
+    if (lower > upper) revert BisectionLib_InvalidBounds(lower, upper);
     // Passes the lower and upper bounds to the optimized function.
     // Reverts if the optimized function `fx` returns both negative or both positive values.
     // This means that the root is not between the bounds.
     // The root is between the bounds if the product of the two values is negative.
     int256 lowerOutput = fx(args, lower);
     int256 upperOutput = fx(args, upper);
-    if (lowerOutput * upperOutput > 0) revert NotInsideBounds(lower, upper);
+    if (lowerOutput * upperOutput > 0) {
+        revert BisectionLib_RootOutsideBounds(lower, upper);
+    }
 
     // Distance is optimized to equal `epsilon`.
     uint256 distance = upper - lower;
