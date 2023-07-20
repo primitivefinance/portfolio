@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.19;
+pragma solidity ^0.8.18;
 
 import "solstat/Gaussian.sol";
 import "solmate/utils/FixedPointMathLib.sol";
@@ -131,9 +131,9 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
  *      -> 1-x = Φ(Φ⁻¹(y/K) + σ√τ - k)
  *          -> x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
  *
+ * ```
  * note
  * Slightly different from original trading function because invariant is different.
- * ```
  *
  * @return invariant        k; Signed invariant of the pool.
  */

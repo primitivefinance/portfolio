@@ -12,7 +12,7 @@ import "./NormalStrategyLib.sol";
  * Normal Strategy
  *
  * @author
- * Primitive
+ * Primitive™
  *
  * @notice
  * Distributes liquidity across a normal distribution.

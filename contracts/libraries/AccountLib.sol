@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.19;
+pragma solidity ^0.8.18;
 
 import "../libraries/SafeTransferLib.sol";
 import "../interfaces/IERC20.sol";
