@@ -9,12 +9,6 @@ import "./ConstantsLib.sol" as ConstantsLib;
 import "./PoolLib.sol";
 import "./SwapLib.sol";
 
-using AssemblyLib for uint256;
-using FixedPointMathLib for uint256;
-using FixedPointMathLib for uint128;
-using FixedPointMathLib for int256;
-using SafeCastLib for uint256;
-
 error Portfolio_InsufficientLiquidity();
 error Portfolio_InvalidDecimals(uint8 decimals);
 error Portfolio_InvalidProtocolFee(uint16 fee);

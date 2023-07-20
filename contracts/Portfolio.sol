@@ -628,10 +628,18 @@ contract Portfolio is IPortfolio {
 
         (uint8 decimalsAsset, uint8 decimalsQuote) =
             (IERC20(asset).decimals(), IERC20(quote).decimals());
-        if (!decimalsAsset.isBetween(MIN_DECIMALS, MAX_DECIMALS)) {
+        if (
+            !decimalsAsset.isBetween(
+                ConstantsLib.MIN_DECIMALS, ConstantsLib.MAX_DECIMALS
+            )
+        ) {
             revert Portfolio_InvalidDecimals(decimalsAsset);
         }
-        if (!decimalsQuote.isBetween(MIN_DECIMALS, MAX_DECIMALS)) {
+        if (
+            !decimalsQuote.isBetween(
+                ConstantsLib.MIN_DECIMALS, ConstantsLib.MAX_DECIMALS
+            )
+        ) {
             revert Portfolio_InvalidDecimals(decimalsQuote);
         }
 
