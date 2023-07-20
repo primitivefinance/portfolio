@@ -28,6 +28,8 @@ contract NormalStrategy is IStrategy {
         portfolio = portfolio_;
     }
 
+    // ====== Required ====== //
+
     function afterCreate(
         uint64 poolId,
         bytes calldata data
@@ -69,6 +71,11 @@ contract NormalStrategy is IStrategy {
         return (true, invariant);
     }
 
+    function validatePool(uint64 poolId) public view override returns (bool) {
+        // todo: refactor
+        return IPortfolioStruct(portfolio).pools(poolId).exists();
+    }
+
     function validateSwap(
         uint64 poolId,
         int256 invariant,
@@ -98,9 +105,48 @@ contract NormalStrategy is IStrategy {
         return true;
     }
 
-    function validatePool(uint64 poolId) public view override returns (bool) {
-        // todo: refactor
-        return IPortfolioStruct(portfolio).pools(poolId).exists();
+    function getAmountOut(
+        uint64 poolId,
+        bool sellAsset,
+        uint256 amountIn,
+        address swapper
+    ) public view override returns (uint256 output) {
+        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+
+        PortfolioPair memory pair =
+            IPortfolioStruct(portfolio).pairs(uint24(poolId >> 40));
+        amountIn = amountIn.scaleToWad(
+            sellAsset ? pair.decimalsAsset : pair.decimalsQuote
+        );
+
+        output = pool.approximateAmountOut({
+            config: configs[poolId],
+            order: Order({
+                input: amountIn.safeCastTo128(),
+                output: 0,
+                useMax: false,
+                poolId: poolId,
+                sellAsset: sellAsset
+            }),
+            timestamp: block.timestamp,
+            protocolFee: IPortfolio(portfolio).protocolFee(),
+            swapper: swapper
+        });
+
+        uint256 outputDec = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
+        output = output.scaleFromWadDown(outputDec);
+    }
+
+    function getSpotPrice(uint64 poolId)
+        public
+        view
+        override
+        returns (uint256 price)
+    {
+        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        price = configs[poolId].transform().approximatePriceGivenX({
+            reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity)
+        });
     }
 
     function getMaxOrder(
@@ -138,6 +184,16 @@ contract NormalStrategy is IStrategy {
         return order;
     }
 
+    function simulateSwap(
+        Order memory order,
+        uint256 timestamp,
+        address swapper
+    )
+        external
+        view
+        returns (bool success, int256 prevInvariant, int256 postInvariant)
+    { }
+
     function getInvariant(uint64 poolId)
         public
         view
@@ -146,6 +202,29 @@ contract NormalStrategy is IStrategy {
     {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
         invariant = pool.getInvariant(configs[poolId]);
+    }
+
+    // ====== Optional ====== //
+
+    function approximateReservesGivenPrice(bytes memory data)
+        public
+        view
+        override
+        returns (uint256, uint256)
+    {
+        (PortfolioConfig memory config, uint256 priceWad) =
+            abi.decode(data, (PortfolioConfig, uint256));
+        NormalCurve memory curve = config.transform();
+        return curve.approximateReservesGivenPrice(priceWad);
+    }
+
+    function getFees(uint64)
+        public
+        view
+        override
+        returns (uint256, uint256, uint256)
+    {
+        return (0, 0, 0);
     }
 
     function getSwapInvariants(Order memory order)
@@ -165,59 +244,6 @@ contract NormalStrategy is IStrategy {
         });
 
         return (invariant, postInvariant);
-    }
-
-    function getAmountOut(
-        uint64 poolId,
-        bool sellAsset,
-        uint256 amountIn,
-        address swapper
-    ) public view override returns (uint256 output) {
-        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-
-        PortfolioPair memory pair =
-            IPortfolioStruct(portfolio).pairs(uint24(poolId >> 40));
-        amountIn = amountIn.scaleToWad(
-            sellAsset ? pair.decimalsAsset : pair.decimalsQuote
-        );
-
-        output = pool.approximateAmountOut({
-            config: configs[poolId],
-            order: Order({
-                input: amountIn.safeCastTo128(),
-                output: 0,
-                useMax: false,
-                poolId: poolId,
-                sellAsset: sellAsset
-            }),
-            timestamp: block.timestamp,
-            protocolFee: IPortfolio(portfolio).protocolFee(),
-            swapper: swapper
-        });
-
-        uint256 outputDec = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
-        output = output.scaleFromWadDown(outputDec);
-    }
-
-    function getFees(uint64)
-        public
-        view
-        override
-        returns (uint256, uint256, uint256)
-    {
-        return (0, 0, 0);
-    }
-
-    function getSpotPrice(uint64 poolId)
-        public
-        view
-        override
-        returns (uint256 price)
-    {
-        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-        price = configs[poolId].transform().approximatePriceGivenX({
-            reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity)
-        });
     }
 
     function getStrategyData(
@@ -244,26 +270,4 @@ contract NormalStrategy is IStrategy {
         (initialX, initialY) =
             config.transform().approximateReservesGivenPrice(priceWad);
     }
-
-    function approximateReservesGivenPrice(bytes memory data)
-        public
-        view
-        override
-        returns (uint256, uint256)
-    {
-        (PortfolioConfig memory config, uint256 priceWad) =
-            abi.decode(data, (PortfolioConfig, uint256));
-        NormalCurve memory curve = config.transform();
-        return curve.approximateReservesGivenPrice(priceWad);
-    }
-
-    function simulateSwap(
-        Order memory order,
-        uint256 timestamp,
-        address swapper
-    )
-        external
-        view
-        returns (bool success, int256 prevInvariant, int256 postInvariant)
-    { }
 }

@@ -17,6 +17,7 @@ import { IPortfolioStrategy } from "./IPortfolio.sol";
  */
 interface IStrategy is IPortfolioStrategy {
     // ====== Required ====== //
+    // Includes: IPortfolioStrategy
 
     /**
      * @notice
@@ -82,11 +83,6 @@ interface IStrategy is IPortfolioStrategy {
         uint256 reserveY
     ) external view returns (bool, int256);
 
-    function getSwapInvariants(Order memory order)
-        external
-        view
-        returns (int256, int256);
-
     // ====== Optional ====== //
 
     function approximateReservesGivenPrice(bytes memory data)
@@ -98,6 +94,11 @@ interface IStrategy is IPortfolioStrategy {
         external
         view
         returns (uint256 fee, uint256 priorityFee, uint256 protocolFee);
+
+    function getSwapInvariants(Order memory order)
+        external
+        view
+        returns (int256, int256);
 
     function getStrategyData(
         uint256 strikePriceWad,
