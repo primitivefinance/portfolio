@@ -71,9 +71,6 @@ contract Portfolio is ERC1155, IPortfolio {
     /// @inheritdoc IPortfolioGetters
     mapping(address => mapping(address => uint24)) public getPairId;
 
-    /// @inheritdoc IPortfolioGetters
-    mapping(address => mapping(uint64 => uint128)) public positions;
-
     /// @dev Part of the reentrancy guard, 1 = unlocked, 2 = locked.
     uint256 internal _locked = 1;
 
