@@ -11,7 +11,6 @@ using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
 using SafeCastLib for uint256;
 
-/// Free functions exposed via `global` give any PortfolioPool instance access to the methods.
 using {
     adjustReserves,
     createPool,
