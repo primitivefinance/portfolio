@@ -358,7 +358,8 @@ contract Portfolio is ERC1155, IPortfolio {
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
 
         if (useMax) {
-            deltaLiquidity = positions[msg.sender][poolId];
+            deltaLiquidity =
+                balanceOf[msg.sender][uint256(poolId)].safeCastTo128();
         }
 
         if (deltaLiquidity == 0) revert Portfolio_ZeroLiquidityDeallocate();
@@ -429,9 +430,16 @@ contract Portfolio is ERC1155, IPortfolio {
             positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
         }
 
-        positions[args.owner][args.poolId] = AssemblyLib.addSignedDelta(
-            positions[args.owner][args.poolId], positionLiquidity
-        );
+        if (positionLiquidity > 0) {
+            _mint(
+                args.owner, args.poolId, uint256(int256(positionLiquidity)), ""
+            );
+        } else {
+            _burn(
+                args.owner, args.poolId, uint256(-(int256(positionLiquidity)))
+            );
+        }
+
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
