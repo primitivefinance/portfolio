@@ -142,6 +142,9 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
         _subjects.weth = address(new WETH());
         vm.label(_subjects.weth, "weth");
 
+        _subjects.renderer = address(new SimplePositionRenderer());
+        vm.label(_subjects.renderer, "renderer");
+
         _subjects.portfolio = address(
             new Portfolio(_subjects.weth, _subjects.registry, _subjects.renderer)
         );
