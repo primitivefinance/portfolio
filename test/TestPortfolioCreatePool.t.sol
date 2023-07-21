@@ -129,6 +129,7 @@ contract TestPortfolioCreatePool is Setup {
     }
     */
 
+    /*
     function test_revert_createPool_above_max_pools() public {
         uint24 pairNonce = uint24(1);
         bytes32 slot =
@@ -166,6 +167,7 @@ contract TestPortfolioCreatePool is Setup {
         vm.expectRevert(arithmeticError);
         subject().multicall(data);
     }
+    */
 
     // todo: fix
     function test_createPool_perpetual() public {

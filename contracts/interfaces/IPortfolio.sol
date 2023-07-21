@@ -210,6 +210,9 @@ interface IPortfolioState {
     /// @notice Contract for storing canonical Portfolio deployments.
     function REGISTRY() external view returns (address);
 
+    /// @notice Contract for rendering position tokens.
+    function POSITION_RENDERER() external view returns (address);
+
     /// @notice Default strategy contract used in pool creation.
     function DEFAULT_STRATEGY() external view returns (address);
 
@@ -264,19 +267,6 @@ interface IPortfolioState {
             uint16 priorityFeeBasisPoints,
             address controller
         );
-
-    /**
-     * @notice
-     * Amount of liquidity owned by `owner` in the pool `poolId`.
-     *
-     * @param owner Address that owns the liquidity.
-     * @param poolId Id of the pool to check.
-     * @return liquidity Amount of liquidity.
-     */
-    function positions(
-        address owner,
-        uint64 poolId
-    ) external view returns (uint128 liquidity);
 }
 
 interface IPortfolioStrategy {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
+import "solmate/tokens/ERC1155.sol";
 import "contracts/interfaces/IStrategy.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/libraries/PortfolioLib.sol";
@@ -59,7 +60,9 @@ library Ghost {
         GhostType memory self,
         address owner
     ) internal view returns (uint128) {
-        return IPortfolio(self.subject).positions(owner, self.poolId);
+        return uint128(
+            ERC1155(self.subject).balanceOf(owner, uint256(self.poolId))
+        );
     }
 
     function pairOf(
