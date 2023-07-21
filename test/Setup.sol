@@ -425,6 +425,7 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
         return _subjects.portfolio;
     }
 
+    /// @inheritdoc ISetup
     function positionRenderer() public view override returns (address) {
         return _subjects.positionRenderer;
     }
