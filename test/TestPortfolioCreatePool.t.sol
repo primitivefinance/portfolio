@@ -31,7 +31,7 @@ contract TestPortfolioCreatePool is Setup {
             portfolio: address(subject()),
             strikePriceWad: strikePrice,
             volatilityBasisPoints: volatility,
-            durationSeconds: duration * 1 days, // todo: fix with correct units
+            durationSeconds: uint32(duration) * 1 days, // todo: fix with correct units
             isPerpetual: false,
             priceWad: uint256(price)
         });
@@ -69,7 +69,7 @@ contract TestPortfolioCreatePool is Setup {
         assertEq(config.volatilityBasisPoints, volatility, "volatility");
         assertEq(
             config.durationSeconds,
-            config.isPerpetual ? SECONDS_PER_YEAR : duration,
+            config.isPerpetual ? SECONDS_PER_YEAR : uint32(duration) * 1 days,
             "duration"
         );
         assertEq(config.strikePriceWad, strikePrice, "strikePrice");

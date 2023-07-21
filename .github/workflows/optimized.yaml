@@ -21,6 +21,3 @@ jobs:
       
       - name: Run tests RMM01Portfolio
         run: FOUNDRY_PROFILE=optimized forge test
-
-      - name: Run invariant tests
-        run: FOUNDRY_PROFILE=optimized forge test --gas-report --match-contract TestRMM01PortfolioInvariants -vvv
