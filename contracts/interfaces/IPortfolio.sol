@@ -210,6 +210,9 @@ interface IPortfolioState {
     /// @notice Contract for storing canonical Portfolio deployments.
     function REGISTRY() external view returns (address);
 
+    /// @notice Contract for rendering position tokens.
+    function POSITION_RENDERER() external view returns (address);
+
     /// @notice Default strategy contract used in pool creation.
     function DEFAULT_STRATEGY() external view returns (address);
 

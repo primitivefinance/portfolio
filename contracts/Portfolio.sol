@@ -59,6 +59,7 @@ contract Portfolio is ERC1155, IPortfolio {
     /// @inheritdoc IPortfolioState
     address public immutable DEFAULT_STRATEGY;
 
+    /// @inheritdoc IPortfolioState
     address public immutable POSITION_RENDERER;
 
     /// @inheritdoc IPortfolioState
