@@ -8,12 +8,6 @@ import "../interfaces/IPortfolio.sol";
 
 // @dev Simple contract to render a position.
 contract SimplePositionRenderer {
-    IPortfolio public portfolio;
-
-    constructor(IPortfolio _portfolio) {
-        portfolio = _portfolio;
-    }
-
     function uri(uint256 id) external view returns (string memory) {
         return string(
             abi.encodePacked(
@@ -39,7 +33,7 @@ contract SimplePositionRenderer {
 
     function _generateName(uint256 id) private view returns (string memory) {
         (address tokenAsset,, address tokenQuote,) =
-            portfolio.pairs(uint24(uint64(id) >> 40));
+            IPortfolio(msg.sender).pairs(uint24(uint64(id) >> 40));
 
         return string(
             abi.encodePacked(
@@ -70,7 +64,7 @@ contract SimplePositionRenderer {
         returns (string memory)
     {
         (address tokenAsset,, address tokenQuote,) =
-            portfolio.pairs(uint24(uint64(id) >> 40));
+            IPortfolio(msg.sender).pairs(uint24(uint64(id) >> 40));
 
         return string(
             abi.encodePacked(
@@ -79,7 +73,7 @@ contract SimplePositionRenderer {
                 '",',
                 '"quote":"',
                 ERC20(tokenQuote).name(),
-                '",'
+                '"'
             )
         );
     }
