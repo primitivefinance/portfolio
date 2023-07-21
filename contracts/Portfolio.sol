@@ -8,6 +8,7 @@ import "./interfaces/IPortfolio.sol";
 import "./interfaces/IPortfolioRegistry.sol";
 import "./interfaces/IStrategy.sol";
 import "./strategies/NormalStrategy.sol";
+import "./PositionRenderer.sol";
 
 /**
  * @title
@@ -57,6 +58,8 @@ contract Portfolio is ERC1155, IPortfolio {
 
     /// @inheritdoc IPortfolioState
     address public immutable DEFAULT_STRATEGY;
+
+    address public immutable POSITION_RENDERER;
 
     /// @inheritdoc IPortfolioState
     uint24 public getPairNonce;
@@ -146,10 +149,15 @@ contract Portfolio is ERC1155, IPortfolio {
      * transactions with Portfolio to fail once `address(this).balance > 0`.
      * @param registry Address of a contract that implements the `IRegistry` interface.
      */
-    constructor(address weth, address registry) ERC1155() {
+    constructor(
+        address weth,
+        address registry,
+        address positionRenderer
+    ) ERC1155() {
         WETH = weth;
         REGISTRY = registry;
         DEFAULT_STRATEGY = address(new NormalStrategy(address(this)));
+        POSITION_RENDERER = positionRenderer;
         __account__.settled = true;
     }
 
@@ -158,7 +166,7 @@ contract Portfolio is ERC1155, IPortfolio {
     }
 
     function uri(uint256 id) public view override returns (string memory) {
-        return "";
+        return PositionRenderer(POSITION_RENDERER).uri(id);
     }
 
     // ===== Account Getters ===== //
