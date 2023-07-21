@@ -24,6 +24,7 @@ struct SubjectsType {
     address registry;
     address weth;
     address portfolio;
+    address positionRenderer;
 }
 
 // Constants
@@ -59,6 +60,9 @@ interface ISetup {
 
     /// @dev Returns the portfolio contract as an address, which is also the subject.
     function portfolio() external view returns (address);
+
+    /// @dev Returns the position renderer contract used in the subject.
+    function positionRenderer() external view returns (address);
 }
 
 // Test State
@@ -138,8 +142,12 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
         _subjects.weth = address(new WETH());
         vm.label(_subjects.weth, "weth");
 
-        _subjects.portfolio =
-            address(new Portfolio(_subjects.weth, _subjects.registry));
+        _subjects.positionRenderer = address(new PositionRenderer());
+        vm.label(_subjects.positionRenderer, "position-renderer");
+
+        _subjects.portfolio = address(
+            new Portfolio(_subjects.weth, _subjects.registry, _subjects.positionRenderer)
+        );
         vm.label(_subjects.portfolio, "portfolio");
 
         _ghost_state = GhostType({
@@ -415,6 +423,10 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
     /// @inheritdoc ISetup
     function portfolio() public view override returns (address) {
         return _subjects.portfolio;
+    }
+
+    function positionRenderer() public view override returns (address) {
+        return _subjects.positionRenderer;
     }
 
     receive() external payable { }
