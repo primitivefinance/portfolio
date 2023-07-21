@@ -123,6 +123,10 @@ contract PositionRenderer {
     function _generateConfig(uint256 id) private view returns (string memory) {
         (,,,,,, address controller) = IPortfolio(msg.sender).pools(uint64(id));
 
+        if (controller == address(0)) {
+            controller = IPortfolio(msg.sender).DEFAULT_STRATEGY();
+        }
+
         (
             uint128 strikePriceWad,
             uint32 volatilityBasisPoints,
