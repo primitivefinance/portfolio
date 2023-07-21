@@ -264,9 +264,9 @@ interface IPortfolioState {
             uint16 priorityFeeBasisPoints,
             address controller
         );
+}
 
-    // ===== Portfolio View ===== //
-
+interface IPortfolioStrategy {
     /**
      * @notice
      * Get amount of tokens out in a swap given amount of tokens in.

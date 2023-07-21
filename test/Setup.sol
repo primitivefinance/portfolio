@@ -28,7 +28,6 @@ struct SubjectsType {
     address weth;
     address portfolio;
     address renderer;
-    address renderer;
 }
 
 // Constants
@@ -64,8 +63,6 @@ interface ISetup {
 
     /// @dev Returns the portfolio contract as an address, which is also the subject.
     function portfolio() external view returns (address);
-
-    function renderer() external view returns (address);
 
     function renderer() external view returns (address);
 }
@@ -123,13 +120,7 @@ library DefaultStrategy {
     }
 }
 
-contract Setup is
-    ISetup,
-    SetupStorage,
-    Test,
-    ERC1155TokenReceiver,
-    ERC1155TokenReceiver
-{
+contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
     using SafeCastLib for uint256;
     using DefaultStrategy for ConfigType;
 

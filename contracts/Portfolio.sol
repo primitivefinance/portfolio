@@ -24,7 +24,7 @@ import "./test/SimplePositionRenderer.sol";
  *
  * @custom:contributor TomAFrench
  */
-contract Portfolio is ERC1155, ERC1155, IPortfolio {
+contract Portfolio is ERC1155, IPortfolio {
     using AssemblyLib for *;
     using FixedPointMathLib for *;
     using SafeCastLib for *;
@@ -61,12 +61,9 @@ contract Portfolio is ERC1155, ERC1155, IPortfolio {
     /// @inheritdoc IPortfolioState
     address public immutable DEFAULT_STRATEGY;
 
+    address public immutable RENDERER;
+
     /// @inheritdoc IPortfolioState
-    address public immutable RENDERER;
-
-    address public immutable RENDERER;
-
-    /// @inheritdoc IPortfolioGetters
     uint24 public getPairNonce;
 
     /// @inheritdoc IPortfolioState
@@ -154,21 +151,16 @@ contract Portfolio is ERC1155, ERC1155, IPortfolio {
      * transactions with Portfolio to fail once `address(this).balance > 0`.
      * @param registry Address of a contract that implements the `IRegistry` interface.
      */
-    constructor(address weth, address registry, address renderer) ERC1155(, address renderer) ERC1155() {
+    constructor(address weth, address registry, address renderer) ERC1155() {
         WETH = weth;
         REGISTRY = registry;
         DEFAULT_STRATEGY = address(new NormalStrategy(address(this)));
-        RENDERER = renderer;
         RENDERER = renderer;
         __account__.settled = true;
     }
 
     receive() external payable {
         if (msg.sender != WETH) revert();
-    }
-
-    function uri(uint256 id) public view override returns (string memory) {
-        return SimplePositionRenderer(RENDERER).uri(id);
     }
 
     function uri(uint256 id) public view override returns (string memory) {
