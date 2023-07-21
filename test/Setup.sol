@@ -9,6 +9,7 @@ import { GhostType, IPortfolioStruct } from "./utils/GhostType.sol";
 
 // Contracts to test
 import "solmate/tokens/WETH.sol";
+import "solmate/tokens/ERC1155.sol";
 import "solmate/utils/SafeCastLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
 import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
@@ -113,7 +114,7 @@ library DefaultStrategy {
     }
 }
 
-contract Setup is ISetup, SetupStorage, Test {
+contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
     using SafeCastLib for uint256;
     using DefaultStrategy for ConfigType;
 

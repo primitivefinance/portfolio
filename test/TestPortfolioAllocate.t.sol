@@ -212,7 +212,7 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        
+
     {
         // Deposit tokens which will be used to compute max liquidity.
         subject().fund(ghost().asset().to_addr(), type(uint256).max);
@@ -741,7 +741,7 @@ contract TestPortfolioAllocate is Setup {
             testConfig.strategyArgs
         );
 
-        uint128 liq = subject().positions(actor(), ghost().poolId);
+        uint128 liq = ghost().position(actor());
         (uint128 deltaAsset, uint128 deltaQuote) =
             subject().getLiquidityDeltas(ghost().poolId, int128(liq));
 
