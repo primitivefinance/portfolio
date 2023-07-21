@@ -88,6 +88,7 @@ error PoolLib_InvalidReserveY();
  * @param feeBasisPoints The swap fee denominated in basis points, where 1 basis point = 0.01%.
  * @param priorityFeeBasisPoints Fee paid by the `controller` if the controller swaps, denominated in basis points.
  * @param controller Address that can change the swap fees.
+ * @param strategy Address implementing the strategy.
  */
 struct PortfolioPool {
     uint128 virtualX; // Total X reserves in WAD units for all liquidity.
@@ -97,6 +98,7 @@ struct PortfolioPool {
     uint16 feeBasisPoints;
     uint16 priorityFeeBasisPoints;
     address controller; // Address that can call `changeParameters()`.
+    address strategy;
 }
 
 // ----------------- //
@@ -108,7 +110,8 @@ function createPool(
     uint256 reserveY,
     uint256 feeBasisPoints,
     uint256 priorityFeeBasisPoints,
-    address controller
+    address controller,
+    address strategy
 ) {
     // Check if the pool has already been created.
     if (self.exists()) revert PoolLib_AlreadyCreated();
@@ -135,6 +138,8 @@ function createPool(
         self.controller = controller;
         self.priorityFeeBasisPoints = priorityFeeBasisPoints.safeCastTo16();
     }
+
+    self.strategy = strategy;
 }
 
 /// @dev Used in `swap()` to update the pool's timestamp.

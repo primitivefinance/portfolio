@@ -49,6 +49,7 @@ contract TestPortfolioCreatePool is Setup {
                 fee, // fee
                 priorityFee, // prior fee
                 address(this), // controller
+                subject().DEFAULT_STRATEGY(),
                 testConfig.strategyArgs
             )
         );
@@ -99,6 +100,7 @@ contract TestPortfolioCreatePool is Setup {
                 1, // fee
                 0, // prior fee
                 address(this), // controller
+                subject().DEFAULT_STRATEGY(),
                 testConfig.strategyArgs
             )
         );
@@ -182,6 +184,7 @@ contract TestPortfolioCreatePool is Setup {
                 100,
                 1,
                 address(0),
+                subject().DEFAULT_STRATEGY(),
                 abi.encode(
                     PortfolioConfig(
                         100,

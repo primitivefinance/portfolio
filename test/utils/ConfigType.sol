@@ -16,6 +16,7 @@ struct ConfigType {
     uint256 feeBasisPoints;
     uint256 priorityFeeBasisPoints;
     address controller;
+    address strategy;
     bytes strategyArgs;
 }
 
@@ -51,6 +52,8 @@ library ConfigLib {
             config.priorityFeeBasisPoints = ConfigLib_DEFAULT_PRIORITY_FEE;
         }
 
+        config.strategy = IPortfolioGetters(target).DEFAULT_STRATEGY();
+
         uint24 pairId =
             IPortfolioGetters(target).getPairId(config.asset, config.quote);
 
@@ -71,6 +74,7 @@ library ConfigLib {
                     config.feeBasisPoints.safeCastTo16(),
                     config.priorityFeeBasisPoints.safeCastTo16(),
                     config.controller,
+                    config.strategy,
                     config.strategyArgs
                 )
             );
@@ -93,6 +97,7 @@ library ConfigLib {
                 feeBasisPoints: config.feeBasisPoints.safeCastTo16(),
                 priorityFeeBasisPoints: config.priorityFeeBasisPoints.safeCastTo16(),
                 controller: config.controller,
+                strategy: config.strategy,
                 strategyArgs: config.strategyArgs
             }) returns (uint64 _id) {
                 id = _id;

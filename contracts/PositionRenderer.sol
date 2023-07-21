@@ -102,7 +102,8 @@ contract PositionRenderer {
             ,
             uint16 feeBasisPoints,
             uint16 priorityFeeBasisPoints,
-            address controller
+            address controller,
+            address strategy
         ) = IPortfolio(msg.sender).pools(uint64(id));
 
         return string(
@@ -115,16 +116,19 @@ contract PositionRenderer {
                 '",',
                 '"controller":"',
                 Strings.toHexString(controller),
+                '",',
+                '"strategy":"',
+                Strings.toHexString(strategy),
                 '"'
             )
         );
     }
 
     function _generateConfig(uint256 id) private view returns (string memory) {
-        (,,,,,, address controller) = IPortfolio(msg.sender).pools(uint64(id));
+        (,,,,,,, address strategy) = IPortfolio(msg.sender).pools(uint64(id));
 
-        if (controller == address(0)) {
-            controller = IPortfolio(msg.sender).DEFAULT_STRATEGY();
+        if (strategy == address(0)) {
+            strategy = IPortfolio(msg.sender).DEFAULT_STRATEGY();
         }
 
         (
@@ -133,7 +137,7 @@ contract PositionRenderer {
             uint32 durationSeconds,
             uint32 creationTimestamp,
             bool isPerpetual
-        ) = NormalStrategy(controller).configs(uint64(id));
+        ) = NormalStrategy(strategy).configs(uint64(id));
 
         return string(
             abi.encodePacked(
