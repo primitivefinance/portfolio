@@ -5,9 +5,16 @@ import "openzeppelin-contracts/utils/Base64.sol";
 import "openzeppelin-contracts/utils/Strings.sol";
 import "solmate/tokens/ERC20.sol";
 import "../interfaces/IPortfolio.sol";
+import "../interfaces/IStrategy.sol";
+import "../NormalStrategy.sol";
 
 // @dev Simple contract to render a position.
 contract SimplePositionRenderer {
+    using Strings for uint256;
+    using Strings for uint128;
+    using Strings for uint32;
+    using Strings for uint16;
+
     function uri(uint256 id) external view returns (string memory) {
         return string(
             abi.encodePacked(
@@ -22,7 +29,11 @@ contract SimplePositionRenderer {
                             '","license":"MIT","creator":"primitive.eth",',
                             '"description":"Concentrated liquidity tokens of a two-token AMM",',
                             '"properties":{',
-                            _generateProperties(id),
+                            _generatePair(id),
+                            ",",
+                            _generatePool(id),
+                            ",",
+                            _generateConfig(id),
                             "}}"
                         )
                     )
@@ -58,21 +69,99 @@ contract SimplePositionRenderer {
         );
     }
 
-    function _generateProperties(uint256 id)
-        private
-        view
-        returns (string memory)
-    {
+    function _generatePair(uint256 id) private view returns (string memory) {
         (address tokenAsset,, address tokenQuote,) =
             IPortfolio(msg.sender).pairs(uint24(uint64(id) >> 40));
 
         return string(
             abi.encodePacked(
-                '"asset":"',
+                '"asset_name":"',
                 ERC20(tokenAsset).name(),
                 '",',
-                '"quote":"',
+                '"asset_symbol":"',
+                ERC20(tokenAsset).symbol(),
+                '",',
+                '"asset_address":"',
+                Strings.toHexString(tokenAsset),
+                '",',
+                '"quote_name":"',
                 ERC20(tokenQuote).name(),
+                '",',
+                '"quote_symbol":"',
+                ERC20(tokenQuote).symbol(),
+                '",',
+                '"quote_address":"',
+                Strings.toHexString(tokenQuote),
+                '"'
+            )
+        );
+    }
+
+    function _generatePool(uint256 id) private view returns (string memory) {
+        (
+            uint128 virtualX,
+            uint128 virtualY,
+            uint128 liquidity,
+            uint32 lastTimestamp,
+            uint16 feeBasisPoints,
+            uint16 priorityFeeBasisPoints,
+            address controller
+        ) = IPortfolio(msg.sender).pools(uint64(id));
+
+        return string(
+            abi.encodePacked(
+                '"virtual_x":"',
+                virtualX.toString(),
+                '",',
+                '"virtual_y":"',
+                virtualY.toString(),
+                '",',
+                '"liquidity":"',
+                liquidity.toString(),
+                '",',
+                '"last_timestamp":"',
+                lastTimestamp.toString(),
+                '",',
+                '"fee_basis_points":"',
+                feeBasisPoints.toString(),
+                '",',
+                '"priority_fee_basis_points":"',
+                priorityFeeBasisPoints.toString(),
+                '",',
+                '"controller":"',
+                Strings.toHexString(controller),
+                '"'
+            )
+        );
+    }
+
+    function _generateConfig(uint256 id) private view returns (string memory) {
+        (,,,,,, address controller) = IPortfolio(msg.sender).pools(uint64(id));
+
+        (
+            uint128 strikePriceWad,
+            uint32 volatilityBasisPoints,
+            uint32 durationSeconds,
+            uint32 creationTimestamp,
+            bool isPerpetual
+        ) = NormalStrategy(controller).configs(uint64(id));
+
+        return string(
+            abi.encodePacked(
+                '"strike_price_wad":"',
+                strikePriceWad.toString(),
+                '",',
+                '"volatility_basis_points":"',
+                volatilityBasisPoints.toString(),
+                '",',
+                '"duration_seconds":"',
+                durationSeconds.toString(),
+                '",',
+                '"creation_timestamp":"',
+                creationTimestamp.toString(),
+                '",',
+                '"is_perpetual":"',
+                isPerpetual ? "true" : "false",
                 '"'
             )
         );
