@@ -2,12 +2,14 @@
 pragma solidity 0.8.19;
 
 import "solmate/tokens/ERC1155.sol";
+import "solmate/tokens/ERC1155.sol";
 import "./libraries/PortfolioLib.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IPortfolioRegistry.sol";
 import "./interfaces/IStrategy.sol";
 import "./strategies/NormalStrategy.sol";
+import "./test/SimplePositionRenderer.sol";
 import "./test/SimplePositionRenderer.sol";
 
 /**
@@ -22,7 +24,7 @@ import "./test/SimplePositionRenderer.sol";
  *
  * @custom:contributor TomAFrench
  */
-contract Portfolio is ERC1155, IPortfolio {
+contract Portfolio is ERC1155, ERC1155, IPortfolio {
     using AssemblyLib for *;
     using FixedPointMathLib for *;
     using SafeCastLib for *;
@@ -60,6 +62,8 @@ contract Portfolio is ERC1155, IPortfolio {
     address public immutable DEFAULT_STRATEGY;
 
     /// @inheritdoc IPortfolioState
+    address public immutable RENDERER;
+
     address public immutable RENDERER;
 
     /// @inheritdoc IPortfolioGetters
@@ -150,16 +154,21 @@ contract Portfolio is ERC1155, IPortfolio {
      * transactions with Portfolio to fail once `address(this).balance > 0`.
      * @param registry Address of a contract that implements the `IRegistry` interface.
      */
-    constructor(address weth, address registry, address renderer) ERC1155() {
+    constructor(address weth, address registry, address renderer) ERC1155(, address renderer) ERC1155() {
         WETH = weth;
         REGISTRY = registry;
         DEFAULT_STRATEGY = address(new NormalStrategy(address(this)));
+        RENDERER = renderer;
         RENDERER = renderer;
         __account__.settled = true;
     }
 
     receive() external payable {
         if (msg.sender != WETH) revert();
+    }
+
+    function uri(uint256 id) public view override returns (string memory) {
+        return SimplePositionRenderer(RENDERER).uri(id);
     }
 
     function uri(uint256 id) public view override returns (string memory) {
@@ -362,6 +371,8 @@ contract Portfolio is ERC1155, IPortfolio {
         if (useMax) {
             deltaLiquidity =
                 balanceOf[msg.sender][uint256(poolId)].safeCastTo128();
+            deltaLiquidity =
+                balanceOf[msg.sender][uint256(poolId)].safeCastTo128();
         }
 
         if (deltaLiquidity == 0) revert Portfolio_ZeroLiquidityDeallocate();
@@ -430,6 +441,16 @@ contract Portfolio is ERC1155, IPortfolio {
                 revert Portfolio_InsufficientLiquidity();
             }
             positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
+        }
+
+        if (positionLiquidity > 0) {
+            _mint(
+                args.owner, args.poolId, uint256(int256(positionLiquidity)), ""
+            );
+        } else {
+            _burn(
+                args.owner, args.poolId, uint256(-(int256(positionLiquidity)))
+            );
         }
 
         if (positionLiquidity > 0) {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 // Test utils
 import "forge-std/Test.sol";
 import "solmate/tokens/ERC1155.sol";
+import "solmate/tokens/ERC1155.sol";
 import { deploy as deployCoin, Coin } from "./utils/CoinType.sol";
 import { ConfigType, safeCastTo16 } from "./utils/ConfigType.sol";
 import { GhostType, IPortfolioStruct } from "./utils/GhostType.sol";
@@ -17,6 +18,7 @@ import "contracts/interfaces/IPortfolio.sol";
 import "contracts/test/FeeOnTransferToken.sol";
 import "contracts/test/SimpleRegistry.sol";
 import "contracts/test/SimplePositionRenderer.sol";
+import "contracts/test/SimplePositionRenderer.sol";
 import "contracts/Portfolio.sol";
 
 // Types
@@ -25,6 +27,7 @@ struct SubjectsType {
     address registry;
     address weth;
     address portfolio;
+    address renderer;
     address renderer;
 }
 
@@ -61,6 +64,8 @@ interface ISetup {
 
     /// @dev Returns the portfolio contract as an address, which is also the subject.
     function portfolio() external view returns (address);
+
+    function renderer() external view returns (address);
 
     function renderer() external view returns (address);
 }
@@ -118,7 +123,13 @@ library DefaultStrategy {
     }
 }
 
-contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
+contract Setup is
+    ISetup,
+    SetupStorage,
+    Test,
+    ERC1155TokenReceiver,
+    ERC1155TokenReceiver
+{
     using SafeCastLib for uint256;
     using DefaultStrategy for ConfigType;
 
