@@ -144,6 +144,7 @@ contract TestGas is Setup {
                 hundred, // fee
                 0, // prior fee
                 address(0), // controller
+                subject().DEFAULT_STRATEGY(),
                 testConfig.strategyArgs
             )
         );
@@ -271,6 +272,7 @@ contract TestGas is Setup {
                 hundred, // fee
                 0, // prior fee
                 address(0), // controller
+                subject().DEFAULT_STRATEGY(),
                 testConfig.strategyArgs
             )
         );
@@ -391,7 +393,7 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        
+
     {
         // Create another pair and pool.
         (address token0, address token1) =
@@ -546,6 +548,7 @@ contract TestGas is Setup {
                         uint16(100 + 100 / i), // fee
                         0, // prior fee
                         controller,
+                        subject().DEFAULT_STRATEGY(),
                         testConfig.strategyArgs
                     )
                 );
@@ -682,6 +685,7 @@ contract TestGas is Setup {
                 uint16(100), // fee
                 uint16(10), // prior fee
                 address(0), // controller
+                subject().DEFAULT_STRATEGY(),
                 testConfig.strategyArgs
             )
         );

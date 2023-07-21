@@ -42,6 +42,7 @@ contract TestPortfolioAllocate is Setup {
                 100, // fee
                 0, // prior fee
                 address(0), // controller
+                subject().DEFAULT_STRATEGY(),
                 testConfig.strategyArgs
             )
         );
@@ -62,7 +63,7 @@ contract TestPortfolioAllocate is Setup {
 
         subject().multicall(data);
 
-        (,, uint128 liquidity,,,,) = subject().pools(poolId);
+        (,, uint128 liquidity,,,,,) = subject().pools(poolId);
 
         assertEq(liquidity, 1 ether, "liquidity");
     }
@@ -738,6 +739,7 @@ contract TestPortfolioAllocate is Setup {
             30, // fee
             0, // priority fee
             address(0),
+            subject().DEFAULT_STRATEGY(),
             testConfig.strategyArgs
         );
 
