@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
+import "solmate/tokens/ERC1155.sol";
 import "./libraries/PortfolioLib.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
@@ -20,7 +21,7 @@ import "./strategies/NormalStrategy.sol";
  *
  * @custom:contributor TomAFrench
  */
-contract Portfolio is IPortfolio {
+contract Portfolio is ERC1155, IPortfolio {
     using AssemblyLib for *;
     using FixedPointMathLib for *;
     using SafeCastLib for *;
@@ -74,9 +75,6 @@ contract Portfolio is IPortfolio {
 
     /// @inheritdoc IPortfolioState
     mapping(address => mapping(address => uint24)) public getPairId;
-
-    /// @inheritdoc IPortfolioState
-    mapping(address => mapping(uint64 => uint128)) public positions;
 
     /// @dev Part of the reentrancy guard, 1 = unlocked, 2 = locked.
     uint256 internal _locked = 1;
@@ -148,7 +146,7 @@ contract Portfolio is IPortfolio {
      * transactions with Portfolio to fail once `address(this).balance > 0`.
      * @param registry Address of a contract that implements the `IRegistry` interface.
      */
-    constructor(address weth, address registry) {
+    constructor(address weth, address registry) ERC1155() {
         WETH = weth;
         REGISTRY = registry;
         DEFAULT_STRATEGY = address(new NormalStrategy(address(this)));
@@ -157,6 +155,10 @@ contract Portfolio is IPortfolio {
 
     receive() external payable {
         if (msg.sender != WETH) revert();
+    }
+
+    function uri(uint256 id) public view override returns (string memory) {
+        return "";
     }
 
     // ===== Account Getters ===== //
@@ -353,7 +355,7 @@ contract Portfolio is IPortfolio {
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
 
         if (useMax) {
-            deltaLiquidity = positions[msg.sender][poolId];
+            deltaLiquidity = balanceOf[msg.sender][poolId].safeCastTo128();
         }
 
         if (deltaLiquidity == 0) revert Portfolio_ZeroLiquidityDeallocate();
@@ -424,9 +426,14 @@ contract Portfolio is IPortfolio {
             positionLiquidity -= int128(uint128(BURNED_LIQUIDITY));
         }
 
-        positions[args.owner][args.poolId] = AssemblyLib.addSignedDelta(
-            positions[args.owner][args.poolId], positionLiquidity
-        );
+        if (positionLiquidity > 0) {
+            _mint(
+                args.owner, args.poolId, uint256(int256(positionLiquidity)), ""
+            );
+        } else {
+            _burn(args.owner, args.poolId, uint256(-int256(positionLiquidity)));
+        }
+
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
