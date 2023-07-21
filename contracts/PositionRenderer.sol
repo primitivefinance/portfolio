@@ -149,9 +149,8 @@ contract PositionRenderer {
                 '"creation_timestamp":"',
                 creationTimestamp.toString(),
                 '",',
-                '"is_perpetual":"',
-                isPerpetual ? "true" : "false",
-                '"'
+                '"is_perpetual":',
+                isPerpetual ? "true" : "false"
             )
         );
     }
