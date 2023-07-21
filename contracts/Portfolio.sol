@@ -682,6 +682,7 @@ contract Portfolio is ERC1155, IPortfolio {
         uint16 feeBasisPoints,
         uint16 priorityFeeBasisPoints,
         address controller,
+        address strategy,
         bytes calldata strategyArgs
     ) public payable virtual returns (uint64 poolId) {
         _preLock();
@@ -703,7 +704,8 @@ contract Portfolio is ERC1155, IPortfolio {
             reserveY: reserveYPerWad,
             feeBasisPoints: feeBasisPoints,
             priorityFeeBasisPoints: priorityFeeBasisPoints,
-            controller: controller
+            controller: controller,
+            strategy: strategy == address(0) ? DEFAULT_STRATEGY : strategy
         });
 
         // Store the last created poolId for the multicall, to make sure the user is not frontrun.
@@ -721,7 +723,8 @@ contract Portfolio is ERC1155, IPortfolio {
             reserveYPerWad,
             feeBasisPoints,
             priorityFeeBasisPoints,
-            controller
+            controller,
+            strategy
         );
         _postLock();
     }

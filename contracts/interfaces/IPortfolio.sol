@@ -137,7 +137,8 @@ interface IPortfolioEvents {
         uint256 reserveYPerWad,
         uint16 feeBasisPoints,
         uint16 priorityFeeBasisPoints,
-        address controller
+        address controller,
+        address strategy
     );
 
     /**
@@ -265,7 +266,8 @@ interface IPortfolioState {
             uint32 lastTimestamp,
             uint16 feeBasisPoints,
             uint16 priorityFeeBasisPoints,
-            address controller
+            address controller,
+            address strategy
         );
 }
 
@@ -568,6 +570,7 @@ interface IPortfolioActions is IPortfolioRegistryActions {
         uint16 feeBasisPoints,
         uint16 priorityFeeBasisPoints,
         address controller,
+        address strategy,
         bytes calldata strategyArgs
     ) external payable returns (uint64 poolId);
 
