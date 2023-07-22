@@ -1042,10 +1042,9 @@ contract Portfolio is ERC1155, IPortfolio {
         );
     }
 
-    // todo: properly implement using pool's controller or the default strategy.
     /// @inheritdoc IPortfolioView
     function getStrategy(uint64 poolId) public view returns (address) {
-        return DEFAULT_STRATEGY;
+        return pools[poolId].strategy;
     }
 
     /// @inheritdoc IPortfolioStrategy
