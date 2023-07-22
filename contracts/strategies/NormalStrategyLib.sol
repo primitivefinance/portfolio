@@ -656,8 +656,9 @@ library NormalStrategyLib {
         PortfolioPool memory self,
         PortfolioConfig memory config
     ) internal view returns (bool) {
-        return config.isPerpetual
-            || self.lastTimestamp >= getMaturity(self, config);
+        if (config.isPerpetual) return false;
+
+        return self.lastTimestamp >= getMaturity(self, config);
     }
 
     /**
