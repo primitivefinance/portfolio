@@ -13,26 +13,24 @@ contract PositionRenderer {
     using Strings for *;
 
     function uri(uint256 id) external view returns (string memory) {
-        return string(
-            abi.encodePacked(
-                "data:application/json;base64,",
-                Base64.encode(
-                    bytes(
-                        abi.encodePacked(
-                            '{"name":"',
-                            _generateName(id),
-                            '","image":"',
-                            _generateImage(),
-                            '","license":"MIT","creator":"primitive.eth",',
-                            '"description":"Concentrated liquidity tokens of a two-token AMM",',
-                            '"properties":{',
-                            _generatePair(id),
-                            ",",
-                            _generatePool(id),
-                            ",",
-                            _generateConfig(id),
-                            "}}"
-                        )
+        return string.concat(
+            "data:application/json;base64,",
+            Base64.encode(
+                bytes(
+                    abi.encodePacked(
+                        '{"name":"',
+                        _generateName(id),
+                        '","image":"',
+                        _generateImage(),
+                        '","license":"MIT","creator":"primitive.eth",',
+                        '"description":"Concentrated liquidity tokens of a two-token AMM",',
+                        '"properties":{',
+                        _generatePair(id),
+                        ",",
+                        _generatePool(id),
+                        ",",
+                        _generateConfig(id),
+                        "}}"
                     )
                 )
             )
@@ -43,24 +41,20 @@ contract PositionRenderer {
         (address tokenAsset,, address tokenQuote,) =
             IPortfolio(msg.sender).pairs(uint24(uint64(id) >> 40));
 
-        return string(
-            abi.encodePacked(
-                "Primitive Portfolio LP ",
-                ERC20(tokenAsset).symbol(),
-                "-",
-                ERC20(tokenQuote).symbol()
-            )
+        return string.concat(
+            "Primitive Portfolio LP ",
+            ERC20(tokenAsset).symbol(),
+            "-",
+            ERC20(tokenQuote).symbol()
         );
     }
 
     function _generateImage() private pure returns (string memory) {
-        return string(
-            abi.encodePacked(
-                "data:image/svg+xml;base64,",
-                Base64.encode(
-                    bytes(
-                        '<svg width="512" height="512" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill="#000" d="M0 0h512v512H0z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M339.976 134.664h41.048L256 340.586 130.976 134.664h41.047V98H64.143L256 414 447.857 98H339.976v36.664Zm-38.759 0V98h-90.436v36.664h90.436Z" fill="#fff"/></svg>'
-                    )
+        return string.concat(
+            "data:image/svg+xml;base64,",
+            Base64.encode(
+                bytes(
+                    '<svg width="512" height="512" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill="#000" d="M0 0h512v512H0z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M339.976 134.664h41.048L256 340.586 130.976 134.664h41.047V98H64.143L256 414 447.857 98H339.976v36.664Zm-38.759 0V98h-90.436v36.664h90.436Z" fill="#fff"/></svg>'
                 )
             )
         );
@@ -70,27 +64,25 @@ contract PositionRenderer {
         (address tokenAsset,, address tokenQuote,) =
             IPortfolio(msg.sender).pairs(uint24(uint64(id) >> 40));
 
-        return string(
-            abi.encodePacked(
-                '"asset_name":"',
-                ERC20(tokenAsset).name(),
-                '",',
-                '"asset_symbol":"',
-                ERC20(tokenAsset).symbol(),
-                '",',
-                '"asset_address":"',
-                Strings.toHexString(tokenAsset),
-                '",',
-                '"quote_name":"',
-                ERC20(tokenQuote).name(),
-                '",',
-                '"quote_symbol":"',
-                ERC20(tokenQuote).symbol(),
-                '",',
-                '"quote_address":"',
-                Strings.toHexString(tokenQuote),
-                '"'
-            )
+        return string.concat(
+            '"asset_name":"',
+            ERC20(tokenAsset).name(),
+            '",',
+            '"asset_symbol":"',
+            ERC20(tokenAsset).symbol(),
+            '",',
+            '"asset_address":"',
+            Strings.toHexString(tokenAsset),
+            '",',
+            '"quote_name":"',
+            ERC20(tokenQuote).name(),
+            '",',
+            '"quote_symbol":"',
+            ERC20(tokenQuote).symbol(),
+            '",',
+            '"quote_address":"',
+            Strings.toHexString(tokenQuote),
+            '"'
         );
     }
 
@@ -106,21 +98,19 @@ contract PositionRenderer {
             address strategy
         ) = IPortfolio(msg.sender).pools(uint64(id));
 
-        return string(
-            abi.encodePacked(
-                '"fee_basis_points":"',
-                feeBasisPoints.toString(),
-                '",',
-                '"priority_fee_basis_points":"',
-                priorityFeeBasisPoints.toString(),
-                '",',
-                '"controller":"',
-                Strings.toHexString(controller),
-                '",',
-                '"strategy":"',
-                Strings.toHexString(strategy),
-                '"'
-            )
+        return string.concat(
+            '"fee_basis_points":"',
+            feeBasisPoints.toString(),
+            '",',
+            '"priority_fee_basis_points":"',
+            priorityFeeBasisPoints.toString(),
+            '",',
+            '"controller":"',
+            Strings.toHexString(controller),
+            '",',
+            '"strategy":"',
+            Strings.toHexString(strategy),
+            '"'
         );
     }
 
@@ -139,23 +129,21 @@ contract PositionRenderer {
             bool isPerpetual
         ) = NormalStrategy(strategy).configs(uint64(id));
 
-        return string(
-            abi.encodePacked(
-                '"strike_price_wad":"',
-                strikePriceWad.toString(),
-                '",',
-                '"volatility_basis_points":"',
-                volatilityBasisPoints.toString(),
-                '",',
-                '"duration_seconds":"',
-                durationSeconds.toString(),
-                '",',
-                '"creation_timestamp":"',
-                creationTimestamp.toString(),
-                '",',
-                '"is_perpetual":',
-                isPerpetual ? "true" : "false"
-            )
+        return string.concat(
+            '"strike_price_wad":"',
+            strikePriceWad.toString(),
+            '",',
+            '"volatility_basis_points":"',
+            volatilityBasisPoints.toString(),
+            '",',
+            '"duration_seconds":"',
+            durationSeconds.toString(),
+            '",',
+            '"creation_timestamp":"',
+            creationTimestamp.toString(),
+            '",',
+            '"is_perpetual":',
+            isPerpetual ? "true" : "false"
         );
     }
 }
