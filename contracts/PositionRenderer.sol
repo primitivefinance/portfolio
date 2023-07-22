@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.4;
 
-import "openzeppelin-contracts/utils/Base64.sol";
-import "openzeppelin-contracts/utils/Strings.sol";
+import "openzeppelin/utils/Base64.sol";
+import "openzeppelin/utils/Strings.sol";
 import "solmate/tokens/ERC20.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IStrategy.sol";
