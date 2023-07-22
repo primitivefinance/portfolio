@@ -711,9 +711,7 @@ contract Portfolio is ERC1155, IPortfolio {
         // Store the last created poolId for the multicall, to make sure the user is not frontrun.
         _getLastPoolId = poolId;
 
-        // todo: fix with proper controller/conditional. Should this be called all the time?
-        try IStrategy(getStrategy(poolId)).afterCreate(poolId, strategyArgs) { }
-            catch { }
+        IStrategy(getStrategy(poolId)).afterCreate(poolId, strategyArgs);
 
         emit CreatePool(
             poolId,
