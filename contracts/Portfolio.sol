@@ -264,7 +264,7 @@ contract Portfolio is ERC1155, IPortfolio {
         if (poolId == 0) poolId = _getLastPoolId;
         if (
             getStrategy(poolId) == address(0)
-                || !IStrategy(getStrategy(poolId)).validatePool(poolId)
+                && !IStrategy(getStrategy(poolId)).validatePool(poolId)
         ) {
             revert Portfolio_NonExistentPool(poolId);
         }
