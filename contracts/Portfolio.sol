@@ -262,11 +262,11 @@ contract Portfolio is ERC1155, IPortfolio {
         if (_currentMulticall == false) _deposit();
 
         if (poolId == 0) poolId = _getLastPoolId;
-        if (
-            getStrategy(poolId) == address(0)
-                && !IStrategy(getStrategy(poolId)).validatePool(poolId)
-        ) {
+        if (getStrategy(poolId) == address(0)) {
             revert Portfolio_NonExistentPool(poolId);
+        }
+        if (!IStrategy(getStrategy(poolId)).validatePool(poolId)) {
+            revert Portfolio_InvalidPool(poolId);
         }
 
         (maxDeltaAsset, maxDeltaQuote) = _scaleAmountsToWad({
