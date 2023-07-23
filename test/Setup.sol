@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-// Test utils
+// Base test contracts
 import "forge-std/Test.sol";
+import "./Configuration.sol";
+
+// Test types
 import { deploy as deployCoin, Coin } from "./utils/CoinType.sol";
-import { ConfigType, safeCastTo16 } from "./utils/ConfigType.sol";
 import { GhostType, IPortfolioStruct } from "./utils/GhostType.sol";
 
 // Contracts to test
@@ -79,7 +81,7 @@ library DefaultStrategy {
     function getDefaultTestConfig(address portfolio)
         internal
         view
-        returns (ConfigType memory config)
+        returns (Configuration memory config)
     {
         return getTestConfig(portfolio, 0, 0, 0, false, 0);
     }
@@ -92,7 +94,7 @@ library DefaultStrategy {
         uint256 durationSeconds,
         bool isPerpetual,
         uint256 priceWad
-    ) internal view returns (ConfigType memory config) {
+    ) internal view returns (Configuration memory config) {
         if (strikePriceWad == 0) {
             strikePriceWad = DefaultStrategy_DEFAULT_STRIKE;
         }
@@ -127,7 +129,7 @@ library DefaultStrategy {
 
 contract Setup is ISetup, Test, ERC1155TokenReceiver {
     using SafeCastLib for uint256;
-    using DefaultStrategy for ConfigType;
+    using DefaultStrategy for Configuration;
 
     // Test ghost state
     GhostType internal _ghost_state;
@@ -299,7 +301,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     }
 
     modifier defaultConfig() {
-        ConfigType memory config =
+        Configuration memory config =
             DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = deployDefaultTokenPair();
 
@@ -318,7 +320,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         bool isPerpetual,
         uint256 priceWad
     ) {
-        ConfigType memory config = DefaultStrategy.getTestConfig({
+        Configuration memory config = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: strikePriceWad,
             volatilityBasisPoints: volatilityBasisPoints,
@@ -337,7 +339,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     }
 
     modifier defaultControlledConfig() {
-        ConfigType memory config =
+        Configuration memory config =
             DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = deployDefaultTokenPair();
 
@@ -350,7 +352,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         uint16 duration = type(uint16).max;
         uint16 volatility = uint16(MIN_VOLATILITY);
 
-        ConfigType memory config = DefaultStrategy.getTestConfig({
+        Configuration memory config = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 1e18,
             volatilityBasisPoints: volatility,
@@ -371,7 +373,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 6));
         vm.label(quote.to_addr(), "quote-6");
 
-        ConfigType memory config =
+        Configuration memory config =
             DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
 
@@ -385,7 +387,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Coin quote = deployCoin("FOT", abi.encode("quote", "QUOTE", 18));
         vm.label(quote.to_addr(), "quote-fot-18");
 
-        ConfigType memory config =
+        Configuration memory config =
             DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
 
@@ -395,7 +397,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
 
     modifier wethConfig() {
         Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
-        ConfigType memory config =
+        Configuration memory config =
             DefaultStrategy.getDefaultTestConfig(address(subject()));
         (config.asset, config.quote) = (weth(), quote.to_addr());
 
@@ -404,7 +406,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     }
 
     modifier durationConfig(uint16 duration) {
-        ConfigType memory config = DefaultStrategy.getTestConfig({
+        Configuration memory config = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 0,
             volatilityBasisPoints: 0,
@@ -419,7 +421,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     }
 
     modifier volatilityConfig(uint16 volatility) {
-        ConfigType memory config = DefaultStrategy.getTestConfig({
+        Configuration memory config = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 0,
             volatilityBasisPoints: volatility,

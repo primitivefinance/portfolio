@@ -126,7 +126,7 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 10 ether,
             volatilityBasisPoints: 1e4,
@@ -254,7 +254,7 @@ contract TestGas is Setup {
 
         uint16 hundred = uint16(100);
 
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 10 ether,
             volatilityBasisPoints: 1e4,
@@ -530,7 +530,7 @@ contract TestGas is Setup {
                 instructions[i] =
                     abi.encodeCall(IPortfolioActions.createPair, (a0, q0));
             } else {
-                ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+                Configuration memory testConfig = DefaultStrategy.getTestConfig({
                     portfolio: address(subject()),
                     strikePriceWad: uint128(1 ether * i),
                     volatilityBasisPoints: uint16(1000 + 1000 / i),
@@ -667,7 +667,7 @@ contract TestGas is Setup {
         view
         returns (bytes memory)
     {
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: uint128(1 ether),
             volatilityBasisPoints: uint16(1000),

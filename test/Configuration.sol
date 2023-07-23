@@ -8,7 +8,7 @@ import {
 import { IStrategy } from "contracts/interfaces/IStrategy.sol";
 
 /// @dev Universal configuration of a pool in Portfolio to test.
-struct ConfigType {
+struct Configuration {
     address asset;
     address quote;
     uint256 reserveXPerWad;
@@ -20,7 +20,7 @@ struct ConfigType {
     bytes strategyArgs;
 }
 
-using ConfigLib for ConfigType global;
+using ConfigurationLib for Configuration global;
 
 uint256 constant ConfigLib_DEFAULT_FEE = 30;
 uint256 constant ConfigLib_DEFAULT_PRIORITY_FEE = 10;
@@ -33,11 +33,25 @@ function safeCastTo16(uint256 x) pure returns (uint16 y) {
 
 // todo: fix testing config so its more clear its for test setup.
 /// @dev Instantiate a pool in Portfolio using a config.
-library ConfigLib {
+library ConfigurationLib {
     using { safeCastTo16 } for uint256;
 
+    function configure() internal pure returns (Configuration memory config) {
+        config = Configuration({
+            asset: address(0),
+            quote: address(0),
+            reserveXPerWad: 0,
+            reserveYPerWad: 0,
+            feeBasisPoints: ConfigLib_DEFAULT_FEE,
+            priorityFeeBasisPoints: ConfigLib_DEFAULT_PRIORITY_FEE,
+            controller: address(0),
+            strategy: address(0),
+            strategyArgs: ""
+        });
+    }
+
     function instantiate(
-        ConfigType memory config,
+        Configuration memory config,
         address target
     ) internal returns (uint64 id) {
         require(config.asset != address(0), "ConfigType_Asset");

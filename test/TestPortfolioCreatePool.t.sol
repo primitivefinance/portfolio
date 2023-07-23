@@ -25,7 +25,7 @@ contract TestPortfolioCreatePool is Setup {
         vm.assume(price > 0);
         vm.assume(strikePrice > 0);
 
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: strikePrice,
             volatilityBasisPoints: volatility,
@@ -70,7 +70,7 @@ contract TestPortfolioCreatePool is Setup {
     }
 
     function test_revert_createPool_invalid_pair_nonce() public {
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 100,
             volatilityBasisPoints: 100,
@@ -97,7 +97,7 @@ contract TestPortfolioCreatePool is Setup {
     }
 
     function test_createPool_no_strategy_defaults() public defaultConfig {
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 100,
             volatilityBasisPoints: 100,
@@ -127,7 +127,7 @@ contract TestPortfolioCreatePool is Setup {
     function test_revert_createPool_priority_fee_invalid_fee() public {
         bytes[] memory data = new bytes[](1);
 
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 1,
             volatilityBasisPoints: 1,
@@ -192,7 +192,7 @@ contract TestPortfolioCreatePool is Setup {
         );
 
         bytes[] memory data = new bytes[](1);
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 100,
             volatilityBasisPoints: 100,

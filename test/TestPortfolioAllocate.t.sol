@@ -24,7 +24,7 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.createPair, (address(tokenA), address(tokenB))
         );
 
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: 1 ether,
             volatilityBasisPoints: 100,
@@ -652,7 +652,7 @@ contract TestPortfolioAllocate is Setup {
             type(uint128).max
         );
 
-        ConfigType memory testConfig =
+        Configuration memory testConfig =
             DefaultStrategy.getDefaultTestConfig(address(subject()));
 
         uint64 poolId = subject().createPool(
