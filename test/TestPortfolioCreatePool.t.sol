@@ -96,6 +96,34 @@ contract TestPortfolioCreatePool is Setup {
         );
     }
 
+    function test_createPool_no_strategy_defaults() public defaultConfig {
+        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 100,
+            volatilityBasisPoints: 100,
+            durationSeconds: 100 * 1 days,
+            isPerpetual: false,
+            priceWad: 1001
+        });
+
+        testConfig.reserveXPerWad++; // Avoid the reserve error
+        testConfig.reserveYPerWad++; // Avoid the reserve error
+
+        uint64 poolId = subject().createPool(
+            0,
+            testConfig.reserveXPerWad,
+            testConfig.reserveYPerWad,
+            100, // fee
+            0, // prior fee
+            address(0), // controller
+            address(0), // strategy
+            testConfig.strategyArgs
+        );
+
+        (,,,,,,, address strategy) = subject().pools(poolId);
+        assertEq(strategy, subject().DEFAULT_STRATEGY());
+    }
+
     function test_revert_createPool_priority_fee_invalid_fee() public {
         bytes[] memory data = new bytes[](1);
 
