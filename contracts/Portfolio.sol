@@ -149,6 +149,7 @@ contract Portfolio is ERC1155, IPortfolio {
      * contract that implements the `deposit()` function will cause all
      * transactions with Portfolio to fail once `address(this).balance > 0`.
      * @param registry Address of a contract that implements the `IRegistry` interface.
+     * @param positionRenderer Address of the contract rendering the NFT positions.
      */
     constructor(
         address weth,
