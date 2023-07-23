@@ -32,8 +32,6 @@ contract TestPortfolioSwap is Setup {
         );
 
         uint256 prev = ghost().quote().to_token().balanceOf(actor());
-
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -41,11 +39,8 @@ contract TestPortfolioSwap is Setup {
             output: amtOut,
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
-        subject().multicall(data);
-
+        subject().swap(order);
         uint256 post = ghost().quote().to_token().balanceOf(actor());
-
         assertTrue(post > prev, "balance-did-not-increase");
     }
 
@@ -68,7 +63,6 @@ contract TestPortfolioSwap is Setup {
             block.timestamp + (uint256(ghost().config().durationSeconds) / 2)
         );
 
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -76,11 +70,8 @@ contract TestPortfolioSwap is Setup {
             output: amtOut,
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
-        subject().multicall(data);
-
+        subject().swap(order);
         uint256 post = ghost().quote().to_token().balanceOf(actor());
-
         assertTrue(post > prev, "physical-balance-did-not-increase");
     }
 
@@ -103,7 +94,6 @@ contract TestPortfolioSwap is Setup {
             )
         );
 
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -111,8 +101,7 @@ contract TestPortfolioSwap is Setup {
             output: amtOut,
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
-        subject().multicall(data);
+        subject().swap(order);
 
         uint256 preBal =
             ghost().asset().to_token().balanceOf(subjects().registry);
@@ -176,7 +165,6 @@ contract TestPortfolioSwap is Setup {
             prevYPerL = prevYPerL.divWadDown(pool.liquidity);
         }
 
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -184,9 +172,7 @@ contract TestPortfolioSwap is Setup {
             output: amountOut,
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
-
-        try subject().multicall(data) {
+        try subject().swap(order) {
             pool = ghost().pool();
 
             (uint256 postXPerL, uint256 postYPerL) =
@@ -311,7 +297,6 @@ contract TestPortfolioSwap is Setup {
         // todo: do getSwapInvariants
         int256 prevInvariant = subject().getInvariant(ghost().poolId);
 
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -319,9 +304,8 @@ contract TestPortfolioSwap is Setup {
             output: amountOut.safeCastTo128(),
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
 
-        try subject().multicall(data) {
+        try subject().swap(order) {
             pool = ghost().pool();
 
             int256 invariant = subject().getInvariant(ghost().poolId);
@@ -375,7 +359,6 @@ contract TestPortfolioSwap is Setup {
         uint256 prevPhysicalOut =
             IERC20(tokenOut).balanceOf(address(ghost().subject));
 
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -383,10 +366,8 @@ contract TestPortfolioSwap is Setup {
             output: amountOut,
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
-
-        subject().multicall{ value: tokenIn == subject().WETH() ? amountIn : 0 }(
-            data
+        subject().swap{ value: tokenIn == subject().WETH() ? amountIn : 0 }(
+            order
         );
 
         uint256 postPhysicalOut =
@@ -488,8 +469,6 @@ contract TestPortfolioSwap is Setup {
         uint256 amountOut
     ) internal {
         uint256 prevPrice = subject().getSpotPrice(ghost().poolId);
-
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -497,8 +476,7 @@ contract TestPortfolioSwap is Setup {
             output: amountOut.safeCastTo128(),
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
-        subject().multicall(data);
+        subject().swap(order);
 
         uint256 postPrice = subject().getSpotPrice(ghost().poolId);
         if (sellAsset) {
@@ -658,8 +636,6 @@ contract TestPortfolioSwap is Setup {
     ) internal {
         // todo: fix with getSwapInvariants...
         int256 prev = subject().getInvariant(ghost().poolId);
-
-        bytes[] memory data = new bytes[](1);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -667,13 +643,12 @@ contract TestPortfolioSwap is Setup {
             output: amountOut.safeCastTo128(),
             sellAsset: sellAsset
         });
-        data[0] = abi.encodeCall(IPortfolioActions.swap, (order));
 
         // todo: Currently failing with "Infinity()" because the quotient is 1, since the
         // new Y reserves with the fee included are at a 1:1 ratio with the strike price
         // when rounded up.
         // We need to figure out how to properly handle that case.
-        try subject().multicall(data) {
+        try subject().swap(order) {
             PortfolioPool memory pool = ghost().pool();
             PortfolioConfig memory config = ghost().config();
             reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
