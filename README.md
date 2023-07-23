@@ -1,76 +1,32 @@
 > Beta: Not production ready. Pending on-going audits.
 
-# Primitive Portfolio
+# Portfolio by Primitive
 
-On-chain portfolio management. Optimized for managing risk and liquidity.
+Portfolio is an automated market making protocol for implementing custom liquidity distribution strategies at the lowest cost possible.
 
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/primitivefinance/portfolio#contributing) [![](https://dcbadge.vercel.app/api/server/primitive?style=flat)](https://discord.gg/primitive) [![Twitter Badge](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/primitivefi)
 
-
-# Portfolio Security
-
-[Visit Primitive Security](https://www.primitive.xyz/security) to view a comprehensive overview of the security initiatives of Portfolio.
-
-## System Invariants
-
-The system is designed around a single invariant:
-
-```
-Actual balance of tokens in contract >= virtually tracked token balance in `__account__.reserves`.
-```
-
-Exposed via: `Portfolio.getNetBalance(token)`
-
-For more invariants, [read this](./test/README.md).
-
-# Portfolio Manual
-
-## Clone
-
-```
-git clone https://github.com/primitivefinance/portfolio.git
-```
-
 ## Installation
 
-Required:
-
-- Foundry
-- Python (if running echidna)
-
-### 1. Install foundry. [source](https://github.com/foundry-rs/foundry)
-
-```
+#### [Required] Foundry. [Source](https://github.com/foundry-rs/foundry).
+If not installed, run the following:
+```bash
+# First install foundryup
 curl -L https://foundry.paradigm.xyz | bash
-```
 
-### 2. Restart terminal or reload `PATH`, then run:
-
-```
+# Restart terminal or reload `PATH`, then run foundryup
 foundryup
 ```
 
-### 3. Install deps
+### Install & Run
 
-```
-forge install
-```
-
-### 4. Test
-
-```
-forge test --match-contract TestRMM01
+```bash
+forge install & forge test
 ```
 
-## Resources
+# Security
 
-- [Portfolio Yellow Paper (Deprecated)](https://www.primitive.xyz/papers/yellow.pdf)
-- [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
-- [Original codebase](https://github.com/primitivefinance/rmm-core)
-- [solstat](https://github.com/primitivefinance/solstat)
-- [Replicating Market Makers](https://github.com/angeris/angeris.github.io/blob/master/papers/rmms.pdf)
-- [RMM whitepaper](https://primitive.xyz/whitepaper)
-- [High precision calculator](https://keisan.casio.com/calculator)
+[Visit Primitive Security](https://www.primitive.xyz/security) to view a comprehensive overview of the security initiatives of Portfolio.
 
 ## Audits
 
@@ -79,7 +35,46 @@ forge test --match-contract TestRMM01
 | ChainSecurity      | 8-weeks     | Completed |
 | Trail of Bits      | 8-weeks     | Completed |
 | Spearbit           | 5-weeks     | Completed |
-| Spearbit Extension | 2-weeks     | Pending   |
+| Spearbit Extension | 2-weeks     | Competed   |
+| Spearbit Extension #2 | 2-weeks     | Pending   |
+
+
+# Documentation
+
+## Hosted
+[Visit Primitive Documentation](https://docs.primitive.xyz) to view the hosted documentation for Portfolio.
+
+
+## Local
+
+To build the documentation locally:
+
+#### [Required] Rust & Cargo
+If not installed, follow the [rust installation instructions](https://www.rust-lang.org/tools/install).
+
+#### [Required] Mdbook
+If not installed, run the following:
+```bash
+cargo install mdbook
+```
+
+### Build and serve
+
+```bash
+cd docs
+mdbook serve --open
+```
+
+## Resources
+
+- [Hosted Documentation](https://docs.primitive.xyz)
+- [Portfolio Yellow Paper (Deprecated)](https://www.primitive.xyz/papers/yellow.pdf)
+- [RMM in desmos](https://www.desmos.com/calculator/8py0nzdgfp)
+- [Original codebase](https://github.com/primitivefinance/rmm-core)
+- [solstat](https://github.com/primitivefinance/solstat)
+- [Replicating Market Makers](https://github.com/angeris/angeris.github.io/blob/master/papers/rmms.pdf)
+- [RMM whitepaper](https://primitive.xyz/whitepaper)
+- [High precision calculator](https://keisan.casio.com/calculator)
 
 
 ## Contributing
