@@ -37,6 +37,9 @@ uint256 constant DefaultStrategy_DEFAULT_PRICE = 1e18;
 
 // Interfaces
 interface ISetup {
+    /// @dev Overwrites the ghost state poolId with `id`.
+    function setGhostPoolId(uint64 id) external;
+
     /// @dev Returns the current targets for the tests.
     function ghost() external view returns (GhostType memory);
 
@@ -46,7 +49,10 @@ interface ISetup {
     /// @dev Returns the target smart contract being called in tests.
     function subject() external view returns (IPortfolio);
 
-    /// @dev Returns the caller of the unit tests.
+    /// @dev Returns the strategy of the subject and subject pool.
+    function strategy() external view returns (IStrategy);
+
+    /// @dev Returns the caller of the unit tests with the modifier `useActor`.
     function actor() external view returns (address);
 
     /// @dev Returns the specific pool of the unit test.
@@ -63,12 +69,6 @@ interface ISetup {
 
     /// @dev Returns the position renderer contract used in the subject.
     function positionRenderer() external view returns (address);
-}
-
-// Test State
-contract SetupStorage {
-    GhostType internal _ghost_state;
-    SubjectsType internal _subjects;
 }
 
 /// Normal strategy test helper
@@ -104,6 +104,13 @@ library DefaultStrategy {
         }
         if (priceWad == 0) priceWad = DefaultStrategy_DEFAULT_PRICE;
 
+        // These get casted down and silently revert if they overflow the target type.
+        require(strikePriceWad <= type(uint128).max, "Setup_InvalidStrike");
+        require(
+            volatilityBasisPoints <= type(uint32).max, "Setup_InvalidVolatility"
+        );
+        require(durationSeconds <= type(uint32).max, "Setup_InvalidDuration");
+
         (config.strategyArgs, config.reserveXPerWad, config.reserveYPerWad) =
         INormalStrategy(IPortfolio(portfolio).DEFAULT_STRATEGY())
             .getStrategyData({
@@ -118,9 +125,15 @@ library DefaultStrategy {
     }
 }
 
-contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
+contract Setup is ISetup, Test, ERC1155TokenReceiver {
     using SafeCastLib for uint256;
     using DefaultStrategy for ConfigType;
+
+    // Test ghost state
+    GhostType internal _ghost_state;
+    SubjectsType internal _subjects;
+
+    // ============= Before Test ============= //
 
     // Important for making sure the setup went smoothly!
     modifier verifySetup() {
@@ -159,27 +172,34 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
         assertEq(subject().VERSION(), "v1.4.0-beta", "version-not-equal");
     }
 
-    function setGhostPoolId(uint64 id_) internal {
-        _ghost_state.poolId = id_;
+    // ============= Edit Test Environment ============= //
+
+    function setGhostPoolId(uint64 id) public {
+        _ghost_state.file("poolId", abi.encode(id));
     }
 
-    // Modifiers for interacting with the test environment
+    //  ============= Test Setup Modifiers ============= //
 
+    /// @dev Stop the gas metering, must resume within the test.
     modifier pauseGas() {
         vm.pauseGasMetering();
         _;
     }
 
+    /// @dev Uses the `prank` forge cheat on the actor in the ghost state.
     modifier useActor() {
         vm.startPrank(actor());
         _;
         vm.stopPrank();
     }
 
+    /// @dev Updates the actor in the ghost state, `useActor` should be used after it.
     modifier setActor(address actor_) {
-        _ghost_state.actor = actor_;
+        _ghost_state.file("actor", abi.encode(actor_));
         _;
     }
+
+    // ============= Pool Setup Modifiers  ============= //
 
     modifier usePairTokens(uint256 amount) {
         // Approve and mint tokens for actor.
@@ -199,6 +219,8 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
         }
         _;
     }
+
+    // Quick default actions
 
     modifier allocateSome(uint128 amt) {
         bytes[] memory data = new bytes[](1);
@@ -283,6 +305,34 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
 
         _ghost_state.poolId = config.instantiate(address(subject()));
 
+        _;
+    }
+
+    modifier customConfig(
+        uint256 feeBasisPoints,
+        uint256 priorityFeeBasisPoints,
+        address controller,
+        uint256 strikePriceWad,
+        uint256 volatilityBasisPoints,
+        uint256 durationSeconds,
+        bool isPerpetual,
+        uint256 priceWad
+    ) {
+        ConfigType memory config = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: strikePriceWad,
+            volatilityBasisPoints: volatilityBasisPoints,
+            durationSeconds: durationSeconds,
+            isPerpetual: isPerpetual,
+            priceWad: priceWad
+        });
+
+        (config.feeBasisPoints, config.priorityFeeBasisPoints) =
+            (feeBasisPoints, priorityFeeBasisPoints);
+
+        (config.asset, config.quote) = deployDefaultTokenPair();
+
+        _ghost_state.poolId = config.instantiate(address(subject()));
         _;
     }
 
@@ -383,7 +433,7 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
         _;
     }
 
-    // Methods for interacting with the test environment
+    // ============= Test Interface ============= //
 
     /// @inheritdoc ISetup
     function ghost() public view override returns (GhostType memory) {
@@ -423,6 +473,11 @@ contract Setup is ISetup, SetupStorage, Test, ERC1155TokenReceiver {
     /// @inheritdoc ISetup
     function portfolio() public view override returns (address) {
         return _subjects.portfolio;
+    }
+
+    /// @inheritdoc ISetup
+    function strategy() public view override returns (IStrategy) {
+        return _ghost_state.strategy();
     }
 
     /// @inheritdoc ISetup

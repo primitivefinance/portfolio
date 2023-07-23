@@ -52,6 +52,14 @@ library ConfigLib {
             config.priorityFeeBasisPoints = ConfigLib_DEFAULT_PRIORITY_FEE;
         }
 
+        require(
+            config.feeBasisPoints < type(uint16).max, "ConfigType_InvalidFee"
+        );
+        require(
+            config.priorityFeeBasisPoints < type(uint16).max,
+            "ConfigType_InvalidPriorityFee"
+        );
+
         config.strategy = IPortfolioGetters(target).DEFAULT_STRATEGY();
 
         uint24 pairId =

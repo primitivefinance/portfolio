@@ -21,7 +21,7 @@ interface ConfigLike {
         returns (PortfolioConfig memory);
 }
 
-/// @dev Universal state for unit tests.
+/// @dev Universal "ghost" state for unit tests.
 struct GhostType {
     address actor;
     address subject;
@@ -40,55 +40,7 @@ struct GhostType {
 library Ghost {
     error InvalidFileKey(bytes32 what);
 
-    function pair(GhostType memory self)
-        internal
-        view
-        returns (PortfolioPair memory)
-    {
-        return IPortfolioStruct(self.subject).pairs(uint16(self.poolId));
-    }
-
-    function pool(GhostType memory self)
-        internal
-        view
-        returns (PortfolioPool memory)
-    {
-        return IPortfolioStruct(self.subject).pools(self.poolId);
-    }
-
-    function position(
-        GhostType memory self,
-        address owner
-    ) internal view returns (uint128) {
-        return uint128(
-            ERC1155(self.subject).balanceOf(owner, uint256(self.poolId))
-        );
-    }
-
-    function pairOf(
-        GhostType memory self,
-        uint24 pairId
-    ) internal view returns (PortfolioPair memory) {
-        return IPortfolioStruct(self.subject).pairs(pairId);
-    }
-
-    function poolOf(
-        GhostType memory self,
-        uint64 poolId
-    ) internal view returns (PortfolioPool memory) {
-        return IPortfolioStruct(self.subject).pools(poolId);
-    }
-
-    function configOf(
-        GhostType memory self,
-        uint64 poolId
-    ) internal view returns (PortfolioConfig memory) {
-        address target = ConfigLike(self.subject).DEFAULT_STRATEGY(); // todo: fix with controller...
-
-        require(target != address(0), "no config/strategy/controller config!");
-        return ConfigLike(target).configs(poolId);
-    }
-
+    /// @dev Sets the ghost state.
     function file(
         GhostType storage self,
         bytes32 what,
@@ -105,6 +57,35 @@ library Ghost {
         }
     }
 
+    /// @dev Gets the pair state of the subject pool.
+    function pair(GhostType memory self)
+        internal
+        view
+        returns (PortfolioPair memory)
+    {
+        return IPortfolioStruct(self.subject).pairs(uint16(self.poolId));
+    }
+
+    /// @dev Gets the pool state of the subject pool.
+    function pool(GhostType memory self)
+        internal
+        view
+        returns (PortfolioPool memory)
+    {
+        return IPortfolioStruct(self.subject).pools(self.poolId);
+    }
+
+    /// @dev Gets the position state of the subject pool for the `owner`.
+    function position(
+        GhostType memory self,
+        address owner
+    ) internal view returns (uint128) {
+        return uint128(
+            ERC1155(self.subject).balanceOf(owner, uint256(self.poolId))
+        );
+    }
+
+    /// @dev Gets the subject's net balance of a token.
     function net(
         GhostType memory self,
         address token
@@ -112,6 +93,7 @@ library Ghost {
         return IPortfolioGetters(self.subject).getNetBalance(token);
     }
 
+    /// @dev Gets the subject's physical balance of a token.
     function physicalBalance(
         GhostType memory self,
         address token
@@ -119,6 +101,7 @@ library Ghost {
         return MockERC20(token).balanceOf(self.subject);
     }
 
+    /// @dev Gets the subject's reserve of a token.
     function reserve(
         GhostType memory self,
         address token
@@ -126,6 +109,7 @@ library Ghost {
         return IPortfolioGetters(self.subject).getReserve(token);
     }
 
+    /// @dev Gets the subject poolid's strategy configuration.
     function config(GhostType memory self)
         internal
         view
@@ -134,27 +118,60 @@ library Ghost {
         return configOf(self, self.poolId);
     }
 
+    /// @dev Gets the asset token, casted to the Coin type, of the subject pool.
     function asset(GhostType memory self) internal view returns (Coin) {
         return Coin.wrap(self.pair().tokenAsset);
     }
 
+    /// @dev Gets the quote token, casted to the Coin type, of the subject pool.
     function quote(GhostType memory self) internal view returns (Coin) {
         return Coin.wrap(self.pair().tokenQuote);
     }
 
+    /// @dev Gets the subject's default strategy. todo: fix with actual strategy.
     function strategy(GhostType memory self)
         internal
         view
         returns (IStrategy)
     {
-        return IStrategy(ConfigLike(self.subject).DEFAULT_STRATEGY());
+        return IStrategy(
+            IPortfolioStruct(self.subject).pools(self.poolId).strategy
+        );
     }
 
+    /// @dev Gets the subject's default strategy.
     function DEFAULT_STRATEGY(GhostType memory self)
         internal
         view
         returns (IStrategy)
     {
         return IStrategy(ConfigLike(self.subject).DEFAULT_STRATEGY());
+    }
+
+    /// @dev Gets the pair state of a target pairId.
+    function pairOf(
+        GhostType memory self,
+        uint24 pairId
+    ) internal view returns (PortfolioPair memory) {
+        return IPortfolioStruct(self.subject).pairs(pairId);
+    }
+
+    /// @dev Gets the pool state of a target poolId.
+    function poolOf(
+        GhostType memory self,
+        uint64 poolId
+    ) internal view returns (PortfolioPool memory) {
+        return IPortfolioStruct(self.subject).pools(poolId);
+    }
+
+    /// @dev Gets the strategy configuration of a target poolId.
+    function configOf(
+        GhostType memory self,
+        uint64 poolId
+    ) internal view returns (PortfolioConfig memory) {
+        address target = ConfigLike(self.subject).DEFAULT_STRATEGY(); // todo: fix with controller...
+
+        require(target != address(0), "no config/strategy/controller config!");
+        return ConfigLike(target).configs(poolId);
     }
 }
