@@ -25,8 +25,6 @@ contract TestPortfolioCreatePool is Setup {
         vm.assume(price > 0);
         vm.assume(strikePrice > 0);
 
-        bytes[] memory data = new bytes[](1);
-
         ConfigType memory testConfig = DefaultStrategy.getTestConfig({
             portfolio: address(subject()),
             strikePriceWad: strikePrice,
@@ -40,21 +38,16 @@ contract TestPortfolioCreatePool is Setup {
             testConfig.reserveXPerWad > 0 && testConfig.reserveYPerWad > 0
         );
 
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (
-                pairId, // magic pair id to use the nonce, which is the createPairId!
-                testConfig.reserveXPerWad,
-                testConfig.reserveYPerWad,
-                fee, // fee
-                priorityFee, // prior fee
-                address(this), // controller
-                subject().DEFAULT_STRATEGY(),
-                testConfig.strategyArgs
-            )
+        subject().createPool(
+            pairId, // magic pair id to use the nonce, which is the createPairId!
+            testConfig.reserveXPerWad,
+            testConfig.reserveYPerWad,
+            fee, // fee
+            priorityFee, // prior fee
+            address(this), // controller
+            subject().DEFAULT_STRATEGY(),
+            testConfig.strategyArgs
         );
-
-        subject().multicall(data);
 
         uint64 poolId = AssemblyLib.encodePoolId(
             pairId, true, subject().getPoolNonce(pairId)
@@ -74,6 +67,33 @@ contract TestPortfolioCreatePool is Setup {
             "duration"
         );
         assertEq(config.strikePriceWad, strikePrice, "strikePrice");
+    }
+
+    function test_revert_createPool_invalid_pair_nonce() public {
+        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 100,
+            volatilityBasisPoints: 100,
+            durationSeconds: 100 * 1 days,
+            isPerpetual: false,
+            priceWad: 1001
+        });
+
+        testConfig.reserveXPerWad++; // Avoid the reserve error
+        testConfig.reserveYPerWad++; // Avoid the reserve error
+
+        vm.expectRevert();
+
+        subject().createPool(
+            0,
+            testConfig.reserveXPerWad,
+            testConfig.reserveYPerWad,
+            100, // fee
+            0, // prior fee
+            address(0), // controller
+            address(0), // strategy
+            testConfig.strategyArgs
+        );
     }
 
     function test_revert_createPool_priority_fee_invalid_fee() public {
