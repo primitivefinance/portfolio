@@ -478,7 +478,7 @@ contract Portfolio is ERC1155, IPortfolio {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
-        // Return and event variables are kept native token decimals.
+        // Return and event variables are kept in native token decimals.
         (poolId, input, output) = (args.poolId, args.input, args.output);
 
         PortfolioPool storage pool = pools[args.poolId];
@@ -592,7 +592,7 @@ contract Portfolio is ERC1155, IPortfolio {
         _decreaseReserves(inter.tokenOutput, inter.amountOutputUnit);
 
         if (inter.protocolFeeAmountUnit != 0) {
-            // protocolFees are stored in WAD units, which reauires Unit = WAD on protocolFeeAmount.
+            // protocolFees are stored in WAD units, which requires Unit = WAD on protocolFeeAmount.
             protocolFees[inter.tokenInput] += inter.protocolFeeAmountUnit;
         }
 
