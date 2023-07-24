@@ -162,8 +162,6 @@ contract TestPortfolioDeallocate is Setup {
         subject().deallocate(true, ghost().poolId, amount, type(uint128).max, 0);
     }
 
-    // TODO: Not sure what's the purpose of this test since deallocate is never
-    // called?
     function test_deallocate_reverts_when_min_quote_unmatched()
         public
         defaultConfig
@@ -188,11 +186,12 @@ contract TestPortfolioDeallocate is Setup {
         subject().multicall(data);
 
         data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (false, address(this), ghost().poolId, amount, 0, type(uint128).max)
+            IPortfolioActions.deallocate,
+            (false, ghost().poolId, amount, 0, type(uint128).max)
         );
-        vm.expectRevert();
-        subject().multicall(data);
+        IPortfolio portfolio = subject();
+        vm.expectRevert(Portfolio_MinQuoteExceeded.selector);
+        portfolio.multicall(data);
     }
 
     function _simple_deallocate(uint128 amount) internal {

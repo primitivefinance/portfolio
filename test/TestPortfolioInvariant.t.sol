@@ -475,43 +475,6 @@ contract TestPortfolioInvariant is Setup {
         assertTrue(result - previousResult < 0, "Invariant not decreasing");
     }
 
-    // todo: new invariant function is different from getY
-    /* function test_get_y_reserves_default() public {
-        uint256 price = 1 ether;
-        uint256 strikePriceWad = price;
-        uint256 volatilityWad = 1 ether;
-        uint256 timeRemainingSec = 31556952;
-        int256 invariant = 0;
-
-        uint256 reserveXPerWad = approximateXGivenPrice(
-            NormalCurve(
-                0, 0, strikePriceWad, volatilityWad, timeRemainingSec, invariant
-            ),
-            price
-        );
-
-        uint256 y0 = approximateYGivenX(
-            NormalCurve(
-                reserveXPerWad,
-                0,
-                strikePriceWad,
-                volatilityWad,
-                timeRemainingSec,
-                invariant
-            )
-        );
-
-        uint256 y1 = Invariant.getY(
-            reserveXPerWad,
-            strikePriceWad,
-            volatilityWad,
-            timeRemainingSec,
-            invariant
-        );
-
-        assertEq(y0, y1, "y0 != y1");
-    } */
-
     /// @dev Careful with this. We are missing the cases of reserves being very low or
     /// very high with respect to their bounds (i.e. reserve of 1).
     function bound_invariant_arguments(

@@ -305,7 +305,6 @@ interface IPortfolioStrategy {
      * @dev
      * Approximates the spot price using approximated math functions.
      * Returns a price in WAD units, not native decimals. The result must be scaled.
-     * todo: Maybe scale the result to native decimals in quote tokens?
      *
      * @custom:mev
      * Vulnerable to manipulation, do not use this inside write functions to avoid
@@ -320,11 +319,12 @@ interface IPortfolioStrategy {
 
     /**
      * @notice
-     * Gets the maximum swap input and output amounts for a given `poolId`.
+     * Gets the maximum swap input and output amounts for a given `poolId`, in native token decimals.
      *
      * @dev
      * The maximum input amount is the amount of `asset` tokens that can be sold.
      * The maximum output amount is the amount of `quote` tokens that can be bought.
+     * Must pass in an order with non-zero input and output amounts.
      *
      * note
      * The maximum input and output amounts should most likely not be used in a swap.
@@ -343,8 +343,9 @@ interface IPortfolioStrategy {
      * @dev
      * The pre- and post- swap invariants are used to check if the swap is valid.
      * The post- invariant must grow by at least 1 wei.
+     * Must pass in an order with non-zero input and output amounts.
      *
-     * @param order Swap order arguments including input and output amounts.
+     * @param order Swap order arguments including input and output amounts, in native token decimals.
      * @param timestamp Expected block.timestamp of execution. Overestimate to overestimate the swap.
      * @param swapper Address that will execute the swap, affects the swap fee paid.
      */

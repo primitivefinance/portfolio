@@ -187,35 +187,6 @@ contract TestPortfolioAllocate is Setup {
         );
     }
 
-    // todo: Use max now only uses entire transient balances, which need to be increased from a swap output or deallocatye.
-    /* function test_allocate_use_max()
-        public
-        defaultConfig
-        useActor
-        usePairTokens(10 ether)
-
-    {
-        // Deposit tokens which will be used to compute max liquidity.
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(ghost().quote().to_addr(), type(uint256).max);
-
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(1),
-                poolId: ghost().poolId,
-                deltaLiquidity: 1,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
-        );
-        assertEq(
-            ghost().pool().liquidity,
-            ghost().position(actor()).liquidity,
-            "position != pool.liquidity"
-        );
-    } */
-
     function test_allocate_does_not_modify_timestamp()
         public
         defaultConfig

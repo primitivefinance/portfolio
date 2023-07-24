@@ -87,8 +87,8 @@ contract NormalStrategy is INormalStrategy {
         (, int256 invariant,) = pool.getSwapInvariants({
             config: configs[poolId],
             order: Order({
-                input: 0,
-                output: 0,
+                input: 2, // avoid revert from zero adjustment, 2 for avoiding fee
+                output: 2, // avoid revert from zero adjustment, 2 for avoiding fee
                 useMax: false,
                 poolId: poolId,
                 sellAsset: sellAsset
@@ -177,7 +177,7 @@ contract NormalStrategy is INormalStrategy {
             config: configs[poolId],
             order: Order({
                 input: amountIn.safeCastTo128(),
-                output: 0,
+                output: 2, // to avoid revert from zero adjustment less fee
                 useMax: false,
                 poolId: poolId,
                 sellAsset: sellAsset
@@ -206,6 +206,8 @@ contract NormalStrategy is INormalStrategy {
         address swapper
     ) public view returns (Order memory) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        PortfolioPair memory pair =
+            IPortfolioStruct(portfolio).pairs(PoolId.wrap(poolId).pairId());
         PortfolioConfig memory config = configs[poolId];
         NormalCurve memory curve = config.transform();
 
@@ -220,16 +222,24 @@ contract NormalStrategy is INormalStrategy {
             sellAsset: sellAsset
         });
 
+        uint256 tempInput;
+        uint256 tempOutput;
+
         if (sellAsset) {
-            order.input = upperX.mulWadDown(pool.liquidity).safeCastTo128()
-                - pool.virtualX - 1;
-            order.output = pool.virtualY
-                - lowerY.mulWadDown(pool.liquidity).safeCastTo128() + 1;
+            tempInput = upperX.mulWadDown(pool.liquidity) - pool.virtualX - 1;
+            tempOutput = pool.virtualY - lowerY.mulWadDown(pool.liquidity) + 1;
+            order.input =
+                tempInput.scaleFromWadDown(pair.decimalsAsset).safeCastTo128();
+            order.output =
+                tempOutput.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
         } else {
-            order.input = upperY.mulWadDown(pool.liquidity).safeCastTo128()
-                - pool.virtualY - 1;
-            order.output = pool.virtualX
-                - lowerX.mulWadDown(pool.liquidity).safeCastTo128() + 1;
+            tempInput = upperY.mulWadDown(pool.liquidity) - pool.virtualY - 1;
+            tempOutput = pool.virtualX - lowerX.mulWadDown(pool.liquidity) + 1;
+
+            order.input =
+                tempInput.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
+            order.output =
+                tempOutput.scaleFromWadDown(pair.decimalsAsset).safeCastTo128();
         }
 
         return order;
@@ -247,6 +257,30 @@ contract NormalStrategy is INormalStrategy {
     {
         PortfolioPool memory pool =
             IPortfolioStruct(portfolio).pools(order.poolId);
+
+        PortfolioPair memory pair = IPortfolioStruct(portfolio).pairs(
+            PoolId.wrap(order.poolId).pairId()
+        );
+
+        // Swap requires an intermediary state where all units are in WAD.
+        SwapState memory inter;
+        if (order.sellAsset) {
+            inter.decimalsInput = pair.decimalsAsset;
+            inter.decimalsOutput = pair.decimalsQuote;
+            inter.tokenInput = pair.tokenAsset;
+            inter.tokenOutput = pair.tokenQuote;
+        } else {
+            inter.decimalsInput = pair.decimalsQuote;
+            inter.decimalsOutput = pair.decimalsAsset;
+            inter.tokenInput = pair.tokenQuote;
+            inter.tokenOutput = pair.tokenAsset;
+        }
+
+        inter.amountInputUnit = order.input;
+        inter.amountOutputUnit = order.output;
+        inter = inter.toWad();
+        order.input = inter.amountInputUnit.safeCastTo128();
+        order.output = inter.amountOutputUnit.safeCastTo128();
 
         (, prevInvariant, postInvariant) = pool.getSwapInvariants({
             config: configs[order.poolId],

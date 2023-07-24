@@ -17,6 +17,8 @@ using FixedPointMathLib for uint128;
 error SwapLib_FeeTooHigh();
 error SwapLib_ProtocolFeeTooHigh();
 error SwapLib_OutputExceedsReserves();
+error SwapLib_ZeroXAdjustment();
+error SwapLib_ZeroYAdjustment();
 
 /**
  * @notice
@@ -127,6 +129,9 @@ function computeAdjustedSwapReserves(
     // Use these adjusted reserves in the invariant check.
     adjustedX = self.sellAsset ? adjustedInputReserveWad : adjustedOutputReserveWad; // forgefmt: disable-line
     adjustedY = self.sellAsset ? adjustedOutputReserveWad : adjustedInputReserveWad; // forgefmt: disable-line
+
+    if (reserveXUnit == adjustedX) revert SwapLib_ZeroXAdjustment();
+    if (reserveYUnit == adjustedY) revert SwapLib_ZeroYAdjustment();
 }
 
 /**

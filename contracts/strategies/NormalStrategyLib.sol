@@ -277,7 +277,7 @@ function approximateXGivenPrice(
         // Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
         int256 result = Gaussian.cdf(int256(cdfInput));
 
-        // todo: handle case where result is > WAD
+        // 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
         reserveXPerWad = uint256(int256(WAD) - result);
     }
 }
@@ -505,6 +505,7 @@ library NormalStrategyLib {
      * Get the invariant values used to verify a swap given a swap order.
      *
      * @dev
+     * Assumes order input and output amounts are in WAD units.
      * This is used to verify that the invariant has increased since the last swap.
      * The reserves per liquidity are rounded in a specific direction to overestimate
      * this invariant result. This will require the invariant after the trade to strictly increase.
@@ -563,17 +564,13 @@ library NormalStrategyLib {
         // Compute the next invariant if the swap amounts are non zero.
         (uint256 reserveX, uint256 reserveY) = (self.virtualX, self.virtualY);
 
-        {
-            Order memory orderCopy = order; // avoid stack too deep
-            uint256 feeBps = swapper == self.controller
-                ? self.priorityFeeBasisPoints
-                : self.feeBasisPoints;
+        uint256 feeBps = swapper == self.controller
+            ? self.priorityFeeBasisPoints
+            : self.feeBasisPoints;
 
-            // Compute the adjusted reserves.
-            (,, reserveX, reserveY) = orderCopy.computeSwapResult(
-                reserveX, reserveY, feeBps, protocolFee
-            );
-        }
+        // Compute the adjusted reserves.
+        (,, reserveX, reserveY) =
+            order.computeSwapResult(reserveX, reserveY, feeBps, protocolFee);
 
         curve.reserveXPerWad = reserveX.divWadDown(self.liquidity);
         curve.reserveYPerWad = reserveY.divWadDown(self.liquidity);

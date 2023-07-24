@@ -172,7 +172,6 @@ contract TestPortfolioCreatePool is Setup {
     }
     */
 
-    // todo: fix
     function test_createPool_perpetual() public {
         uint24 pairNonce = uint24(1);
         bytes[] memory data = new bytes[](1);

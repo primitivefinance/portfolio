@@ -128,7 +128,7 @@ library Ghost {
         return Coin.wrap(self.pair().tokenQuote);
     }
 
-    /// @dev Gets the subject's default strategy. todo: fix with actual strategy.
+    /// @dev Gets the subject's default strategy.
     function strategy(GhostType memory self)
         internal
         view
@@ -167,7 +167,7 @@ library Ghost {
         GhostType memory self,
         uint64 poolId
     ) internal view returns (PortfolioConfig memory) {
-        address target = ConfigLike(self.subject).DEFAULT_STRATEGY(); // todo: fix with controller...
+        address target = poolOf(self, poolId).strategy;
 
         require(target != address(0), "no config/strategy/controller config!");
         return ConfigLike(target).configs(poolId);
