@@ -489,7 +489,7 @@ contract TestPortfolioSwap is Setup {
 
         // Stack traces show that the NormalStrategy contract returns
         // `false` from `beforeSwap()` in this case.
-        vm.expectRevert();
+        vm.expectRevert(Portfolio_BeforeSwapFail.selector);
         subject().swap(order);
     }
 
