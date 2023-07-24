@@ -792,7 +792,7 @@ contract TestGas is Setup {
         pauseGas
         usePools(1)
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(100 ether)
     {
         // Allocate to first pool
         uint64 poolId = ghost().poolId;

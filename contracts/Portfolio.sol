@@ -326,8 +326,9 @@ contract Portfolio is ERC1155, IPortfolio {
             deltaQuote.scaleFromWadDown(pair.decimalsQuote)
         );
 
-        if (deltaAsset == 0) revert Portfolio_ZeroAssetAllocate();
-        if (deltaQuote == 0) revert Portfolio_ZeroQuoteAllocate();
+        if (deltaAsset == 0 && deltaQuote == 0) {
+            revert Portfolio_ZeroAmountsAllocate();
+        }
 
         emit Allocate(
             poolId,

@@ -28,13 +28,12 @@ error Portfolio_MinQuoteExceeded();
 error Portfolio_NonExistentPool(uint64 poolId);
 error Portfolio_NotController();
 error Portfolio_PairExists(uint24 pairId);
-error Portfolio_ZeroAssetAllocate();
+error Portfolio_ZeroAmountsAllocate();
 error Portfolio_ZeroLiquidityAllocate();
 error Portfolio_ZeroLiquidityDeallocate();
 error Portfolio_ZeroSwapLiquidity();
 error Portfolio_ZeroSwapInput();
 error Portfolio_ZeroSwapOutput();
-error Portfolio_ZeroQuoteAllocate();
 
 struct PortfolioPair {
     address tokenAsset; // Base asset, referred to as "X" reserve.
