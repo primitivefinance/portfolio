@@ -54,26 +54,6 @@ struct ChangeLiquidityParams {
     address tokenQuote; // Address of the quote token.
 }
 
-struct Iteration {
-    int256 prevInvariant; // Invariant of the pool before the swap, after timestamp update.
-    int256 nextInvariant; // Invariant of the pool after the swap.
-    uint256 virtualX; // Virtual X reserves in WAD units for all liquidity.
-    uint256 virtualY; // Virtual Y reserves in WAD units for all liquidity.
-    uint256 remainder; // Remainder of input tokens to swap in, in WAD units.
-    uint256 feeAmount; // Fee amount in WAD units.
-    uint256 protocolFeeAmount; // WAD
-    uint256 liquidity; // Total supply of liquidity in WAD units.
-    uint256 input;
-    uint256 output;
-}
-
-struct SwapState {
-    uint8 decimalsInput;
-    address tokenInput;
-    uint8 decimalsOutput;
-    address tokenOutput;
-}
-
 struct Payment {
     uint256 amountTransferTo; // Amount to transfer to the `msg.sender` in `settlement`, in WAD.
     uint256 amountTransferFrom; // Amount to transfer from the `msg.sender` in `settlement`, in WAD.

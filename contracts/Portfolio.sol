@@ -467,171 +467,149 @@ contract Portfolio is ERC1155, IPortfolio {
     function swap(Order memory args)
         external
         payable
-        returns (uint64 poolId, uint256 input, uint256 output)
+        returns (uint64, uint256, uint256)
     {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
-        // --- Checks --- //
-        if (!IStrategy(getStrategy(args.poolId)).validatePool(args.poolId)) {
-            revert Portfolio_NonExistentPool(args.poolId);
-        }
-
         PortfolioPool storage pool = pools[args.poolId];
+        if (!pool.exists()) revert Portfolio_NonExistentPool(args.poolId);
+        if (pool.isEmpty()) revert Portfolio_ZeroSwapLiquidity();
+
+        IStrategy strategy = IStrategy(getStrategy(args.poolId));
+        if (!strategy.validatePool(args.poolId)) revert Portfolio_InvalidPool(args.poolId);// forgefmt: disable-line
 
         // Sets the pool's lastTimestamp to the current block timestamp, in storage.
         pool.syncPoolTimestamp(block.timestamp);
 
-        // Scale amounts from native token decimals to WAD.
-        // Load input and output token information with respective pair tokens.
-        SwapState memory info;
-        PortfolioPair memory pair = pairs[PoolId.wrap(args.poolId).pairId()];
-        if (args.sellAsset) {
-            (args.input, args.output) = _scaleAmountsToWad({
-                poolId: args.poolId,
-                amountAssetDec: args.input,
-                amountQuoteDec: args.output
-            });
-
-            info.decimalsInput = pair.decimalsAsset;
-            info.decimalsOutput = pair.decimalsQuote;
-            info.tokenInput = pair.tokenAsset;
-            info.tokenOutput = pair.tokenQuote;
-        } else {
-            (args.output, args.input) = _scaleAmountsToWad({
-                poolId: args.poolId,
-                amountAssetDec: args.output,
-                amountQuoteDec: args.input
-            });
-
-            info.decimalsInput = pair.decimalsQuote;
-            info.decimalsOutput = pair.decimalsAsset;
-            info.tokenInput = pair.tokenQuote;
-            info.tokenOutput = pair.tokenAsset;
-        }
-
-        (bool success, int256 invariant) = IStrategy(getStrategy(args.poolId))
-            .beforeSwap(args.poolId, args.sellAsset, msg.sender);
+        // Call the beforeSwap hook to get the pre-swap invariant.
+        (bool success, int256 invariant) =
+            strategy.beforeSwap(args.poolId, args.sellAsset, msg.sender);
         if (!success) revert Portfolio_BeforeSwapFail();
 
-        Iteration memory iteration;
-        iteration.input = args.input;
-        iteration.output = args.output;
-        iteration.prevInvariant = invariant;
-        iteration.liquidity = pool.liquidity;
-        (iteration.virtualX, iteration.virtualY) =
-            (pool.virtualX, pool.virtualY);
+        // Load input and output token information with respective pair tokens.
+        PortfolioPair memory pair = pairs[PoolId.wrap(args.poolId).pairId()];
 
+        // Swap requires an intermediary state where all units are in WAD.
+        SwapState memory inter;
+        if (args.sellAsset) {
+            inter.decimalsInput = pair.decimalsAsset;
+            inter.decimalsOutput = pair.decimalsQuote;
+            inter.tokenInput = pair.tokenAsset;
+            inter.tokenOutput = pair.tokenQuote;
+        } else {
+            inter.decimalsInput = pair.decimalsQuote;
+            inter.decimalsOutput = pair.decimalsAsset;
+            inter.tokenInput = pair.tokenQuote;
+            inter.tokenOutput = pair.tokenAsset;
+        }
+
+        // Overwrites the input argument with the token surplus, if available.
         if (args.useMax) {
             // Net balance is the surplus of tokens in the accounting state that can be spent.
-            int256 netBalance = getNetBalance(info.tokenInput);
-
+            int256 netBalance = getNetBalance(inter.tokenInput);
             if (netBalance > 0) {
-                (uint128 netBalanceAssetWad, uint128 netBalanceAssetQuote) =
-                _scaleAmountsToWad({
-                    poolId: poolId,
-                    amountAssetDec: uint256(netBalance),
-                    amountQuoteDec: uint256(netBalance)
-                });
-
-                iteration.input =
-                    args.sellAsset ? netBalanceAssetWad : netBalanceAssetQuote;
+                args.input = uint256(netBalance).safeCastTo128();
             }
         }
 
-        if (iteration.output == 0) revert Portfolio_ZeroSwapOutput();
-        if (iteration.input == 0) revert Portfolio_ZeroSwapInput();
-        if (iteration.liquidity == 0) revert Portfolio_ZeroSwapLiquidity();
+        inter.prevInvariant = invariant;
+        inter.amountInputUnit = args.input;
+        inter.amountOutputUnit = args.output;
 
-        // --- Effects --- //
+        // Converts input and output amounts to WAD units for the swap math.
+        inter = inter.toWad();
+
+        // ====== Enter Intermediary State ====== //
+
+        if (inter.amountOutputUnit == 0) revert Portfolio_ZeroSwapOutput();
+        if (inter.amountInputUnit == 0) revert Portfolio_ZeroSwapInput();
+
+        // Copy the swap amount args and edit them with the WAD scaled ones.
+        Order memory orderInWad = args;
+
+        (orderInWad.input, orderInWad.output) = (
+            inter.amountInputUnit.safeCastTo128(),
+            inter.amountOutputUnit.safeCastTo128()
+        );
 
         {
-            Order memory order = args; // todo: input doesnt get set here if it changes from use max
+            // Use the priority fee if the pool controller is the caller.
+            uint256 feeBps = pool.controller == msg.sender
+                ? pool.priorityFeeBasisPoints
+                : pool.feeBasisPoints;
 
-            // In the case of a non-zero protocol fee, a small portion of the input amount (protocol fee) is not re-invested to the pool.
-            // Therefore, to properly sync the pool's reserve, the protocol fee must be subtracted from the input.
-            uint256 deltaIndependentReserveWad = iteration.input;
-
-            {
-                // Use the priority fee if the pool controller is the caller.
-                uint256 feeBps = pool.controller == msg.sender
-                    ? pool.priorityFeeBasisPoints
-                    : pool.feeBasisPoints;
-
-                // Compute the respective fee and protocol fee amounts.
-                // Compute the reserves after applying the desired swap amounts and fees.
-                uint256 adjustedVirtualX;
-                uint256 adjustedVirtualY;
-                (
-                    iteration.feeAmount,
-                    iteration.protocolFeeAmount,
-                    adjustedVirtualX,
-                    adjustedVirtualY
-                ) = order.computeSwapResult(
-                    iteration.virtualX, iteration.virtualY, feeBps, protocolFee
-                );
-
-                // --- Invariant Check --- //
-
-                bool validInvariant;
-                (validInvariant, iteration.nextInvariant) = IStrategy(
-                    getStrategy(order.poolId)
-                ).validateSwap(
-                    order.poolId,
-                    iteration.prevInvariant,
-                    adjustedVirtualX,
-                    adjustedVirtualY
-                );
-
-                if (!validInvariant) {
-                    revert Portfolio_InvalidInvariant(
-                        iteration.prevInvariant, iteration.nextInvariant
-                    );
-                }
-            }
-
-            // Take the protocol fee from the input amount, so that protocol fee is not re-invested into pool.
-            deltaIndependentReserveWad -= iteration.protocolFeeAmount;
-
-            // Increases the independent pool reserve by the input amount, including fee and excluding protocol fee.
-            // Decrease the dependent pool reserve by the output amount.
-            pool.adjustReserves(
-                order.sellAsset, deltaIndependentReserveWad, iteration.output
+            // Compute the respective fee and protocol fee amounts.
+            // Compute the reserves after applying the desired swap amounts and fees.
+            uint256 adjustedVirtualX;
+            uint256 adjustedVirtualY;
+            (
+                inter.feeAmountUnit,
+                inter.protocolFeeAmountUnit,
+                adjustedVirtualX,
+                adjustedVirtualY
+            ) = orderInWad.computeSwapResult(
+                pool.virtualX, pool.virtualY, feeBps, protocolFee
             );
 
-            _increaseReserves(info.tokenInput, iteration.input); // Increasing global reserves creates a debit that must be paid from `msg.sender`.
-            _decreaseReserves(info.tokenOutput, iteration.output); // Decreasing global reserves creates a surplus that can be used in following instructions.
+            // ====== Invariant Check ====== //
 
-            // --- Post-conditions --- //
-
-            // Protocol fees are applied to a mapping that can be claimed by Registry controller.
-            // Protocol fees are in WAD units and are downscaled to their original decimals when being claimed.
-            if (iteration.protocolFeeAmount != 0) {
-                protocolFees[info.tokenInput] += iteration.protocolFeeAmount;
-            }
-
-            // Amounts are scaled back to their original decimals for the swap event and return variables.
-            iteration.input =
-                iteration.input.scaleFromWadDown(info.decimalsInput);
-            iteration.output =
-                iteration.output.scaleFromWadDown(info.decimalsOutput);
-            iteration.feeAmount =
-                iteration.feeAmount.scaleFromWadDown(info.decimalsInput);
-
-            emit Swap(
-                order.poolId,
-                info.tokenInput,
-                iteration.input,
-                info.tokenOutput,
-                iteration.output,
-                iteration.feeAmount,
-                iteration.nextInvariant
+            bool validInvariant;
+            (validInvariant, inter.nextInvariant) = strategy.validateSwap(
+                orderInWad.poolId,
+                inter.prevInvariant,
+                adjustedVirtualX,
+                adjustedVirtualY
             );
 
-            if (_currentMulticall == false) _settlement();
-            _postLock();
+            if (!validInvariant) {
+                revert Portfolio_InvalidInvariant(
+                    inter.prevInvariant, inter.nextInvariant
+                );
+            }
         }
-        return (args.poolId, iteration.input, iteration.output);
+
+        // In the case of a non-zero protocol fee, a small portion of the input amount (protocol fee) is not re-invested to the pool.
+        // Therefore, to properly sync the pool's reserve, the protocol fee must be subtracted from the input.
+        // Take the protocol fee from the input amount, so that protocol fee is not re-invested into pool.
+        // Increases the independent pool reserve by the input amount, including fee and excluding protocol fee.
+        // Decrease the dependent pool reserve by the output amount.
+        pool.adjustReserves(
+            orderInWad.sellAsset,
+            inter.amountInputUnit - inter.protocolFeeAmountUnit,
+            inter.amountOutputUnit
+        );
+
+        // Increasing reserves requires Portfolio's balance of tokens to also increases by the end of `settlement`.
+        _increaseReserves(inter.tokenInput, inter.amountInputUnit);
+        // Decreasing reserves creates a surplus in Portfolio's balance, which is transferred out in `settlement`.
+        _decreaseReserves(inter.tokenOutput, inter.amountOutputUnit);
+
+        if (inter.protocolFeeAmountUnit != 0) {
+            // protocolFees are stored in WAD units, which reauires Unit = WAD on protocolFeeAmount.
+            protocolFees[inter.tokenInput] += inter.protocolFeeAmountUnit;
+        }
+
+        // ====== Exit Intermediary State ====== //
+
+        // Amounts are scaled back to their original decimals for the swap event and return variables.
+        inter = inter.fromWad();
+
+        // Swap event emits amounts in native token decimals.
+        emit Swap(
+            args.poolId,
+            inter.tokenInput,
+            args.input,
+            inter.tokenOutput,
+            args.output,
+            inter.feeAmountUnit,
+            inter.nextInvariant
+        );
+
+        if (_currentMulticall == false) _settlement();
+        _postLock();
+
+        return (args.poolId, args.input, args.output);
     }
 
     /// @inheritdoc IPortfolioActions
@@ -1051,7 +1029,7 @@ contract Portfolio is ERC1155, IPortfolio {
 
     /// @inheritdoc IPortfolioStrategy
     function simulateSwap(
-        Order memory args,
+        Order memory order,
         uint256 timestamp,
         address swapper
     )
@@ -1061,8 +1039,8 @@ contract Portfolio is ERC1155, IPortfolio {
         override
         returns (bool success, int256 prevInvariant, int256 postInvariant)
     {
-        return IStrategy(getStrategy(args.poolId)).simulateSwap(
-            args, timestamp, swapper
+        return IStrategy(getStrategy(order.poolId)).simulateSwap(
+            order, timestamp, swapper
         );
     }
 

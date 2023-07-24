@@ -22,9 +22,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
-            subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, address(this)
-            )
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
         );
 
         uint256 prev = ghost().quote().to_token().balanceOf(actor());
@@ -85,9 +83,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
-            subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, address(this)
-            )
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
         );
 
         Order memory order = Order({
@@ -520,9 +516,7 @@ contract TestPortfolioSwap is Setup {
                 sellAsset ? pair.decimalsQuote : pair.decimalsAsset
             );
 
-            _swap_check_invariant(
-                sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
-            );
+            _swap_check_invariant(sellAsset, amountIn, amountOut);
         }
     }
 
@@ -561,9 +555,7 @@ contract TestPortfolioSwap is Setup {
         uint256 amountOut =
             subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
-        _swap_check_invariant(
-            sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
-        );
+        _swap_check_invariant(sellAsset, amountIn, amountOut);
     }
 
     function test_swap_deallocate_before_swap_reverts()
@@ -622,12 +614,8 @@ contract TestPortfolioSwap is Setup {
     function _swap_check_invariant(
         bool sellAsset,
         uint256 amountIn,
-        uint256 amountOut,
-        uint256 reserveXPerL,
-        uint256 reserveYPerL
+        uint256 amountOut
     ) internal {
-        // todo: fix with getSwapInvariants...
-        int256 prev = subject().getInvariant(ghost().poolId);
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
@@ -636,37 +624,18 @@ contract TestPortfolioSwap is Setup {
             sellAsset: sellAsset
         });
 
-        // todo: Currently failing with "Infinity()" because the quotient is 1, since the
-        // new Y reserves with the fee included are at a 1:1 ratio with the strike price
-        // when rounded up.
-        // We need to figure out how to properly handle that case.
+        (bool swapSuccess, int256 prev, int256 post) = subject().simulateSwap({
+            order: order,
+            timestamp: block.timestamp,
+            swapper: actor()
+        });
+
         try subject().swap(order) {
-            PortfolioPool memory pool = ghost().pool();
-            PortfolioConfig memory config = ghost().config();
-            reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
-            reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
-            uint256 quotient = reserveYPerL.divWadUp(config.strikePriceWad);
-            uint256 difference = 1 ether - reserveXPerL;
-            console.log("reserveXPerL", reserveXPerL);
-            console.log("reserveYPerL", reserveYPerL);
-            console.log("strikePrice", config.strikePriceWad);
-            console.log("quotient", quotient);
-            console.log("difference", difference);
-
-            // todo: MUST FIX THIS!
-            // avoids scenario where the new reserves with the fees
-            // hit the bounds of the reserves.
-            // Basically, a 1e18 quotient or difference are undefined in the current
-            // trading function.
-            // so we need to figure out how to handle it.
-            if (quotient >= 1 ether || quotient == 0) return; // Exits before checking invariant.
-            if (difference >= 1 ether || difference == 0) return; // Exits before checking invariant.
-
-            int256 post = subject().getInvariant(ghost().poolId);
-
+            assertTrue(swapSuccess, "simulateSwap-failed but swap succeeded");
             assertTrue(post >= prev, "post-invariant-not-gte-prev");
         } catch {
             // do nothing, since it failed.
+            assertTrue(!swapSuccess, "simulateSwap-succeeded but swap failed");
         }
     }
 
@@ -706,5 +675,32 @@ contract TestPortfolioSwap is Setup {
 
         // Asset balance shouldnt change since we used the max from surplus.
         assertEq(postAssetBalance, prevAssetBalance, "asset-balance-changed");
+    }
+
+    function test_swap_returns_native_decimals()
+        public
+        sixDecimalQuoteConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+    {
+        // Estimate amount out.
+        bool sellAsset = true;
+        uint128 amtIn = 0.1 ether;
+        uint128 amtOut = uint128(
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
+        );
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+        (uint64 poolId, uint256 input, uint256 output) = subject().swap(order);
+        assertEq(poolId, ghost().poolId, "poolId != ghost().poolId");
+        assertEq(input, uint256(order.input), "input != order.input");
+        assertEq(output, uint256(order.output), "output != order.output");
     }
 }
