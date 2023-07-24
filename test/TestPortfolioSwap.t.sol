@@ -464,4 +464,32 @@ contract TestPortfolioSwap is Setup {
         assertEq(input, uint256(order.input), "input != order.input");
         assertEq(output, uint256(order.output), "output != order.output");
     }
+
+    function test_swap_reverts_after_expiry()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+    {
+        bool sellAsset = true;
+        uint128 amtIn = 0.1 ether;
+        uint128 amtOut = uint128(
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
+        );
+        vm.warp(block.timestamp + (uint256(ghost().config().durationSeconds)));
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+
+        // Stack traces show that the NormalStrategy contract returns
+        // `false` from `beforeSwap()` in this case.
+        vm.expectRevert();
+        subject().swap(order);
+    }
 }
