@@ -7,6 +7,9 @@ import "../libraries/PortfolioLib.sol";
 import "./INormalStrategy.sol";
 import "./NormalStrategyLib.sol";
 
+/// @dev Enforces minimum positive invariant growth for swaps in pools using this strategy.
+uint256 constant MINIMUM_INVARIANT_DELTA = 1;
+
 /**
  * @title
  * Normal Strategy
@@ -25,11 +28,11 @@ contract NormalStrategy is INormalStrategy {
     using NormalStrategyLib for PortfolioPool;
     using NormalStrategyLib for PortfolioConfig;
 
+    /// @dev Canonical Portfolio smart contract.
     address public immutable portfolio;
 
+    /// @dev Tracks each pool strategy configuration.
     mapping(uint64 poolId => PortfolioConfig config) public configs;
-
-    uint256 constant MINIMUM_INVARIANT_DELTA = 1;
 
     constructor(address portfolio_) {
         portfolio = portfolio_;
@@ -37,14 +40,12 @@ contract NormalStrategy is INormalStrategy {
 
     // ====== Required ====== //
 
-    event log(uint256);
-
     /// @inheritdoc IStrategy
     function afterCreate(
         uint64 poolId,
         bytes calldata strategyArgs
     ) public override returns (bool success) {
-        PortfolioConfig memory config = strategyArgs.decode(); // note: decodes can revert silently.
+        PortfolioConfig memory config = strategyArgs.decode();
 
         configs[poolId].modify({
             strikePriceWad: config.strikePriceWad,
@@ -83,8 +84,8 @@ contract NormalStrategy is INormalStrategy {
 
     /// @inheritdoc IStrategy
     function validatePool(uint64 poolId) public view override returns (bool) {
-        // todo: refactor
-        return IPortfolioStruct(portfolio).pools(poolId).exists();
+        // This strategy is validated by default for any pool that uses it.
+        return true;
     }
 
     /// @inheritdoc IStrategy
@@ -107,6 +108,24 @@ contract NormalStrategy is INormalStrategy {
         return (valid, invariantAfterSwap);
     }
 
+    /**
+     * @notice
+     * Validates the invariant rule of swaps.
+     *
+     * @dev
+     * This is a critical check because it's possible for the invariant
+     * to be manipulated in a way that keeps it the same,
+     * but the reserves are adjusted in a way that credits tokens
+     * to the caller. In that scenario, while the trading function says the swap
+     * is valid because the invariant did not change, the exact adjusted reserves
+     * could have found a combination that takes advantage of the trading function's
+     * error. The trading function used by this strategy has approximation error.
+     * To avoid this scenario that introduces a potential attack vector or weapon,
+     * a minimum __positive__ invariant delta is enforced.
+     *
+     * @param invariantBefore Invariant computed during the `beforeSwap` hook call.
+     * @param invariantAfter Invariant computed during the `validateSwap` hook call.
+     */
     function _validateSwap(
         int256 invariantBefore,
         int256 invariantAfter
@@ -127,7 +146,8 @@ contract NormalStrategy is INormalStrategy {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
         PortfolioPair memory pair =
-            IPortfolioStruct(portfolio).pairs(uint24(poolId >> 40));
+            IPortfolioStruct(portfolio).pairs(PoolId.wrap(poolId).pair());
+
         amountIn = amountIn.scaleToWad(
             sellAsset ? pair.decimalsAsset : pair.decimalsQuote
         );
@@ -236,6 +256,25 @@ contract NormalStrategy is INormalStrategy {
 
     // ====== Optional ====== //
 
+    /**
+     * @notice
+     * Approximates the x and y reserves per liquidity given a price.
+     *
+     * @dev
+     * Derived from the original trading function, the function
+     * is an approximation with error. This should not be relied upon
+     * to get a pool to an exact price, but it can be used to get it very close.
+     *
+     * @custom:warning
+     * This function can be manipulated to return a bad price
+     * if the caller relies upon this method onchain. Do not rely on
+     * the result of this function onchain.
+     *
+     * @param priceWad Price of the asset to approximate the reserves at, in WAD units.
+     * @param strategyArgs Encoded normal strategy arguments: abi.encode(PortfolioConfig).
+     * @return reserveXPerWad X reserves per WAD liquidity at `priceWad`, in WAD units.
+     * @return reserveYPerWad Y reserves per WAD liquidity at `priceWad`, in WAD units.
+     */
     function approximateReservesGivenPrice(
         uint256 priceWad,
         bytes memory strategyArgs
@@ -245,6 +284,19 @@ contract NormalStrategy is INormalStrategy {
         return curve.approximateReservesGivenPrice(priceWad);
     }
 
+    /**
+     * @notice
+     * Get the data required for creating a pool with this strategy.
+     *
+     * @param strikePriceWad Strike price is the terminal price of the asset token offered by the pool, in WAD units.
+     * @param volatilityBasisPoints Affects the range of prices that the pool can be traded at, in basis points.
+     * @param durationSeconds The duration of the pool until swaps can no longer happen, in seconds.
+     * @param isPerpetual If swaps can always occur in the pool; the time to expiry is fixed.
+     * @param priceWad Initial price to approximately set the pool to, in WAD units.
+     * @return strategyData Encoded configuration of the Normal Strategy parameters for `createPool`.
+     * @return initialX Initial X reserves of a pool in WAD units, per WAD liquidity, at `priceWad`.
+     * @return initialY Initial Y reserves of a pool in WAD units, per WAD liquidity, at `priceWad`.
+     */
     function getStrategyData(
         uint256 strikePriceWad,
         uint256 volatilityBasisPoints,
