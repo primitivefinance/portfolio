@@ -279,6 +279,13 @@ interface IPortfolioStrategy {
      * @dev
      * Computes an amount out of tokens given an `amountIn`.
      *
+     * @custom:warning
+     * This function returns a value that makes it vulnerable to manipulation onchain.
+     * Do not rely on the function of this output for any critical logic onchain.
+     * Use this functions offchain to approximate the output amount of a swap.
+     * This uses approximated math functions, which can lead to error and thus
+     * produce swap orders that are mispriced.
+     *
      * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
      * @param swapper Address that will execute the swap.
@@ -298,7 +305,6 @@ interface IPortfolioStrategy {
      * @dev
      * Approximates the spot price using approximated math functions.
      * Returns a price in WAD units, not native decimals. The result must be scaled.
-     * todo: Maybe scale the result to native decimals in quote tokens?
      *
      * @custom:mev
      * Vulnerable to manipulation, do not use this inside write functions to avoid
@@ -313,11 +319,12 @@ interface IPortfolioStrategy {
 
     /**
      * @notice
-     * Gets the maximum swap input and output amounts for a given `poolId`.
+     * Gets the maximum swap input and output amounts for a given `poolId`, in native token decimals.
      *
      * @dev
      * The maximum input amount is the amount of `asset` tokens that can be sold.
      * The maximum output amount is the amount of `quote` tokens that can be bought.
+     * Must pass in an order with non-zero input and output amounts.
      *
      * note
      * The maximum input and output amounts should most likely not be used in a swap.
@@ -336,8 +343,9 @@ interface IPortfolioStrategy {
      * @dev
      * The pre- and post- swap invariants are used to check if the swap is valid.
      * The post- invariant must grow by at least 1 wei.
+     * Must pass in an order with non-zero input and output amounts.
      *
-     * @param order Swap order arguments including input and output amounts.
+     * @param order Swap order arguments including input and output amounts, in native token decimals.
      * @param timestamp Expected block.timestamp of execution. Overestimate to overestimate the swap.
      * @param swapper Address that will execute the swap, affects the swap fee paid.
      */
@@ -536,7 +544,7 @@ interface IPortfolioActions is IPortfolioRegistryActions {
      * @return input Real quantity of `input` tokens sent to pool, in native token decimals.
      * @return output Real quantity of `output` tokens sent to swapper, in native token decimals.
      */
-    function swap(Order memory args)
+    function swap(Order calldata args)
         external
         payable
         returns (uint64 poolId, uint256 input, uint256 output);

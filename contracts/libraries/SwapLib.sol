@@ -11,11 +11,14 @@ using {
     computeSwapResult
 } for Order global;
 
+using AssemblyLib for uint256;
 using FixedPointMathLib for uint128;
 
 error SwapLib_FeeTooHigh();
 error SwapLib_ProtocolFeeTooHigh();
 error SwapLib_OutputExceedsReserves();
+error SwapLib_ZeroXAdjustment();
+error SwapLib_ZeroYAdjustment();
 
 /**
  * @notice
@@ -59,22 +62,22 @@ struct Order {
  * @param self Swap order to compute fees for.
  * @param feeBasisPoints Fee denominated in basis points, where 1 basis point = 0.01%.
  * @param protocolFeeProportion Proportion of the fee amount to charge as a protocol fee.
- * @return feeAmount Quantity of input tokens which are considered the fee amount.
- * @return protocolFeeAmount Quantity of input tokens which are paid as the protocol fee amount.
+ * @return feeAmountUnit Quantity of input tokens which are considered the fee amount, in units equivalent to `self.input`.
+ * @return protocolFeeAmountUnit Quantity of input tokens which are paid as the protocol fee amount, in units equivalent to `self.input`.
  */
 function computeFeeAmounts(
     Order memory self,
     uint256 feeBasisPoints,
     uint256 protocolFeeProportion
-) pure returns (uint256 feeAmount, uint256 protocolFeeAmount) {
+) pure returns (uint256 feeAmountUnit, uint256 protocolFeeAmountUnit) {
     // Fee amount cannot be zero, so we can use the `mulDivUp` function to round up.
-    feeAmount = self.input.mulDivUp(feeBasisPoints, BASIS_POINT_DIVISOR);
+    feeAmountUnit = self.input.mulDivUp(feeBasisPoints, BASIS_POINT_DIVISOR);
 
     if (protocolFeeProportion != 0) {
         // Protocol fee is a proportion of the fee amount.
-        protocolFeeAmount = feeAmount / protocolFeeProportion;
+        protocolFeeAmountUnit = feeAmountUnit / protocolFeeProportion;
         // Subtract the protocol fee from the fee amount.
-        feeAmount -= protocolFeeAmount;
+        feeAmountUnit -= protocolFeeAmountUnit;
     }
 }
 
@@ -88,40 +91,47 @@ function computeFeeAmounts(
  * note
  * If the swap output exceeds the output reserves, it means a price limit has been reached for the pool.
  *
- * @param self Swap order to compute adjusted reserves for.
- * @param reserveX Total asset tokens in reserves of pool, scaled to WAD units.
- * @param reserveY Total quote tokens in reserves of pool, scaled to WAD units.
- * @param feeAmount Quantity of input tokens which are considered the fee amount.
- * @param protocolFeeAmount Quantity of input tokens which are paid as the protocol fee amount.
+ * @custom:warning
+ * If the `self.input` and `self.output` quantities are not in WAD units, this computation could be incorrect.
+ *
+ * @param self Swap order to compute adjusted reserves for. Input and Output must be WAD units.
+ * @param reserveXUnit Total asset tokens in reserves of pool, Unit = input/output units.
+ * @param reserveYUnit Total quote tokens in reserves of pool, Unit = input/output units.
+ * @param feeAmountUnit Quantity of input tokens which are considered the fee amount, Unit = input units.
+ * @param protocolFeeAmountUnit Quantity of input tokens which are paid as the protocol fee amount, Unit = input units.
  * @return adjustedX Swap & fee adjusted reserve of asset tokens.
  * @return adjustedY Swap & fee adjusted reserve of quote tokens.
  */
 function computeAdjustedSwapReserves(
     Order memory self,
-    uint256 reserveX,
-    uint256 reserveY,
-    uint256 feeAmount,
-    uint256 protocolFeeAmount
+    uint256 reserveXUnit,
+    uint256 reserveYUnit,
+    uint256 feeAmountUnit,
+    uint256 protocolFeeAmountUnit
 ) pure returns (uint256 adjustedX, uint256 adjustedY) {
-    uint256 adjustedInputReserve = self.sellAsset ? reserveX : reserveY;
-    uint256 adjustedOutputReserve = self.sellAsset ? reserveY : reserveX;
+    uint256 adjustedInputReserveWad =
+        self.sellAsset ? reserveXUnit : reserveYUnit;
+    uint256 adjustedOutputReserveWad = self.sellAsset ? reserveYUnit : reserveXUnit; // forgefmt: disable-line
 
     // Input amount is added to the reserves for the swap.
-    adjustedInputReserve += self.input;
+    adjustedInputReserveWad += self.input;
     // Fee amount is reinvested into the pool, but it's not considered in the invariant check, so we subtract it.
-    if (feeAmount > adjustedInputReserve) revert SwapLib_FeeTooHigh();
-    adjustedInputReserve -= feeAmount;
+    if (feeAmountUnit > adjustedInputReserveWad) revert SwapLib_FeeTooHigh();
+    adjustedInputReserveWad -= feeAmountUnit;
     // Protocol fee is subtracted, even though it's included in the fee, because protocol fees
     // do not get added to the pool's reserves.
-    if (protocolFeeAmount > adjustedInputReserve) revert SwapLib_ProtocolFeeTooHigh(); // forgefmt: disable-line
-    adjustedInputReserve -= protocolFeeAmount;
+    if (protocolFeeAmountUnit > adjustedInputReserveWad) revert SwapLib_ProtocolFeeTooHigh(); // forgefmt: disable-line
+    adjustedInputReserveWad -= protocolFeeAmountUnit;
     // Output amount is removed from the reserves for the swap.
-    if (self.output > adjustedOutputReserve) revert SwapLib_OutputExceedsReserves(); // forgefmt: disable-line
-    adjustedOutputReserve -= self.output;
+    if (self.output > adjustedOutputReserveWad) revert SwapLib_OutputExceedsReserves(); // forgefmt: disable-line
+    adjustedOutputReserveWad -= self.output;
 
     // Use these adjusted reserves in the invariant check.
-    adjustedX = self.sellAsset ? adjustedInputReserve : adjustedOutputReserve;
-    adjustedY = self.sellAsset ? adjustedOutputReserve : adjustedInputReserve;
+    adjustedX = self.sellAsset ? adjustedInputReserveWad : adjustedOutputReserveWad; // forgefmt: disable-line
+    adjustedY = self.sellAsset ? adjustedOutputReserveWad : adjustedInputReserveWad; // forgefmt: disable-line
+
+    if (reserveXUnit == adjustedX) revert SwapLib_ZeroXAdjustment();
+    if (reserveYUnit == adjustedY) revert SwapLib_ZeroYAdjustment();
 }
 
 /**
@@ -133,8 +143,8 @@ function computeAdjustedSwapReserves(
  * to confirm a swap will be validated.
  *
  * @param self Swap order to compute swap result for.
- * @param reserveX Total asset tokens in reserves of pool, scaled to WAD units.
- * @param reserveY Total quote tokens in reserves of pool, scaled to WAD units.
+ * @param reserveXUnit Total asset tokens in reserves of pool, Unit = input/output units.
+ * @param reserveYUnit Total quote tokens in reserves of pool, Unit = input/output units.
  * @param feeBps Fee denominated in basis points, where 1 basis point = 0.01%.
  * @param protocolFee Proportion of the fee amount to charge as a protocol fee.
  * @return feeAmount Quantity of input tokens which are considered the fee amount.
@@ -144,8 +154,8 @@ function computeAdjustedSwapReserves(
  */
 function computeSwapResult(
     Order memory self,
-    uint256 reserveX,
-    uint256 reserveY,
+    uint256 reserveXUnit,
+    uint256 reserveYUnit,
     uint256 feeBps,
     uint256 protocolFee
 )
@@ -159,6 +169,64 @@ function computeSwapResult(
 {
     (feeAmount, protocolFeeAmount) = self.computeFeeAmounts(feeBps, protocolFee);
     (adjustedX, adjustedY) = self.computeAdjustedSwapReserves(
-        reserveX, reserveY, feeAmount, protocolFeeAmount
+        reserveXUnit, reserveYUnit, feeAmount, protocolFeeAmount
     );
+}
+
+/**
+ * @notice
+ * Intermediary state during a swap() call.
+ *
+ * @dev
+ * This struct helps avoid stack too deep errors during swap.
+ *
+ * @param prevInvariant Invariant of the pool before the swap, after timestamp update.
+ * @param nextInvariant Invariant of the pool after the swap, returned from validateSwap.
+ * @param feeAmountUnit Absolute fee amount of input token, Unit = input units.
+ * @param protocolFeeAmountUnit Absolute protocol fee amount of input token, Unit = input units.
+ * @param amountInputUnit Quantity of tokens added to reserves, Unit = input units.
+ * @param amountOutputUnit Quantity of tokens removed from reserves, Unit = output units.
+ * @param tokenInput Address of the token being added to the pool.
+ * @param tokenOutput Address of the token being removed from the pool.
+ * @param decimalsInput Decimals of the token being added to the pool.
+ * @param decimalsOutput Decimals of the token being removed from the pool.
+ */
+struct SwapState {
+    int256 prevInvariant;
+    int256 nextInvariant;
+    uint256 feeAmountUnit;
+    uint256 protocolFeeAmountUnit;
+    uint256 amountInputUnit;
+    uint256 amountOutputUnit;
+    address tokenInput;
+    address tokenOutput;
+    uint8 decimalsInput;
+    uint8 decimalsOutput;
+}
+
+using { toWad, fromWad } for SwapState global;
+
+/// @dev Converts native token decimal units to WAD units, assumes inputs are already in native token decimal units.
+function toWad(SwapState memory self) pure returns (SwapState memory) {
+    self.feeAmountUnit = self.feeAmountUnit.scaleToWad(self.decimalsInput);
+    self.protocolFeeAmountUnit =
+        self.protocolFeeAmountUnit.scaleToWad(self.decimalsInput);
+    self.amountInputUnit = self.amountInputUnit.scaleToWad(self.decimalsInput);
+    self.amountOutputUnit =
+        self.amountOutputUnit.scaleToWad(self.decimalsOutput);
+    return self;
+}
+
+/// @dev Converts WAD units to native token decimal units.
+function fromWad(SwapState memory self) pure returns (SwapState memory) {
+    // Assuming these quantities are originally scaled to WAD units in swap(),
+    // scaling them down and rounding down should lead to no information loss.
+    self.feeAmountUnit = self.feeAmountUnit.scaleFromWadDown(self.decimalsInput);
+    self.protocolFeeAmountUnit =
+        self.protocolFeeAmountUnit.scaleFromWadDown(self.decimalsInput);
+    self.amountInputUnit =
+        self.amountInputUnit.scaleFromWadDown(self.decimalsInput);
+    self.amountOutputUnit =
+        self.amountOutputUnit.scaleFromWadDown(self.decimalsOutput);
+    return self;
 }

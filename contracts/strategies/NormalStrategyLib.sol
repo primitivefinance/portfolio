@@ -42,12 +42,14 @@ uint256 constant MIN_VOLATILITY = 1; // 0.01%
 uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = SECONDS_PER_DAY; // Miniumum duration is one day.
 uint256 constant MAX_DURATION = SECONDS_PER_YEAR * 3; // Maximum duration is three years.
+uint256 constant STRATEGY_ARGS_LENGTH = 32 * 5; // Not packed, 5 words total = 32 * 5 = 160 bytes.
 
 error NormalStrategyLib_ConfigExists();
 error NormalStrategyLib_UpperPriceLimitReached();
 error NormalStrategyLib_LowerPriceLimitReached();
 error NormalStrategyLib_NonExpiringPool();
 error NormalStrategyLib_InvalidDuration();
+error NormalStrategyLib_InvalidStrategyArgs();
 error NormalStrategyLib_InvalidStrikePrice();
 error NormalStrategyLib_InvalidVolatility();
 
@@ -275,7 +277,7 @@ function approximateXGivenPrice(
         // Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
         int256 result = Gaussian.cdf(int256(cdfInput));
 
-        // todo: handle case where result is > WAD
+        // 1 - Φ(( ln(S/K) + (σ²/2)τ ) / σ√τ)
         reserveXPerWad = uint256(int256(WAD) - result);
     }
 }
@@ -458,6 +460,10 @@ library NormalStrategyLib {
         pure
         returns (PortfolioConfig memory)
     {
+        if (bytes(strategyArgs).length != STRATEGY_ARGS_LENGTH) {
+            revert NormalStrategyLib_InvalidStrategyArgs();
+        }
+
         return abi.decode(strategyArgs, (PortfolioConfig));
     }
 
@@ -499,6 +505,7 @@ library NormalStrategyLib {
      * Get the invariant values used to verify a swap given a swap order.
      *
      * @dev
+     * Assumes order input and output amounts are in WAD units.
      * This is used to verify that the invariant has increased since the last swap.
      * The reserves per liquidity are rounded in a specific direction to overestimate
      * this invariant result. This will require the invariant after the trade to strictly increase.
@@ -557,17 +564,13 @@ library NormalStrategyLib {
         // Compute the next invariant if the swap amounts are non zero.
         (uint256 reserveX, uint256 reserveY) = (self.virtualX, self.virtualY);
 
-        {
-            Order memory orderCopy = order; // avoid stack too deep
-            uint256 feeBps = swapper == self.controller
-                ? self.priorityFeeBasisPoints
-                : self.feeBasisPoints;
+        uint256 feeBps = swapper == self.controller
+            ? self.priorityFeeBasisPoints
+            : self.feeBasisPoints;
 
-            // Compute the adjusted reserves.
-            (,, reserveX, reserveY) = orderCopy.computeSwapResult(
-                reserveX, reserveY, feeBps, protocolFee
-            );
-        }
+        // Compute the adjusted reserves.
+        (,, reserveX, reserveY) =
+            order.computeSwapResult(reserveX, reserveY, feeBps, protocolFee);
 
         curve.reserveXPerWad = reserveX.divWadDown(self.liquidity);
         curve.reserveYPerWad = reserveY.divWadDown(self.liquidity);
@@ -592,27 +595,36 @@ library NormalStrategyLib {
         NormalCurve memory curve = transform(config);
         curve.invariant = prevInv;
 
-        uint256 dependentReserve;
+        uint256 adjustedDependentReserve;
         bool sellAsset = order.sellAsset;
 
         // Approximate the output reserve per liquidity using the math functions.
         if (sellAsset) {
             curve.reserveXPerWad = independentReserve;
             curve.reserveYPerWad = curve.approximateYGivenX();
-            dependentReserve = curve.reserveYPerWad;
+            adjustedDependentReserve = curve.reserveYPerWad;
         } else {
             curve.reserveYPerWad = independentReserve;
             curve.reserveXPerWad = curve.approximateXGivenY();
-            dependentReserve = curve.reserveXPerWad;
+            adjustedDependentReserve = curve.reserveXPerWad;
         }
 
-        uint256 lower = dependentReserve.mulDivDown(98, 100);
-        uint256 upper = dependentReserve.mulDivUp(102, 100);
-        amountOutWad = dependentReserve;
+        // If the approximated dependent reserve is 0,
+        // then the output amount is the remaining dependent reserves.
+        // Since Portfolio does not rely on the output of this function to verify swaps,
+        // "tricking" the dependent reserve to become 0 will not result in a vulnerability.
+        // It may result in a mispriced swap if this output is relied on or off chain.
+        if (adjustedDependentReserve == 0) {
+            return (sellAsset ? self.virtualY : self.virtualX);
+        }
+
+        uint256 lower = adjustedDependentReserve.mulDivDown(98, 100);
+        uint256 upper = adjustedDependentReserve.mulDivUp(102, 100);
 
         // Output reserve is approximated with the derived math functions,
         // but to get it precise it needs a root finding algorithm.
-        amountOutWad = bisection(
+        // Approximates the dependent reserve per liquidity by finding the root of the trading function.
+        adjustedDependentReserve = bisection(
             abi.encode(curve),
             lower,
             upper,
@@ -621,10 +633,14 @@ library NormalStrategyLib {
             sellAsset ? findRootForSwappingInX : findRootForSwappingInY
         );
 
-        amountOutWad++;
-        amountOutWad = amountOutWad.mulWadDown(self.liquidity);
-        amountOutWad =
-            (sellAsset ? self.virtualY : self.virtualX) - amountOutWad;
+        // Rounded up since the bisection could result in a fractional value, which is truncated.
+        adjustedDependentReserve++;
+        // Convert the adjustedDependentReserve per liquidity to adjustedDependentReserve for all liquidity.
+        adjustedDependentReserve =
+            adjustedDependentReserve.mulWadDown(self.liquidity);
+        // Compute the difference between the previous dependent reserve and adjusted dependent reserve.
+        amountOutWad = (sellAsset ? self.virtualY : self.virtualX)
+            - adjustedDependentReserve;
     }
 
     function findRootForSwappingInX(

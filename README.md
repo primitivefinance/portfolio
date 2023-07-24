@@ -73,6 +73,16 @@ cd docs
 mdbook serve --open
 ```
 
+## coverage
+
+[Optional] Install coverage gutters [vs code extension](https://github.com/ryanluker/vscode-coverage-gutters).
+
+Then run this to generate a coverage report:
+
+```bash
+forge coverage --report lcov
+```
+
 ## Resources
 
 - [Hosted Documentation](https://docs.primitive.xyz)

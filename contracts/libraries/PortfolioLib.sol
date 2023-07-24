@@ -14,7 +14,7 @@ error Portfolio_DuplicateToken();
 error Portfolio_Insolvent(address token, int256 net);
 error Portfolio_InsufficientLiquidity();
 error Portfolio_InvalidDecimals(uint8 decimals);
-error Portfolio_InvalidProtocolFee(uint16 fee);
+error Portfolio_InvalidProtocolFee(uint256 protocolFee);
 error Portfolio_InvalidPool(uint64 poolId);
 error Portfolio_InvalidInvariant(int256 prev, int256 next);
 error Portfolio_InvalidPairNonce();
@@ -28,13 +28,12 @@ error Portfolio_MinQuoteExceeded();
 error Portfolio_NonExistentPool(uint64 poolId);
 error Portfolio_NotController();
 error Portfolio_PairExists(uint24 pairId);
-error Portfolio_ZeroAssetAllocate();
+error Portfolio_ZeroAmountsAllocate();
 error Portfolio_ZeroLiquidityAllocate();
 error Portfolio_ZeroLiquidityDeallocate();
 error Portfolio_ZeroSwapLiquidity();
 error Portfolio_ZeroSwapInput();
 error Portfolio_ZeroSwapOutput();
-error Portfolio_ZeroQuoteAllocate();
 
 struct PortfolioPair {
     address tokenAsset; // Base asset, referred to as "X" reserve.
@@ -52,26 +51,6 @@ struct ChangeLiquidityParams {
     address owner; // Address with position liquidity to change.
     address tokenAsset; // Address of the asset token.
     address tokenQuote; // Address of the quote token.
-}
-
-struct Iteration {
-    int256 prevInvariant; // Invariant of the pool before the swap, after timestamp update.
-    int256 nextInvariant; // Invariant of the pool after the swap.
-    uint256 virtualX; // Virtual X reserves in WAD units for all liquidity.
-    uint256 virtualY; // Virtual Y reserves in WAD units for all liquidity.
-    uint256 remainder; // Remainder of input tokens to swap in, in WAD units.
-    uint256 feeAmount; // Fee amount in WAD units.
-    uint256 protocolFeeAmount; // WAD
-    uint256 liquidity; // Total supply of liquidity in WAD units.
-    uint256 input;
-    uint256 output;
-}
-
-struct SwapState {
-    uint8 decimalsInput;
-    address tokenInput;
-    uint8 decimalsOutput;
-    address tokenOutput;
 }
 
 struct Payment {

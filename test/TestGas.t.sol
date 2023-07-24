@@ -5,6 +5,8 @@ import "./Setup.sol";
 import "contracts/libraries/PortfolioLib.sol";
 
 contract TestGas is Setup {
+    using NormalConfiguration for Configuration;
+
     using SafeCastLib for uint256;
     using AssemblyLib for uint256;
     using FixedPointMathLib for uint128;
@@ -88,17 +90,22 @@ contract TestGas is Setup {
         allocateSome(1 ether)
     {
         bool sellAsset = true;
-        uint128 amountIn = uint128(0.01 ether);
+
+        Order memory maxOrder =
+            subject().getMaxOrder(ghost().poolId, sellAsset, actor());
+        uint128 inputAmount = maxOrder.input / 2;
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, actor())
-                * 95 / 100
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, inputAmount, actor()
+            )
         );
+
         bytes[] memory data = new bytes[](1);
 
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
-            input: amountIn,
+            input: inputAmount,
             output: estimatedAmountOut,
             sellAsset: sellAsset
         });
@@ -126,14 +133,11 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 10 ether,
-            volatilityBasisPoints: 1e4,
-            durationSeconds: hundred * 1 days,
-            isPerpetual: false,
-            priceWad: 10 ether
-        });
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "strikePriceWad", abi.encode(10 ether)
+        ).editStrategy("volatilityBasisPoints", abi.encode(1e4)).editStrategy(
+            "durationSeconds", abi.encode(100 days)
+        ).editStrategy("priceWad", abi.encode(10 ether));
 
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
@@ -254,14 +258,9 @@ contract TestGas is Setup {
 
         uint16 hundred = uint16(100);
 
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 10 ether,
-            volatilityBasisPoints: 1e4,
-            durationSeconds: hundred * 1 days,
-            isPerpetual: false,
-            priceWad: 10 ether
-        });
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "strikePriceWad", abi.encode(10 ether)
+        ).editStrategy("priceWad", abi.encode(10 ether));
 
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
@@ -530,14 +529,26 @@ contract TestGas is Setup {
                 instructions[i] =
                     abi.encodeCall(IPortfolioActions.createPair, (a0, q0));
             } else {
-                ConfigType memory testConfig = DefaultStrategy.getTestConfig({
-                    portfolio: address(subject()),
-                    strikePriceWad: uint128(1 ether * i),
-                    volatilityBasisPoints: uint16(1000 + 1000 / i),
-                    durationSeconds: uint16(1 + 100 / i) * 1 days,
-                    isPerpetual: false,
-                    priceWad: uint128(1 ether * i)
-                });
+                // todo: implement better config fuzzing!
+                uint128 strike =
+                    uint128(bound(uint256(0), 0.1 ether, 10_000 ether));
+                uint128 price =
+                    uint128(bound(uint256(0), strike * 2 / 3, strike * 3 / 2));
+                uint32 volatility = uint32(
+                    bound(uint256(0), MIN_VOLATILITY * 1000, MAX_VOLATILITY)
+                );
+                uint32 duration =
+                    uint32(bound(uint256(0), MIN_DURATION * 100, MAX_DURATION));
+
+                Configuration memory testConfig = configureNormalStrategy()
+                    .editStrategy("strikePriceWad", abi.encode(strike)).editStrategy(
+                    "volatilityBasisPoints", abi.encode(volatility)
+                ).editStrategy("durationSeconds", abi.encode(duration))
+                    .editStrategy("priceWad", abi.encode(price));
+
+                testConfig.asset = address(1); // note: avoids validate failure
+                testConfig.quote = address(1); // note: avoids validate failure
+                testConfig.validate(NormalConfiguration.validateNormalStrategy);
 
                 instructions[i] = abi.encodeCall(
                     IPortfolioActions.createPool,
@@ -667,14 +678,9 @@ contract TestGas is Setup {
         view
         returns (bytes memory)
     {
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: uint128(1 ether),
-            volatilityBasisPoints: uint16(1000),
-            durationSeconds: uint16(100) * 1 days,
-            isPerpetual: false,
-            priceWad: uint128(1 ether)
-        });
+        Configuration memory testConfig = configureNormalStrategy(); // default strategy
+        (testConfig.asset, testConfig.quote) = (address(1), address(1)); // avoids failure
+        testConfig.validate(NormalConfiguration.validateNormalStrategy);
 
         bytes memory payload = abi.encodeCall(
             IPortfolioActions.createPool,
@@ -780,12 +786,13 @@ contract TestGas is Setup {
         _subject.multicall(instructions);
     }
 
+    /// @dev blocked by https://github.com/primitivefinance/portfolio/issues/423
     function test_gas_chain_swap_allocate_from_portfolio()
         public
         pauseGas
         usePools(1)
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(100 ether)
     {
         // Allocate to first pool
         uint64 poolId = ghost().poolId;

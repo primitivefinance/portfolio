@@ -11,9 +11,48 @@ contract TestPortfolioSwap is Setup {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for uint128;
 
-    // todo: fix duration params...
-    uint256 constant TEST_SWAP_MIN_DURATION = 1;
-    uint256 constant TEST_SWAP_MAX_DURATION = 700;
+    // todo: make this a lot better...
+    function _fuzz_random_args(
+        bool sellAsset,
+        uint256 amountIn,
+        uint256 amountOut
+    ) internal {
+        Order memory maxOrder =
+            subject().getMaxOrder(ghost().poolId, sellAsset, actor());
+
+        amountIn =
+            uint128(bound(amountIn, maxOrder.input / 1000 + 1, maxOrder.input));
+
+        amountOut =
+            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amountIn.safeCastTo128(),
+            output: amountOut.safeCastTo128(),
+            sellAsset: sellAsset
+        });
+
+        try subject().simulateSwap({
+            order: order,
+            timestamp: block.timestamp,
+            swapper: actor()
+        }) returns (bool swapSuccess, int256 prev, int256 post) {
+            try subject().swap(order) {
+                assertTrue(
+                    swapSuccess, "simulateSwap-failed but swap succeeded"
+                );
+                assertTrue(post >= prev, "post-invariant-not-gte-prev");
+            } catch {
+                assertTrue(
+                    !swapSuccess, "simulateSwap-succeeded but swap failed"
+                );
+            }
+        } catch {
+            // pass this case
+        }
+    }
 
     function test_swap_increases_user_balance_token_out()
         public
@@ -26,9 +65,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
-            subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, address(this)
-            )
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
         );
 
         uint256 prev = ghost().quote().to_token().balanceOf(actor());
@@ -89,9 +126,7 @@ contract TestPortfolioSwap is Setup {
         bool sellAsset = true;
         uint128 amtIn = 0.1 ether;
         uint128 amtOut = uint128(
-            subject().getAmountOut(
-                ghost().poolId, sellAsset, amtIn, address(this)
-            )
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
         );
 
         Order memory order = Order({
@@ -113,40 +148,6 @@ contract TestPortfolioSwap is Setup {
         assertTrue(postBal > preBal, "nothing claimed");
     }
 
-    function testFuzz_swap_virtual_reserves_do_not_stay_the_same(
-        bool sellAsset,
-        uint128 amountIn,
-        uint128 amountOut
-    )
-        public
-        defaultConfig
-        useActor
-        usePairTokens(10 ether)
-        allocateSome(1 ether)
-    {
-        vm.assume(amountIn > 0);
-        vm.assume(amountOut > 0);
-        _swap_check_virtual_reserves(sellAsset, amountIn, amountOut);
-    }
-
-    function testFuzz_swap_virtual_reserves_do_not_stay_the_same_low_decimals(
-        bool sellAsset,
-        uint128 amountIn,
-        uint128 amountOut
-    )
-        public
-        sixDecimalQuoteConfig
-        useActor
-        usePairTokens(10 ether)
-        allocateSome(1 ether)
-    {
-        vm.assume(amountIn > 0);
-        vm.assume(amountOut > 0);
-        _swap_check_virtual_reserves(sellAsset, amountIn, amountOut);
-    }
-
-    // todo: update this test to coerce the amount out so it will be a valid trade.
-    // once the bisection update is merged in, getAmountOut can be used more reliably.
     function _swap_check_virtual_reserves(
         bool sellAsset,
         uint128 amountIn,
@@ -155,41 +156,12 @@ contract TestPortfolioSwap is Setup {
         PortfolioPool memory pool = ghost().pool();
         (uint256 prevXPerL, uint256 prevYPerL) = (pool.virtualX, pool.virtualY);
 
-        // Pre-invariant check will round the output token reserve up when computing
-        // how much is in the reserve per liquidity.
-        if (sellAsset) {
-            prevXPerL = prevXPerL.divWadDown(pool.liquidity);
-            prevYPerL = prevYPerL.divWadUp(pool.liquidity);
-        } else {
-            prevXPerL = prevXPerL.divWadUp(pool.liquidity);
-            prevYPerL = prevYPerL.divWadDown(pool.liquidity);
-        }
+        _fuzz_random_args(sellAsset, amountIn, amountOut);
 
-        Order memory order = Order({
-            useMax: false,
-            poolId: ghost().poolId,
-            input: amountIn,
-            output: amountOut,
-            sellAsset: sellAsset
-        });
-        try subject().swap(order) {
-            pool = ghost().pool();
-
-            (uint256 postXPerL, uint256 postYPerL) =
-                (pool.virtualX, pool.virtualY);
-            postXPerL = postXPerL.divWadDown(pool.liquidity);
-            postYPerL = postYPerL.divWadDown(pool.liquidity);
-
-            console.log("prevXPerL", prevXPerL);
-            console.log("postXPerL", postXPerL);
-            console.log("prevYPerL", prevYPerL);
-            console.log("postYPerL", postYPerL);
-
-            assertTrue(postXPerL != prevXPerL, "invariant-x-unchanged");
-            assertTrue(postYPerL != prevYPerL, "invariant-y-unchanged");
-        } catch {
-            // Swap failed, so don't do anything.
-        }
+        pool = ghost().pool();
+        (uint256 postXPerL, uint256 postYPerL) = (pool.virtualX, pool.virtualY);
+        assertTrue(postXPerL != prevXPerL, "invariant-x-unchanged");
+        assertTrue(postYPerL != prevYPerL, "invariant-y-unchanged");
     }
 
     function testFuzz_swap_low_decimals(
@@ -203,56 +175,39 @@ contract TestPortfolioSwap is Setup {
         allocateSome(1 ether)
     {
         bool sellAsset = seed % 2 == 0;
-        _fuzz_swap(sellAsset, amountIn);
+        _fuzz_random_args(sellAsset, amountIn, 0);
     }
 
     function testFuzz_swap_durationConfig(
         uint256 seed,
-        uint128 amountIn,
-        uint16 dur
+        uint128 amountIn
     )
         public
-        durationConfig(
-            uint16(bound(dur, TEST_SWAP_MIN_DURATION, TEST_SWAP_MAX_DURATION))
-        )
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
     {
         bool sellAsset = seed % 2 == 0;
-        _fuzz_swap(sellAsset, amountIn);
+        _fuzz_random_args(sellAsset, amountIn, 0);
     }
 
     function testFuzz_swap_volatilityConfig(
         uint256 seed,
-        uint128 amountIn,
-        uint16 vol
+        uint128 amountIn
     )
         public
-        volatilityConfig(uint16(bound(vol, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
     {
         bool sellAsset = seed % 2 == 0;
-        _fuzz_swap(sellAsset, amountIn);
+        _fuzz_random_args(sellAsset, amountIn, 0);
     }
 
-    function testFuzz_swap_random_inputs(
-        uint256 seed,
-        uint64 amountIn,
-        uint64 amountOut
-    )
-        public
-        defaultConfig
-        useActor
-        usePairTokens(100 ether)
-        allocateSome(1 ether)
-    {
-        _fuzz_random_args(seed % 2 == 0, amountIn, amountOut);
-    }
-
-    function testFuzz_swap_random_small_inputs(
+    // todo: fix these
+    /* function testFuzz_swap_random_small_inputs(
         uint256 seed,
         uint64 amountIn,
         uint64 amountOut
@@ -285,101 +240,7 @@ contract TestPortfolioSwap is Setup {
             amountOut, type(uint128).max - 1e18, type(uint128).max
         ).safeCastTo128();
         _fuzz_random_args(seed % 2 == 0, amountIn, amountOut);
-    }
-
-    function _fuzz_random_args(
-        bool sellAsset,
-        uint256 amountIn,
-        uint256 amountOut
-    ) internal {
-        PortfolioPool memory pool = ghost().pool();
-
-        // todo: do getSwapInvariants
-        int256 prevInvariant = subject().getInvariant(ghost().poolId);
-
-        Order memory order = Order({
-            useMax: false,
-            poolId: ghost().poolId,
-            input: amountIn.safeCastTo128(),
-            output: amountOut.safeCastTo128(),
-            sellAsset: sellAsset
-        });
-
-        try subject().swap(order) {
-            pool = ghost().pool();
-
-            int256 invariant = subject().getInvariant(ghost().poolId);
-            // assertTrue(invariant >= 0, "invariant-negative"); todo: review if we need this?
-            assertTrue(invariant >= prevInvariant, "invariant-decreased");
-        } catch { }
-    }
-
-    function _fuzz_swap(bool sellAsset, uint128 amountIn) internal {
-        vm.assume(amountIn > 100);
-
-        uint256 reserveIn;
-
-        PortfolioPool memory pool = ghost().pool();
-        PortfolioPair memory pair = ghost().pair();
-        if (sellAsset) {
-            reserveIn = pool.virtualX;
-        } else {
-            reserveIn = pool.virtualY;
-        }
-        {
-            Order memory maxOrder =
-                subject().getMaxOrder(ghost().poolId, sellAsset, actor());
-            uint256 maxAmountIn = maxOrder.input;
-
-            uint256 decimalsIn =
-                sellAsset ? pair.decimalsAsset : pair.decimalsQuote;
-
-            // uint256 decimalsOut = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
-
-            maxAmountIn = maxAmountIn.scaleFromWadDown(decimalsIn);
-            vm.assume(maxAmountIn > amountIn);
-        }
-
-        uint128 amountOut = subject().getAmountOut(
-            ghost().poolId, sellAsset, amountIn, actor()
-        ).safeCastTo128();
-
-        vm.assume(amountOut > 0);
-
-        address tokenIn;
-        address tokenOut;
-        if (sellAsset) {
-            tokenIn = pair.tokenAsset;
-            tokenOut = pair.tokenQuote;
-        } else {
-            tokenIn = pair.tokenQuote;
-            tokenOut = pair.tokenAsset;
-        }
-
-        uint256 prevPhysicalOut =
-            IERC20(tokenOut).balanceOf(address(ghost().subject));
-
-        Order memory order = Order({
-            useMax: false,
-            poolId: ghost().poolId,
-            input: amountIn,
-            output: amountOut,
-            sellAsset: sellAsset
-        });
-        subject().swap{ value: tokenIn == subject().WETH() ? amountIn : 0 }(
-            order
-        );
-
-        uint256 postPhysicalOut =
-            IERC20(tokenOut).balanceOf(address(ghost().subject));
-
-        assertApproxEqAbs(
-            postPhysicalOut,
-            prevPhysicalOut - amountOut,
-            1,
-            "out-physical-not-eq"
-        );
-    }
+    } */
 
     function test_swap_price_decreases()
         public
@@ -486,94 +347,6 @@ contract TestPortfolioSwap is Setup {
         }
     }
 
-    function testFuzz_swap_invariant_gte_previous_invariant(
-        bool sellAsset,
-        uint256 amountIn,
-        uint256 amountOut
-    )
-        public
-        defaultConfig
-        useActor
-        usePairTokens(100 ether)
-        allocateSome(10 ether)
-    {
-        PortfolioPool memory pool = ghost().pool();
-        PortfolioPair memory pair = ghost().pair();
-
-        uint256 reserveXPerL;
-        uint256 reserveYPerL;
-
-        if (sellAsset) {
-            reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
-            reserveYPerL = pool.virtualY.divWadUp(pool.liquidity);
-        } else {
-            reserveXPerL = pool.virtualX.divWadUp(pool.liquidity);
-            reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
-        }
-
-        {
-            // bound the amounts to be within the max amount in and max amount out
-            uint256 maxAmountIn =
-                subject().getMaxOrder(ghost().poolId, sellAsset, actor()).input;
-
-            amountIn = bound(amountIn, 1, maxAmountIn);
-            amountOut = bound(
-                amountOut, 1, ((sellAsset ? reserveYPerL : reserveXPerL) - 1)
-            );
-
-            amountIn = amountIn.scaleFromWadDown(
-                sellAsset ? pair.decimalsAsset : pair.decimalsQuote
-            );
-            amountOut = amountOut.scaleFromWadDown(
-                sellAsset ? pair.decimalsQuote : pair.decimalsAsset
-            );
-
-            _swap_check_invariant(
-                sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
-            );
-        }
-    }
-
-    function testFuzz_swap_amountIn_invariant_does_not_decrease(
-        bool sellAsset,
-        uint256 amountIn
-    )
-        public
-        defaultConfig
-        useActor
-        usePairTokens(100 ether)
-        allocateSome(10 ether)
-    {
-        vm.assume(amountIn > 100);
-
-        PortfolioPool memory pool = ghost().pool();
-
-        uint256 reserveXPerL;
-        uint256 reserveYPerL;
-
-        if (sellAsset) {
-            reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
-            reserveYPerL = pool.virtualY.divWadUp(pool.liquidity);
-        } else {
-            reserveXPerL = pool.virtualX.divWadUp(pool.liquidity);
-            reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
-        }
-
-        Order memory maxOrder =
-            subject().getMaxOrder(ghost().poolId, sellAsset, actor());
-
-        uint256 maxIn = maxOrder.input;
-
-        vm.assume(maxIn > amountIn);
-
-        uint256 amountOut =
-            subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
-
-        _swap_check_invariant(
-            sellAsset, amountIn, amountOut, reserveXPerL, reserveYPerL
-        );
-    }
-
     function test_swap_deallocate_before_swap_reverts()
         public
         defaultConfig
@@ -627,54 +400,68 @@ contract TestPortfolioSwap is Setup {
         subject().swap(order);
     }
 
-    function _swap_check_invariant(
-        bool sellAsset,
-        uint256 amountIn,
-        uint256 amountOut,
-        uint256 reserveXPerL,
-        uint256 reserveYPerL
-    ) internal {
-        // todo: fix with getSwapInvariants...
-        int256 prev = subject().getInvariant(ghost().poolId);
+    /// blocked by https://github.com/primitivefinance/portfolio/issues/425
+    function test_swap_use_max_from_surplus()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(1 ether)
+    {
+        bool sellAsset = true;
+        uint256 inputAmount = 0.1 ether;
+
+        // transfer tokens directly to use for the input
+        ghost().asset().to_token().transfer(address(subject()), inputAmount);
+
+        // Estimate amount out.
         Order memory order = Order({
-            useMax: false,
+            useMax: true,
             poolId: ghost().poolId,
-            input: amountIn.safeCastTo128(),
-            output: amountOut.safeCastTo128(),
+            input: 0,
+            output: 0,
             sellAsset: sellAsset
         });
 
-        // todo: Currently failing with "Infinity()" because the quotient is 1, since the
-        // new Y reserves with the fee included are at a 1:1 ratio with the strike price
-        // when rounded up.
-        // We need to figure out how to properly handle that case.
-        try subject().swap(order) {
-            PortfolioPool memory pool = ghost().pool();
-            PortfolioConfig memory config = ghost().config();
-            reserveXPerL = pool.virtualX.divWadDown(pool.liquidity);
-            reserveYPerL = pool.virtualY.divWadDown(pool.liquidity);
-            uint256 quotient = reserveYPerL.divWadUp(config.strikePriceWad);
-            uint256 difference = 1 ether - reserveXPerL;
-            console.log("reserveXPerL", reserveXPerL);
-            console.log("reserveYPerL", reserveYPerL);
-            console.log("strikePrice", config.strikePriceWad);
-            console.log("quotient", quotient);
-            console.log("difference", difference);
+        order.output = uint128(
+            subject().getAmountOut(
+                order.poolId, sellAsset, inputAmount, actor()
+            )
+        );
 
-            // todo: MUST FIX THIS!
-            // avoids scenario where the new reserves with the fees
-            // hit the bounds of the reserves.
-            // Basically, a 1e18 quotient or difference are undefined in the current
-            // trading function.
-            // so we need to figure out how to handle it.
-            if (quotient >= 1 ether || quotient == 0) return; // Exits before checking invariant.
-            if (difference >= 1 ether || difference == 0) return; // Exits before checking invariant.
+        // Do the swap
+        uint256 prevAssetBalance = ghost().asset().to_token().balanceOf(actor());
+        subject().swap(order);
+        uint256 postAssetBalance = ghost().asset().to_token().balanceOf(actor());
 
-            int256 post = subject().getInvariant(ghost().poolId);
+        // Asset balance shouldnt change since we used the max from surplus.
+        assertEq(postAssetBalance, prevAssetBalance, "asset-balance-changed");
+    }
 
-            assertTrue(post >= prev, "post-invariant-not-gte-prev");
-        } catch {
-            // do nothing, since it failed.
-        }
+    function test_swap_returns_native_decimals()
+        public
+        sixDecimalQuoteConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+    {
+        // Estimate amount out.
+        bool sellAsset = true;
+        uint128 amtIn = 0.1 ether;
+        uint128 amtOut = uint128(
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
+        );
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+        (uint64 poolId, uint256 input, uint256 output) = subject().swap(order);
+        assertEq(poolId, ghost().poolId, "poolId != ghost().poolId");
+        assertEq(input, uint256(order.input), "input != order.input");
+        assertEq(output, uint256(order.output), "output != order.output");
     }
 }

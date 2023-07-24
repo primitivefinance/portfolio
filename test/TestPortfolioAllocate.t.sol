@@ -2,12 +2,12 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
+import { BURNED_LIQUIDITY } from "contracts/libraries/PoolLib.sol";
 
 contract TestPortfolioAllocate is Setup {
-    using AssemblyLib for uint256;
+    using NormalConfiguration for Configuration;
 
-    uint256 constant TEST_ALLOCATE_MIN_DURATION = 1;
-    uint256 constant TEST_ALLOCATE_MAX_DURATION = 720;
+    using AssemblyLib for uint256;
 
     function test_multicall_create_pair_pool_allocate() public useActor {
         MockERC20 tokenA = new MockERC20("TokenA", "AAA", 18);
@@ -24,14 +24,9 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.createPair, (address(tokenA), address(tokenB))
         );
 
-        ConfigType memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 1 ether,
-            volatilityBasisPoints: 100,
-            durationSeconds: 100 * 1 days,
-            isPerpetual: false,
-            priceWad: 1 ether
-        });
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "durationSeconds", abi.encode(100 * 1 days)
+        ).editStrategy("volatilityBasisPoints", abi.encode(100));
 
         data[1] = abi.encodeCall(
             IPortfolioActions.createPool,
@@ -191,35 +186,6 @@ contract TestPortfolioAllocate is Setup {
             "position != pool.liquidity"
         );
     }
-
-    // todo: Use max now only uses entire transient balances, which need to be increased from a swap output or deallocatye.
-    /* function test_allocate_use_max()
-        public
-        defaultConfig
-        useActor
-        usePairTokens(10 ether)
-
-    {
-        // Deposit tokens which will be used to compute max liquidity.
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(ghost().quote().to_addr(), type(uint256).max);
-
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(1),
-                poolId: ghost().poolId,
-                deltaLiquidity: 1,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
-        );
-        assertEq(
-            ghost().pool().liquidity,
-            ghost().position(actor()).liquidity,
-            "position != pool.liquidity"
-        );
-    } */
 
     function test_allocate_does_not_modify_timestamp()
         public
@@ -475,17 +441,11 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_duration_modifies_liquidity(
-        uint16 duration,
+        uint256 seed,
         uint64 liquidity
     )
         public
-        durationConfig(
-            uint16(
-                bound(
-                    duration, TEST_ALLOCATE_MIN_DURATION, TEST_ALLOCATE_MAX_DURATION
-                )
-            )
-        )
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -495,18 +455,12 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_low_duration_modifies_liquidity(
-        uint16 duration,
+        uint32 duration,
         uint64 liquidity
     )
         public
         durationConfig(
-            uint16(
-                bound(
-                    duration,
-                    TEST_ALLOCATE_MIN_DURATION,
-                    TEST_ALLOCATE_MIN_DURATION + 100
-                )
-            )
+            uint32(bound(duration, MIN_DURATION, MIN_DURATION + (100 days)))
         )
         useActor
         usePairTokens(500 ether)
@@ -517,18 +471,12 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_high_duration_modifies_liquidity(
-        uint16 duration,
+        uint32 duration,
         uint64 liquidity
     )
         public
         durationConfig(
-            uint16(
-                bound(
-                    duration,
-                    TEST_ALLOCATE_MAX_DURATION - 100,
-                    TEST_ALLOCATE_MAX_DURATION
-                )
-            )
+            uint32(bound(duration, MAX_DURATION - (100 days), MAX_DURATION))
         )
         useActor
         usePairTokens(500 ether)
@@ -539,11 +487,11 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_volatility_modifies_liquidity(
-        uint16 volatility,
+        uint256 seed,
         uint64 liquidity
     )
         public
-        volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -558,7 +506,7 @@ contract TestPortfolioAllocate is Setup {
     )
         public
         volatilityConfig(
-            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+            uint32(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
         usePairTokens(500 ether)
@@ -574,7 +522,7 @@ contract TestPortfolioAllocate is Setup {
     )
         public
         volatilityConfig(
-            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+            uint32(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
         usePairTokens(500 ether)
@@ -652,8 +600,7 @@ contract TestPortfolioAllocate is Setup {
             type(uint128).max
         );
 
-        ConfigType memory testConfig =
-            DefaultStrategy.getDefaultTestConfig(address(subject()));
+        Configuration memory testConfig = configureNormalStrategy();
 
         uint64 poolId = subject().createPool(
             1, // pair id
@@ -718,6 +665,53 @@ contract TestPortfolioAllocate is Setup {
             postQuoteBalance,
             preQuoteBalance + quoteDeallocate - quoteAllocate,
             "quote balance"
+        );
+    }
+
+    function test_allocate_reverts_insufficient_liquidity()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+    {
+        vm.expectRevert(Portfolio_InsufficientLiquidity.selector);
+        subject().allocate(
+            false,
+            actor(),
+            ghost().poolId,
+            uint128(BURNED_LIQUIDITY - 1),
+            type(uint128).max,
+            type(uint128).max
+        );
+    }
+
+    function test_allocate_reverts_portfolio_insolvent()
+        public
+        feeOnTokenTransferConfig
+        useActor
+        usePairTokens(100 ether)
+    {
+        // This will revert with the insolvent error because fee on transfer token
+        // will reduce some of the tokens that are paid to portfolio.
+
+        uint128 liquidity = 1 ether;
+        (uint256 deltaAsset,) =
+            subject().getLiquidityDeltas(ghost().poolId, int128(liquidity));
+        uint256 debt = deltaAsset / 100; // ASSUMES FEE ON TRANSFER IS 1%
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Portfolio_Insolvent.selector,
+                ghost().asset().to_addr(),
+                -int256(debt)
+            )
+        );
+        subject().allocate(
+            false,
+            actor(),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
         );
     }
 }

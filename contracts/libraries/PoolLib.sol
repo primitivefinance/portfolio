@@ -11,6 +11,28 @@ using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
 using SafeCastLib for uint256;
 
+type PoolId is uint64;
+
+using PoolIdLib for PoolId global;
+
+/// @dev Helper methods to decode the data encoded in a pool id.
+library PoolIdLib {
+    /// @dev Pair id is encoded in the first 24-bits.
+    function pairId(PoolId poolId) internal pure returns (uint24 id) {
+        id = uint24(PoolId.unwrap(poolId) >> 40);
+    }
+
+    /// @dev Controlled boolean is between the first 24-bits and last 32-bits.
+    function controlled(PoolId poolId) internal pure returns (bool) {
+        return uint8(PoolId.unwrap(poolId) >> 32) == 1;
+    }
+
+    /// @dev Nonce is encoded in the last 32-bits.
+    function nonce(PoolId poolId) internal pure returns (uint32 nonce) {
+        nonce = uint32(PoolId.unwrap(poolId));
+    }
+}
+
 using {
     adjustReserves,
     createPool,

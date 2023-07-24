@@ -1,6 +1,6 @@
 on: [push]
 
-name: unit tests (profile=test)
+name: coverage (profile=default) no via-ir
 
 jobs:
   check:
@@ -16,5 +16,5 @@ jobs:
         with:
           version: nightly
 
-      - name: Run tests
-        run: FOUNDRY_PROFILE=test forge test --gas-report
+      - name: Run coverage
+        run: forge coverage

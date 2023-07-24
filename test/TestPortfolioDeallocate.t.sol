@@ -4,10 +4,6 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioDeallocate is Setup {
-    // todo: fix duration params...
-    uint256 constant TEST_DEALLOCATE_MIN_DURATION = 1;
-    uint256 constant TEST_DEALLOCATE_MAX_DURATION = 700;
-
     function test_deallocate_max()
         public
         defaultConfig
@@ -61,11 +57,11 @@ contract TestPortfolioDeallocate is Setup {
     }
 
     function testFuzz_deallocate_volatility(
-        uint64 liquidity,
-        uint16 volatility
+        uint256 seed,
+        uint64 liquidity
     )
         public
-        volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -83,19 +79,11 @@ contract TestPortfolioDeallocate is Setup {
     }
 
     function testFuzz_deallocate_duration(
-        uint64 liquidity,
-        uint16 duration
+        uint256 seed,
+        uint64 liquidity
     )
         public
-        durationConfig(
-            uint16(
-                bound(
-                    duration,
-                    TEST_DEALLOCATE_MIN_DURATION,
-                    TEST_DEALLOCATE_MAX_DURATION
-                )
-            )
-        )
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -174,8 +162,6 @@ contract TestPortfolioDeallocate is Setup {
         subject().deallocate(true, ghost().poolId, amount, type(uint128).max, 0);
     }
 
-    // TODO: Not sure what's the purpose of this test since deallocate is never
-    // called?
     function test_deallocate_reverts_when_min_quote_unmatched()
         public
         defaultConfig
@@ -200,11 +186,12 @@ contract TestPortfolioDeallocate is Setup {
         subject().multicall(data);
 
         data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (false, address(this), ghost().poolId, amount, 0, type(uint128).max)
+            IPortfolioActions.deallocate,
+            (false, ghost().poolId, amount, 0, type(uint128).max)
         );
-        vm.expectRevert();
-        subject().multicall(data);
+        IPortfolio portfolio = subject();
+        vm.expectRevert(Portfolio_MinQuoteExceeded.selector);
+        portfolio.multicall(data);
     }
 
     function _simple_deallocate(uint128 amount) internal {

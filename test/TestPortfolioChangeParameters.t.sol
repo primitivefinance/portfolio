@@ -25,7 +25,7 @@ contract TestPortfolioChangeParameters is Setup {
         uint64 poolId = ghost().poolId;
         uint16 prev = ghost().pool().priorityFeeBasisPoints;
         subject().changeParameters(
-            poolId, Setup_DEFAULT_PRIORITY_FEE + 10, Setup_DEFAULT_FEE + 20
+            poolId, prev + 10, Configuration_DEFAULT_FEE + 20
         );
         uint16 post = ghost().pool().priorityFeeBasisPoints;
         assertEq(post, prev + 10, "priority-fee-change");
@@ -38,9 +38,7 @@ contract TestPortfolioChangeParameters is Setup {
         uint64 poolId = ghost().poolId;
         vm.expectRevert(Portfolio_NotController.selector);
         vm.prank(address(0x0006));
-        subject().changeParameters(
-            poolId, Setup_DEFAULT_PRIORITY_FEE, Setup_DEFAULT_FEE
-        );
+        subject().changeParameters(poolId, 1, Configuration_DEFAULT_FEE);
     }
 
     function test_revert_changeParameters_priority_fee_above_max()
@@ -71,6 +69,8 @@ contract TestPortfolioChangeParameters is Setup {
         vm.expectRevert(
             abi.encodeWithSelector(PoolLib_InvalidFee.selector, failureArg)
         );
-        subject().changeParameters(poolId, Setup_DEFAULT_FEE, failureArg);
+        subject().changeParameters(
+            poolId, Configuration_DEFAULT_FEE, failureArg
+        );
     }
 }
