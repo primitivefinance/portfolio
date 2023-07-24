@@ -464,31 +464,34 @@ contract Portfolio is ERC1155, IPortfolio {
     }
 
     /// @inheritdoc IPortfolioActions
-    function swap(Order memory args)
+    function swap(Order calldata args)
         external
         payable
-        returns (uint64, uint256, uint256)
+        returns (uint64 poolId, uint256 input, uint256 output)
     {
         _preLock();
         if (_currentMulticall == false) _deposit();
 
+        // Return and event variables are kept native token decimals.
+        (poolId, input, output) = (args.poolId, args.input, args.output);
+
         PortfolioPool storage pool = pools[args.poolId];
-        if (!pool.exists()) revert Portfolio_NonExistentPool(args.poolId);
+        if (!pool.exists()) revert Portfolio_NonExistentPool(poolId);
         if (pool.isEmpty()) revert Portfolio_ZeroSwapLiquidity();
 
-        IStrategy strategy = IStrategy(getStrategy(args.poolId));
-        if (!strategy.validatePool(args.poolId)) revert Portfolio_InvalidPool(args.poolId);// forgefmt: disable-line
+        IStrategy strategy = IStrategy(getStrategy(poolId));
+        if (!strategy.validatePool(poolId)) revert Portfolio_InvalidPool(poolId);// forgefmt: disable-line
 
         // Sets the pool's lastTimestamp to the current block timestamp, in storage.
         pool.syncPoolTimestamp(block.timestamp);
 
         // Call the beforeSwap hook to get the pre-swap invariant.
         (bool success, int256 invariant) =
-            strategy.beforeSwap(args.poolId, args.sellAsset, msg.sender);
+            strategy.beforeSwap(poolId, args.sellAsset, msg.sender);
         if (!success) revert Portfolio_BeforeSwapFail();
 
         // Load input and output token information with respective pair tokens.
-        PortfolioPair memory pair = pairs[PoolId.wrap(args.poolId).pairId()];
+        PortfolioPair memory pair = pairs[PoolId.wrap(poolId).pairId()];
 
         // Swap requires an intermediary state where all units are in WAD.
         SwapState memory inter;
@@ -509,13 +512,13 @@ contract Portfolio is ERC1155, IPortfolio {
             // Net balance is the surplus of tokens in the accounting state that can be spent.
             int256 netBalance = getNetBalance(inter.tokenInput);
             if (netBalance > 0) {
-                args.input = uint256(netBalance).safeCastTo128();
+                input = uint256(netBalance).safeCastTo128();
             }
         }
 
         inter.prevInvariant = invariant;
-        inter.amountInputUnit = args.input;
-        inter.amountOutputUnit = args.output;
+        inter.amountInputUnit = input;
+        inter.amountOutputUnit = output;
 
         // Converts input and output amounts to WAD units for the swap math.
         inter = inter.toWad();
@@ -556,10 +559,7 @@ contract Portfolio is ERC1155, IPortfolio {
 
             bool validInvariant;
             (validInvariant, inter.nextInvariant) = strategy.validateSwap(
-                orderInWad.poolId,
-                inter.prevInvariant,
-                adjustedVirtualX,
-                adjustedVirtualY
+                poolId, inter.prevInvariant, adjustedVirtualX, adjustedVirtualY
             );
 
             if (!validInvariant) {
@@ -575,7 +575,7 @@ contract Portfolio is ERC1155, IPortfolio {
         // Increases the independent pool reserve by the input amount, including fee and excluding protocol fee.
         // Decrease the dependent pool reserve by the output amount.
         pool.adjustReserves(
-            orderInWad.sellAsset,
+            args.sellAsset,
             inter.amountInputUnit - inter.protocolFeeAmountUnit,
             inter.amountOutputUnit
         );
@@ -597,19 +597,17 @@ contract Portfolio is ERC1155, IPortfolio {
 
         // Swap event emits amounts in native token decimals.
         emit Swap(
-            args.poolId,
+            poolId,
             inter.tokenInput,
-            args.input,
+            input,
             inter.tokenOutput,
-            args.output,
+            output,
             inter.feeAmountUnit,
             inter.nextInvariant
         );
 
         if (_currentMulticall == false) _settlement();
         _postLock();
-
-        return (args.poolId, args.input, args.output);
     }
 
     /// @inheritdoc IPortfolioActions

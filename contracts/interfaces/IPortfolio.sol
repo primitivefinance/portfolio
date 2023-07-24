@@ -543,7 +543,7 @@ interface IPortfolioActions is IPortfolioRegistryActions {
      * @return input Real quantity of `input` tokens sent to pool, in native token decimals.
      * @return output Real quantity of `output` tokens sent to swapper, in native token decimals.
      */
-    function swap(Order memory args)
+    function swap(Order calldata args)
         external
         payable
         returns (uint64 poolId, uint256 input, uint256 output);
