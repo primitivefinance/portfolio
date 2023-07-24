@@ -14,7 +14,7 @@ error Portfolio_DuplicateToken();
 error Portfolio_Insolvent(address token, int256 net);
 error Portfolio_InsufficientLiquidity();
 error Portfolio_InvalidDecimals(uint8 decimals);
-error Portfolio_InvalidProtocolFee(uint16 fee);
+error Portfolio_InvalidProtocolFee(uint256 protocolFee);
 error Portfolio_InvalidPool(uint64 poolId);
 error Portfolio_InvalidInvariant(int256 prev, int256 next);
 error Portfolio_InvalidPairNonce();

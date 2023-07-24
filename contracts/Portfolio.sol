@@ -546,7 +546,7 @@ contract Portfolio is ERC1155, IPortfolio {
         // --- Effects --- //
 
         {
-            Order memory order = args;
+            Order memory order = args; // todo: input doesnt get set here if it changes from use max
 
             // In the case of a non-zero protocol fee, a small portion of the input amount (protocol fee) is not re-invested to the pool.
             // Therefore, to properly sync the pool's reserve, the protocol fee must be subtracted from the input.
@@ -941,7 +941,7 @@ contract Portfolio is ERC1155, IPortfolio {
             revert Portfolio_NotController();
         }
         if (fee > 20 || fee < 4) {
-            revert Portfolio_InvalidProtocolFee(uint16(fee));
+            revert Portfolio_InvalidProtocolFee(fee);
         }
 
         uint256 prevFee = protocolFee;

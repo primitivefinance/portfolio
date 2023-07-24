@@ -2,6 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
+import { BURNED_LIQUIDITY } from "contracts/libraries/PoolLib.sol";
 
 contract TestPortfolioAllocate is Setup {
     using NormalConfiguration for Configuration;
@@ -693,6 +694,53 @@ contract TestPortfolioAllocate is Setup {
             postQuoteBalance,
             preQuoteBalance + quoteDeallocate - quoteAllocate,
             "quote balance"
+        );
+    }
+
+    function test_allocate_reverts_insufficient_liquidity()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+    {
+        vm.expectRevert(Portfolio_InsufficientLiquidity.selector);
+        subject().allocate(
+            false,
+            actor(),
+            ghost().poolId,
+            uint128(BURNED_LIQUIDITY - 1),
+            type(uint128).max,
+            type(uint128).max
+        );
+    }
+
+    function test_allocate_reverts_portfolio_insolvent()
+        public
+        feeOnTokenTransferConfig
+        useActor
+        usePairTokens(100 ether)
+    {
+        // This will revert with the insolvent error because fee on transfer token
+        // will reduce some of the tokens that are paid to portfolio.
+
+        uint128 liquidity = 1 ether;
+        (uint256 deltaAsset,) =
+            subject().getLiquidityDeltas(ghost().poolId, int128(liquidity));
+        uint256 debt = deltaAsset / 100; // ASSUMES FEE ON TRANSFER IS 1%
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Portfolio_Insolvent.selector,
+                ghost().asset().to_addr(),
+                -int256(debt)
+            )
+        );
+        subject().allocate(
+            false,
+            actor(),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
         );
     }
 }

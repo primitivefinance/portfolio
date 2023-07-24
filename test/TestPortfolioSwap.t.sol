@@ -669,4 +669,42 @@ contract TestPortfolioSwap is Setup {
             // do nothing, since it failed.
         }
     }
+
+    /// blocked by https://github.com/primitivefinance/portfolio/issues/425
+    function test_swap_use_max_from_surplus()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+        allocateSome(1 ether)
+    {
+        bool sellAsset = true;
+        uint256 inputAmount = 0.1 ether;
+
+        // transfer tokens directly to use for the input
+        ghost().asset().to_token().transfer(address(subject()), inputAmount);
+
+        // Estimate amount out.
+        Order memory order = Order({
+            useMax: true,
+            poolId: ghost().poolId,
+            input: 0,
+            output: 0,
+            sellAsset: sellAsset
+        });
+
+        order.output = uint128(
+            subject().getAmountOut(
+                order.poolId, sellAsset, inputAmount, actor()
+            )
+        );
+
+        // Do the swap
+        uint256 prevAssetBalance = ghost().asset().to_token().balanceOf(actor());
+        subject().swap(order);
+        uint256 postAssetBalance = ghost().asset().to_token().balanceOf(actor());
+
+        // Asset balance shouldnt change since we used the max from surplus.
+        assertEq(postAssetBalance, prevAssetBalance, "asset-balance-changed");
+    }
 }

@@ -168,6 +168,15 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         _;
     }
 
+    modifier useRegistryController() {
+        address controller =
+            IPortfolioRegistry(subjects().registry).controller();
+        _ghost_state.file("actor", abi.encode(controller)); // so actor() doesn't break...
+        vm.startPrank(controller);
+        _;
+        vm.stopPrank();
+    }
+
     // ============= Pool Setup Modifiers  ============= //
 
     modifier usePairTokens(uint256 amount) {
@@ -205,6 +214,12 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
             )
         );
         subject().multicall(data);
+        _;
+    }
+
+    modifier setProtocolFee(uint256 fee) {
+        vm.prank(IPortfolioRegistry(subjects().registry).controller());
+        subject().setProtocolFee(fee);
         _;
     }
 

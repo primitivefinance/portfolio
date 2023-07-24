@@ -4,10 +4,6 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioDeallocate is Setup {
-    // todo: fix duration params...
-    uint256 constant TEST_DEALLOCATE_MIN_DURATION = 1;
-    uint256 constant TEST_DEALLOCATE_MAX_DURATION = 700;
-
     function test_deallocate_max()
         public
         defaultConfig
