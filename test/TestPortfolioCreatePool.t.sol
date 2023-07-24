@@ -4,7 +4,9 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioCreatePool is Setup {
+    using NormalConfiguration for Configuration;
     using NormalStrategyLib for PortfolioPool;
+    using { safeCastTo16 } for uint256;
 
     uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 4;
     uint256 internal constant POOL_NONCE_STORAGE_SLOT = 6;
@@ -12,27 +14,25 @@ contract TestPortfolioCreatePool is Setup {
     function testFuzz_createPool(
         uint16 priorityFee,
         uint16 fee,
-        uint16 duration,
-        uint16 volatility,
+        uint32 duration,
+        uint32 volatility,
         uint128 strikePrice,
         uint128 price
     ) public {
         uint24 pairId = uint24(1);
         fee = uint16(bound(fee, MIN_FEE + 1, MAX_FEE));
-        priorityFee = uint16(bound(priorityFee, 1, fee));
-        duration = uint16(bound(duration, 1, 720));
-        volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
+        priorityFee = uint16(bound(priorityFee, MIN_FEE, fee));
+        duration = uint32(bound(duration, MIN_DURATION, MAX_DURATION));
+        volatility = uint32(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
         vm.assume(price > 0);
         vm.assume(strikePrice > 0);
 
-        Configuration memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: strikePrice,
-            volatilityBasisPoints: volatility,
-            durationSeconds: uint32(duration) * 1 days, // todo: fix with correct units
-            isPerpetual: false,
-            priceWad: uint256(price)
-        });
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "strikePriceWad", abi.encode(strikePrice)
+        ).editStrategy("volatilityBasisPoints", abi.encode(volatility))
+            .editStrategy("durationSeconds", abi.encode(duration)).editStrategy(
+            "priceWad", abi.encode(price)
+        );
 
         vm.assume(
             testConfig.reserveXPerWad > 0 && testConfig.reserveYPerWad > 0
@@ -63,21 +63,14 @@ contract TestPortfolioCreatePool is Setup {
         assertEq(config.volatilityBasisPoints, volatility, "volatility");
         assertEq(
             config.durationSeconds,
-            config.isPerpetual ? SECONDS_PER_YEAR : uint32(duration) * 1 days,
+            config.isPerpetual ? SECONDS_PER_YEAR : uint32(duration),
             "duration"
         );
         assertEq(config.strikePriceWad, strikePrice, "strikePrice");
     }
 
     function test_revert_createPool_invalid_pair_nonce() public {
-        Configuration memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 100,
-            volatilityBasisPoints: 100,
-            durationSeconds: 100 * 1 days,
-            isPerpetual: false,
-            priceWad: 1001
-        });
+        Configuration memory testConfig = configureNormalStrategy();
 
         testConfig.reserveXPerWad++; // Avoid the reserve error
         testConfig.reserveYPerWad++; // Avoid the reserve error
@@ -97,14 +90,7 @@ contract TestPortfolioCreatePool is Setup {
     }
 
     function test_createPool_no_strategy_defaults() public defaultConfig {
-        Configuration memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 100,
-            volatilityBasisPoints: 100,
-            durationSeconds: 100 * 1 days,
-            isPerpetual: false,
-            priceWad: 1001
-        });
+        Configuration memory testConfig = configureNormalStrategy();
 
         testConfig.reserveXPerWad++; // Avoid the reserve error
         testConfig.reserveYPerWad++; // Avoid the reserve error
@@ -124,17 +110,12 @@ contract TestPortfolioCreatePool is Setup {
         assertEq(strategy, subject().DEFAULT_STRATEGY());
     }
 
-    function test_revert_createPool_priority_fee_invalid_fee() public {
+    function test_revert_createPool_invalid_priority_fee() public {
         bytes[] memory data = new bytes[](1);
 
-        Configuration memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 1,
-            volatilityBasisPoints: 1,
-            durationSeconds: 1 * 1 days,
-            isPerpetual: false,
-            priceWad: 1
-        });
+        Configuration memory testConfig = configureNormalStrategy().edit(
+            "priorityFeeBasisPoints", abi.encode(0)
+        );
 
         testConfig.reserveXPerWad++; // Avoid the reserve error
         testConfig.reserveYPerWad++; // Avoid the reserve error
@@ -146,7 +127,7 @@ contract TestPortfolioCreatePool is Setup {
                 testConfig.reserveXPerWad,
                 testConfig.reserveYPerWad,
                 1, // fee
-                0, // prior fee
+                testConfig.priorityFeeBasisPoints.safeCastTo16(), // prior fee
                 address(this), // controller
                 subject().DEFAULT_STRATEGY(),
                 testConfig.strategyArgs
@@ -240,8 +221,7 @@ contract TestPortfolioCreatePool is Setup {
                         uint32(100) * 1 days,
                         uint32(block.timestamp),
                         true
-                    ),
-                    100
+                    )
                     )
             )
         );

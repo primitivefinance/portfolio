@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-// Base test contracts
+// Base test contract
 import "forge-std/Test.sol";
+
+// Global test configuration for Portfolio
 import "./Configuration.sol";
 
-// Test types
+// Test helper types
 import { deploy as deployCoin, Coin } from "./utils/CoinType.sol";
 import { GhostType, IPortfolioStruct } from "./utils/GhostType.sol";
+import { safeCastTo16 } from "./utils/Utility.sol";
 
-// Contracts to test
+// Contracts used in testing
 import "solmate/tokens/WETH.sol";
 import "solmate/tokens/ERC1155.sol";
 import "solmate/utils/SafeCastLib.sol";
@@ -20,7 +23,10 @@ import "contracts/test/FeeOnTransferToken.sol";
 import "contracts/test/SimpleRegistry.sol";
 import "contracts/Portfolio.sol";
 
-// Types
+// Strategy to test
+import "./strategies/NormalConfiguration.sol";
+
+// Contracts in the test environment
 struct SubjectsType {
     address deployer;
     address registry;
@@ -28,14 +34,6 @@ struct SubjectsType {
     address portfolio;
     address positionRenderer;
 }
-
-// Constants
-uint16 constant Setup_DEFAULT_FEE = 30;
-uint16 constant Setup_DEFAULT_PRIORITY_FEE = 10;
-uint256 constant DefaultStrategy_DEFAULT_STRIKE = 1e18;
-uint256 constant DefaultStrategy_DEFAULT_VOLATILITY = 1000;
-uint256 constant DefaultStrategy_DEFAULT_DURATION = 1 days;
-uint256 constant DefaultStrategy_DEFAULT_PRICE = 1e18;
 
 // Interfaces
 interface ISetup {
@@ -73,63 +71,9 @@ interface ISetup {
     function positionRenderer() external view returns (address);
 }
 
-/// Normal strategy test helper
-library DefaultStrategy {
-    using SafeCastLib for uint256;
-
-    /// @dev Gets the test configuration with default values.
-    function getDefaultTestConfig(address portfolio)
-        internal
-        view
-        returns (Configuration memory config)
-    {
-        return getTestConfig(portfolio, 0, 0, 0, false, 0);
-    }
-
-    /// @dev Transforms the necessary parameters and strategy config to a common config.
-    function getTestConfig(
-        address portfolio,
-        uint256 strikePriceWad,
-        uint256 volatilityBasisPoints,
-        uint256 durationSeconds,
-        bool isPerpetual,
-        uint256 priceWad
-    ) internal view returns (Configuration memory config) {
-        if (strikePriceWad == 0) {
-            strikePriceWad = DefaultStrategy_DEFAULT_STRIKE;
-        }
-        if (volatilityBasisPoints == 0) {
-            volatilityBasisPoints = DefaultStrategy_DEFAULT_VOLATILITY;
-        }
-        if (durationSeconds == 0) {
-            durationSeconds = DefaultStrategy_DEFAULT_DURATION;
-        }
-        if (priceWad == 0) priceWad = DefaultStrategy_DEFAULT_PRICE;
-
-        // These get casted down and silently revert if they overflow the target type.
-        require(strikePriceWad <= type(uint128).max, "Setup_InvalidStrike");
-        require(
-            volatilityBasisPoints <= type(uint32).max, "Setup_InvalidVolatility"
-        );
-        require(durationSeconds <= type(uint32).max, "Setup_InvalidDuration");
-
-        (config.strategyArgs, config.reserveXPerWad, config.reserveYPerWad) =
-        INormalStrategy(IPortfolio(portfolio).DEFAULT_STRATEGY())
-            .getStrategyData({
-            strikePriceWad: strikePriceWad,
-            volatilityBasisPoints: volatilityBasisPoints,
-            durationSeconds: durationSeconds,
-            isPerpetual: isPerpetual,
-            priceWad: priceWad
-        });
-
-        return config;
-    }
-}
-
 contract Setup is ISetup, Test, ERC1155TokenReceiver {
-    using SafeCastLib for uint256;
-    using DefaultStrategy for Configuration;
+    using NormalConfiguration for Configuration;
+    using SafeCastLib for *;
 
     // Test ghost state
     GhostType internal _ghost_state;
@@ -176,8 +120,19 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
 
     // ============= Edit Test Environment ============= //
 
+    /// @dev Updates the ghost pool, "pool()".
     function setGhostPoolId(uint64 id) public {
         _ghost_state.file("poolId", abi.encode(id));
+    }
+
+    /// @dev Uses the global test Configuration type to create a pool and set the ghost state.
+    function activateConfig(Configuration memory config) internal {
+        // Creates a pool with poolId and sets the ghost pool id.
+        setGhostPoolId(
+            config.activate(
+                address(subject()), NormalConfiguration.validateNormalStrategy
+            )
+        );
     }
 
     //  ============= Test Setup Modifiers ============= //
@@ -301,11 +256,10 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     }
 
     modifier defaultConfig() {
-        Configuration memory config =
-            DefaultStrategy.getDefaultTestConfig(address(subject()));
+        Configuration memory config = configureNormalStrategy();
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
 
         _;
     }
@@ -320,50 +274,43 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         bool isPerpetual,
         uint256 priceWad
     ) {
-        Configuration memory config = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: strikePriceWad,
-            volatilityBasisPoints: volatilityBasisPoints,
-            durationSeconds: durationSeconds,
-            isPerpetual: isPerpetual,
-            priceWad: priceWad
-        });
-
-        (config.feeBasisPoints, config.priorityFeeBasisPoints) =
-            (feeBasisPoints, priorityFeeBasisPoints);
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "strikePriceWad", abi.encode(strikePriceWad)
+        ).editStrategy(
+            "volatilityBasisPoints", abi.encode(volatilityBasisPoints)
+        ).editStrategy("durationSeconds", abi.encode(durationSeconds))
+            .editStrategy("isPerpetual", abi.encode(isPerpetual)).editStrategy(
+            "priceWad", abi.encode(priceWad)
+        ).edit("feeBasisPoints", abi.encode(feeBasisPoints)).edit(
+            "priorityFeeBasisPoints", abi.encode(priorityFeeBasisPoints)
+        ).edit("controller", abi.encode(controller));
 
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 
     modifier defaultControlledConfig() {
-        Configuration memory config =
-            DefaultStrategy.getDefaultTestConfig(address(subject()));
+        Configuration memory config = configureNormalStrategy();
         (config.asset, config.quote) = deployDefaultTokenPair();
 
         config.controller = address(this);
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 
     modifier stablecoinPortfolioConfig() {
-        uint16 duration = type(uint16).max;
-        uint16 volatility = uint16(MIN_VOLATILITY);
+        uint32 duration = type(uint32).max;
+        uint32 volatility = uint32(MIN_VOLATILITY);
 
-        Configuration memory config = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 1e18,
-            volatilityBasisPoints: volatility,
-            durationSeconds: duration, // todo: fix
-            isPerpetual: true,
-            priceWad: 1e18
-        });
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "durationSeconds", abi.encode(duration)
+        ).editStrategy("volatilityBasisPoints", abi.encode(volatility));
 
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 
@@ -373,11 +320,10 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 6));
         vm.label(quote.to_addr(), "quote-6");
 
-        Configuration memory config =
-            DefaultStrategy.getDefaultTestConfig(address(subject()));
+        Configuration memory config = configureNormalStrategy();
         (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 
@@ -387,51 +333,40 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Coin quote = deployCoin("FOT", abi.encode("quote", "QUOTE", 18));
         vm.label(quote.to_addr(), "quote-fot-18");
 
-        Configuration memory config =
-            DefaultStrategy.getDefaultTestConfig(address(subject()));
+        Configuration memory config = configureNormalStrategy();
         (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 
     modifier wethConfig() {
         Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
-        Configuration memory config =
-            DefaultStrategy.getDefaultTestConfig(address(subject()));
+        Configuration memory config = configureNormalStrategy();
         (config.asset, config.quote) = (weth(), quote.to_addr());
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 
-    modifier durationConfig(uint16 duration) {
-        Configuration memory config = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 0,
-            volatilityBasisPoints: 0,
-            durationSeconds: uint32(duration) * 1 days, // todo: fix
-            isPerpetual: false,
-            priceWad: 0
-        });
+    modifier durationConfig(uint32 durationSeconds) {
+        console.log("duration", durationSeconds);
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "durationSeconds", abi.encode(durationSeconds)
+        );
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 
-    modifier volatilityConfig(uint16 volatility) {
-        Configuration memory config = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 0,
-            volatilityBasisPoints: volatility,
-            durationSeconds: 0, // todo: fix
-            isPerpetual: false,
-            priceWad: 0
-        });
+    modifier volatilityConfig(uint32 volatilityBasisPoints) {
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "volatilityBasisPoints", abi.encode(volatilityBasisPoints)
+        );
         (config.asset, config.quote) = deployDefaultTokenPair();
 
-        _ghost_state.poolId = config.instantiate(address(subject()));
+        activateConfig(config);
         _;
     }
 

@@ -4,10 +4,9 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioAllocate is Setup {
-    using AssemblyLib for uint256;
+    using NormalConfiguration for Configuration;
 
-    uint256 constant TEST_ALLOCATE_MIN_DURATION = 1;
-    uint256 constant TEST_ALLOCATE_MAX_DURATION = 720;
+    using AssemblyLib for uint256;
 
     function test_multicall_create_pair_pool_allocate() public useActor {
         MockERC20 tokenA = new MockERC20("TokenA", "AAA", 18);
@@ -24,14 +23,9 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.createPair, (address(tokenA), address(tokenB))
         );
 
-        Configuration memory testConfig = DefaultStrategy.getTestConfig({
-            portfolio: address(subject()),
-            strikePriceWad: 1 ether,
-            volatilityBasisPoints: 100,
-            durationSeconds: 100 * 1 days,
-            isPerpetual: false,
-            priceWad: 1 ether
-        });
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "durationSeconds", abi.encode(100 * 1 days)
+        ).editStrategy("volatilityBasisPoints", abi.encode(100));
 
         data[1] = abi.encodeCall(
             IPortfolioActions.createPool,
@@ -475,17 +469,11 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_duration_modifies_liquidity(
-        uint16 duration,
+        uint32 duration,
         uint64 liquidity
     )
         public
-        durationConfig(
-            uint16(
-                bound(
-                    duration, TEST_ALLOCATE_MIN_DURATION, TEST_ALLOCATE_MAX_DURATION
-                )
-            )
-        )
+        durationConfig(uint32(bound(duration, MIN_DURATION, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -495,18 +483,12 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_low_duration_modifies_liquidity(
-        uint16 duration,
+        uint32 duration,
         uint64 liquidity
     )
         public
         durationConfig(
-            uint16(
-                bound(
-                    duration,
-                    TEST_ALLOCATE_MIN_DURATION,
-                    TEST_ALLOCATE_MIN_DURATION + 100
-                )
-            )
+            uint32(bound(duration, MIN_DURATION, MIN_DURATION + (100 days)))
         )
         useActor
         usePairTokens(500 ether)
@@ -517,18 +499,12 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_high_duration_modifies_liquidity(
-        uint16 duration,
+        uint32 duration,
         uint64 liquidity
     )
         public
         durationConfig(
-            uint16(
-                bound(
-                    duration,
-                    TEST_ALLOCATE_MAX_DURATION - 100,
-                    TEST_ALLOCATE_MAX_DURATION
-                )
-            )
+            uint32(bound(duration, MAX_DURATION - (100 days), MAX_DURATION))
         )
         useActor
         usePairTokens(500 ether)
@@ -543,7 +519,7 @@ contract TestPortfolioAllocate is Setup {
         uint64 liquidity
     )
         public
-        volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        volatilityConfig(uint32(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -558,7 +534,7 @@ contract TestPortfolioAllocate is Setup {
     )
         public
         volatilityConfig(
-            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+            uint32(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
         usePairTokens(500 ether)
@@ -574,7 +550,7 @@ contract TestPortfolioAllocate is Setup {
     )
         public
         volatilityConfig(
-            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+            uint32(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
         usePairTokens(500 ether)
@@ -652,8 +628,7 @@ contract TestPortfolioAllocate is Setup {
             type(uint128).max
         );
 
-        Configuration memory testConfig =
-            DefaultStrategy.getDefaultTestConfig(address(subject()));
+        Configuration memory testConfig = configureNormalStrategy();
 
         uint64 poolId = subject().createPool(
             1, // pair id

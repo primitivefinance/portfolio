@@ -37,12 +37,14 @@ contract NormalStrategy is INormalStrategy {
 
     // ====== Required ====== //
 
+    event log(uint256);
+
     /// @inheritdoc IStrategy
     function afterCreate(
         uint64 poolId,
         bytes calldata strategyArgs
     ) public override returns (bool success) {
-        PortfolioConfig memory config = strategyArgs.decode();
+        PortfolioConfig memory config = strategyArgs.decode(); // note: decodes can revert silently.
 
         configs[poolId].modify({
             strikePriceWad: config.strikePriceWad,

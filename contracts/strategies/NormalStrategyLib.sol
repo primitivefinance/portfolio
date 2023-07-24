@@ -42,12 +42,14 @@ uint256 constant MIN_VOLATILITY = 1; // 0.01%
 uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = SECONDS_PER_DAY; // Miniumum duration is one day.
 uint256 constant MAX_DURATION = SECONDS_PER_YEAR * 3; // Maximum duration is three years.
+uint256 constant STRATEGY_ARGS_LENGTH = 32 * 5; // Not packed, 5 words total = 32 * 5 = 160 bytes.
 
 error NormalStrategyLib_ConfigExists();
 error NormalStrategyLib_UpperPriceLimitReached();
 error NormalStrategyLib_LowerPriceLimitReached();
 error NormalStrategyLib_NonExpiringPool();
 error NormalStrategyLib_InvalidDuration();
+error NormalStrategyLib_InvalidStrategyArgs();
 error NormalStrategyLib_InvalidStrikePrice();
 error NormalStrategyLib_InvalidVolatility();
 
@@ -458,6 +460,10 @@ library NormalStrategyLib {
         pure
         returns (PortfolioConfig memory)
     {
+        if (bytes(strategyArgs).length != STRATEGY_ARGS_LENGTH) {
+            revert NormalStrategyLib_InvalidStrategyArgs();
+        }
+
         return abi.decode(strategyArgs, (PortfolioConfig));
     }
 

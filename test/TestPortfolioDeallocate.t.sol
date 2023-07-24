@@ -84,18 +84,10 @@ contract TestPortfolioDeallocate is Setup {
 
     function testFuzz_deallocate_duration(
         uint64 liquidity,
-        uint16 duration
+        uint32 duration
     )
         public
-        durationConfig(
-            uint16(
-                bound(
-                    duration,
-                    TEST_DEALLOCATE_MIN_DURATION,
-                    TEST_DEALLOCATE_MAX_DURATION
-                )
-            )
-        )
+        durationConfig(uint32(bound(duration, MIN_DURATION, MAX_DURATION)))
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))

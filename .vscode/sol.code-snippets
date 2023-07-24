@@ -21,6 +21,7 @@
 			"import './Setup.sol';",
 			"$2",
 			"contract TestTemplate is Setup {",
+			"\t using NormalConfiguration for Configuration;",
 			"$2",
 			"}"
 		],

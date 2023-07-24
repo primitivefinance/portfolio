@@ -11,10 +11,6 @@ contract TestPortfolioSwap is Setup {
     using FixedPointMathLib for uint256;
     using FixedPointMathLib for uint128;
 
-    // todo: fix duration params...
-    uint256 constant TEST_SWAP_MIN_DURATION = 1;
-    uint256 constant TEST_SWAP_MAX_DURATION = 700;
-
     function test_swap_increases_user_balance_token_out()
         public
         defaultConfig
@@ -209,12 +205,10 @@ contract TestPortfolioSwap is Setup {
     function testFuzz_swap_durationConfig(
         uint256 seed,
         uint128 amountIn,
-        uint16 dur
+        uint32 dur
     )
         public
-        durationConfig(
-            uint16(bound(dur, TEST_SWAP_MIN_DURATION, TEST_SWAP_MAX_DURATION))
-        )
+        durationConfig(uint32(bound(dur, MIN_DURATION, MAX_DURATION)))
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
@@ -226,10 +220,10 @@ contract TestPortfolioSwap is Setup {
     function testFuzz_swap_volatilityConfig(
         uint256 seed,
         uint128 amountIn,
-        uint16 vol
+        uint32 vol
     )
         public
-        volatilityConfig(uint16(bound(vol, MIN_VOLATILITY, MAX_VOLATILITY)))
+        volatilityConfig(uint32(bound(vol, MIN_VOLATILITY, MAX_VOLATILITY)))
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
