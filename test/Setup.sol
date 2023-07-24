@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 
 // Global test configuration for Portfolio
 import "./Configuration.sol";
+import "./strategies/NormalConfiguration.sol";
 
 // Test helper types
 import { deploy as deployCoin, Coin } from "./utils/CoinType.sol";
@@ -24,7 +25,7 @@ import "contracts/test/SimpleRegistry.sol";
 import "contracts/Portfolio.sol";
 
 // Strategy to test
-import "./strategies/NormalConfiguration.sol";
+import "contracts/strategies/NormalStrategy.sol";
 
 // Contracts in the test environment
 struct SubjectsType {

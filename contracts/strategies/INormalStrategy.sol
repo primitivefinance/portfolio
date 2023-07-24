@@ -11,6 +11,19 @@ import "../interfaces/IStrategy.sol";
  * Interface for the Normal Distribution Liquidity Strategy.
  */
 interface INormalStrategy is IStrategy {
+    /// @dev Emitted when this contract is created.
+    event Genesis(address indexed portfolio);
+
+    /// @dev Emitted after a pool is created with a config.
+    event AfterCreate(
+        address indexed portfolio,
+        uint64 indexed poolId,
+        uint256 strikePriceWad,
+        uint256 volatilityBasisPoints,
+        uint256 durationSeconds,
+        bool isPerpetual
+    );
+
     /**
      * @notice
      * Gets reserves of a pool which have a reported price equal to the given price.

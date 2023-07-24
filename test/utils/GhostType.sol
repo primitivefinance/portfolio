@@ -134,9 +134,7 @@ library Ghost {
         view
         returns (IStrategy)
     {
-        return IStrategy(
-            IPortfolioStruct(self.subject).pools(self.poolId).strategy
-        );
+        return IStrategy(self.pool().strategy);
     }
 
     /// @dev Gets the subject's default strategy.

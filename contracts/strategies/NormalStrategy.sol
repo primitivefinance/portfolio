@@ -10,6 +10,9 @@ import "./NormalStrategyLib.sol";
 /// @dev Enforces minimum positive invariant growth for swaps in pools using this strategy.
 uint256 constant MINIMUM_INVARIANT_DELTA = 1;
 
+/// @dev Emitted when a hook is called by a non-portfolio address.
+error NormalStrategy_NotPortfolio();
+
 /**
  * @title
  * Normal Strategy
@@ -36,6 +39,14 @@ contract NormalStrategy is INormalStrategy {
 
     constructor(address portfolio_) {
         portfolio = portfolio_;
+        emit Genesis(portfolio_);
+    }
+
+    /// @dev Mutable function hooks are only called by the immutable portfolio address.
+    modifier hook() {
+        if (msg.sender != portfolio) revert NormalStrategy_NotPortfolio();
+
+        _;
     }
 
     // ====== Required ====== //
@@ -44,10 +55,20 @@ contract NormalStrategy is INormalStrategy {
     function afterCreate(
         uint64 poolId,
         bytes calldata strategyArgs
-    ) public override returns (bool success) {
+    ) public hook returns (bool success) {
         PortfolioConfig memory config = strategyArgs.decode();
 
+        // Assumes after the createPool call goes through it can never reach this again.
         configs[poolId].modify({
+            strikePriceWad: config.strikePriceWad,
+            volatilityBasisPoints: config.volatilityBasisPoints,
+            durationSeconds: config.durationSeconds,
+            isPerpetual: config.isPerpetual
+        });
+
+        emit AfterCreate({
+            portfolio: portfolio,
+            poolId: poolId,
             strikePriceWad: config.strikePriceWad,
             volatilityBasisPoints: config.volatilityBasisPoints,
             durationSeconds: config.durationSeconds,
@@ -60,7 +81,7 @@ contract NormalStrategy is INormalStrategy {
         uint64 poolId,
         bool sellAsset,
         address swapper
-    ) public override returns (bool, int256) {
+    ) public hook returns (bool, int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
         (, int256 invariant,) = pool.getSwapInvariants({
@@ -83,7 +104,7 @@ contract NormalStrategy is INormalStrategy {
     }
 
     /// @inheritdoc IStrategy
-    function validatePool(uint64 poolId) public view override returns (bool) {
+    function validatePool(uint64 poolId) public view returns (bool) {
         // This strategy is validated by default for any pool that uses it.
         return true;
     }
@@ -94,7 +115,7 @@ contract NormalStrategy is INormalStrategy {
         int256 invariant,
         uint256 reserveX,
         uint256 reserveY
-    ) public view override returns (bool, int256) {
+    ) public view returns (bool, int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
         // Update the reserves in memory.
@@ -142,7 +163,7 @@ contract NormalStrategy is INormalStrategy {
         bool sellAsset,
         uint256 amountIn,
         address swapper
-    ) public view override returns (uint256 output) {
+    ) public view returns (uint256 output) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
         PortfolioPair memory pair =
@@ -171,12 +192,7 @@ contract NormalStrategy is INormalStrategy {
     }
 
     /// @inheritdoc IPortfolioStrategy
-    function getSpotPrice(uint64 poolId)
-        public
-        view
-        override
-        returns (uint256 price)
-    {
+    function getSpotPrice(uint64 poolId) public view returns (uint256 price) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
         price = configs[poolId].transform().approximatePriceGivenX({
             reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity)
@@ -188,7 +204,7 @@ contract NormalStrategy is INormalStrategy {
         uint64 poolId,
         bool sellAsset,
         address swapper
-    ) public view override returns (Order memory) {
+    ) public view returns (Order memory) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
         PortfolioConfig memory config = configs[poolId];
         NormalCurve memory curve = config.transform();
@@ -247,7 +263,6 @@ contract NormalStrategy is INormalStrategy {
     function getInvariant(uint64 poolId)
         public
         view
-        override
         returns (int256 invariant)
     {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
@@ -278,7 +293,7 @@ contract NormalStrategy is INormalStrategy {
     function approximateReservesGivenPrice(
         uint256 priceWad,
         bytes memory strategyArgs
-    ) public view override returns (uint256, uint256) {
+    ) public view returns (uint256, uint256) {
         PortfolioConfig memory config = strategyArgs.decode();
         NormalCurve memory curve = config.transform();
         return curve.approximateReservesGivenPrice(priceWad);
@@ -306,7 +321,6 @@ contract NormalStrategy is INormalStrategy {
     )
         public
         pure
-        override
         returns (bytes memory strategyData, uint256 initialX, uint256 initialY)
     {
         PortfolioConfig memory config = PortfolioConfig(
