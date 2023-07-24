@@ -45,9 +45,10 @@ struct Configuration {
     bytes strategyArgs;
 }
 
-using { activate, edit, validate } for Configuration global;
+using { activate, edit, fuzz, validate } for Configuration global;
 
 error Configuration_InvalidKey(bytes32 what);
+error Configuration_FuzzInvalidKey(bytes32 what);
 
 address constant Configuration_DEFAULT_CONTROLLER = address(0);
 address constant Configuration_DEFAULT_STRATEGY = address(0);
@@ -185,6 +186,25 @@ function edit(
         self.strategyArgs = value;
     } else {
         revert Configuration_InvalidKey(key);
+    }
+
+    return self;
+}
+
+/// @dev Fuzzes the fee arguments within its valid range.
+function fuzz(
+    Configuration memory self,
+    function (uint256 , uint256 , uint256) internal view returns (uint256) bound,
+    bytes32 key,
+    uint256 seed
+) view returns (Configuration memory) {
+    if (key == "feeBasisPoints") {
+        self.feeBasisPoints = bound(seed, MIN_FEE, MAX_FEE).safeCastTo16();
+    } else if (key == "priorityFeeBasisPoints") {
+        self.priorityFeeBasisPoints =
+            bound(seed, MIN_FEE, self.feeBasisPoints).safeCastTo16();
+    } else {
+        revert Configuration_FuzzInvalidKey(key);
     }
 
     return self;

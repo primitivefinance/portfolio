@@ -127,6 +127,10 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
 
     /// @dev Uses the global test Configuration type to create a pool and set the ghost state.
     function activateConfig(Configuration memory config) internal {
+        if (config.asset == address(0) && config.quote == address(0)) {
+            (config.asset, config.quote) = deployDefaultTokenPair();
+        }
+
         // Creates a pool with poolId and sets the ghost pool id.
         setGhostPoolId(
             config.activate(
@@ -257,10 +261,8 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
 
     modifier defaultConfig() {
         Configuration memory config = configureNormalStrategy();
-        (config.asset, config.quote) = deployDefaultTokenPair();
 
         activateConfig(config);
-
         _;
     }
 
@@ -285,15 +287,12 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
             "priorityFeeBasisPoints", abi.encode(priorityFeeBasisPoints)
         ).edit("controller", abi.encode(controller));
 
-        (config.asset, config.quote) = deployDefaultTokenPair();
-
         activateConfig(config);
         _;
     }
 
     modifier defaultControlledConfig() {
         Configuration memory config = configureNormalStrategy();
-        (config.asset, config.quote) = deployDefaultTokenPair();
 
         config.controller = address(this);
         activateConfig(config);
@@ -307,8 +306,6 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Configuration memory config = configureNormalStrategy().editStrategy(
             "durationSeconds", abi.encode(duration)
         ).editStrategy("volatilityBasisPoints", abi.encode(volatility));
-
-        (config.asset, config.quote) = deployDefaultTokenPair();
 
         activateConfig(config);
         _;
@@ -349,12 +346,35 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         _;
     }
 
+    // So this is interesting...
+    // Bound is a virtual function on an abstract contract
+    // So it doesn't have a Function Type (yes, uppercase), that we can access to pass through as a fn arg.
+    // So we wrap it with this, to pass to our fuzzStrategy and fuzz functions.
+    // https://docs.soliditylang.org/en/v0.8.20/contracts.html#abstract-contracts
+    function _bound_wrapper(
+        uint256 x,
+        uint256 min,
+        uint256 max
+    ) internal view returns (uint256 result) {
+        result = bound(x, min, max);
+    }
+
+    modifier fuzzConfig(bytes32 key, uint256 seed) {
+        Configuration memory config = configureNormalStrategy();
+        if (key == "feeBasisPoints" || key == "priorityFeeBasisPoints") {
+            config = config.fuzz(_bound_wrapper, key, seed);
+        } else {
+            config = config.fuzzStrategy(_bound_wrapper, key, seed);
+        }
+
+        activateConfig(config);
+        _;
+    }
+
     modifier durationConfig(uint32 durationSeconds) {
-        console.log("duration", durationSeconds);
         Configuration memory config = configureNormalStrategy().editStrategy(
             "durationSeconds", abi.encode(durationSeconds)
         );
-        (config.asset, config.quote) = deployDefaultTokenPair();
 
         activateConfig(config);
         _;
@@ -364,7 +384,6 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Configuration memory config = configureNormalStrategy().editStrategy(
             "volatilityBasisPoints", abi.encode(volatilityBasisPoints)
         );
-        (config.asset, config.quote) = deployDefaultTokenPair();
 
         activateConfig(config);
         _;

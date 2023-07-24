@@ -54,6 +54,7 @@ function configureNormalStrategy() pure returns (Configuration memory) {
 /// @dev Use this in the `Setup.sol` file to test the normal strategy: `using NormalConfiguration for Configuration`.
 library NormalConfiguration {
     error NormalConfiguration_InvalidKey(bytes32 what);
+    error NormalConfiguration_FuzzInvalidKey(bytes32 what);
 
     /// @dev Validates the normal strategy configuration, reverting if invalid, used in `Configuration.activate`.
     function validateNormalStrategy(Configuration memory self)
@@ -148,5 +149,44 @@ library NormalConfiguration {
         (config.reserveXPerWad, config.reserveYPerWad) =
             strategyConfig.transform().approximateReservesGivenPrice(priceWad);
         return config;
+    }
+
+    /// @dev Fuzzes the normal strategy arguments within their valid ranges.
+    function fuzzStrategy(
+        Configuration memory self,
+        function (uint256 , uint256 , uint256) internal view returns (uint256)
+            bound,
+        bytes32 key,
+        uint256 seed
+    ) internal view returns (Configuration memory) {
+        PortfolioConfig memory strategyConfig = self.strategyArgs.decode();
+
+        // Make sure to fuzz price at the end!
+        if (key == "priceWad") {
+            // todo: find a better lower bound
+            // todo: find a better upper bound
+            uint128 price = bound(
+                seed,
+                strategyConfig.strikePriceWad / 2,
+                strategyConfig.strikePriceWad * 2
+            ).safeCastTo128();
+
+            return setReserves(self, price);
+        }
+
+        if (key == "strikePriceWad") {
+            strategyConfig.strikePriceWad =
+                bound(seed, MIN_STRIKE_PRICE, MAX_STRIKE_PRICE).safeCastTo128();
+        } else if (key == "volatilityBasisPoints") {
+            strategyConfig.volatilityBasisPoints =
+                bound(seed, MIN_VOLATILITY, MAX_VOLATILITY).safeCastTo32();
+        } else if (key == "durationSeconds") {
+            strategyConfig.durationSeconds =
+                bound(seed, MIN_DURATION, MAX_DURATION).safeCastTo32();
+        } else {
+            revert NormalConfiguration_FuzzInvalidKey(key);
+        }
+
+        return self.edit("strategyArgs", strategyConfig.encode());
     }
 }
