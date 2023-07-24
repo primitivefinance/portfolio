@@ -90,17 +90,22 @@ contract TestGas is Setup {
         allocateSome(1 ether)
     {
         bool sellAsset = true;
-        uint128 amountIn = uint128(0.01 ether);
+
+        Order memory maxOrder =
+            subject().getMaxOrder(ghost().poolId, sellAsset, actor());
+        uint128 inputAmount = maxOrder.input / 2;
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, actor())
-                * 95 / 100
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, inputAmount, actor()
+            )
         );
+
         bytes[] memory data = new bytes[](1);
 
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
-            input: amountIn,
+            input: inputAmount,
             output: estimatedAmountOut,
             sellAsset: sellAsset
         });
@@ -781,6 +786,7 @@ contract TestGas is Setup {
         _subject.multicall(instructions);
     }
 
+    /// @dev blocked by https://github.com/primitivefinance/portfolio/issues/423
     function test_gas_chain_swap_allocate_from_portfolio()
         public
         pauseGas

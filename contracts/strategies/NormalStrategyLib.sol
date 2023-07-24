@@ -598,27 +598,36 @@ library NormalStrategyLib {
         NormalCurve memory curve = transform(config);
         curve.invariant = prevInv;
 
-        uint256 dependentReserve;
+        uint256 adjustedDependentReserve;
         bool sellAsset = order.sellAsset;
 
         // Approximate the output reserve per liquidity using the math functions.
         if (sellAsset) {
             curve.reserveXPerWad = independentReserve;
             curve.reserveYPerWad = curve.approximateYGivenX();
-            dependentReserve = curve.reserveYPerWad;
+            adjustedDependentReserve = curve.reserveYPerWad;
         } else {
             curve.reserveYPerWad = independentReserve;
             curve.reserveXPerWad = curve.approximateXGivenY();
-            dependentReserve = curve.reserveXPerWad;
+            adjustedDependentReserve = curve.reserveXPerWad;
         }
 
-        uint256 lower = dependentReserve.mulDivDown(98, 100);
-        uint256 upper = dependentReserve.mulDivUp(102, 100);
-        amountOutWad = dependentReserve;
+        // If the approximated dependent reserve is 0,
+        // then the output amount is the remaining dependent reserves.
+        // Since Portfolio does not rely on the output of this function to verify swaps,
+        // "tricking" the dependent reserve to become 0 will not result in a vulnerability.
+        // It may result in a mispriced swap if this output is relied on or off chain.
+        if (adjustedDependentReserve == 0) {
+            return (sellAsset ? self.virtualY : self.virtualX);
+        }
+
+        uint256 lower = adjustedDependentReserve.mulDivDown(98, 100);
+        uint256 upper = adjustedDependentReserve.mulDivUp(102, 100);
 
         // Output reserve is approximated with the derived math functions,
         // but to get it precise it needs a root finding algorithm.
-        amountOutWad = bisection(
+        // Approximates the dependent reserve per liquidity by finding the root of the trading function.
+        adjustedDependentReserve = bisection(
             abi.encode(curve),
             lower,
             upper,
@@ -627,10 +636,14 @@ library NormalStrategyLib {
             sellAsset ? findRootForSwappingInX : findRootForSwappingInY
         );
 
-        amountOutWad++;
-        amountOutWad = amountOutWad.mulWadDown(self.liquidity);
-        amountOutWad =
-            (sellAsset ? self.virtualY : self.virtualX) - amountOutWad;
+        // Rounded up since the bisection could result in a fractional value, which is truncated.
+        adjustedDependentReserve++;
+        // Convert the adjustedDependentReserve per liquidity to adjustedDependentReserve for all liquidity.
+        adjustedDependentReserve =
+            adjustedDependentReserve.mulWadDown(self.liquidity);
+        // Compute the difference between the previous dependent reserve and adjusted dependent reserve.
+        amountOutWad = (sellAsset ? self.virtualY : self.virtualX)
+            - adjustedDependentReserve;
     }
 
     function findRootForSwappingInX(

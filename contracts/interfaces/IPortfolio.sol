@@ -279,6 +279,13 @@ interface IPortfolioStrategy {
      * @dev
      * Computes an amount out of tokens given an `amountIn`.
      *
+     * @custom:warning
+     * This function returns a value that makes it vulnerable to manipulation onchain.
+     * Do not rely on the function of this output for any critical logic onchain.
+     * Use this functions offchain to approximate the output amount of a swap.
+     * This uses approximated math functions, which can lead to error and thus
+     * produce swap orders that are mispriced.
+     *
      * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param amountIn Quantity of tokens to swap in, denominated in native token decimal units.
      * @param swapper Address that will execute the swap.
