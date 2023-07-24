@@ -61,11 +61,11 @@ contract TestPortfolioDeallocate is Setup {
     }
 
     function testFuzz_deallocate_volatility(
-        uint64 liquidity,
-        uint16 volatility
+        uint256 seed,
+        uint64 liquidity
     )
         public
-        volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -83,11 +83,11 @@ contract TestPortfolioDeallocate is Setup {
     }
 
     function testFuzz_deallocate_duration(
-        uint64 liquidity,
-        uint32 duration
+        uint256 seed,
+        uint64 liquidity
     )
         public
-        durationConfig(uint32(bound(duration, MIN_DURATION, MAX_DURATION)))
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))

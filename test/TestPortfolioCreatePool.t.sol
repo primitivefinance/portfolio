@@ -11,62 +11,34 @@ contract TestPortfolioCreatePool is Setup {
     uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 4;
     uint256 internal constant POOL_NONCE_STORAGE_SLOT = 6;
 
-    function testFuzz_createPool(
-        uint16 priorityFee,
-        uint16 fee,
-        uint32 duration,
-        uint32 volatility,
-        uint128 strikePrice,
-        uint128 price
-    ) public {
-        uint24 pairId = uint24(1);
-        fee = uint16(bound(fee, MIN_FEE + 1, MAX_FEE));
-        priorityFee = uint16(bound(priorityFee, MIN_FEE, fee));
-        duration = uint32(bound(duration, MIN_DURATION, MAX_DURATION));
-        volatility = uint32(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-        vm.assume(price > 0);
-        vm.assume(strikePrice > 0);
-
-        Configuration memory testConfig = configureNormalStrategy().editStrategy(
-            "strikePriceWad", abi.encode(strikePrice)
-        ).editStrategy("volatilityBasisPoints", abi.encode(volatility))
-            .editStrategy("durationSeconds", abi.encode(duration)).editStrategy(
-            "priceWad", abi.encode(price)
-        );
-
-        vm.assume(
-            testConfig.reserveXPerWad > 0 && testConfig.reserveYPerWad > 0
-        );
-
-        subject().createPool(
-            pairId, // magic pair id to use the nonce, which is the createPairId!
-            testConfig.reserveXPerWad,
-            testConfig.reserveYPerWad,
-            fee, // fee
-            priorityFee, // prior fee
-            address(this), // controller
-            subject().DEFAULT_STRATEGY(),
-            testConfig.strategyArgs
-        );
-
-        uint64 poolId = AssemblyLib.encodePoolId(
-            pairId, true, subject().getPoolNonce(pairId)
-        );
-        setGhostPoolId(poolId);
-
+    function testFuzz_createPool(uint256 seed) public fuzzAllConfig(seed) {
         PortfolioPool memory pool = ghost().pool();
         PortfolioConfig memory config = ghost().config();
+        PortfolioConfig memory globalPortfolioConfig =
+            NormalStrategyLib.decode(global_config().strategyArgs);
 
-        assertEq(pool.controller, address(this), "controller");
-        assertEq(pool.priorityFeeBasisPoints, priorityFee, "priorityFee");
-        assertEq(pool.feeBasisPoints, fee, "fee");
-        assertEq(config.volatilityBasisPoints, volatility, "volatility");
+        assertEq(pool.controller, global_config().controller, "controller");
+        assertEq(
+            pool.priorityFeeBasisPoints,
+            global_config().priorityFeeBasisPoints,
+            "priorityFee"
+        );
+        assertEq(pool.feeBasisPoints, global_config().feeBasisPoints, "fee");
+        assertEq(
+            config.volatilityBasisPoints,
+            globalPortfolioConfig.volatilityBasisPoints,
+            "volatility"
+        );
         assertEq(
             config.durationSeconds,
-            config.isPerpetual ? SECONDS_PER_YEAR : uint32(duration),
+            globalPortfolioConfig.durationSeconds,
             "duration"
         );
-        assertEq(config.strikePriceWad, strikePrice, "strikePrice");
+        assertEq(
+            config.strikePriceWad,
+            globalPortfolioConfig.strikePriceWad,
+            "strikePrice"
+        );
     }
 
     function test_revert_createPool_invalid_pair_nonce() public {

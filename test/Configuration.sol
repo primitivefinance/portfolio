@@ -53,7 +53,7 @@ error Configuration_FuzzInvalidKey(bytes32 what);
 address constant Configuration_DEFAULT_CONTROLLER = address(0);
 address constant Configuration_DEFAULT_STRATEGY = address(0);
 uint16 constant Configuration_DEFAULT_FEE = 30;
-uint16 constant Configuration_DEFAULT_PRIORITY_FEE = 10;
+uint16 constant Configuration_DEFAULT_PRIORITY_FEE = 0;
 
 /// @dev Instantiates a configuration with default values.
 function configure() pure returns (Configuration memory) {
@@ -83,12 +83,19 @@ function validate(
         self.feeBasisPoints.isBetween(MIN_FEE, MAX_FEE),
         "Configuration_InvalidFee"
     );
-    require(
-        self.priorityFeeBasisPoints.isBetween(MIN_FEE, self.feeBasisPoints),
-        "Configuration_InvalidPriorityFee"
-    );
-    require(validateStrategy(self), "Configuration_InvalidStrategyArgs");
 
+    if (self.priorityFeeBasisPoints > 0) {
+        require(
+            self.priorityFeeBasisPoints.isBetween(MIN_FEE, self.feeBasisPoints),
+            "Configuration_InvalidPriorityFee"
+        );
+        require(
+            self.controller != address(0),
+            "Configuration_PriorityFeeWithoutController"
+        );
+    }
+
+    require(validateStrategy(self), "Configuration_InvalidStrategyArgs");
     return true;
 }
 

@@ -204,11 +204,10 @@ contract TestPortfolioSwap is Setup {
 
     function testFuzz_swap_durationConfig(
         uint256 seed,
-        uint128 amountIn,
-        uint32 dur
+        uint128 amountIn
     )
         public
-        durationConfig(uint32(bound(dur, MIN_DURATION, MAX_DURATION)))
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)
@@ -219,11 +218,10 @@ contract TestPortfolioSwap is Setup {
 
     function testFuzz_swap_volatilityConfig(
         uint256 seed,
-        uint128 amountIn,
-        uint32 vol
+        uint128 amountIn
     )
         public
-        volatilityConfig(uint32(bound(vol, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(100 ether)
         allocateSome(1 ether)

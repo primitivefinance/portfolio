@@ -469,11 +469,11 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_duration_modifies_liquidity(
-        uint32 duration,
+        uint256 seed,
         uint64 liquidity
     )
         public
-        durationConfig(uint32(bound(duration, MIN_DURATION, MAX_DURATION)))
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
@@ -515,11 +515,11 @@ contract TestPortfolioAllocate is Setup {
     }
 
     function testFuzz_allocate_volatility_modifies_liquidity(
-        uint16 volatility,
+        uint256 seed,
         uint64 liquidity
     )
         public
-        volatilityConfig(uint32(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))

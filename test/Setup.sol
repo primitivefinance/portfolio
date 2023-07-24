@@ -78,6 +78,11 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     // Test ghost state
     GhostType internal _ghost_state;
     SubjectsType internal _subjects;
+    Configuration internal _global_config;
+
+    function global_config() internal view returns (Configuration memory) {
+        return _global_config;
+    }
 
     // ============= Before Test ============= //
 
@@ -130,6 +135,9 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         if (config.asset == address(0) && config.quote == address(0)) {
             (config.asset, config.quote) = deployDefaultTokenPair();
         }
+
+        // Makes it accessible for debugging via `Setup.global_config()`.
+        _global_config = config;
 
         // Creates a pool with poolId and sets the ghost pool id.
         setGhostPoolId(
@@ -295,6 +303,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Configuration memory config = configureNormalStrategy();
 
         config.controller = address(this);
+        config.priorityFeeBasisPoints = MIN_FEE;
         activateConfig(config);
         _;
     }
@@ -366,6 +375,32 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         } else {
             config = config.fuzzStrategy(_bound_wrapper, key, seed);
         }
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier fuzzAllConfig(uint256 seed) {
+        // Cursed but... works...
+        function (uint, uint, uint) internal view returns(uint) bounder =
+            _bound_wrapper;
+
+        uint256 fuzzInput = seed; // for avoiding stack too deep...
+        Configuration memory config =
+            configureNormalStrategy().fuzz(bounder, "feeBasisPoints", fuzzInput);
+        config = config.fuzz(bounder, "priorityFeeBasisPoints", fuzzInput)
+            .fuzzStrategy(bounder, "strikePriceWad", fuzzInput);
+        config = config.fuzzStrategy(
+            bounder, "volatilityBasisPoints", fuzzInput
+        ).fuzzStrategy(bounder, "durationSeconds", fuzzInput);
+        config = config.fuzzStrategy(bounder, "priceWad", fuzzInput);
+
+        if (config.priorityFeeBasisPoints != 0) {
+            config = config.edit("controller", abi.encode(address(this))); // Must have controller if priority fee is non zero.
+        }
+
+        // Validate the config's reserves before reverting...
+        vm.assume(config.reserveXPerWad != 0 && config.reserveYPerWad != 0);
 
         activateConfig(config);
         _;

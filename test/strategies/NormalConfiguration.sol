@@ -165,10 +165,12 @@ library NormalConfiguration {
         if (key == "priceWad") {
             // todo: find a better lower bound
             // todo: find a better upper bound
+
+            uint256 upperBound = uint256(strategyConfig.strikePriceWad) * 2;
+            if (upperBound > type(uint128).max) upperBound = type(uint128).max;
+
             uint128 price = bound(
-                seed,
-                strategyConfig.strikePriceWad / 2,
-                strategyConfig.strikePriceWad * 2
+                seed, uint256(strategyConfig.strikePriceWad) / 2, upperBound
             ).safeCastTo128();
 
             return setReserves(self, price);
