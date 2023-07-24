@@ -492,4 +492,34 @@ contract TestPortfolioSwap is Setup {
         vm.expectRevert();
         subject().swap(order);
     }
+
+    function test_swap_reverts_for_non_existent_pool(uint64 poolId)
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+    {
+        vm.assume(poolId != ghost().poolId);
+        vm.assume(poolId != 0);
+
+        bool sellAsset = true;
+        uint128 amtIn = 0.1 ether;
+        uint128 amtOut = uint128(
+            subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
+        );
+
+        Order memory order = Order({
+            useMax: false,
+            poolId: poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Portfolio_NonExistentPool.selector, poolId)
+        );
+        subject().swap(order);
+    }
 }
