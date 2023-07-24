@@ -146,7 +146,7 @@ contract NormalStrategy is INormalStrategy {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
         PortfolioPair memory pair =
-            IPortfolioStruct(portfolio).pairs(PoolId.wrap(poolId).pair());
+            IPortfolioStruct(portfolio).pairs(PoolId.wrap(poolId).pairId());
 
         amountIn = amountIn.scaleToWad(
             sellAsset ? pair.decimalsAsset : pair.decimalsQuote

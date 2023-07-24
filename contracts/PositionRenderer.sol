@@ -4,13 +4,15 @@ pragma solidity ^0.8.4;
 import "openzeppelin/utils/Base64.sol";
 import "openzeppelin/utils/Strings.sol";
 import "solmate/tokens/ERC20.sol";
+import "solmate/utils/SafeCastLib.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IStrategy.sol";
 import "./strategies/NormalStrategy.sol";
 
-// @dev Contract to render a position.
+/// @dev Contract to render a position.
 contract PositionRenderer {
     using Strings for *;
+    using SafeCastLib for *;
 
     function uri(uint256 id) external view returns (string memory) {
         return string(
@@ -40,8 +42,8 @@ contract PositionRenderer {
     }
 
     function _generateName(uint256 id) private view returns (string memory) {
-        (address tokenAsset,, address tokenQuote,) =
-            IPortfolio(msg.sender).pairs(uint24(uint64(id) >> 40));
+        (address tokenAsset,, address tokenQuote,) = IPortfolio(msg.sender)
+            .pairs(PoolId.wrap(id.safeCastTo64()).pairId());
 
         return string(
             abi.encodePacked(
@@ -67,8 +69,8 @@ contract PositionRenderer {
     }
 
     function _generatePair(uint256 id) private view returns (string memory) {
-        (address tokenAsset,, address tokenQuote,) =
-            IPortfolio(msg.sender).pairs(uint24(uint64(id) >> 40));
+        (address tokenAsset,, address tokenQuote,) = IPortfolio(msg.sender)
+            .pairs(PoolId.wrap(id.safeCastTo64()).pairId());
 
         return string(
             abi.encodePacked(

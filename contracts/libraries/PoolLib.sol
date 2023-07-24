@@ -18,7 +18,7 @@ using PoolIdLib for PoolId global;
 /// @dev Helper methods to decode the data encoded in a pool id.
 library PoolIdLib {
     /// @dev Pair id is encoded in the first 24-bits.
-    function pair(PoolId poolId) internal pure returns (uint24 id) {
+    function pairId(PoolId poolId) internal pure returns (uint24 id) {
         id = uint24(PoolId.unwrap(poolId) >> 40);
     }
 

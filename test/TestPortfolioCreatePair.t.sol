@@ -22,7 +22,7 @@ contract TestPortfolioCreatePair is Setup {
             IPortfolioActions.createPair,
             (ghost().asset().to_addr(), ghost().quote().to_addr())
         );
-        uint24 pairId = uint24(ghost().poolId >> 40);
+        uint24 pairId = PoolId.wrap(ghost().poolId).pairId();
         vm.expectRevert(
             abi.encodeWithSelector(Portfolio_PairExists.selector, pairId)
         );

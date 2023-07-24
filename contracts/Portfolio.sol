@@ -276,7 +276,7 @@ contract Portfolio is ERC1155, IPortfolio {
             amountQuoteDec: maxDeltaQuote
         });
 
-        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
+        PortfolioPair memory pair = pairs[PoolId.wrap(poolId).pairId()];
 
         if (useMax) {
             // A positive net balance is a surplus of tokens in the accounting state that can be used to mint liquidity.
@@ -364,7 +364,7 @@ contract Portfolio is ERC1155, IPortfolio {
             amountQuoteDec: minDeltaQuote
         });
 
-        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
+        PortfolioPair memory pair = pairs[PoolId.wrap(poolId).pairId()];
         (address asset, address quote) = (pair.tokenAsset, pair.tokenQuote);
 
         if (useMax) {
@@ -485,7 +485,7 @@ contract Portfolio is ERC1155, IPortfolio {
         // Scale amounts from native token decimals to WAD.
         // Load input and output token information with respective pair tokens.
         SwapState memory info;
-        PortfolioPair memory pair = pairs[uint16(args.poolId >> 40)];
+        PortfolioPair memory pair = pairs[PoolId.wrap(args.poolId).pairId()];
         if (args.sellAsset) {
             (args.input, args.output) = _scaleAmountsToWad({
                 poolId: args.poolId,
@@ -783,7 +783,7 @@ contract Portfolio is ERC1155, IPortfolio {
         uint256 amountAssetDec,
         uint256 amountQuoteDec
     ) internal view returns (uint128 amountAssetWad, uint128 amountQuoteWad) {
-        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
+        PortfolioPair memory pair = pairs[PoolId.wrap(poolId).pairId()];
 
         amountAssetWad = amountAssetDec.safeCastTo128();
         if (amountAssetDec != type(uint128).max) {
@@ -962,7 +962,7 @@ contract Portfolio is ERC1155, IPortfolio {
         (uint256 deltaAssetWad, uint256 deltaQuoteWad) =
             pools[poolId].getPoolLiquidityDeltas(deltaLiquidity);
 
-        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
+        PortfolioPair memory pair = pairs[PoolId.wrap(poolId).pairId()];
 
         if (deltaLiquidity < 0) {
             // If deallocating, round amounts down to ensure credits are not overestimated.
@@ -985,7 +985,7 @@ contract Portfolio is ERC1155, IPortfolio {
         uint256 amount0,
         uint256 amount1
     ) public view returns (uint128 deltaLiquidity) {
-        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
+        PortfolioPair memory pair = pairs[PoolId.wrap(poolId).pairId()];
 
         (amount0, amount1) = (
             amount0.scaleToWad(pair.decimalsAsset),
@@ -1005,7 +1005,7 @@ contract Portfolio is ERC1155, IPortfolio {
         (uint256 deltaAssetWad, uint256 deltaQuoteWad) =
             pools[poolId].getPoolReserves();
 
-        PortfolioPair memory pair = pairs[uint24(poolId >> 40)];
+        PortfolioPair memory pair = pairs[PoolId.wrap(poolId).pairId()];
 
         deltaAsset = deltaAssetWad.scaleFromWadDown(pair.decimalsAsset);
         deltaQuote = deltaQuoteWad.scaleFromWadDown(pair.decimalsQuote);
