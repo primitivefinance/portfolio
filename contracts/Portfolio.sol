@@ -166,6 +166,11 @@ contract Portfolio is ERC1155, IPortfolio {
         if (msg.sender != WETH) revert();
     }
 
+    /**
+     * @notice Returns the metadata associated with a pool token.
+     * @param id Id of the pool (type can be casted from `uint64`).
+     * @return A Base64 encoded JSON string containing the pool metadata.
+     */
     function uri(uint256 id) public view override returns (string memory) {
         return PositionRenderer(POSITION_RENDERER).uri(id);
     }
