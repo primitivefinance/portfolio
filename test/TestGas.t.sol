@@ -5,10 +5,16 @@ import "./Setup.sol";
 import "contracts/libraries/PortfolioLib.sol";
 
 contract TestGas is Setup {
+    using NormalConfiguration for Configuration;
+
     using SafeCastLib for uint256;
     using AssemblyLib for uint256;
     using FixedPointMathLib for uint128;
     using FixedPointMathLib for uint256;
+
+    address token_a;
+    address token_b;
+    address token_c;
 
     // helpers
     modifier usePools(uint256 amount) {
@@ -16,18 +22,24 @@ contract TestGas is Setup {
         _;
     }
 
-    function _getTokens() internal returns (address, address) {
-        return (address(subjects().tokens[0]), address(subjects().tokens[1]));
+    function _getTokens() internal view returns (address, address) {
+        return (token_a, token_b);
     }
 
     uint256 internal constant POOLS_LIMIT = 100;
 
     IPortfolio _subject;
 
-    // setup
     function setUp() public override {
         super.setUp();
         _subject = subject(); // We use the same subject in this contract.
+
+        token_a =
+            deployCoin("token", abi.encode("token a", "A", uint8(18))).to_addr();
+        token_b =
+            deployCoin("token", abi.encode("token b", "B", uint8(18))).to_addr();
+        token_c =
+            deployCoin("token", abi.encode("token c", "C", uint8(18))).to_addr();
     }
 
     function test_gas_single_allocate()
@@ -36,7 +48,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
@@ -61,7 +72,6 @@ contract TestGas is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether + uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
@@ -78,20 +88,24 @@ contract TestGas is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(1 ether)
-        isArmed
     {
         bool sellAsset = true;
-        uint128 amountIn = uint128(0.01 ether);
+
+        Order memory maxOrder =
+            subject().getMaxOrder(ghost().poolId, sellAsset, actor());
+        uint128 inputAmount = maxOrder.input / 2;
         uint128 estimatedAmountOut = uint128(
-            _subject.getAmountOut(ghost().poolId, sellAsset, amountIn, actor())
-                * 95 / 100
+            subject().getAmountOut(
+                ghost().poolId, sellAsset, inputAmount, actor()
+            )
         );
+
         bytes[] memory data = new bytes[](1);
 
         Order memory order = Order({
             useMax: false,
             poolId: ghost().poolId,
-            input: amountIn,
+            input: inputAmount,
             output: estimatedAmountOut,
             sellAsset: sellAsset
         });
@@ -107,11 +121,9 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         // Create another pair and pool.
-        (address token0, address token1) =
-            (address(subjects().tokens[1]), address(subjects().tokens[2]));
+        (address token0, address token1) = (token_b, token_c);
 
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
@@ -121,17 +133,23 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "strikePriceWad", abi.encode(10 ether)
+        ).editStrategy("volatilityBasisPoints", abi.encode(1e4)).editStrategy(
+            "durationSeconds", abi.encode(100 days)
+        ).editStrategy("priceWad", abi.encode(10 ether));
+
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
             (
-                uint24(0),
-                address(0),
-                0,
-                hundred,
-                1e4,
-                hundred,
-                10 ether,
-                10 ether
+                0, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                hundred, // fee
+                0, // prior fee
+                address(0), // controller
+                subject().DEFAULT_STRATEGY(),
+                testConfig.strategyArgs
             )
         );
 
@@ -167,7 +185,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, false);
     }
@@ -178,7 +195,6 @@ contract TestGas is Setup {
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(5, false);
     }
@@ -189,7 +205,6 @@ contract TestGas is Setup {
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(10, false);
     }
@@ -200,7 +215,6 @@ contract TestGas is Setup {
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(25, false);
     }
@@ -211,7 +225,6 @@ contract TestGas is Setup {
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(50, false);
     }
@@ -222,7 +235,6 @@ contract TestGas is Setup {
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(100, false);
     }
@@ -233,11 +245,9 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         // Create another pair and pool.
-        (address token0, address token1) =
-            (address(subjects().tokens[1]), address(subjects().tokens[2]));
+        (address token0, address token1) = (token_b, token_c);
 
         _approveMint(address(token0), 100 ether);
         _approveMint(address(token1), 100 ether);
@@ -247,19 +257,25 @@ contract TestGas is Setup {
         subject().multicall(data);
 
         uint16 hundred = uint16(100);
+
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "strikePriceWad", abi.encode(10 ether)
+        ).editStrategy("priceWad", abi.encode(10 ether));
+
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
             (
-                uint24(0),
-                address(0),
-                0,
-                hundred,
-                1e4,
-                hundred,
-                10 ether,
-                10 ether
+                0, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                hundred, // fee
+                0, // prior fee
+                address(0), // controller
+                subject().DEFAULT_STRATEGY(),
+                testConfig.strategyArgs
             )
         );
+
         subject().multicall(data);
 
         bytes[] memory instructions = new bytes[](2);
@@ -298,7 +314,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, true);
         _multi_deallocate(2, false);
@@ -310,7 +325,6 @@ contract TestGas is Setup {
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(5, true);
         _multi_deallocate(5, false);
@@ -322,7 +336,6 @@ contract TestGas is Setup {
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(10, true);
         _multi_deallocate(10, false);
@@ -334,7 +347,6 @@ contract TestGas is Setup {
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(25, true);
         _multi_deallocate(25, false);
@@ -346,7 +358,6 @@ contract TestGas is Setup {
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(50, true);
         _multi_deallocate(50, false);
@@ -358,7 +369,6 @@ contract TestGas is Setup {
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(100, true);
         _multi_deallocate(100, false);
@@ -370,7 +380,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, true);
         _multi_deallocate(2, false);
@@ -383,7 +392,7 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
+
     {
         // Create another pair and pool.
         (address token0, address token1) =
@@ -450,7 +459,6 @@ contract TestGas is Setup {
         usePools(2)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(2, true);
         _multi_swap(2, false);
@@ -462,7 +470,6 @@ contract TestGas is Setup {
         usePools(5)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(5, true);
         _multi_swap(5, false);
@@ -474,7 +481,6 @@ contract TestGas is Setup {
         usePools(10)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(10, true);
         _multi_swap(10, false);
@@ -486,7 +492,6 @@ contract TestGas is Setup {
         usePools(25)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(25, true);
         _multi_swap(25, false);
@@ -498,7 +503,6 @@ contract TestGas is Setup {
         usePools(50)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(50, true);
         _multi_swap(50, false);
@@ -510,7 +514,6 @@ contract TestGas is Setup {
         usePools(100)
         useActor
         usePairTokens(10_000 ether)
-        isArmed
     {
         _multi_allocate(100, true);
         _multi_swap(100, false);
@@ -519,25 +522,45 @@ contract TestGas is Setup {
     function _create_pools(uint256 amount) internal {
         require(amount <= POOLS_LIMIT);
         address controller = address(0);
-        (address a0, address q0) =
-            (address(subjects().tokens[0]), address(subjects().tokens[1]));
+        (address a0, address q0) = _getTokens();
         bytes[] memory instructions = new bytes[](amount + 1);
         for (uint256 i; i != (amount + 1); ++i) {
             if (i == 0) {
                 instructions[i] =
                     abi.encodeCall(IPortfolioActions.createPair, (a0, q0));
             } else {
+                // todo: implement better config fuzzing!
+                uint128 strike =
+                    uint128(bound(uint256(0), 0.1 ether, 10_000 ether));
+                uint128 price =
+                    uint128(bound(uint256(0), strike * 2 / 3, strike * 3 / 2));
+                uint32 volatility = uint32(
+                    bound(uint256(0), MIN_VOLATILITY * 1000, MAX_VOLATILITY)
+                );
+                uint32 duration =
+                    uint32(bound(uint256(0), MIN_DURATION * 100, MAX_DURATION));
+
+                Configuration memory testConfig = configureNormalStrategy()
+                    .editStrategy("strikePriceWad", abi.encode(strike)).editStrategy(
+                    "volatilityBasisPoints", abi.encode(volatility)
+                ).editStrategy("durationSeconds", abi.encode(duration))
+                    .editStrategy("priceWad", abi.encode(price));
+
+                testConfig.asset = address(1); // note: avoids validate failure
+                testConfig.quote = address(1); // note: avoids validate failure
+                testConfig.validate(NormalConfiguration.validateNormalStrategy);
+
                 instructions[i] = abi.encodeCall(
                     IPortfolioActions.createPool,
                     (
                         0, // magic pair id to use the nonce, which is the createPairId!
+                        testConfig.reserveXPerWad,
+                        testConfig.reserveYPerWad,
+                        uint16(100 + 100 / i), // fee
+                        0, // prior fee
                         controller,
-                        0,
-                        uint16(100 + 100 / i),
-                        uint16(1000 + 1000 / i),
-                        uint16(1 + 100 / i),
-                        uint128(1 ether * i),
-                        uint128(1 ether * i)
+                        subject().DEFAULT_STRATEGY(),
+                        testConfig.strategyArgs
                     )
                 );
             }
@@ -620,18 +643,13 @@ contract TestGas is Setup {
             uint64 poolId = uint64(ghost().poolId + i); // We can do this because we create pools from one nonce.
 
             bool sellAsset = i % 2 == 0;
-            uint256 reserveIn = sellAsset ? pool.virtualX : pool.virtualY;
-            uint128 amountIn = RMM01Portfolio(payable(address(_subject)))
-                .computeMaxInput({
-                poolId: poolId,
-                sellAsset: sellAsset,
-                reserveIn: reserveIn.divWadDown(pool.liquidity),
-                liquidity: pool.liquidity
-            }).safeCastTo128() / 10;
+            Order memory maxOrder =
+                subject().getMaxOrder(poolId, sellAsset, actor());
+            uint128 amountIn = maxOrder.input;
 
             // This estimated amount is accurate, however, each getAmountOut computation uses the current invariant.
             // Since all the computed output amounts use the current invariant, once these are executed there will be small
-            // discrepencies in the invariant which will throw the InvalidInvariant error.
+            // discrepencies in the invariant which will throw the Portfolio_InvalidInvariant error.
             // To properly get all the amounts out, the getAmountOut needs to take into account the invariant change as well.
             uint128 estimatedAmountOut = uint128(
                 _subject.getAmountOut(poolId, sellAsset, amountIn, actor())
@@ -657,22 +675,28 @@ contract TestGas is Setup {
 
     function _createInstruction(uint24 pairId)
         internal
-        pure
+        view
         returns (bytes memory)
     {
-        return abi.encodeCall(
+        Configuration memory testConfig = configureNormalStrategy(); // default strategy
+        (testConfig.asset, testConfig.quote) = (address(1), address(1)); // avoids failure
+        testConfig.validate(NormalConfiguration.validateNormalStrategy);
+
+        bytes memory payload = abi.encodeCall(
             IPortfolioActions.createPool,
             (
-                pairId,
-                address(0),
-                uint16(10),
-                uint16(100),
-                uint16(1000),
-                uint16(100),
-                uint128(1 ether),
-                uint128(1 ether)
+                pairId, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                uint16(100), // fee
+                uint16(10), // prior fee
+                address(0), // controller
+                subject().DEFAULT_STRATEGY(),
+                testConfig.strategyArgs
             )
         );
+
+        return payload;
     }
 
     function _allocateInstruction(uint64 poolId)
@@ -762,12 +786,13 @@ contract TestGas is Setup {
         _subject.multicall(instructions);
     }
 
+    /// @dev blocked by https://github.com/primitivefinance/portfolio/issues/423
     function test_gas_chain_swap_allocate_from_portfolio()
         public
         pauseGas
         usePools(1)
         useActor
-        usePairTokens(10 ether)
+        usePairTokens(100 ether)
     {
         // Allocate to first pool
         uint64 poolId = ghost().poolId;
@@ -802,7 +827,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(100 ether)
-        isArmed
     {
         // Allocate to first pool
         uint24 pairId = 1;
@@ -840,7 +864,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = _allocateInstruction(ghost().poolId);
@@ -854,7 +877,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory instructions = new bytes[](1);
         instructions[0] = _allocateInstruction(ghost().poolId);
@@ -901,7 +923,6 @@ contract TestGas is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         bytes[] memory instructions = new bytes[](2);
         instructions[0] = _allocateInstruction(ghost().poolId);
@@ -917,7 +938,6 @@ contract TestGas is Setup {
         usePools(1)
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         bytes[] memory instructions = new bytes[](1);
 

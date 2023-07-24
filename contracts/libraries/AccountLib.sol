@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.19;
+pragma solidity ^0.8.18;
 
 import "../libraries/SafeTransferLib.sol";
 import "../interfaces/IERC20.sol";
@@ -8,7 +8,6 @@ import "./AssemblyLib.sol";
 
 using {
     __wrapEther__,
-    dangerousFund,
     cache,
     decrease,
     increase,
@@ -52,7 +51,7 @@ function __balanceOf__(address token, address account) view returns (uint256) {
 /// @dev Must validate `weth` is real weth.
 function __wrapEther__(AccountSystem storage self, address weth) {
     self.touch(weth);
-    IWETH(weth).deposit{value: msg.value}();
+    IWETH(weth).deposit{ value: msg.value }();
 }
 
 /**
@@ -62,18 +61,6 @@ function __wrapEther__(AccountSystem storage self, address weth) {
 function __dangerousUnwrapEther__(address weth, address to, uint256 amount) {
     IWETH(weth).withdraw(amount);
     SafeTransferLib.safeTransferETH(to, amount);
-}
-
-/// @dev External call to the `to` address is dangerous.
-function dangerousFund(
-    AccountSystem storage self,
-    address token,
-    address to,
-    uint256 amount
-) {
-    self.touch(token);
-    // Settlement gifts tokens to msg.sender.
-    SafeTransferLib.safeTransferFrom(token, msg.sender, to, amount);
 }
 
 /// @dev Actives a token and increases the reserves. Settlement will pick up this activated token.

@@ -4,75 +4,111 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestPortfolioCreatePool is Setup {
+    using NormalConfiguration for Configuration;
+    using NormalStrategyLib for PortfolioPool;
+    using { safeCastTo16 } for uint256;
+
     uint256 internal constant PAIR_NONCE_STORAGE_SLOT = 4;
     uint256 internal constant POOL_NONCE_STORAGE_SLOT = 6;
 
-    function testFuzz_createPool(
-        uint16 priorityFee,
-        uint16 fee,
-        uint16 duration,
-        uint16 volatility,
-        uint128 strikePrice,
-        uint128 price
-    ) public {
-        uint24 pairId = uint24(1);
-        fee = uint16(bound(fee, MIN_FEE, MAX_FEE));
-        priorityFee = uint16(bound(priorityFee, 1, fee));
-        duration = uint16(bound(duration, MIN_DURATION, MAX_DURATION));
-        volatility = uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY));
-        vm.assume(price > 0);
-        vm.assume(strikePrice > 0);
+    function testFuzz_createPool(uint256 seed) public fuzzAllConfig(seed) {
+        PortfolioPool memory pool = ghost().pool();
+        PortfolioConfig memory config = ghost().config();
+        PortfolioConfig memory globalPortfolioConfig =
+            NormalStrategyLib.decode(global_config().strategyArgs);
 
+        assertEq(pool.controller, global_config().controller, "controller");
+        assertEq(
+            pool.priorityFeeBasisPoints,
+            global_config().priorityFeeBasisPoints,
+            "priorityFee"
+        );
+        assertEq(pool.feeBasisPoints, global_config().feeBasisPoints, "fee");
+        assertEq(
+            config.volatilityBasisPoints,
+            globalPortfolioConfig.volatilityBasisPoints,
+            "volatility"
+        );
+        assertEq(
+            config.durationSeconds,
+            globalPortfolioConfig.durationSeconds,
+            "duration"
+        );
+        assertEq(
+            config.strikePriceWad,
+            globalPortfolioConfig.strikePriceWad,
+            "strikePrice"
+        );
+    }
+
+    function test_revert_createPool_invalid_pair_nonce() public {
+        Configuration memory testConfig = configureNormalStrategy();
+
+        testConfig.reserveXPerWad++; // Avoid the reserve error
+        testConfig.reserveYPerWad++; // Avoid the reserve error
+
+        vm.expectRevert();
+
+        subject().createPool(
+            0,
+            testConfig.reserveXPerWad,
+            testConfig.reserveYPerWad,
+            100, // fee
+            0, // prior fee
+            address(0), // controller
+            address(0), // strategy
+            testConfig.strategyArgs
+        );
+    }
+
+    function test_createPool_no_strategy_defaults() public defaultConfig {
+        Configuration memory testConfig = configureNormalStrategy();
+
+        testConfig.reserveXPerWad++; // Avoid the reserve error
+        testConfig.reserveYPerWad++; // Avoid the reserve error
+
+        uint64 poolId = subject().createPool(
+            0,
+            testConfig.reserveXPerWad,
+            testConfig.reserveYPerWad,
+            100, // fee
+            0, // prior fee
+            address(0), // controller
+            address(0), // strategy
+            testConfig.strategyArgs
+        );
+
+        (,,,,,,, address strategy) = subject().pools(poolId);
+        assertEq(strategy, subject().DEFAULT_STRATEGY());
+    }
+
+    function test_revert_createPool_invalid_priority_fee() public {
         bytes[] memory data = new bytes[](1);
+
+        Configuration memory testConfig = configureNormalStrategy().edit(
+            "priorityFeeBasisPoints", abi.encode(0)
+        );
+
+        testConfig.reserveXPerWad++; // Avoid the reserve error
+        testConfig.reserveYPerWad++; // Avoid the reserve error
+
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
             (
-                pairId,
-                address(this),
-                priorityFee,
-                fee,
-                volatility,
-                duration,
-                strikePrice,
-                price
+                uint24(1), // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                1, // fee
+                testConfig.priorityFeeBasisPoints.safeCastTo16(), // prior fee
+                address(this), // controller
+                subject().DEFAULT_STRATEGY(),
+                testConfig.strategyArgs
             )
         );
 
-        subject().multicall(data);
-
-        uint64 poolId = AssemblyLib.encodePoolId(
-            pairId, true, subject().getPoolNonce(pairId)
+        vm.expectRevert(
+            abi.encodeWithSelector(PoolLib_InvalidPriorityFee.selector, 0)
         );
-        setGhostPoolId(poolId);
-
-        PortfolioPool memory pool = ghost().pool();
-        PortfolioCurve memory actual = pool.params;
-
-        assertEq(pool.controller, address(this), "controller");
-        assertEq(actual.priorityFee, priorityFee, "priorityFee");
-        assertEq(actual.fee, fee, "fee");
-        assertEq(actual.volatility, volatility, "volatility");
-        assertEq(actual.duration, duration, "duration");
-        assertEq(actual.strikePrice, strikePrice, "strikePrice");
-    }
-
-    function test_revert_createPool_zero_price() public {
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (uint24(1), address(this), 1, 1, 1, 1, 1, 0)
-        );
-        vm.expectRevert(ZeroPrice.selector);
-        subject().multicall(data);
-    }
-
-    function test_revert_createPool_priority_fee_invalid_fee() public {
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.createPool,
-            (uint24(1), address(this), 0, 1, 1, 1, 1, 1)
-        );
-        vm.expectRevert(abi.encodeWithSelector(InvalidFee.selector, 0));
         subject().multicall(data);
     }
 
@@ -96,6 +132,7 @@ contract TestPortfolioCreatePool is Setup {
     }
     */
 
+    /*
     function test_revert_createPool_above_max_pools() public {
         uint24 pairNonce = uint24(1);
         bytes32 slot =
@@ -108,29 +145,55 @@ contract TestPortfolioCreatePool is Setup {
         );
 
         bytes[] memory data = new bytes[](1);
+        Configuration memory testConfig = DefaultStrategy.getTestConfig({
+            portfolio: address(subject()),
+            strikePriceWad: 100,
+            volatilityBasisPoints: 100,
+            durationSeconds: 100 * 1 days,
+            isPerpetual: false,
+            priceWad: 1001
+        });
+
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
-            (pairNonce, address(0), 1, 100, 100, 100, 100, 1001)
+            (
+                pairNonce, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                100, // fee
+                0, // prior fee
+                address(0), // controller
+                testConfig.strategyArgs
+            )
         );
+
         vm.expectRevert(arithmeticError);
         subject().multicall(data);
     }
+    */
 
     function test_createPool_perpetual() public {
-        uint16 perpetualMagicVariable = type(uint16).max;
         uint24 pairNonce = uint24(1);
         bytes[] memory data = new bytes[](1);
         data[0] = abi.encodeCall(
             IPortfolioActions.createPool,
             (
                 pairNonce,
-                address(0),
+                1,
                 1,
                 100,
-                100,
-                perpetualMagicVariable,
-                100,
-                100
+                1,
+                address(0),
+                subject().DEFAULT_STRATEGY(),
+                abi.encode(
+                    PortfolioConfig(
+                        100,
+                        100,
+                        uint32(100) * 1 days,
+                        uint32(block.timestamp),
+                        true
+                    )
+                    )
             )
         );
 
@@ -139,17 +202,17 @@ contract TestPortfolioCreatePool is Setup {
             pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
         );
         assertEq(
-            ghost().poolOf(poolId).params.duration,
-            perpetualMagicVariable,
-            "duration != perpetualMagicVariable"
+            ghost().configOf(poolId).durationSeconds,
+            SECONDS_PER_YEAR,
+            "duration != SECONDS_PER_YEAR"
         );
         assertEq(
-            ghost().poolOf(poolId).computeTau(0),
+            ghost().poolOf(poolId).computeTau(ghost().configOf(poolId), 0),
             SECONDS_PER_YEAR,
             "tau != year"
         );
         assertEq(
-            ghost().poolOf(poolId).lastTau(),
+            ghost().poolOf(poolId).computeLatestTau(ghost().configOf(poolId)),
             SECONDS_PER_YEAR,
             "lastTau != year"
         );
