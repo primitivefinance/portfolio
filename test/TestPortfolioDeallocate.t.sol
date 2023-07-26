@@ -10,23 +10,17 @@ contract TestPortfolioDeallocate is Setup {
         useActor
         usePairTokens(10 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         uint128 liquidity = 1 ether;
 
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                liquidity,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            ghost().poolId,
+            liquidity,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(data);
 
         // Deallocating liquidity can round down.
         uint256 prev = ghost().position(actor());
@@ -34,10 +28,8 @@ contract TestPortfolioDeallocate is Setup {
         if (amount > prev) {
             amount = uint128(prev);
         }
-        data[0] = abi.encodeCall(
-            IPortfolioActions.deallocate, (true, ghost().poolId, amount, 0, 0)
-        );
-        subject().multicall(data);
+
+        subject().deallocate(true, ghost().poolId, amount, 0, 0);
         uint256 post = ghost().position(actor());
 
         assertApproxEqAbs(
@@ -50,79 +42,61 @@ contract TestPortfolioDeallocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
-        isArmed
+        allocateSome(uint128(BURNED_LIQUIDITY * 1e5))
     {
-        vm.assume(liquidity > 10 ** (18 - 6));
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                liquidity,
-                type(uint128).max,
-                type(uint128).max
-            )
+        vm.assume(liquidity > 1e15);
+        subject().allocate(
+            false,
+            address(this),
+            ghost().poolId,
+            liquidity,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(data);
         _simple_deallocate(liquidity);
     }
 
     function testFuzz_deallocate_volatility(
-        uint64 liquidity,
-        uint16 volatility
+        uint256 seed,
+        uint64 liquidity
     )
         public
-        volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                liquidity,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            ghost().poolId,
+            liquidity,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(data);
         _simple_deallocate(liquidity);
     }
 
     function testFuzz_deallocate_duration(
-        uint64 liquidity,
-        uint16 duration
+        uint256 seed,
+        uint64 liquidity
     )
         public
-        durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                liquidity,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            ghost().poolId,
+            liquidity,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(data);
         _simple_deallocate(liquidity);
     }
 
@@ -131,24 +105,17 @@ contract TestPortfolioDeallocate is Setup {
         wethConfig
         useActor
         usePairTokens(500 ether)
-        isArmed
     {
         vm.assume(liquidity > BURNED_LIQUIDITY);
         vm.deal(actor(), 250 ether);
-
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                liquidity,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate{ value: 250 ether }(
+            false,
+            address(this),
+            ghost().poolId,
+            liquidity,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall{ value: 250 ether }(data);
         _simple_deallocate(liquidity);
     }
 
@@ -161,22 +128,16 @@ contract TestPortfolioDeallocate is Setup {
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                liquidity,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            ghost().poolId,
+            liquidity,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(data);
         vm.warp(block.timestamp + timestep);
         _simple_deallocate(liquidity);
     }
@@ -186,31 +147,19 @@ contract TestPortfolioDeallocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(data);
         vm.expectRevert();
-
-        data[0] = abi.encodeCall(
-            IPortfolioActions.deallocate,
-            (true, ghost().poolId, amount, type(uint128).max, 0)
-        );
-        subject().multicall(data);
+        subject().deallocate(true, ghost().poolId, amount, type(uint128).max, 0);
     }
 
     function test_deallocate_reverts_when_min_quote_unmatched()
@@ -218,7 +167,6 @@ contract TestPortfolioDeallocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -238,30 +186,23 @@ contract TestPortfolioDeallocate is Setup {
         subject().multicall(data);
 
         data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (false, address(this), ghost().poolId, amount, 0, type(uint128).max)
+            IPortfolioActions.deallocate,
+            (false, ghost().poolId, amount, 0, type(uint128).max)
         );
-        vm.expectRevert();
-        subject().multicall(data);
+        IPortfolio portfolio = subject();
+        vm.expectRevert(Portfolio_MinQuoteExceeded.selector);
+        portfolio.multicall(data);
     }
 
     function _simple_deallocate(uint128 amount) internal {
         uint256 prev = ghost().position(actor());
-
         uint128 amountToRemove = amount;
         if (amount > prev) {
             amountToRemove = uint128(prev);
         }
 
         bool useMax = false;
-
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.deallocate,
-            (useMax, ghost().poolId, amountToRemove, 0, 0)
-        );
-        subject().multicall(data);
-
+        subject().deallocate(useMax, ghost().poolId, amountToRemove, 0, 0);
         uint256 post = ghost().position(actor());
 
         // Deallocating liquidity can round down.

@@ -1,167 +1,184 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-// Test subjects
-import "contracts/RMM01Portfolio.sol";
-import "solmate/tokens/WETH.sol";
-
-// Test utils
+// Base test contract
 import "forge-std/Test.sol";
-import "./HelperActorsLib.sol";
-import "./HelperConfigsLib.sol";
-import "./HelperGhostLib.sol";
-import "./HelperSubjectsLib.sol";
-import "./HelperUtils.sol" as Utils;
 
-/**
- * @dev Portfolio's test environment is setup to easily extend the tests with new configurations, actors, or environment
- * states.
- *
- * For every test:
- * Do you have the `useActor` modifier?
- * Do you use a config modifier, like `defaultConfig`?
- * Do you check if the test is ready with the `isArmed` modifier?
- *
- * | Problem                                                 | Solution                                                                  |
- * | ------------------------------------------------------- |
- * ------------------------------------------------------------------------- |
- * | Different contracts with same interface                 | Internal virtual function in test setup that returns test
- * subject.        |
- * | Pools with different configurations                     | Virtual function in setup that overrides config.                          |
- * | Redundant inputs per test, e.g. poolId, tokens, actors. | Ghost variable state accessed via a virtual internal
- * function.            |
- * | Multiple tokens and actors                              | Managed via a registry lib with easy ways to fetch, add,
- * and remove them. |
- * | Time based test scenarios                               | Cheatcodes, and maybe a library to manage the time with
- * more granularity. |
- */
-contract Setup is Test {
-    using SafeCastLib for uint256;
+// Global test configuration for Portfolio
+import "./Configuration.sol";
+import "./strategies/NormalConfiguration.sol";
 
-    /**
-     * @dev Manages the addresses calling the subjects in the environment.
-     */
+// Test helper types
+import { deploy as deployCoin, Coin } from "./utils/CoinType.sol";
+import { GhostType, IPortfolioStruct } from "./utils/GhostType.sol";
+import { safeCastTo16 } from "./utils/Utility.sol";
 
-    ActorsState private _actors;
-    /**
-     * @dev Manages the contextual state in the environment. Includes subjects/actors.
-     */
-    GhostState private _ghost;
-    /**
-     * @dev Manages all the contracts in the environment.
-     */
-    SubjectsState private _subjects;
+// Contracts used in testing
+import "solmate/tokens/WETH.sol";
+import "solmate/tokens/ERC1155.sol";
+import "solmate/utils/SafeCastLib.sol";
+import "solmate/test/utils/mocks/MockERC20.sol";
+import "solmate/test/utils/weird-tokens/ReturnsTooLittleToken.sol";
+import "contracts/interfaces/IPortfolio.sol";
+import "contracts/test/FeeOnTransferToken.sol";
+import "contracts/test/SimpleRegistry.sol";
+import "contracts/Portfolio.sol";
 
-    receive() external payable { }
+// Strategy to test
+import "contracts/strategies/NormalStrategy.sol";
 
-    /**
-     * @notice Deploys WETH, subject, and three tokens. Creates a default pool.
-     * @dev Initializes the actor, subject, and poolId ghost state.
-     */
-    function setUp() public virtual {
-        _subjects.startDeploy(vm).wrapper().registrar().subject().token(
-            "token", abi.encode("Asset-Std", "A-STD-18", uint8(18))
-        ).token("token", abi.encode("Quote-Std", "Q-STD-18", uint8(18))).token(
-            "token", abi.encode("USDC", "USDC-6", uint8(6))
-        ).token("FOT", abi.encode("Asset-FOT", "A-FOT-18", uint8(18))).token(
-            "FOT", abi.encode("Quote-FOT", "Q-FOT-18", uint8(18))
-        ).stopDeploy();
+// Contracts in the test environment
+struct SubjectsType {
+    address deployer;
+    address registry;
+    address weth;
+    address portfolio;
+    address positionRenderer;
+}
 
-        _ghost = GhostState({
-            actor: _subjects.deployer,
-            subject: address(_subjects.last),
-            poolId: 0
-        });
+// Interfaces
+interface ISetup {
+    /// @dev Overwrites the ghost state poolId with `id`.
+    function setGhostPoolId(uint64 id) external;
+
+    /// @dev Returns the current targets for the tests.
+    function ghost() external view returns (GhostType memory);
+
+    /// @dev Returns the current subjects for the tests.
+    function subjects() external view returns (SubjectsType memory);
+
+    /// @dev Returns the target smart contract being called in tests.
+    function subject() external view returns (IPortfolio);
+
+    /// @dev Returns the strategy of the subject and subject pool.
+    function strategy() external view returns (IStrategy);
+
+    /// @dev Returns the caller of the unit tests with the modifier `useActor`.
+    function actor() external view returns (address);
+
+    /// @dev Returns the specific pool of the unit test.
+    function poolId() external view returns (uint256);
+
+    /// @dev Returns the WETH token.
+    function weth() external view returns (address);
+
+    /// @dev Returns the registry contract used in the subject.
+    function registry() external view returns (address);
+
+    /// @dev Returns the portfolio contract as an address, which is also the subject.
+    function portfolio() external view returns (address);
+
+    /// @dev Returns the position renderer contract used in the subject.
+    function positionRenderer() external view returns (address);
+}
+
+contract Setup is ISetup, Test, ERC1155TokenReceiver {
+    using NormalConfiguration for Configuration;
+    using SafeCastLib for *;
+
+    // Test ghost state
+    GhostType internal _ghost_state;
+    SubjectsType internal _subjects;
+    Configuration internal _global_config;
+
+    function global_config() internal view returns (Configuration memory) {
+        return _global_config;
     }
 
-    function setGhostPoolId(uint64 poolId) public virtual {
-        require(poolId != 0, "invalid-poolId");
-        _ghost.file("poolId", abi.encode(poolId));
-    }
+    // ============= Before Test ============= //
 
-    function setGhostActor(address actor) public virtual {
-        require(actor != address(0), "invalid-actor");
-        _ghost.file("actor", abi.encode(actor));
-    }
-
-    function addGhostActor(address actor) public virtual {
-        actors().add(actor);
-    }
-
-    /**
-     * @dev Fetches the ghost state to get information or manipulate it.
-     */
-    function ghost() public view virtual returns (GhostState memory) {
-        return _ghost;
-    }
-
-    /**
-     * @dev Actors can be this test contract or helper contracts like RevertCatcher, which
-     * bubbles errors up using try/catch.
-     */
-    function actors() internal virtual returns (ActorsState storage) {
-        return _actors;
-    }
-
-    /**
-     * @dev Subjects are the contracts being tested on or used in testing.
-     */
-    function subjects() internal virtual returns (SubjectsState storage) {
-        return _subjects;
-    }
-
-    function getTokens() public view virtual returns (MockERC20[] memory) {
-        return _subjects.tokens;
-    }
-
-    /**
-     * @notice Contract that is being tested.
-     * @dev Target subject is a ghost variable because it changes in the environment.
-     */
-    function subject() public view virtual returns (IPortfolio) {
-        return IPortfolio(_ghost.subject);
-    }
-
-    /**
-     * @notice Address that is calling the test subject contract.
-     * @dev Uses the existing actor that is being pranked via `useActor` modifier.
-     * It uses the `_ghost.actor` instead of `_actor.last` because it can
-     * change in the environment.
-     */
-    function actor() public view virtual returns (address) {
-        return _ghost.actor;
-    }
-
-    function getActors() public view virtual returns (address[] memory) {
-        address[] memory actors = _actors.active;
-        return actors;
-    }
-
-    function getRandomActor(uint256 index)
-        public
-        view
-        virtual
-        returns (address)
-    {
-        return _actors.rand(index);
-    }
-
-    // === Modifiers for Tests === //
-
-    modifier isArmed() {
-        require(ghost().poolId != 0, "did you forget to use a config modifier?");
+    // Important for making sure the setup went smoothly!
+    modifier verifySetup() {
+        _;
         require(
             ghost().subject != address(0), "did you forget to deploy a subject?"
         );
         require(ghost().actor != address(0), "did you forget to set an actor?");
+    }
+
+    // Setup
+    function setUp() public virtual verifySetup {
+        _subjects.deployer = address(this);
+        vm.label(_subjects.deployer, "deployer");
+
+        _subjects.registry = address(new SimpleRegistry());
+        vm.label(_subjects.registry, "registry");
+
+        _subjects.weth = address(new WETH());
+        vm.label(_subjects.weth, "weth");
+
+        _subjects.positionRenderer = address(new PositionRenderer());
+        vm.label(_subjects.positionRenderer, "position-renderer");
+
+        _subjects.portfolio = address(
+            new Portfolio(_subjects.weth, _subjects.registry, _subjects.positionRenderer)
+        );
+        vm.label(_subjects.portfolio, "portfolio");
+
+        _ghost_state = GhostType({
+            actor: address(this),
+            subject: _subjects.portfolio,
+            poolId: 0
+        });
+
+        assertEq(subject().VERSION(), "v1.4.0-beta", "version-not-equal");
+    }
+
+    // ============= Edit Test Environment ============= //
+
+    /// @dev Updates the ghost pool, "pool()".
+    function setGhostPoolId(uint64 id) public {
+        _ghost_state.file("poolId", abi.encode(id));
+    }
+
+    /// @dev Uses the global test Configuration type to create a pool and set the ghost state.
+    function activateConfig(Configuration memory config) internal {
+        if (config.asset == address(0) && config.quote == address(0)) {
+            (config.asset, config.quote) = deployDefaultTokenPair();
+        }
+
+        // Makes it accessible for debugging via `Setup.global_config()`.
+        _global_config = config;
+
+        // Creates a pool with poolId and sets the ghost pool id.
+        setGhostPoolId(
+            config.activate(
+                address(subject()), NormalConfiguration.validateNormalStrategy
+            )
+        );
+    }
+
+    //  ============= Test Setup Modifiers ============= //
+
+    /// @dev Stop the gas metering, must resume within the test.
+    modifier pauseGas() {
+        vm.pauseGasMetering();
         _;
     }
 
+    /// @dev Uses the `prank` forge cheat on the actor in the ghost state.
     modifier useActor() {
         vm.startPrank(actor());
         _;
         vm.stopPrank();
     }
+
+    /// @dev Updates the actor in the ghost state, `useActor` should be used after it.
+    modifier setActor(address actor_) {
+        _ghost_state.file("actor", abi.encode(actor_));
+        _;
+    }
+
+    modifier useRegistryController() {
+        address controller =
+            IPortfolioRegistry(subjects().registry).controller();
+        _ghost_state.file("actor", abi.encode(controller)); // so actor() doesn't break...
+        vm.startPrank(controller);
+        _;
+        vm.stopPrank();
+    }
+
+    // ============= Pool Setup Modifiers  ============= //
 
     modifier usePairTokens(uint256 amount) {
         // Approve and mint tokens for actor.
@@ -182,109 +199,7 @@ contract Setup is Test {
         _;
     }
 
-    /**
-     * @dev Uses a default parameter set to create a pool.
-     * @custom:example
-     * ```
-     * function test_basic_deposit() public defaultConfig {...}
-     * ```
-     */
-    modifier defaultConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier defaultControlledConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
-            "controller", abi.encode(address(this))
-        ).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier stablecoinPortfolioConfig() {
-        uint16 duration = type(uint16).max;
-        uint16 volatility = uint16(MIN_VOLATILITY);
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[1]))
-        ).edit("quote", abi.encode(address(subjects().tokens[2]))).edit(
-            "duration", abi.encode(duration)
-        ).edit("volatility", abi.encode(volatility)).edit(
-            "fee", abi.encode(uint16(MIN_FEE))
-        ).edit("price", abi.encode(uint128(1e18))).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier sixDecimalQuoteConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[2]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier feeOnTokenTransferConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[3]))
-        ).edit("quote", abi.encode(address(subjects().tokens[4]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier wethConfig() {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().weth))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).generate(
-            address(subject())
-        );
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier durationConfig(uint16 duration) {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
-            "duration", abi.encode(duration)
-        ).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier volatilityConfig(uint16 volatility) {
-        uint64 poolId = Configs.fresh().edit(
-            "asset", abi.encode(address(subjects().tokens[0]))
-        ).edit("quote", abi.encode(address(subjects().tokens[1]))).edit(
-            "volatility", abi.encode(volatility)
-        ).generate(address(subject()));
-
-        setGhostPoolId(poolId);
-        _;
-    }
-
-    modifier pauseGas() {
-        vm.pauseGasMetering();
-        _;
-    }
+    // Quick default actions
 
     modifier allocateSome(uint128 amt) {
         bytes[] memory data = new bytes[](1);
@@ -300,6 +215,12 @@ contract Setup is Test {
             )
         );
         subject().multicall(data);
+        _;
+    }
+
+    modifier setProtocolFee(uint256 fee) {
+        vm.prank(IPortfolioRegistry(subjects().registry).controller());
+        subject().setProtocolFee(fee);
         _;
     }
 
@@ -353,16 +274,223 @@ contract Setup is Test {
         _;
     }
 
-    modifier setActor(address actor) {
-        _ghost.file("actor", abi.encode(actor));
+    // Modifier configs
+
+    function deployDefaultTokenPair() internal returns (address, address) {
+        Coin asset = deployCoin("token", abi.encode("asset", "ASSET", 18));
+        Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
+
+        return (asset.to_addr(), quote.to_addr());
+    }
+
+    modifier defaultConfig() {
+        Configuration memory config = configureNormalStrategy();
+
+        activateConfig(config);
         _;
     }
 
-    // === Gas Utils === //
-    function wasteGas(uint256 slots) internal pure {
-        assembly {
-            let memPtr := mload(0x40)
-            mstore(add(memPtr, mul(32, slots)), 1) // Expand memory
-        }
+    modifier customConfig(
+        uint256 feeBasisPoints,
+        uint256 priorityFeeBasisPoints,
+        address controller,
+        uint256 strikePriceWad,
+        uint256 volatilityBasisPoints,
+        uint256 durationSeconds,
+        bool isPerpetual,
+        uint256 priceWad
+    ) {
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "strikePriceWad", abi.encode(strikePriceWad)
+        ).editStrategy(
+            "volatilityBasisPoints", abi.encode(volatilityBasisPoints)
+        ).editStrategy("durationSeconds", abi.encode(durationSeconds))
+            .editStrategy("isPerpetual", abi.encode(isPerpetual)).editStrategy(
+            "priceWad", abi.encode(priceWad)
+        ).edit("feeBasisPoints", abi.encode(feeBasisPoints)).edit(
+            "priorityFeeBasisPoints", abi.encode(priorityFeeBasisPoints)
+        ).edit("controller", abi.encode(controller));
+
+        activateConfig(config);
+        _;
     }
+
+    modifier defaultControlledConfig() {
+        Configuration memory config = configureNormalStrategy();
+
+        config.controller = address(this);
+        config.priorityFeeBasisPoints = MIN_FEE;
+        activateConfig(config);
+        _;
+    }
+
+    modifier stablecoinPortfolioConfig() {
+        uint32 duration = type(uint32).max;
+        uint32 volatility = uint32(MIN_VOLATILITY);
+
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "durationSeconds", abi.encode(duration)
+        ).editStrategy("volatilityBasisPoints", abi.encode(volatility));
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier sixDecimalQuoteConfig() {
+        Coin asset = deployCoin("token", abi.encode("asset", "ASSET", 18));
+        vm.label(asset.to_addr(), "asset-18");
+        Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 6));
+        vm.label(quote.to_addr(), "quote-6");
+
+        Configuration memory config = configureNormalStrategy();
+        (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier feeOnTokenTransferConfig() {
+        Coin asset = deployCoin("FOT", abi.encode("asset", "ASSET", 18));
+        vm.label(asset.to_addr(), "asset-fot-18");
+        Coin quote = deployCoin("FOT", abi.encode("quote", "QUOTE", 18));
+        vm.label(quote.to_addr(), "quote-fot-18");
+
+        Configuration memory config = configureNormalStrategy();
+        (config.asset, config.quote) = (asset.to_addr(), quote.to_addr());
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier wethConfig() {
+        Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
+        Configuration memory config = configureNormalStrategy();
+        (config.asset, config.quote) = (weth(), quote.to_addr());
+
+        activateConfig(config);
+        _;
+    }
+
+    // So this is interesting...
+    // Bound is a virtual function on an abstract contract
+    // So it doesn't have a Function Type (yes, uppercase), that we can access to pass through as a fn arg.
+    // So we wrap it with this, to pass to our fuzzStrategy and fuzz functions.
+    // https://docs.soliditylang.org/en/v0.8.20/contracts.html#abstract-contracts
+    function _bound_wrapper(
+        uint256 x,
+        uint256 min,
+        uint256 max
+    ) internal view returns (uint256 result) {
+        result = bound(x, min, max);
+    }
+
+    modifier fuzzConfig(bytes32 key, uint256 seed) {
+        Configuration memory config = configureNormalStrategy();
+        if (key == "feeBasisPoints" || key == "priorityFeeBasisPoints") {
+            config = config.fuzz(_bound_wrapper, key, seed);
+        } else {
+            config = config.fuzzStrategy(_bound_wrapper, key, seed);
+        }
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier fuzzAllConfig(uint256 seed) {
+        // Cursed but... works...
+        function (uint, uint, uint) internal view returns(uint) bounder =
+            _bound_wrapper;
+
+        uint256 fuzzInput = seed; // for avoiding stack too deep...
+        Configuration memory config =
+            configureNormalStrategy().fuzz(bounder, "feeBasisPoints", fuzzInput);
+        config = config.fuzz(bounder, "priorityFeeBasisPoints", fuzzInput)
+            .fuzzStrategy(bounder, "strikePriceWad", fuzzInput);
+        config = config.fuzzStrategy(
+            bounder, "volatilityBasisPoints", fuzzInput
+        ).fuzzStrategy(bounder, "durationSeconds", fuzzInput);
+        config = config.fuzzStrategy(bounder, "priceWad", fuzzInput);
+
+        if (config.priorityFeeBasisPoints != 0) {
+            config = config.edit("controller", abi.encode(address(this))); // Must have controller if priority fee is non zero.
+        }
+
+        // Validate the config's reserves before reverting...
+        vm.assume(config.reserveXPerWad != 0 && config.reserveYPerWad != 0);
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier durationConfig(uint32 durationSeconds) {
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "durationSeconds", abi.encode(durationSeconds)
+        );
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier volatilityConfig(uint32 volatilityBasisPoints) {
+        Configuration memory config = configureNormalStrategy().editStrategy(
+            "volatilityBasisPoints", abi.encode(volatilityBasisPoints)
+        );
+
+        activateConfig(config);
+        _;
+    }
+
+    // ============= Test Interface ============= //
+
+    /// @inheritdoc ISetup
+    function ghost() public view override returns (GhostType memory) {
+        return _ghost_state;
+    }
+
+    /// @inheritdoc ISetup
+    function subjects() public view returns (SubjectsType memory) {
+        return _subjects;
+    }
+
+    /// @inheritdoc ISetup
+    function actor() public view override returns (address) {
+        return _ghost_state.actor;
+    }
+
+    /// @inheritdoc ISetup
+    function subject() public view override returns (IPortfolio) {
+        return IPortfolio(payable(_ghost_state.subject));
+    }
+
+    /// @inheritdoc ISetup
+    function poolId() public view override returns (uint256) {
+        return _ghost_state.poolId;
+    }
+
+    /// @inheritdoc ISetup
+    function weth() public view override returns (address) {
+        return _subjects.weth;
+    }
+
+    /// @inheritdoc ISetup
+    function registry() public view override returns (address) {
+        return _subjects.registry;
+    }
+
+    /// @inheritdoc ISetup
+    function portfolio() public view override returns (address) {
+        return _subjects.portfolio;
+    }
+
+    /// @inheritdoc ISetup
+    function strategy() public view override returns (IStrategy) {
+        return _ghost_state.strategy();
+    }
+
+    /// @inheritdoc ISetup
+    function positionRenderer() public view override returns (address) {
+        return _subjects.positionRenderer;
+    }
+
+    receive() external payable { }
 }

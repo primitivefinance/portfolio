@@ -1,7 +1,7 @@
 {
   "name": "@primitivexyz/portfolio",
   "license": "AGPL-3.0-only",
-  "version": "v1.3.0-beta",
+  "version": "v1.4.0-beta",
   "description": "Onchain protocol for low cost portfolio management using automated market making strategies.",
   "publishConfig": {
     "access": "public"

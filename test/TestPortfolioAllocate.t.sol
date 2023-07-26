@@ -2,8 +2,11 @@
 pragma solidity ^0.8.4;
 
 import "./Setup.sol";
+import { BURNED_LIQUIDITY } from "contracts/libraries/PoolLib.sol";
 
 contract TestPortfolioAllocate is Setup {
+    using NormalConfiguration for Configuration;
+
     using AssemblyLib for uint256;
 
     function test_multicall_create_pair_pool_allocate() public useActor {
@@ -21,9 +24,22 @@ contract TestPortfolioAllocate is Setup {
             IPortfolioActions.createPair, (address(tokenA), address(tokenB))
         );
 
+        Configuration memory testConfig = configureNormalStrategy().editStrategy(
+            "durationSeconds", abi.encode(100 * 1 days)
+        ).editStrategy("volatilityBasisPoints", abi.encode(100));
+
         data[1] = abi.encodeCall(
             IPortfolioActions.createPool,
-            (0, address(0), 1, 100, 100, 100, 1 ether, 1 ether)
+            (
+                0, // magic pair id to use the nonce, which is the createPairId!
+                testConfig.reserveXPerWad,
+                testConfig.reserveYPerWad,
+                100, // fee
+                0, // prior fee
+                address(0), // controller
+                subject().DEFAULT_STRATEGY(),
+                testConfig.strategyArgs
+            )
         );
 
         uint64 poolId = AssemblyLib.encodePoolId(1, false, 1);
@@ -42,7 +58,7 @@ contract TestPortfolioAllocate is Setup {
 
         subject().multicall(data);
 
-        (,, uint128 liquidity,,,,) = subject().pools(poolId);
+        (,, uint128 liquidity,,,,,) = subject().pools(poolId);
 
         assertEq(liquidity, 1 ether, "liquidity");
     }
@@ -52,24 +68,16 @@ contract TestPortfolioAllocate is Setup {
         wethConfig
         useActor
         usePairTokens(500 ether)
-        isArmed
     {
         vm.deal(actor(), 250 ether);
-
-        bytes[] memory data = new bytes[](1);
-        data[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                1 ether,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate{ value: 250 ether }(
+            false,
+            address(this),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
         );
-
-        subject().multicall{value: 250 ether}(data);
     }
 
     function test_allocate_recipient_weth()
@@ -77,11 +85,9 @@ contract TestPortfolioAllocate is Setup {
         wethConfig
         useActor
         usePairTokens(500 ether)
-        isArmed
     {
         vm.deal(actor(), 250 ether);
-
-        subject().allocate{value: 250 ether}(
+        subject().allocate{ value: 250 ether }(
             false,
             address(0xbeef),
             ghost().poolId,
@@ -99,7 +105,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         subject().allocate(
             false,
@@ -119,7 +124,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         // Arguments for test.
         uint128 amount = 0.1 ether;
@@ -128,21 +132,14 @@ contract TestPortfolioAllocate is Setup {
         // Fetch the variable we are changing (pool.liquidity).
         uint256 prev = ghost().pool().liquidity;
         // Trigger the function being tested.
-
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
-
         // Fetch the variable changed.
         uint256 post = ghost().pool().liquidity;
         // Ghost assertions comparing the actual and expected deltas.
@@ -160,7 +157,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         // Arguments for test.
         uint128 amount = 0.1 ether;
@@ -191,63 +187,25 @@ contract TestPortfolioAllocate is Setup {
         );
     }
 
-    // todo: Use max now only uses entire transient balances, which need to be increased from a swap output or deallocatye.
-    /* function test_allocate_use_max()
-        public
-        defaultConfig
-        useActor
-        usePairTokens(10 ether)
-        isArmed
-    {
-        // Deposit tokens which will be used to compute max liquidity.
-        subject().fund(ghost().asset().to_addr(), type(uint256).max);
-        subject().fund(ghost().quote().to_addr(), type(uint256).max);
-
-        subject().multiprocess(
-            FVMLib.encodeAllocateOrDeallocate({
-                shouldAllocate: true,
-                useMax: uint8(1),
-                poolId: ghost().poolId,
-                deltaLiquidity: 1,
-                deltaQuote: type(uint128).max,
-                deltaAsset: type(uint128).max
-            })
-        );
-        assertEq(
-            ghost().pool().liquidity,
-            ghost().position(actor()).liquidity,
-            "position != pool.liquidity"
-        );
-    } */
-
     function test_allocate_does_not_modify_timestamp()
         public
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
         uint256 prev = ghost().pool().lastTimestamp;
-
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
 
         uint256 post = ghost().pool().lastTimestamp;
-
         assertEq(post, prev, "pool.lastTimestamp");
     }
 
@@ -256,30 +214,22 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
         uint256 prev_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 prev_quote = ghost().reserve(ghost().quote().to_addr());
         (uint256 delta0, uint256 delta1) = ghost().pool().getPoolLiquidityDeltas({
             deltaLiquidity: int128(amount)
         });
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
-
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
 
@@ -294,19 +244,13 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
         vm.expectRevert();
-
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (false, address(this), xid, amount, 0, type(uint128).max)
+        subject().allocate(
+            false, address(this), xid, amount, 0, type(uint128).max
         );
-        subject().multicall(instructions);
     }
 
     function test_allocate_reverts_when_max_delta_reached()
@@ -314,19 +258,13 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
         vm.expectRevert();
-
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (false, address(this), xid, amount, type(uint128).max, 0)
+        subject().allocate(
+            false, address(this), xid, amount, type(uint128).max, 0
         );
-        subject().multicall(instructions);
     }
 
     /// todo: This is identical logic, only thing that changed was the config modifier.
@@ -337,7 +275,6 @@ contract TestPortfolioAllocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -348,19 +285,14 @@ contract TestPortfolioAllocate is Setup {
             deltaLiquidity: int128(amount)
         });
 
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
 
         uint256 post_asset = ghost().reserve(ghost().asset().to_addr());
         uint256 post_quote = ghost().reserve(ghost().quote().to_addr());
@@ -376,7 +308,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
@@ -389,19 +320,14 @@ contract TestPortfolioAllocate is Setup {
             deltaLiquidity: int128(amount)
         });
 
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
 
         uint256 post_asset =
             ghost().asset().to_token().balanceOf(address(subject()));
@@ -417,70 +343,55 @@ contract TestPortfolioAllocate is Setup {
     function test_allocate_non_existent_pool_reverts() public useActor {
         uint64 failureArg = 51;
         vm.expectRevert(
-            abi.encodeWithSelector(NonExistentPool.selector, failureArg)
-        );
-
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                failureArg,
-                1 ether,
-                type(uint128).max,
-                type(uint128).max
+            abi.encodeWithSelector(
+                Portfolio_NonExistentPool.selector, failureArg
             )
         );
-        subject().multicall(instructions);
+
+        subject().allocate(
+            false,
+            address(this),
+            failureArg,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
+        );
     }
 
     function test_allocate_zero_liquidity_reverts()
         public
         defaultConfig
         useActor
-        isArmed
     {
         uint256 failureArg = 0;
-        vm.expectRevert(ZeroLiquidity.selector);
+        vm.expectRevert(Portfolio_ZeroLiquidityAllocate.selector);
 
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                uint128(failureArg),
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            ghost().poolId,
+            uint128(failureArg),
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
     }
 
     function test_allocate_liquidity_overflow_reverts()
         public
         defaultConfig
         useActor
-        isArmed
     {
         uint256 failureArg = uint256(type(uint128).max) + 1;
         vm.expectRevert(); // safeCastTo128 reverts with no message, so it's just an "Evm Error".
 
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                ghost().poolId,
-                uint128(failureArg),
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            ghost().poolId,
+            uint128(failureArg),
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
     }
 
     function test_allocate_fee_on_transfer_token()
@@ -488,11 +399,9 @@ contract TestPortfolioAllocate is Setup {
         feeOnTokenTransferConfig
         usePairTokens(10 ether)
         useActor
-        isArmed
     {
         uint128 amount = 0.1 ether;
         uint64 xid = ghost().poolId;
-
         (uint256 amount0,) =
             subject().getLiquidityDeltas(ghost().poolId, int128(amount));
         uint256 fee0 = amount0 * 1 / 100;
@@ -500,28 +409,22 @@ contract TestPortfolioAllocate is Setup {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                NegativeBalance.selector,
+                Portfolio_Insolvent.selector,
                 ghost().asset().to_addr(),
                 -int256(fee0)
             )
         );
 
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
 
         int256 net = ghost().net(ghost().asset().to_addr());
-
         console.logInt(net);
         assertTrue(net >= 0, "Negative net balance for token");
     }
@@ -531,68 +434,67 @@ contract TestPortfolioAllocate is Setup {
         sixDecimalQuoteConfig
         useActor
         usePairTokens(500 ether)
-        allocateSome(uint128(BURNED_LIQUIDITY * 1e3))
-        isArmed
+        allocateSome(uint128(BURNED_LIQUIDITY * 1e4))
     {
-        vm.assume(liquidity > 10 ** (18 - 6));
+        vm.assume(liquidity > 1e15);
         _simple_allocate_check_liquidity(liquidity);
     }
 
     function testFuzz_allocate_duration_modifies_liquidity(
-        uint16 duration,
+        uint256 seed,
         uint64 liquidity
     )
         public
-        durationConfig(uint16(bound(duration, MIN_DURATION, MAX_DURATION)))
+        fuzzConfig("durationSeconds", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
     }
 
     function testFuzz_allocate_low_duration_modifies_liquidity(
-        uint16 duration,
+        uint32 duration,
         uint64 liquidity
     )
         public
-        durationConfig(uint16(bound(duration, MIN_DURATION, MIN_DURATION + 100)))
+        durationConfig(
+            uint32(bound(duration, MIN_DURATION, MIN_DURATION + (100 days)))
+        )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
     }
 
     function testFuzz_allocate_high_duration_modifies_liquidity(
-        uint16 duration,
+        uint32 duration,
         uint64 liquidity
     )
         public
-        durationConfig(uint16(bound(duration, MAX_DURATION - 100, MAX_DURATION)))
+        durationConfig(
+            uint32(bound(duration, MAX_DURATION - (100 days), MAX_DURATION))
+        )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
     }
 
     function testFuzz_allocate_volatility_modifies_liquidity(
-        uint16 volatility,
+        uint256 seed,
         uint64 liquidity
     )
         public
-        volatilityConfig(uint16(bound(volatility, MIN_VOLATILITY, MAX_VOLATILITY)))
+        fuzzConfig("volatilityBasisPoints", seed)
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -604,12 +506,11 @@ contract TestPortfolioAllocate is Setup {
     )
         public
         volatilityConfig(
-            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+            uint32(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -621,12 +522,11 @@ contract TestPortfolioAllocate is Setup {
     )
         public
         volatilityConfig(
-            uint16(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
+            uint32(bound(volatility, MIN_VOLATILITY, MIN_VOLATILITY + 100))
         )
         useActor
         usePairTokens(500 ether)
         allocateSome(uint128(BURNED_LIQUIDITY))
-        isArmed
     {
         vm.assume(liquidity > 0);
         _simple_allocate_check_liquidity(liquidity);
@@ -642,19 +542,14 @@ contract TestPortfolioAllocate is Setup {
             ghost().quote().to_token().balanceOf(address(subject()))
         );
 
-        bytes[] memory instructions = new bytes[](1);
-        instructions[0] = abi.encodeCall(
-            IPortfolioActions.allocate,
-            (
-                false,
-                address(this),
-                xid,
-                amount,
-                type(uint128).max,
-                type(uint128).max
-            )
+        subject().allocate(
+            false,
+            address(this),
+            xid,
+            amount,
+            type(uint128).max,
+            type(uint128).max
         );
-        subject().multicall(instructions);
 
         uint256 post = ghost().pool().liquidity;
         (uint256 postA, uint256 postQ) = (
@@ -693,7 +588,6 @@ contract TestPortfolioAllocate is Setup {
         defaultConfig
         useActor
         usePairTokens(10 ether)
-        isArmed
     {
         uint128 liquidity = 1 ether;
 
@@ -706,18 +600,20 @@ contract TestPortfolioAllocate is Setup {
             type(uint128).max
         );
 
+        Configuration memory testConfig = configureNormalStrategy();
+
         uint64 poolId = subject().createPool(
-            1,
+            1, // pair id
+            testConfig.reserveXPerWad, //x
+            testConfig.reserveYPerWad, // y
+            30, // fee
+            0, // priority fee
             address(0),
-            DEFAULT_PRIORITY_FEE,
-            DEFAULT_FEE,
-            DEFAULT_VOLATILITY,
-            DEFAULT_DURATION,
-            DEFAULT_STRIKE,
-            DEFAULT_PRICE
+            subject().DEFAULT_STRATEGY(),
+            testConfig.strategyArgs
         );
 
-        uint128 liq = subject().positions(actor(), ghost().poolId);
+        uint128 liq = ghost().position(actor());
         (uint128 deltaAsset, uint128 deltaQuote) =
             subject().getLiquidityDeltas(ghost().poolId, int128(liq));
 
@@ -769,6 +665,53 @@ contract TestPortfolioAllocate is Setup {
             postQuoteBalance,
             preQuoteBalance + quoteDeallocate - quoteAllocate,
             "quote balance"
+        );
+    }
+
+    function test_allocate_reverts_insufficient_liquidity()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(100 ether)
+    {
+        vm.expectRevert(Portfolio_InsufficientLiquidity.selector);
+        subject().allocate(
+            false,
+            actor(),
+            ghost().poolId,
+            uint128(BURNED_LIQUIDITY - 1),
+            type(uint128).max,
+            type(uint128).max
+        );
+    }
+
+    function test_allocate_reverts_portfolio_insolvent()
+        public
+        feeOnTokenTransferConfig
+        useActor
+        usePairTokens(100 ether)
+    {
+        // This will revert with the insolvent error because fee on transfer token
+        // will reduce some of the tokens that are paid to portfolio.
+
+        uint128 liquidity = 1 ether;
+        (uint256 deltaAsset,) =
+            subject().getLiquidityDeltas(ghost().poolId, int128(liquidity));
+        uint256 debt = deltaAsset / 100; // ASSUMES FEE ON TRANSFER IS 1%
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Portfolio_Insolvent.selector,
+                ghost().asset().to_addr(),
+                -int256(debt)
+            )
+        );
+        subject().allocate(
+            false,
+            actor(),
+            ghost().poolId,
+            1 ether,
+            type(uint128).max,
+            type(uint128).max
         );
     }
 }

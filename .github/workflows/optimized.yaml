@@ -20,7 +20,4 @@ jobs:
         run: FOUNDRY_PROFILE=optimized forge build --sizes --skip test
       
       - name: Run tests RMM01Portfolio
-        run: FOUNDRY_PROFILE=optimized forge test --match-contract TestRMM01
-
-      - name: Run invariant tests
-        run: FOUNDRY_PROFILE=optimized forge test --gas-report --match-contract TestRMM01PortfolioInvariants -vvv
+        run: FOUNDRY_PROFILE=optimized forge test

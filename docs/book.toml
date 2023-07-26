@@ -1,0 +1,6 @@
+[book]
+authors = ["@primitivefinance"]
+language = "en"
+multilingual = false
+src = "src"
+title = "portfolio-docs"

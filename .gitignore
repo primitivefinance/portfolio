@@ -1,4 +1,3 @@
-docs
 node_modules
 .env
 coverage
@@ -20,9 +19,6 @@ broadcast
 
 # macOS
 .DS_Store
-
-# VScode
-.vscode
 
 # Differential testing
 test/differential/data

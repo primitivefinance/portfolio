@@ -19,5 +19,5 @@ jobs:
       - name: Run build
         run: FOUNDRY_PROFILE=default forge build --skip test
       
-      - name: Run tests RMM01Portfolio
-        run: FOUNDRY_PROFILE=default forge test --gas-report --match-contract TestRMM01 -vvv
+      - name: Run tests
+        run: FOUNDRY_PROFILE=default forge test --gas-report -vvv
