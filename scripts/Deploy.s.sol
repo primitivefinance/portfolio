@@ -2,12 +2,12 @@
 pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
-
 import "solmate/tokens/WETH.sol";
-import "contracts/RMM01Portfolio.sol";
-import "contracts/test/SimpleRegistry.sol";
-
 import "nugu/NuguFactory.sol";
+
+import "../contracts/test/SimpleRegistry.sol";
+import "../contracts/Portfolio.sol";
+import "../contracts/PositionRenderer.sol";
 
 contract Deploy is Script {
     function run(address weth, address registry) external {
@@ -38,11 +38,19 @@ contract Deploy is Script {
             );
         }
 
+        // First we deploy the PositionRenderer contract
+        address positionRenderer = factory.deploy(
+            keccak256("PositionRenderer"),
+            type(PositionRenderer).creationCode,
+            0
+        );
+
         // Then we can deploy the Portfolio contract
         address portfolio = factory.deploy(
-            keccak256("RMM01Portfolio"),
+            keccak256("Portfolio"),
             abi.encodePacked(
-                type(RMM01Portfolio).creationCode, abi.encode(weth, registry)
+                type(Portfolio).creationCode,
+                abi.encode(weth, registry, positionRenderer)
             ),
             0
         );
@@ -50,6 +58,7 @@ contract Deploy is Script {
         console.log(unicode"🚀 Contracts deployed!");
         console.log("WETH:", weth);
         console.log("Registry:", registry);
+        console.log("PositionRenderer:", positionRenderer);
         console.log("Portfolio:", portfolio);
 
         vm.stopBroadcast();
