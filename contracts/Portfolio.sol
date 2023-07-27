@@ -604,6 +604,7 @@ contract Portfolio is ERC1155, IPortfolio {
         // Swap event emits amounts in native token decimals.
         emit Swap(
             poolId,
+            args.sellAsset,
             inter.tokenInput,
             input,
             inter.tokenOutput,

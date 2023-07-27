@@ -38,6 +38,7 @@ interface IPortfolioEvents {
      * @dev
      * Swaps `input` amount of `tokenIn` for `output` amount of `tokenOut` in pool with `poolId`.
      *
+     * @param sellAsset If true, swap `asset` for `quote` tokens.
      * @param tokenIn Token sold.
      * @param input Quantity of input token sold in native token decimals.
      * @param tokenOut Token bought.
@@ -47,6 +48,7 @@ interface IPortfolioEvents {
      */
     event Swap(
         uint64 indexed poolId,
+        bool sellAsset,
         address indexed tokenIn,
         uint256 input,
         address indexed tokenOut,
