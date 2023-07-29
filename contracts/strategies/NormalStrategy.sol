@@ -88,7 +88,7 @@ contract NormalStrategy is INormalStrategy {
             config: configs[poolId],
             order: Order({
                 input: 2, // avoid revert from zero adjustment, 2 for avoiding fee
-                output: 2, // avoid revert from zero adjustment, 2 for avoiding fee
+                output: 1, // avoid revert from zero adjustment
                 useMax: false,
                 poolId: poolId,
                 sellAsset: sellAsset
@@ -177,7 +177,7 @@ contract NormalStrategy is INormalStrategy {
             config: configs[poolId],
             order: Order({
                 input: amountIn.safeCastTo128(),
-                output: 2, // to avoid revert from zero adjustment less fee
+                output: 1, // to avoid revert from zero adjustment
                 useMax: false,
                 poolId: poolId,
                 sellAsset: sellAsset
