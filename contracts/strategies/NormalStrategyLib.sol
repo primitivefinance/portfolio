@@ -305,7 +305,6 @@ function approximatePriceGivenX(
     uint256 reserveXPerWad
 ) pure returns (uint256 priceWad) {
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
-    (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
 
     if (reserveXPerWad >= upperBoundX) return self.strikePriceWad; // Terminal price limit.
     if (reserveXPerWad <= lowerBoundX) return type(uint128).max; // Upper price limit.
