@@ -7,9 +7,6 @@ import "../libraries/PortfolioLib.sol";
 import "./INormalStrategy.sol";
 import "./NormalStrategyLib.sol";
 
-/// @dev Enforces minimum positive invariant growth for swaps in pools using this strategy.
-uint256 constant MINIMUM_INVARIANT_DELTA = 1;
-
 /// @dev Emitted when a hook is called by a non-portfolio address.
 error NormalStrategy_NotPortfolio();
 
@@ -152,7 +149,7 @@ contract NormalStrategy is INormalStrategy {
         int256 invariantAfter
     ) internal pure returns (bool) {
         int256 delta = invariantAfter - invariantBefore;
-        if (delta < int256(MINIMUM_INVARIANT_DELTA)) return false;
+        if (delta < MINIMUM_INVARIANT_DELTA) return false;
 
         return true;
     }

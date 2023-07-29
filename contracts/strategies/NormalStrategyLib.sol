@@ -36,6 +36,8 @@ using {
 
 using { encode, modify, transform } for PortfolioConfig global;
 
+/// @dev Enforces minimum positive invariant growth for swaps in pools using this strategy.
+int256 constant MINIMUM_INVARIANT_DELTA = 1;
 uint256 constant MIN_STRIKE_PRICE = 1; // 1 wei
 uint256 constant MAX_STRIKE_PRICE = type(uint128).max;
 uint256 constant MIN_VOLATILITY = 1; // 0.01%
@@ -647,10 +649,11 @@ library NormalStrategyLib {
         uint256 value
     ) internal pure returns (int256) {
         // Optimize the trading function such that it is strictly monotonically increasing.
-        // Find the root: f(x) - invariant + 2 = 0
+        // Find the root: f(x) - (invariant + min invariant delta) = 0
         NormalCurve memory curve = abi.decode(args, (NormalCurve));
         curve.reserveYPerWad = value;
-        return tradingFunction(curve) - (curve.invariant + 1);
+        return
+            tradingFunction(curve) - (curve.invariant + MINIMUM_INVARIANT_DELTA);
     }
 
     function findRootForSwappingInY(
@@ -658,10 +661,11 @@ library NormalStrategyLib {
         uint256 value
     ) internal pure returns (int256) {
         // Optimize the trading function such that it is strictly monotonically increasing.
-        // Find the root: f(x) - invariant + 2 = 0
+        // Find the root: f(x) - (invariant + min invariant delta) = 0
         NormalCurve memory curve = abi.decode(args, (NormalCurve));
         curve.reserveXPerWad = value;
-        return tradingFunction(curve) - (curve.invariant + 1);
+        return
+            tradingFunction(curve) - (curve.invariant + MINIMUM_INVARIANT_DELTA);
     }
 
     // ----------------- //
