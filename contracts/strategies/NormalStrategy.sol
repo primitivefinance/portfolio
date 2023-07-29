@@ -227,14 +227,14 @@ contract NormalStrategy is INormalStrategy {
 
         if (sellAsset) {
             tempInput = upperX.mulWadDown(pool.liquidity) - pool.virtualX - 1;
-            tempOutput = pool.virtualY - lowerY.mulWadDown(pool.liquidity) + 1;
+            tempOutput = pool.virtualY - lowerY.mulWadDown(pool.liquidity) - 1;
             order.input =
                 tempInput.scaleFromWadDown(pair.decimalsAsset).safeCastTo128();
             order.output =
                 tempOutput.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
         } else {
             tempInput = upperY.mulWadDown(pool.liquidity) - pool.virtualY - 1;
-            tempOutput = pool.virtualX - lowerX.mulWadDown(pool.liquidity) + 1;
+            tempOutput = pool.virtualX - lowerX.mulWadDown(pool.liquidity) - 1;
 
             order.input =
                 tempInput.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
