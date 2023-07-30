@@ -198,8 +198,8 @@ contract TestPortfolioCreatePool is Setup {
         );
 
         subject().multicall(data);
-        uint64 poolId = AssemblyLib.encodePoolId(
-            pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
+        uint64 poolId = PoolIdLib.encode(
+            false, false, pairNonce, uint32(subject().getPoolNonce(pairNonce))
         );
         assertEq(
             ghost().configOf(poolId).durationSeconds,

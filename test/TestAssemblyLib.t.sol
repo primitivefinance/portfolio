@@ -46,4 +46,19 @@ contract TestAssemblyLib is Test {
             output, delta < 0 ? input - uint128(-delta) : input + uint128(delta)
         );
     }
+
+    function test_pack() public {
+        bytes1 to_pack = 0x01;
+        bytes1 packed = AssemblyLib.pack(to_pack, 0x0);
+        assertEq(uint8(packed), uint8(0x10), "upper packed");
+        assertEq(uint8(packed & 0x0f), 0x00, "lower packed");
+    }
+
+    function test_separate() public {
+        bytes1 to_pack = 0x01;
+        bytes1 packed = AssemblyLib.pack(to_pack, 0x0);
+        (bytes1 unpacked, bytes1 unpacked_zero) = AssemblyLib.separate(packed);
+        assertEq(uint8(unpacked), uint8(to_pack), "unpacked");
+        assertEq(uint8(unpacked_zero), 0x00, "unpacked_zero");
+    }
 }

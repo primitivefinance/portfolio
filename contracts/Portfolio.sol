@@ -681,9 +681,16 @@ contract Portfolio is ERC1155, IPortfolio {
         // Increment the pool nonce.
         uint32 poolNonce = ++getPoolNonce[pairNonce];
 
+        // Zero address strtaegy is a magic value to use the default strategy.
+        strategy = strategy == address(0) ? DEFAULT_STRATEGY : strategy;
+
         // Compute the poolId, which is a packed 64-bit integer.
-        bool hasController = controller != address(0);
-        poolId = AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
+        poolId = PoolIdLib.encode(
+            strategy != DEFAULT_STRATEGY, // Flips the "altered" flag in the upper 4 bits: "0x10..."
+            controller != address(0), // Flips the "controlled" flag in the lower 4 bits:  "0x01..."
+            pairNonce,
+            poolNonce
+        );
 
         // Instantiate the pool.
         pools[poolId].createPool({
@@ -692,12 +699,13 @@ contract Portfolio is ERC1155, IPortfolio {
             feeBasisPoints: feeBasisPoints,
             priorityFeeBasisPoints: priorityFeeBasisPoints,
             controller: controller,
-            strategy: strategy == address(0) ? DEFAULT_STRATEGY : strategy
+            strategy: strategy
         });
 
         // Store the last created poolId for the multicall, to make sure the user is not frontrun.
         _getLastPoolId = poolId;
 
+        // This call also prevents accidently creating a pool with an invalid strategy target address.
         IStrategy(getStrategy(poolId)).afterCreate(poolId, strategyArgs);
 
         emit CreatePool(

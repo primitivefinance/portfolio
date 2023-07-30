@@ -6,6 +6,7 @@ import "solmate/utils/SafeCastLib.sol";
 import "./AssemblyLib.sol";
 
 using AssemblyLib for uint256;
+using AssemblyLib for bytes1;
 using FixedPointMathLib for uint256;
 using FixedPointMathLib for uint128;
 using FixedPointMathLib for int256;
@@ -17,19 +18,103 @@ using PoolIdLib for PoolId global;
 
 /// @dev Helper methods to decode the data encoded in a pool id.
 library PoolIdLib {
-    /// @dev Pair id is encoded in the first 24-bits.
-    function pairId(PoolId poolId) internal pure returns (uint24 id) {
-        id = uint24(PoolId.unwrap(poolId) >> 40);
+    /**
+     * @notice
+     * Packs key pool information into a 64-bit pool id.
+     *
+     * @dev
+     * Pools with a leading upper flag set, i.e. `0x10...`, MUST be approached with caution, as this
+     * indicates that the pool has a non-default strategy contract. The strategy address
+     * has power over a pool's key swap validation logic and its liquidity logic.
+     *
+     * Pools with a leading lower flag set, i.e. `0x01...`, should be approached with some caution,
+     * as this indicates that the pool has a non-zero address controller. The controller
+     * has power to change the swap and priority swap fees of the pool, within reasonable bounds.
+     *
+     * @custom:example
+     * ```
+     * uint64 poolId = encode(true, true, 7,  42);
+     * assertEq(poolId, 0x110000070000002a);
+     * bool controlled = true;
+     * bool altered = true;
+     * bytes1 packedBools = AssemblyLib.pack(bytes1(uint8(controlled ? 1 : 0)), bytes1(uint8(altered ? 1 : 0)));
+     * uint64 poolIdEncoded = abi.encodePacked(packedBools, uint24(pairId), uint32(poolNonce));
+     * assertEq(poolIdEncoded, poolId);
+     * ```
+     *
+     * @param controlled Whether the pool has a non-zero address controller.
+     * @param altered Whether the pool has the non-default strategy address.
+     * @param pairId Id of the pair of asset / quote tokens.
+     * @param poolNonce Current pool nonce of the created pools for the `pairId`.
+     * @return poolId Packs the above arguments into a 64-bit pool identifier.
+     */
+    function encode(
+        bool controlled,
+        bool altered,
+        uint24 pairId,
+        uint32 poolNonce
+    ) internal pure returns (uint64 poolId) {
+        // Packs key information about a pool into a single byte.
+        // If the pool has a controller and if it has a non-default strategy are pieces of information
+        // that can be read directly from the pool id.
+        // Pool ids with a leading 0x11 byte should be approached with caution,
+        // while the pool ids with a leading 0x00 byte are using default parameters.
+        uint8 packed = uint8(
+            AssemblyLib.pack(
+                bytes1(uint8(altered ? 1 : 0)),
+                bytes1(uint8(controlled ? 1 : 0))
+            )
+        );
+
+        assembly {
+            // First, shifts the single byte packed flags all the way to the
+            // first 8 bits of the 64-bit pool id (64 - 8 = 56).
+            // Second, shifts the pairId to the 24 bits after the flags, (56 - 24 = 32).
+            // Third, places the pool nonce in the last 32 bits of the pool id (32 - 32 = 0).
+            // This algorithm packs the 64-bit pool id with key information, in the following layout:
+            // 0x       00             000000000000 0000000000000000
+            //          ^^             ^^^^^^^^^^^^ ^^^^^^^^^^^^^^^^
+            // (altered, controlled)      pairId       poolNonce
+            poolId := or(or(shl(56, packed), shl(32, pairId)), poolNonce)
+        }
     }
 
-    /// @dev Controlled boolean is between the first 24-bits and last 32-bits.
+    /// @dev Helper function to decode a pool id into its key information components.
+    function decode(uint64 poolId)
+        internal
+        pure
+        returns (bool controlled, bool altered, uint24 pairId, uint32 nonce)
+    {
+        PoolId id = PoolId.wrap(poolId);
+        controlled = id.controlled();
+        altered = id.altered();
+        pairId = id.pairId();
+        nonce = id.nonce();
+    }
+
+    /// @dev Pair id is the 24-bits to the left of the 32-bit pool nonce at the end.
+    function pairId(PoolId poolId) internal pure returns (uint24 id) {
+        id = uint24(PoolId.unwrap(poolId) >> 32);
+    }
+
+    /// @dev Controlled flag true if the pool has a controller. Lower 4 bits of the first byte.
     function controlled(PoolId poolId) internal pure returns (bool) {
-        return uint8(PoolId.unwrap(poolId) >> 32) == 1;
+        (, bytes1 controlled) =
+            bytes1(uint8(PoolId.unwrap(poolId) >> 56)).separate();
+        return uint8(controlled) == 1;
     }
 
     /// @dev Nonce is encoded in the last 32-bits.
     function nonce(PoolId poolId) internal pure returns (uint32 nonce) {
+        // Uses an unsafe cast to uint32 to truncate the pool id to its last 32 bits.
         nonce = uint32(PoolId.unwrap(poolId));
+    }
+
+    /// @dev Altered flag is true if the pool does __not__ use the default strategy. Upper 4 bits of the first byte.
+    function altered(PoolId poolId) internal pure returns (bool) {
+        (bytes1 altered,) =
+            bytes1(uint8(PoolId.unwrap(poolId) >> 56)).separate();
+        return uint8(altered) == 1;
     }
 }
 
