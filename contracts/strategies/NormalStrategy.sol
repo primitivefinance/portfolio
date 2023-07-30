@@ -187,7 +187,18 @@ contract NormalStrategy is INormalStrategy {
     /// @inheritdoc IPortfolioStrategy
     function getSpotPrice(uint64 poolId) public view returns (uint256 price) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-        price = configs[poolId].transform().approximatePriceGivenX({
+        PortfolioConfig memory config = configs[poolId];
+
+        NormalCurve memory curve = config.transform();
+
+        // The `transform` function does not recompute the time remaining.
+        // Overwrite it manually so the approximation uses the new time remaining,
+        // instead of the initial full duration on pool creation.
+        curve.timeRemainingSeconds = config.computeTau(block.timestamp);
+
+        // The `transform` function also sets `invariant` to 0.
+        // This is fine because it's not required for the price calculation.
+        price = curve.approximatePriceGivenX({
             reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity)
         });
     }
@@ -323,6 +334,9 @@ contract NormalStrategy is INormalStrategy {
     ) public view returns (uint256, uint256) {
         PortfolioConfig memory config = strategyArgs.decode();
         NormalCurve memory curve = config.transform();
+
+        // Assumes the `config.creationTimestamp` is set to `block.timestamp`.
+        // Therefore, `curve.timeRemainingSeconds` is equal to the full duration, `config.durationSeconds`.
         return curve.approximateReservesGivenPrice(priceWad);
     }
 
@@ -359,6 +373,7 @@ contract NormalStrategy is INormalStrategy {
         );
         strategyData = config.encode();
 
+        // Utilizes `durationSeconds` argument as the `timeRemainingSeconds` parameter.
         (initialX, initialY) =
             config.transform().approximateReservesGivenPrice(priceWad);
     }

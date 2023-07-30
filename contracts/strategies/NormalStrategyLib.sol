@@ -34,7 +34,13 @@ using {
     tradingFunction
 } for NormalCurve global;
 
-using { encode, modify, transform } for PortfolioConfig global;
+using {
+    computeTau,
+    encode,
+    getMaturity,
+    modify,
+    transform
+} for PortfolioConfig global;
 
 /// @dev Enforces minimum positive invariant growth for swaps in pools using this strategy.
 int256 constant MINIMUM_INVARIANT_DELTA = 1;
@@ -363,7 +369,22 @@ struct PortfolioConfig {
     bool isPerpetual;
 }
 
-/// @dev Transforms the normal strategy configuration into a class with methods for its math.
+/**
+ * @notice
+ * Tranforms a configuration into it's respective trading function parameters,
+ * converted to the required units.
+ *
+ * @dev Notes on the transformation:
+ * - Invariant is set to 0. For most functions that utilize the curve parameters,
+ * the invariant is not needed. However, for functions like the
+ * `approximateYGivenX` and `approximateXGivenY` the invariant is needed.
+ * Therefore, after the config has been transformed, it's invariant should be
+ * set to the result of `tradingFunction` if using these functions.
+ * - Time remaining is set to the config's duration. However,
+ * the duration parameter used in this transformed `NormalCurve` should be
+ * recomputed based on a fresher timestamp, like the current one. This is because
+ * the duration stored in the config is the static duration that the pool started with.
+ */
 function transform(PortfolioConfig memory config)
     pure
     returns (NormalCurve memory)
@@ -425,6 +446,38 @@ function modify(
     config.strikePriceWad = strikePriceWad.safeCastTo128();
 
     config.creationTimestamp = uint32(block.timestamp);
+}
+
+/**
+ * @notice
+ * Get time remaining from timestamp.
+ *
+ * @dev
+ * Computes the time remaining in seconds for the pool to reach maturity.
+ *
+ * @param timestamp Timestamp (seconds) to start from when computing the time remaining.
+ */
+function computeTau(
+    PortfolioConfig memory config,
+    uint256 timestamp
+) pure returns (uint256) {
+    if (config.isPerpetual) return SECONDS_PER_YEAR;
+
+    uint256 endTimestamp = getMaturity(config);
+    unchecked {
+        // Cannot underflow as LHS is either equal to `timestamp` or greater.
+        return AssemblyLib.max(timestamp, endTimestamp) - timestamp;
+    }
+}
+
+/// @dev Get the timestamp of the pool's maturity.
+function getMaturity(PortfolioConfig memory config) pure returns (uint32) {
+    if (config.isPerpetual) revert NormalStrategyLib_NonExpiringPool();
+
+    // Portfolio duration is limited such that this addition will never overflow uint32.
+    unchecked {
+        return config.creationTimestamp + config.durationSeconds;
+    }
 }
 
 /**
@@ -561,7 +614,7 @@ library NormalStrategyLib {
             reserveYPerWad: reserveYPerWad,
             strikePriceWad: config.strikePriceWad,
             standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
-            timeRemainingSeconds: computeTau(self, config, timestamp),
+            timeRemainingSeconds: config.computeTau(timestamp),
             invariant: 0
         });
 
@@ -618,7 +671,7 @@ library NormalStrategyLib {
             reserveYPerWad: 0,
             strikePriceWad: config.strikePriceWad,
             standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
-            timeRemainingSeconds: computeTau(self, config, timestamp),
+            timeRemainingSeconds: config.computeTau(timestamp),
             invariant: 0
         });
 
@@ -725,7 +778,7 @@ library NormalStrategyLib {
     ) internal view returns (bool) {
         if (config.isPerpetual) return false;
 
-        return self.lastTimestamp >= getMaturity(self, config);
+        return self.lastTimestamp >= getMaturity(config);
     }
 
     /**
@@ -740,43 +793,7 @@ library NormalStrategyLib {
         PortfolioPool memory self,
         PortfolioConfig memory config
     ) internal view returns (uint256) {
-        return computeTau(self, config, self.lastTimestamp);
-    }
-
-    /**
-     * @notice
-     * Get time remaining from timestamp.
-     *
-     * @dev
-     * Computes the time remaining in seconds for the pool to reach maturity.
-     *
-     * @param timestamp Timestamp (seconds) to start from when computing the time remaining.
-     */
-    function computeTau(
-        PortfolioPool memory self,
-        PortfolioConfig memory config,
-        uint256 timestamp
-    ) internal pure returns (uint256) {
-        if (config.isPerpetual) return SECONDS_PER_YEAR;
-
-        uint256 endTimestamp = getMaturity(self, config);
-        unchecked {
-            // Cannot underflow as LHS is either equal to `timestamp` or greater.
-            return AssemblyLib.max(timestamp, endTimestamp) - timestamp;
-        }
-    }
-
-    /// @dev Get the timestamp of the pool's maturity.
-    function getMaturity(
-        PortfolioPool memory self,
-        PortfolioConfig memory config
-    ) internal pure returns (uint32) {
-        if (config.isPerpetual) revert NormalStrategyLib_NonExpiringPool();
-
-        // Portfolio duration is limited such that this addition will never overflow uint32.
-        unchecked {
-            return config.creationTimestamp + config.durationSeconds;
-        }
+        return computeTau(config, self.lastTimestamp);
     }
 
     // ----------------- //

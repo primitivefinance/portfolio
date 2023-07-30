@@ -207,7 +207,7 @@ contract TestPortfolioCreatePool is Setup {
             "duration != SECONDS_PER_YEAR"
         );
         assertEq(
-            ghost().poolOf(poolId).computeTau(ghost().configOf(poolId), 0),
+            ghost().configOf(poolId).computeTau(0),
             SECONDS_PER_YEAR,
             "tau != year"
         );
