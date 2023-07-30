@@ -80,22 +80,15 @@ contract NormalStrategy is INormalStrategy {
         address swapper
     ) public hook returns (bool, int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        PortfolioConfig memory config = configs[poolId];
 
-        (, int256 invariant,) = pool.getSwapInvariants({
-            config: configs[poolId],
-            order: Order({
-                input: 2, // avoid revert from zero adjustment, 2 for avoiding fee
-                output: 1, // avoid revert from zero adjustment
-                useMax: false,
-                poolId: poolId,
-                sellAsset: sellAsset
-            }),
-            timestamp: block.timestamp,
-            protocolFee: IPortfolioGetters(portfolio).protocolFee(),
-            swapper: swapper
-        });
+        // This invariant uses the rounded up output reserves,
+        // and computes the time remaining in the pool (a key parameter in the trading function)
+        // using the `block.timestamp`.
+        int256 invariant =
+            pool.getInvariantUp(config, sellAsset, block.timestamp);
 
-        if (pool.expired(configs[poolId])) return (false, invariant);
+        if (pool.expired(config)) return (false, invariant);
 
         return (true, invariant);
     }
@@ -120,7 +113,7 @@ contract NormalStrategy is INormalStrategy {
         pool.virtualY = reserveY.safeCastTo128();
 
         // Compute the new invariant.
-        int256 invariantAfterSwap = pool.getInvariant(configs[poolId]);
+        int256 invariantAfterSwap = pool.getInvariantDown(configs[poolId]);
         bool valid = _validateSwap(invariant, invariantAfterSwap);
 
         return (valid, invariantAfterSwap);
@@ -297,7 +290,7 @@ contract NormalStrategy is INormalStrategy {
         returns (int256 invariant)
     {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-        invariant = pool.getInvariant(configs[poolId]);
+        invariant = pool.getInvariantDown(configs[poolId]);
     }
 
     // ====== Optional ====== //

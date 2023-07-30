@@ -473,15 +473,24 @@ library NormalStrategyLib {
      * Get the invariant of the pool, computed on its last swap.
      *
      * @dev
-     * This invariant result is used in Portfolio's __critical__ invariant check.
-     * A swap will revert if this result has not increased since the last swap.
+     * Use this to get the "after" swap invariant.
      *
+     * Rounded down via rounded down virtual reserves per liquidity.
+     * Uses the last swap's timestamp to compute the time remaining in the pool.
+     * This invariant result is used in Portfolio's __critical__ invariant check,
+     * as it's "after" swap invariant value.
+     * A swap will revert if this result has not increased by at least min invariant delta,
+     * when compared to the "before" swap invariant value, which is rounded up.
+     *
+     * @param self Pool's liquidity and reserves to use to compute the invariant.
+     * @param config Parameters of the trading function to use in the trading function.
+     * @return invariant The invariant of the pool, computed at the time of the last swap.
      */
-    function getInvariant(
+    function getInvariantDown(
         PortfolioPool memory self,
         PortfolioConfig memory config
     ) internal view returns (int256) {
-        // Due to rounding errors, the invariant is not strictly monotonical all the time.
+        // Due to rounding errors, the invariant is not strictly monotonic all the time.
         // This is because the invariant is computed using approximations, and the rounding
         // error could cause enough loss of information to keep the invariant unchanged,
         // even if the reserves change a small amount.
@@ -489,6 +498,7 @@ library NormalStrategyLib {
         uint256 reserveXPerWad = self.virtualX.divWadDown(self.liquidity);
         uint256 reserveYPerWad = self.virtualY.divWadDown(self.liquidity);
 
+        // Uses `self.lastTimestamp` as the current timestamp to compute time remaining.
         NormalCurve memory curve = NormalCurve({
             reserveXPerWad: reserveXPerWad,
             reserveYPerWad: reserveYPerWad,
@@ -498,6 +508,64 @@ library NormalStrategyLib {
             invariant: 0
         });
 
+        return tradingFunction(curve);
+    }
+
+    /**
+     * @notice
+     * Computes the invariant of the pool using a rounded up output reserve.
+     *
+     * @dev
+     * Use this to get the "before" swap invariant.
+     *
+     * If either reserve increases, the invariant should also increase.
+     * However, due to approximation errors and truncation, it's possible
+     * the invariant does not change with a small increase in one of the reserves.
+     * By rounding one of the reserves up, it has the effect of rounding the invariant up.
+     * By rounding specifically the output reserve up, it rounds the output swap quantity down.
+     * Rounding the invariant up is advantageous for Portfolio,
+     * because the swapper must increase the invariant by the rounded up amount
+     * and the minimum invariant delta.
+     *
+     * @param self Pool's liquidity and reserves to use to compute the invariant.
+     * @param config Parameters of the trading function to use in the trading function.
+     * @param sellAsset Whether the asset is the input reserve or the output reserve.
+     * @param timestamp Expected timestamp of the swap. Used to compute time remaining in the pool.
+     * @return invariant Invariant of the pool before a swap in the `sellAsset` direction takes place at the current time.
+     */
+    function getInvariantUp(
+        PortfolioPool memory self,
+        PortfolioConfig memory config,
+        bool sellAsset,
+        uint256 timestamp
+    ) internal pure returns (int256) {
+        // Computes the existing invariant of the pool using a
+        // rounded up virtual output reserve per liquidity.
+        // This is to make it advantageous for Portfolio
+        // by overestimating the current invariant.
+        // Since an invariant must increase in a swap to be valid,
+        // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
+        uint256 reserveXPerWad = self.virtualX;
+        uint256 reserveYPerWad = self.virtualY;
+        if (sellAsset) {
+            reserveXPerWad = reserveXPerWad.divWadDown(self.liquidity);
+            reserveYPerWad = reserveYPerWad.divWadUp(self.liquidity);
+        } else {
+            reserveXPerWad = reserveXPerWad.divWadUp(self.liquidity);
+            reserveYPerWad = reserveYPerWad.divWadDown(self.liquidity);
+        }
+
+        // Uses `timestamp` as the current timestamp to compute time remaining.
+        NormalCurve memory curve = NormalCurve({
+            reserveXPerWad: reserveXPerWad,
+            reserveYPerWad: reserveYPerWad,
+            strikePriceWad: config.strikePriceWad,
+            standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
+            timeRemainingSeconds: computeTau(self, config, timestamp),
+            invariant: 0
+        });
+
+        // This invariant uses the rounded up output reserves and start `timestamp`.
         return tradingFunction(curve);
     }
 
@@ -530,37 +598,8 @@ library NormalStrategyLib {
             int256 postInvariant
         )
     {
-        NormalCurve memory curve;
-
-        {
-            // Computes the existing invariant of the pool with
-            // rounded up virtual reserves for the output reserve of a trade.
-            // This is to make it advantageous for Portfolio
-            // by overestimating the current invariant.
-            // Since an invariant must increase in a swap to be a valid trade,
-            // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
-            uint256 reserveXPerWad = self.virtualX;
-            uint256 reserveYPerWad = self.virtualY;
-            if (order.sellAsset) {
-                reserveXPerWad = reserveXPerWad.divWadDown(self.liquidity);
-                reserveYPerWad = reserveYPerWad.divWadUp(self.liquidity);
-            } else {
-                reserveXPerWad = reserveXPerWad.divWadUp(self.liquidity);
-                reserveYPerWad = reserveYPerWad.divWadDown(self.liquidity);
-            }
-
-            curve = NormalCurve({
-                reserveXPerWad: reserveXPerWad,
-                reserveYPerWad: reserveYPerWad,
-                strikePriceWad: config.strikePriceWad,
-                standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
-                timeRemainingSeconds: computeTau(self, config, timestamp),
-                invariant: 0
-            });
-        }
-
-        // This invariant uses the rounded up input reserves and start `timestamp`.
-        prevInvariant = tradingFunction(curve);
+        // Computed using a rounded up output reserve per liquidity.
+        prevInvariant = getInvariantUp(self, config, order.sellAsset, timestamp);
 
         // Compute the next invariant if the swap amounts are non zero.
         (uint256 reserveX, uint256 reserveY) = (self.virtualX, self.virtualY);
@@ -573,10 +612,19 @@ library NormalStrategyLib {
         (,, reserveX, reserveY) =
             order.computeSwapResult(reserveX, reserveY, feeBps, protocolFee);
 
+        // Uses the `timestamp` as the current time for computing the time remaining in the pool.
+        NormalCurve memory curve = NormalCurve({
+            reserveXPerWad: 0,
+            reserveYPerWad: 0,
+            strikePriceWad: config.strikePriceWad,
+            standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
+            timeRemainingSeconds: computeTau(self, config, timestamp),
+            invariant: 0
+        });
+
+        // Rounded down reserves to round the invariant down.
         curve.reserveXPerWad = reserveX.divWadDown(self.liquidity);
         curve.reserveYPerWad = reserveY.divWadDown(self.liquidity);
-
-        // This invariant uses the rounded down reserves after the swap is done.
         postInvariant = tradingFunction(curve);
         adjustedIndependentReserve =
             order.sellAsset ? curve.reserveXPerWad : curve.reserveYPerWad;
