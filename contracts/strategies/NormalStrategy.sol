@@ -63,6 +63,9 @@ contract NormalStrategy is INormalStrategy {
             isPerpetual: config.isPerpetual
         });
 
+        // Config storage could have been altered with `modify`.
+        config = configs[poolId];
+
         emit AfterCreate({
             portfolio: portfolio,
             poolId: poolId,
