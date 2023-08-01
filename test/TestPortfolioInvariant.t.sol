@@ -13,9 +13,9 @@ import "solstat/Invariant.sol";
 uint256 constant BASIS_POINTS_DEN = 10000;
 
 /// @dev Critical constant. Minimum acceptable delta to change x or y by.
-/// Setting this to 1 should fail the tests, since there are cases where the invariant
-/// will not change.
-uint256 constant MINIMUM_DELTA = 1e9;
+/// Setting this to < 3 should fail the tests, since there are cases where the invariant
+/// will not change at these small delta values.
+uint256 constant MINIMUM_DELTA = 3;
 
 uint256 constant MINIMUM_LIQUIDITY = PortfolioLib.BURNED_LIQUIDITY;
 uint256 constant MAXIMUM_RESERVE_X = 1e18 - 1;
@@ -147,7 +147,7 @@ contract TestPortfolioInvariant is Setup {
     /// k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
     /// As x -> 1, Φ⁻¹(1-x) -> Φ⁻¹(0) -> -∞, so k -> ∞
     /// Since this part is subtracted, the resultant `k` increases.
-    function test_fuzz_invariant_increasing_x_increasing_invariant(
+    function test_fuzz_invariant_increasing_x_increasing_invariant_strict(
         uint256 deltaX,
         uint256 reserveXPerWad,
         uint256 reserveYPerWad,
@@ -228,7 +228,7 @@ contract TestPortfolioInvariant is Setup {
     /// As x -> 0, Φ⁻¹(1-x) -> Φ⁻¹(1) -> ∞, so k -> -∞
     /// Since this part with the x is subtracted from the first part,
     /// the resultant `k` decreases.
-    function test_fuzz_invariant_decreasing_x_decreasing_invariant(
+    function test_fuzz_invariant_decreasing_x_decreasing_invariant_strict(
         uint256 deltaX,
         uint256 reserveXPerWad,
         uint256 reserveYPerWad,
@@ -300,7 +300,7 @@ contract TestPortfolioInvariant is Setup {
     /// k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
     /// As y -> K, Φ⁻¹(y/K) -> Φ⁻¹(1) -> ∞, so k -> ∞
     /// Since this is the leading part, it increases k.
-    function test_fuzz_invariant_increasing_y_increasing_invariant(
+    function test_fuzz_invariant_increasing_y_increasing_invariant_strict(
         uint256 deltaY,
         uint256 reserveXPerWad,
         uint256 reserveYPerWad,
@@ -387,7 +387,7 @@ contract TestPortfolioInvariant is Setup {
     /// k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
     /// As y -> 0, Φ⁻¹(y/K) -> Φ⁻¹(0) -> -∞, so k -> -∞
     /// Since this is the leading part, it decreases k.
-    function test_fuzz_invariant_decreasing_y_decreasing_invariant(
+    function test_fuzz_invariant_decreasing_y_decreasing_invariant_strict(
         uint256 deltaY,
         uint256 reserveXPerWad,
         uint256 reserveYPerWad,
@@ -516,7 +516,6 @@ contract TestPortfolioInvariant is Setup {
         // Time remaining should be first bounded by the Portfolio bounds then scaled to the proper units.
         // Porfolio bounds are in days, which must be scaled to seconds.
         timeRemainingSec = bound(timeRemainingSec, MIN_DURATION, MAX_DURATION);
-        timeRemainingSec = timeRemainingSec * SECONDS_PER_DAY;
 
         // Need to make sure the computations in the function are valid.
         uint256 quotient = reserveYPerWad.divWadUp(strikePriceWad);
@@ -569,6 +568,44 @@ contract TestPortfolioInvariant is Setup {
                 ? reserveYPerWad.divWadUp(strikePriceWad)
                 : postReserve.divWadUp(strikePriceWad)
         );
+
+        console.log("PPFs");
+        console.logInt(
+            Gaussian.ppf(
+                int256(
+                    applyDeltaToX
+                        ? reserveYPerWad.divWadUp(strikePriceWad)
+                        : postReserve.divWadUp(strikePriceWad)
+                )
+            )
+        );
+        console.logInt(
+            Gaussian.ppf(
+                int256(
+                    applyDeltaToX
+                        ? 1 ether - postReserve
+                        : 1 ether - reserveXPerWad
+                )
+            )
+        );
+        console.log(
+            "stdDevSqrtTau",
+            volatilityWad.mulWadDown(
+                (timeRemainingSec * WAD / SECONDS_PER_YEAR).sqrt() * SQRT_WAD
+            )
+        );
+        console.log(
+            "stdDevSqrtTau computed",
+            NormalCurve({
+                reserveXPerWad: 0,
+                reserveYPerWad: 0,
+                standardDeviationWad: volatilityWad,
+                strikePriceWad: strikePriceWad,
+                timeRemainingSeconds: timeRemainingSec,
+                invariant: 0
+            }).computeStdDevSqrtTau()
+        );
+        console.log("END PPFS");
 
         console.log("prevDifference        : ", 1 ether - reserveXPerWad);
         console.log(

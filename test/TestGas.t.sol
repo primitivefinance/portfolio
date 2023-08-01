@@ -722,7 +722,9 @@ contract TestGas is Setup {
         bool direction,
         uint64 poolId
     ) internal view returns (bytes memory) {
-        uint128 amountIn = uint128(0.05 ether);
+        Order memory maxOrder =
+            subject().getMaxOrder(poolId, direction, actor());
+        uint128 amountIn = maxOrder.input / 2;
         uint128 amountOut = subject().getAmountOut(
             poolId, direction, amountIn, actor()
         ).safeCastTo128();

@@ -250,11 +250,12 @@ contract TestPortfolioSwap is Setup {
         allocateSome(1 ether)
     {
         bool sellAsset = true;
-        uint256 amountIn = 0.01 ether;
+        uint256 amountIn =
+            subject().getMaxOrder(ghost().poolId, sellAsset, actor()).input / 2;
         uint256 amountOut =
             subject().getAmountOut(ghost().poolId, sellAsset, amountIn, actor());
 
-        (, int256 prev, int256 post) = IStrategy(
+        (bool success, int256 prev, int256 post) = IStrategy(
             subject().getStrategy(ghost().poolId)
         ).simulateSwap(
             Order({
@@ -267,6 +268,8 @@ contract TestPortfolioSwap is Setup {
             block.timestamp,
             actor()
         );
+
+        assertTrue(success, "simulated-swap-failed");
 
         console.log("ivnariants");
         console.logInt(prev);
@@ -521,5 +524,95 @@ contract TestPortfolioSwap is Setup {
             abi.encodeWithSelector(Portfolio_NonExistentPool.selector, poolId)
         );
         subject().swap(order);
+    }
+
+    /// @dev POC from Spearbit issue #54
+    function test_swap_all_out()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+    {
+        (uint256 reserveAsset, uint256 reserveQuote) =
+            subject().getPoolReserves(ghost().poolId);
+
+        bool sellAsset = true;
+        uint128 amtIn = 2; // pass reserve-not-stale check after taking fee
+        uint128 amtOut = uint128(reserveQuote);
+
+        uint256 prev = ghost().quote().to_token().balanceOf(actor());
+        Order memory order = Order({
+            useMax: false,
+            poolId: ghost().poolId,
+            input: amtIn,
+            output: amtOut,
+            sellAsset: sellAsset
+        });
+
+        IPortfolio subject_ = subject();
+
+        // This swap takes all of the quote token "y" out of the pool.
+        // Therefore, we will hit the "lower bound" case for the "y" reserves.
+        // This will make the invariant y term `Gaussian.ppf(1)`, which is -8710427241990476442.
+        // Then it will subtract the invariantTermX and add the stdDevSqrtTau term.
+        // The minimum value for the invariantTermX is the same, `Gaussian.ppf(1)`, which is -8710427241990476442.
+        // Therefore, the x reserve needs to be close to its upper bound, since the input to the ppf is 1 - x.
+        // If it is close or at the boundary, it will cancel out the invariant y term.
+        // If its not close, the stdDevSqrtTau term will need to be large enough to close the difference,
+        // which might be too large than that term could be.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Portfolio_InvalidInvariant.selector,
+                int256(938),
+                int256(-8707810991428151127)
+            )
+        );
+        subject_.swap(order);
+    }
+
+    /// Computes the `ppf`, percent point function, at both boundaries, which should cancel eachother out.
+    function test_ppf_bounds_cancel_eachother() public {
+        int256 upper = 1e18 - 1;
+        int256 lower = 1;
+
+        int256 upperResult = Gaussian.ppf(upper);
+        int256 lowerResult = Gaussian.ppf(lower);
+
+        assertEq(upperResult + lowerResult, 0, "ppf-bounds-cancel-eachother");
+    }
+
+    function test_maximum_std_dev_sqrt_tau() public {
+        uint256 maximum_std_dev = MAX_VOLATILITY;
+        uint256 maximum_tau = MAX_DURATION;
+
+        // Scale to wad units
+        maximum_std_dev = maximum_std_dev * WAD / BASIS_POINT_DIVISOR;
+        maximum_tau = maximum_tau * WAD / SECONDS_PER_YEAR;
+
+        uint256 maximum = maximum_std_dev * FixedPointMathLib.sqrt(maximum_tau)
+            * SQRT_WAD / WAD;
+        console.log(maximum);
+
+        int256 min_ppf = int256(-8710427241990476442);
+
+        int256 sum = min_ppf + int256(maximum);
+        console.logInt(sum);
+
+        int256 min_invariant_x_term =
+            1e18 - Gaussian.cdf(int256(-4380300224490476443));
+        console.logInt(min_invariant_x_term);
+    }
+
+    function test_inv_math() public {
+        uint256 y = 98500000000000003;
+        uint256 K = 100000000000000000;
+        uint256 x = 13119679224773016;
+
+        int256 invariantTermY = Gaussian.ppf(int256(y * 1e18 / K));
+        int256 invariantTermX = Gaussian.ppf(int256(1e18 - x));
+
+        console.logInt(invariantTermX);
+        console.logInt(invariantTermY);
     }
 }

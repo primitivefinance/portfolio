@@ -276,6 +276,10 @@ function adjustReserves(
         self.virtualX -= deltaOutWad.safeCastTo128();
         self.virtualY += deltaInWad.safeCastTo128();
     }
+
+    // Verify the reserves are not zero. Prevents one side of the pool from ever being 0.
+    if (self.virtualX == 0) revert PoolLib_InvalidReserveX();
+    if (self.virtualY == 0) revert PoolLib_InvalidReserveY();
 }
 
 // ----------------- //
@@ -306,6 +310,8 @@ function isActive(PortfolioPool memory self) pure returns (bool) {
  * Must be used offchain, or else the pool's reserves can be manipulated to
  * take advantage of this function's reliance on the reserves.
  * This function can be used in conjuction with `getPoolLiquidityDeltas` to compute the maximum `allocate()` for a user.
+ * Prevents zero amount allocates by returning a 0 liquidity amount if one of the deltas is 0.
+ * Attempting to allocate 0 liquidity will revert.
  *
  * @param deltaAsset Desired amount of `asset` to allocate, denominated in WAD.
  * @param deltaQuote Desired amount of `quote` to allocate, denominated in WAD.
@@ -331,8 +337,6 @@ function getPoolMaxLiquidity(
     if(self.virtualY != 0) liquidity1 = deltaQuote.mulDivDown(totalLiquidity, self.virtualY);  // forgefmt: disable-line
     // Use the smaller of the two liquidity amounts, which should be used to compute the liquidity deltas.
     deltaLiquidity = AssemblyLib.min(liquidity0, liquidity1).safeCastTo128(); // forgefmt: disable-line
-    // When one of the reserves is 0, then liquidity can be minted from only one token being allocated.
-    if(deltaLiquidity == 0) AssemblyLib.max(liquidity0, liquidity1).safeCastTo128(); // forgefmt: disable-line
 }
 
 /**
