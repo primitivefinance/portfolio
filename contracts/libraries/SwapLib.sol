@@ -14,7 +14,6 @@ using {
 using AssemblyLib for uint256;
 using FixedPointMathLib for uint128;
 
-error SwapLib_FeeTooHigh();
 error SwapLib_ProtocolFeeTooHigh();
 error SwapLib_OutputExceedsReserves();
 error SwapLib_ZeroXAdjustment();
@@ -116,7 +115,7 @@ function computeAdjustedSwapReserves(
     // Input amount is added to the reserves for the swap.
     adjustedInputReserveWad += self.input;
     // Fee amount is reinvested into the pool, but it's not considered in the invariant check, so we subtract it.
-    if (feeAmountUnit > adjustedInputReserveWad) revert SwapLib_FeeTooHigh();
+    // Assumes the fee % is always less than 100%, therefore this cannot underflow.
     adjustedInputReserveWad -= feeAmountUnit;
     // Protocol fee is subtracted, even though it's included in the fee, because protocol fees
     // do not get added to the pool's reserves.
