@@ -57,8 +57,6 @@ uint256 constant BISECTION_EPSILON = 1;
 uint256 constant BISECTION_MAX_ITER = 256;
 
 error NormalStrategyLib_ConfigExists();
-error NormalStrategyLib_UpperPriceLimitReached();
-error NormalStrategyLib_LowerPriceLimitReached();
 error NormalStrategyLib_NonExpiringPool();
 error NormalStrategyLib_InvalidDuration();
 error NormalStrategyLib_InvalidStrategyArgs();
