@@ -21,7 +21,7 @@ contract TestPortfolio is Setup {
         uint32 poolNonce = 1;
 
         uint64 encoded =
-            PoolIdLib.encode(controlled, altered, pairId, poolNonce);
+            PoolIdLib.encode(altered, controlled, pairId, poolNonce);
 
         uint64 poolId_ = uint64(bytes8(hex"1100000200000001"));
         assertEq(encoded, poolId_, "pool id");
@@ -33,6 +33,50 @@ contract TestPortfolio is Setup {
         assertEq(uint32(encoded), poolNonce, "pool nonce");
         assertEq(uint24(encoded >> 32), pairId, "pair id");
         assertEq(uint8(encoded >> 56), 0x11, "controlled and altered");
+        assertEq(
+            uint8(bytes1(bytes1(uint8(encoded >> 56)) & 0x0f)),
+            controlled ? 1 : 0,
+            "controlled"
+        );
+        assertEq(uint8(encoded >> 60), altered ? 1 : 0, "altered");
+    }
+
+    function test_encode_pool_id_altered_not_controlled() public {
+        bool altered = true;
+        bool controlled = false;
+        uint24 pairId = 2;
+        uint32 poolNonce = 1;
+
+        uint64 encoded =
+            PoolIdLib.encode(altered, controlled, pairId, poolNonce);
+
+        assertEq(PoolId.wrap(encoded).altered(), altered, "altered-method");
+        assertEq(
+            PoolId.wrap(encoded).controlled(), controlled, "controlled-method"
+        );
+        assertEq(uint8(encoded >> 56), 0x10, "first byte");
+        assertEq(
+            uint8(bytes1(bytes1(uint8(encoded >> 56)) & 0x0f)),
+            controlled ? 1 : 0,
+            "controlled"
+        );
+        assertEq(uint8(encoded >> 60), altered ? 1 : 0, "altered");
+    }
+
+    function test_encode_pool_id_not_altered_controlled() public {
+        bool altered = false;
+        bool controlled = true;
+        uint24 pairId = 2;
+        uint32 poolNonce = 1;
+
+        uint64 encoded =
+            PoolIdLib.encode(altered, controlled, pairId, poolNonce);
+
+        assertEq(PoolId.wrap(encoded).altered(), altered, "altered-method");
+        assertEq(
+            PoolId.wrap(encoded).controlled(), controlled, "controlled-method"
+        );
+        assertEq(uint8(encoded >> 56), 0x01, "first byte");
         assertEq(
             uint8(bytes1(bytes1(uint8(encoded >> 56)) & 0x0f)),
             controlled ? 1 : 0,

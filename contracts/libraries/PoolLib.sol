@@ -33,24 +33,24 @@ library PoolIdLib {
      *
      * @custom:example
      * ```
-     * uint64 poolId = encode(true, true, 7,  42);
-     * assertEq(poolId, 0x110000070000002a);
-     * bool controlled = true;
      * bool altered = true;
-     * bytes1 packedBools = AssemblyLib.pack(bytes1(uint8(controlled ? 1 : 0)), bytes1(uint8(altered ? 1 : 0)));
+     * bool controlled = false;
+     * uint64 poolId = encode(altered, controlled, 7,  42);
+     * assertEq(poolId, 0x100000070000002a);
+     * bytes1 packedBools = AssemblyLib.pack(bytes1(uint8(altered ? 1 : 0)), bytes1(uint8(controlled ? 1 : 0)));
      * uint64 poolIdEncoded = abi.encodePacked(packedBools, uint24(pairId), uint32(poolNonce));
      * assertEq(poolIdEncoded, poolId);
      * ```
      *
-     * @param controlled Whether the pool has a non-zero address controller.
      * @param altered Whether the pool has the non-default strategy address.
+     * @param controlled Whether the pool has a non-zero address controller.
      * @param pairId Id of the pair of asset / quote tokens.
      * @param poolNonce Current pool nonce of the created pools for the `pairId`.
      * @return poolId Packs the above arguments into a 64-bit pool identifier.
      */
     function encode(
-        bool controlled,
         bool altered,
+        bool controlled,
         uint24 pairId,
         uint32 poolNonce
     ) internal pure returns (uint64 poolId) {
