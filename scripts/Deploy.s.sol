@@ -9,8 +9,28 @@ import "../contracts/test/SimpleRegistry.sol";
 import "../contracts/Portfolio.sol";
 import "../contracts/PositionRenderer.sol";
 
+// This script allows you to deploy the Portfolio contract and its dependencies,
+// you can learn how to use it in our documentation:
+// https://docs.primitive.xyz/protocol/contracts/deployments#deploying-portfolio
 contract Deploy is Script {
+    function deployIfNecessary(
+        NuguFactory factory,
+        string memory name,
+        bytes memory creationCode,
+        bytes32 salt
+    ) private returns (address at) {
+        at = factory.getDeployed(salt);
+
+        if (at.code.length == 0) {
+            factory.deploy(salt, creationCode, 0);
+            console.log("%s %s (deployed)", name, at);
+        } else {
+            console.log("%s %s (skipped)", name, at);
+        }
+    }
+
     function run(address weth, address registry) external {
+        console.log("~");
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
@@ -26,41 +46,51 @@ contract Deploy is Script {
 
         // If no WETH address is provided, we deploy a new contract
         if (weth == address(0)) {
-            weth = factory.deploy(keccak256("WETH"), type(WETH).creationCode, 0);
+            deployIfNecessary(
+                factory, "WETH", type(WETH).creationCode, keccak256("WETH")
+            );
+        } else {
+            console.log("WETH %s (reused)", weth);
         }
 
         // Same thing for the Portfolio registry
         if (registry == address(0)) {
-            registry = factory.deploy(
-                keccak256("SimpleRegistry"),
+            deployIfNecessary(
+                factory,
+                "Registry",
                 type(SimpleRegistry).creationCode,
-                0
+                keccak256(type(SimpleRegistry).creationCode)
             );
+        } else {
+            console.log("Registry %s (reused)", registry);
         }
 
         // First we deploy the PositionRenderer contract
-        address positionRenderer = factory.deploy(
-            keccak256("PositionRenderer"),
+        address positionRenderer = deployIfNecessary(
+            factory,
+            "PositionRenderer",
             type(PositionRenderer).creationCode,
-            0
+            keccak256(type(PositionRenderer).creationCode)
         );
 
         // Then we can deploy the Portfolio contract
-        address portfolio = factory.deploy(
-            keccak256("Portfolio"),
+        address portfolio = deployIfNecessary(
+            factory,
+            "Portfolio",
             abi.encodePacked(
                 type(Portfolio).creationCode,
                 abi.encode(weth, registry, positionRenderer)
             ),
-            0
+            keccak256(type(Portfolio).creationCode)
         );
 
-        console.log(unicode"🚀 Contracts deployed!");
-        console.log("WETH:", weth);
-        console.log("Registry:", registry);
-        console.log("PositionRenderer:", positionRenderer);
-        console.log("Portfolio:", portfolio);
+        console.log(
+            "NormalStrategy",
+            Portfolio(payable(portfolio)).DEFAULT_STRATEGY(),
+            "(deployed)"
+        );
 
         vm.stopBroadcast();
+        console.log("~");
     }
 }
