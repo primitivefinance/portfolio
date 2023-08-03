@@ -46,6 +46,7 @@ contract Deploy is Script {
     }
 
     function run(address weth, address registry) external {
+        console.log("~");
         console.log("{");
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -109,5 +110,6 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
         console.log("}");
+        console.log("~");
     }
 }
