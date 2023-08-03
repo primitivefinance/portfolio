@@ -13,6 +13,22 @@ import "../contracts/PositionRenderer.sol";
 // you can learn how to use it in our documentation:
 // https://docs.primitive.xyz/protocol/contracts/deployments#deploying-portfolio
 contract Deploy is Script {
+    function printJSON(
+        string memory name,
+        address at,
+        string memory status,
+        bool isLast
+    ) private view {
+        console.log(
+            string.concat(
+                '"%s":{"address":"%s","status":"%s"}', isLast ? "" : ","
+            ),
+            name,
+            at,
+            status
+        );
+    }
+
     function deployIfNecessary(
         NuguFactory factory,
         string memory name,
@@ -23,14 +39,14 @@ contract Deploy is Script {
 
         if (at.code.length == 0) {
             factory.deploy(salt, creationCode, 0);
-            console.log("%s %s (deployed)", name, at);
+            printJSON(name, at, "deployed", false);
         } else {
-            console.log("%s %s (skipped)", name, at);
+            printJSON(name, at, "skipped", false);
         }
     }
 
     function run(address weth, address registry) external {
-        console.log("~");
+        console.log("{");
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
@@ -50,7 +66,7 @@ contract Deploy is Script {
                 factory, "WETH", type(WETH).creationCode, keccak256("WETH")
             );
         } else {
-            console.log("WETH %s (reused)", weth);
+            printJSON("WETH", weth, "reused", false);
         }
 
         // Same thing for the Portfolio registry
@@ -62,7 +78,7 @@ contract Deploy is Script {
                 keccak256(type(SimpleRegistry).creationCode)
             );
         } else {
-            console.log("Registry %s (reused)", registry);
+            printJSON("Registry", registry, "reused", false);
         }
 
         // First we deploy the PositionRenderer contract
@@ -84,13 +100,14 @@ contract Deploy is Script {
             keccak256(type(Portfolio).creationCode)
         );
 
-        console.log(
+        printJSON(
             "NormalStrategy",
             Portfolio(payable(portfolio)).DEFAULT_STRATEGY(),
-            "(deployed)"
+            "deployed",
+            true
         );
 
         vm.stopBroadcast();
-        console.log("~");
+        console.log("}");
     }
 }
