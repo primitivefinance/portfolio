@@ -245,10 +245,10 @@ function tradingFunction(NormalCurve memory self)
     // Overwrite the reserves to be as close to its bounds as possible, to avoid reverting.
     uint256 invariantTermXInput; // x - 1
     if (self.reserveXPerWad >= upperBoundX) {
-        // As x -> 1E18, 1E18 - x -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermX to 1E18 - 1E18 + 1.
+        // As x -> 1E18, 1E18 - x -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermXInput to 1E18 - 1E18 + 1.
         invariantTermXInput = 1;
     } else if (self.reserveXPerWad <= lowerBoundX) {
-        // As x -> 0, 1E18 - 0 -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermX to 1E18 - 0 - 1.
+        // As x -> 0, 1E18 - 0 -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermXInput to 1E18 - 0 - 1.
         invariantTermXInput = WAD - 1;
     } else {
         invariantTermXInput = WAD - self.reserveXPerWad;
@@ -257,10 +257,10 @@ function tradingFunction(NormalCurve memory self)
     uint256 invariantTermYInput =
         self.reserveYPerWad.divWadDown(self.strikePriceWad); // y/K -> [0,1]
     if (invariantTermYInput >= WAD) {
-        // As y -> K, y/K -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound y/K to 1E18 - 1.
+        // As y -> K, y/K -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermYInput to 1E18 - 1.
         invariantTermYInput = WAD - 1;
     } else if (invariantTermYInput <= 0) {
-        // As y -> 0, y/K -> 0, Φ⁻¹(0) = -∞, therefore bound y/K to 0 + 1.
+        // As y -> 0, y/K -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermYInput to 0 + 1.
         invariantTermYInput = 1;
     }
 
