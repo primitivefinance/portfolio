@@ -241,7 +241,6 @@ function tradingFunction(NormalCurve memory self)
 
     // Get the bounds and check if one of the reserves has reached the bounds.
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
-    (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
 
     // Overwrite the reserves to be as close to its bounds as possible, to avoid reverting.
     uint256 invariantTermXInput; // x - 1
@@ -255,15 +254,14 @@ function tradingFunction(NormalCurve memory self)
         invariantTermXInput = WAD - self.reserveXPerWad;
     }
 
-    uint256 invariantTermYInput; // y/K
-    if (self.reserveYPerWad >= upperBoundY) {
+    uint256 invariantTermYInput =
+        self.reserveYPerWad.divWadDown(self.strikePriceWad); // y/K -> [0,1]
+    if (invariantTermYInput >= WAD) {
         // As y -> K, y/K -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound y/K to 1E18 - 1.
         invariantTermYInput = WAD - 1;
-    } else if (self.reserveYPerWad <= lowerBoundY) {
+    } else if (invariantTermYInput <= 0) {
         // As y -> 0, y/K -> 0, Φ⁻¹(0) = -∞, therefore bound y/K to 0 + 1.
         invariantTermYInput = 1;
-    } else {
-        invariantTermYInput = self.reserveYPerWad.divWadUp(self.strikePriceWad); // forgefmt:disable-line
     }
 
     // Φ⁻¹(1-x)
