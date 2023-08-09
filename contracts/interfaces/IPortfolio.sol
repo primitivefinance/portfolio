@@ -571,7 +571,26 @@ interface IPortfolioActions is IPortfolioRegistryActions {
      * @notice
      * Instantiate a pool at a desired price with custom fees and arguments.
      *
+     * @dev
+     * WARNING: Pools can be created with __malicious__ `strategy` contracts.
+     * The `strategy` contracts have the power to create custom `swap` validation logic,
+     * and also can prevent the pool from being allocated to or deallocated from.
+     * Pools are created with a default strategy that uses standard mathematics based
+     * swap validation logic. Pools can never have their strategy changed after creation.
+     *
+     * Pools can have a `controller` address which has limited power over the pool.
+     * Pool controllers have the power to adjust the `feeBasisPoints` and `priorityFeeBasisPoints`.
+     * These can only be adjusted within reasonable bounds: the MIN and MAX fee bounds.
+     *
      * @param pairId Nonce of the target pair. A `0` is a magic variable to use the state variable `getPairNonce` instead.
+     * @param reserveXPerWad Initial virtual reserve for the `asset` token, per WAD units of liquidity and in WAD units.
+     * @param reserveYPerWad Initial virtual reserve for the `quote` token, per WAD units of liquidity and in WAD units.
+     * @param feeBasisPoints Fee charged on swaps, denominated in basis points (1 = 0.01%).
+     * @param priorityFeeBasisPoints Fee charged on swaps if the swap is initiated by the `controller`, denominated in basis points (1 = 0.01%).
+     * @param controller Address that can adjust the pool's fee and priority fee within reasonable bounds.
+     * @param strategy Address of the external strategy contract that handles swap validation.
+     * @param strategyArgs Abi-encoded arguments that are passed to the `strategy` contract via the `afterCreate` hook.
+     * @return poolId Packed encoded custom identifier for the pool. See `PoolLib.sol` for more details.
      */
     function createPool(
         uint24 pairId,

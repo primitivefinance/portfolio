@@ -7,9 +7,6 @@ import "../libraries/PortfolioLib.sol";
 import "./INormalStrategy.sol";
 import "./NormalStrategyLib.sol";
 
-/// @dev Enforces minimum positive invariant growth for swaps in pools using this strategy.
-uint256 constant MINIMUM_INVARIANT_DELTA = 1;
-
 /// @dev Emitted when a hook is called by a non-portfolio address.
 error NormalStrategy_NotPortfolio();
 
@@ -66,6 +63,9 @@ contract NormalStrategy is INormalStrategy {
             isPerpetual: config.isPerpetual
         });
 
+        // Config storage could have been altered with `modify`.
+        config = configs[poolId];
+
         emit AfterCreate({
             portfolio: portfolio,
             poolId: poolId,
@@ -83,22 +83,15 @@ contract NormalStrategy is INormalStrategy {
         address swapper
     ) public hook returns (bool, int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        PortfolioConfig memory config = configs[poolId];
 
-        (, int256 invariant,) = pool.getSwapInvariants({
-            config: configs[poolId],
-            order: Order({
-                input: 2, // avoid revert from zero adjustment, 2 for avoiding fee
-                output: 2, // avoid revert from zero adjustment, 2 for avoiding fee
-                useMax: false,
-                poolId: poolId,
-                sellAsset: sellAsset
-            }),
-            timestamp: block.timestamp,
-            protocolFee: IPortfolioGetters(portfolio).protocolFee(),
-            swapper: swapper
-        });
+        // This invariant uses the rounded up output reserves,
+        // and computes the time remaining in the pool (a key parameter in the trading function)
+        // using the `block.timestamp`.
+        int256 invariant =
+            pool.getInvariantUp(config, sellAsset, block.timestamp);
 
-        if (pool.expired(configs[poolId])) return (false, invariant);
+        if (pool.expired(config)) return (false, invariant);
 
         return (true, invariant);
     }
@@ -123,7 +116,7 @@ contract NormalStrategy is INormalStrategy {
         pool.virtualY = reserveY.safeCastTo128();
 
         // Compute the new invariant.
-        int256 invariantAfterSwap = pool.getInvariant(configs[poolId]);
+        int256 invariantAfterSwap = pool.getInvariantDown(configs[poolId]);
         bool valid = _validateSwap(invariant, invariantAfterSwap);
 
         return (valid, invariantAfterSwap);
@@ -152,7 +145,7 @@ contract NormalStrategy is INormalStrategy {
         int256 invariantAfter
     ) internal pure returns (bool) {
         int256 delta = invariantAfter - invariantBefore;
-        if (delta < int256(MINIMUM_INVARIANT_DELTA)) return false;
+        if (delta < MINIMUM_INVARIANT_DELTA) return false;
 
         return true;
     }
@@ -177,7 +170,7 @@ contract NormalStrategy is INormalStrategy {
             config: configs[poolId],
             order: Order({
                 input: amountIn.safeCastTo128(),
-                output: 2, // to avoid revert from zero adjustment less fee
+                output: 1, // to avoid revert from zero adjustment
                 useMax: false,
                 poolId: poolId,
                 sellAsset: sellAsset
@@ -194,7 +187,18 @@ contract NormalStrategy is INormalStrategy {
     /// @inheritdoc IPortfolioStrategy
     function getSpotPrice(uint64 poolId) public view returns (uint256 price) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-        price = configs[poolId].transform().approximatePriceGivenX({
+        PortfolioConfig memory config = configs[poolId];
+
+        NormalCurve memory curve = config.transform();
+
+        // The `transform` function does not recompute the time remaining.
+        // Overwrite it manually so the approximation uses the new time remaining,
+        // instead of the initial full duration on pool creation.
+        curve.timeRemainingSeconds = config.computeTau(block.timestamp);
+
+        // The `transform` function also sets `invariant` to 0.
+        // This is fine because it's not required for the price calculation.
+        price = curve.approximatePriceGivenX({
             reserveXPerWad: pool.virtualX.divWadDown(pool.liquidity)
         });
     }
@@ -227,14 +231,14 @@ contract NormalStrategy is INormalStrategy {
 
         if (sellAsset) {
             tempInput = upperX.mulWadDown(pool.liquidity) - pool.virtualX - 1;
-            tempOutput = pool.virtualY - lowerY.mulWadDown(pool.liquidity) + 1;
+            tempOutput = pool.virtualY - lowerY.mulWadDown(pool.liquidity) - 1;
             order.input =
                 tempInput.scaleFromWadDown(pair.decimalsAsset).safeCastTo128();
             order.output =
                 tempOutput.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
         } else {
             tempInput = upperY.mulWadDown(pool.liquidity) - pool.virtualY - 1;
-            tempOutput = pool.virtualX - lowerX.mulWadDown(pool.liquidity) + 1;
+            tempOutput = pool.virtualX - lowerX.mulWadDown(pool.liquidity) - 1;
 
             order.input =
                 tempInput.scaleFromWadDown(pair.decimalsQuote).safeCastTo128();
@@ -300,7 +304,7 @@ contract NormalStrategy is INormalStrategy {
         returns (int256 invariant)
     {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-        invariant = pool.getInvariant(configs[poolId]);
+        invariant = pool.getInvariantDown(configs[poolId]);
     }
 
     // ====== Optional ====== //
@@ -330,6 +334,9 @@ contract NormalStrategy is INormalStrategy {
     ) public view returns (uint256, uint256) {
         PortfolioConfig memory config = strategyArgs.decode();
         NormalCurve memory curve = config.transform();
+
+        // Assumes the `config.creationTimestamp` is set to `block.timestamp`.
+        // Therefore, `curve.timeRemainingSeconds` is equal to the full duration, `config.durationSeconds`.
         return curve.approximateReservesGivenPrice(priceWad);
     }
 
@@ -366,6 +373,7 @@ contract NormalStrategy is INormalStrategy {
         );
         strategyData = config.encode();
 
+        // Utilizes `durationSeconds` argument as the `timeRemainingSeconds` parameter.
         (initialX, initialY) =
             config.transform().approximateReservesGivenPrice(priceWad);
     }

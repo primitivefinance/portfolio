@@ -133,9 +133,9 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
 
     /// @dev Uses the global test Configuration type to create a pool and set the ghost state.
     function activateConfig(Configuration memory config) internal {
-        if (config.asset == address(0) && config.quote == address(0)) {
-            (config.asset, config.quote) = deployDefaultTokenPair();
-        }
+        (address asset, address quote) = deployDefaultTokenPair();
+        if (config.asset == address(0)) config.asset = asset;
+        if (config.quote == address(0)) config.quote = quote;
 
         // Makes it accessible for debugging via `Setup.global_config()`.
         _global_config = config;
@@ -366,6 +366,15 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         Coin quote = deployCoin("token", abi.encode("quote", "QUOTE", 18));
         Configuration memory config = configureNormalStrategy();
         (config.asset, config.quote) = (weth(), quote.to_addr());
+
+        activateConfig(config);
+        _;
+    }
+
+    modifier customTokenConfig(bool isAsset, address token) {
+        Configuration memory config = configureNormalStrategy();
+        if (isAsset) config.asset = token;
+        else config.quote = token;
 
         activateConfig(config);
         _;

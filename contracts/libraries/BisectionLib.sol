@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 /// @dev Thrown when the lower bound is greater than the upper bound.
 error BisectionLib_InvalidBounds(uint256 lower, uint256 upper);
 /// @dev Thrown when the result of the function `fx` for each input, `upper` and `lower`, is the same sign.
-error BisectionLib_RootOutsideBounds(uint256 lower, uint256 upper);
+error BisectionLib_RootOutsideBounds(int256 lowerResult, int256 upperResult);
 
 /**
  * @notice
@@ -38,7 +38,7 @@ function bisection(
     int256 lowerOutput = fx(args, lower);
     int256 upperOutput = fx(args, upper);
     if (lowerOutput * upperOutput > 0) {
-        revert BisectionLib_RootOutsideBounds(lower, upper);
+        revert BisectionLib_RootOutsideBounds(lowerOutput, upperOutput);
     }
 
     // Distance is optimized to equal `epsilon`.

@@ -160,7 +160,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = PoolIdLib.encode(false, false, uint24(2), uint32(1));
 
             instructions[i] = abi.encodeCall(
                 IPortfolioActions.allocate,
@@ -271,7 +271,7 @@ contract TestGas is Setup {
                 hundred, // fee
                 0, // prior fee
                 address(0), // controller
-                subject().DEFAULT_STRATEGY(),
+                address(0), // default strategy
                 testConfig.strategyArgs
             )
         );
@@ -283,7 +283,7 @@ contract TestGas is Setup {
         for (uint256 i; i != 2; ++i) {
             uint64 poolId;
             if (i == 0) poolId = ghost().poolId;
-            else poolId = AssemblyLib.encodePoolId(uint24(2), false, uint32(1));
+            else poolId = PoolIdLib.encode(false, false, uint24(2), uint32(1));
 
             bytes[] memory go = new bytes[](1);
             go[0] = abi.encodeCall(
@@ -567,8 +567,9 @@ contract TestGas is Setup {
         }
 
         // Super important
-        uint64 poolId = AssemblyLib.encodePoolId(
-            uint24(1), controller != address(0), uint32(1)
+        bool altered = false;
+        uint64 poolId = PoolIdLib.encode(
+            altered, controller != address(0), uint24(1), uint32(1)
         );
         // By setting this poolId all the modifiers that rely on the tokens asset and quote
         // can use this set poolId's pair. Since we created all the pools with the same pair,
@@ -721,7 +722,9 @@ contract TestGas is Setup {
         bool direction,
         uint64 poolId
     ) internal view returns (bytes memory) {
-        uint128 amountIn = uint128(0.05 ether);
+        Order memory maxOrder =
+            subject().getMaxOrder(poolId, direction, actor());
+        uint128 amountIn = maxOrder.input / 2;
         uint128 amountOut = subject().getAmountOut(
             poolId, direction, amountIn, actor()
         ).safeCastTo128();
@@ -769,8 +772,8 @@ contract TestGas is Setup {
         }
 
         uint24 pairId = 1;
-        uint64 poolId = AssemblyLib.encodePoolId(
-            pairId, false, subject().getPoolNonce(pairId) + 1
+        uint64 poolId = PoolIdLib.encode(
+            false, false, pairId, subject().getPoolNonce(pairId) + 1
         );
 
         bytes[] memory instructions = new bytes[](2);
@@ -901,8 +904,8 @@ contract TestGas is Setup {
         }
 
         uint24 pairId = 1;
-        uint64 poolId = AssemblyLib.encodePoolId(
-            pairId, false, subject().getPoolNonce(pairId) + 1
+        uint64 poolId = PoolIdLib.encode(
+            false, false, pairId, subject().getPoolNonce(pairId) + 1
         );
 
         bytes[] memory instructions = new bytes[](2);

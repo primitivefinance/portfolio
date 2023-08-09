@@ -112,27 +112,75 @@ contract Portfolio is ERC1155, IPortfolio {
     uint64 private _getLastPoolId;
 
     /**
+     * @notice
+     * Custom mutex designed to prevent injected single-call re-entrancy
+     * during multi-calls.
+     *
      * @dev
-     * Protects against reentrancy and getting to invalid settlement states.
+     * Protects against re-entrancy and getting to invalid settlement states.
      * This lock works in pair with `_postLock` and both should be used on all
      * external non-view functions (except the restricted ones).
+     *
+     * Upon entering the mutex, there can be two conditions:
+     * 1. `_locked != 1`. If not in a multicall, i.e. `&& !_currentMulticall`,
+     *                    revert (singleCall -> singleCall re-entrancy).
+     * 2. `_locked > 2`.  Reached here from starting in multicall.
+     *                    This was called from another singleCall that did not have postLock() fire,
+     *                    i.e. `_locked > 2`, revert because its injected re-entrancy:
+     *                    (multiCall -> singleCall -> injected singleCall re-entrancy).
+     *
+     * This enforces that only the originally defined multicall actions are run,
+     * and injected single calls are successfully caught and reverted by the mutex.
+     * These injected re-entrancy guards are caught because the `postLock()` never gets called,
+     * which decrements the `_locked` variable.
+     * Multicalls go through because they don't fire the `postLock()` until after the calls ran.
+     *
+     * @custom:example Scenarios:
+     * 1. reenter during multicall's action execution
+     * multicall -> _currentMulticall = true
+     *   preLock() -> _locked++ = 2
+     *     singleCall()
+     *       preLock() -> _locked++ = 3
+     *       reenter during current execution (injected) -> postLock() does not decrement _locked.
+     *         singeCall()
+     *           preLock(): (_locked != 1 && (false || true)) == true, revert
+     *   _currentMulticall = false;
+     *   settlement()
+     *   postLock()
+     *
+     * 2. reenter during multicall's settlement
+     * multicall -> _currentMulticall = true
+     *   preLock() -> _locked++ = 2
+     *     singleCall
+     *       preLock(): -> _locked++ == 3
+     *       postLock(): -> _locked-- == 2
+     *   _currentMulticall = false;
+     *   settlement() -> _locked == 2
+     *     reenter
+     *       singeCall()
+     *         preLock(): (_locked != 1 && (true || false)) == true, revert
+     *   ...if continued (somehow gets passed the revert)
+     *       mutliCall()
+     *         passes multicall re-entrancy guard because not in multicall
+     *         preLock(): (_locked != 1 && (true || false)) == true, revert
+     *   ... settlement finishes
+     *   postLock(): -> _locked-- == 1
      *
      * note
      * Private functions are used instead of modifiers to reduce the size
      * of the bytecode.
      */
     function _preLock() private {
-        // Reverts if the lock was already set and the current call is not a multicall.
-        if (_locked != 1 && !_currentMulticall) {
+        if (_locked != 1 && (!_currentMulticall || _locked > 2)) {
             revert Portfolio_InvalidReentrancy();
         }
 
-        _locked = 2;
+        _locked++;
     }
 
     /// @dev Second part of the reentracy guard (see `_preLock`).
     function _postLock() private {
-        _locked = 1;
+        _locked--;
 
         // Reverts if the account system was not settled after a normal call.
         if (!__account__.settled && !_currentMulticall) {
@@ -681,9 +729,16 @@ contract Portfolio is ERC1155, IPortfolio {
         // Increment the pool nonce.
         uint32 poolNonce = ++getPoolNonce[pairNonce];
 
+        // Zero address strtaegy is a magic value to use the default strategy.
+        strategy = strategy == address(0) ? DEFAULT_STRATEGY : strategy;
+
         // Compute the poolId, which is a packed 64-bit integer.
-        bool hasController = controller != address(0);
-        poolId = AssemblyLib.encodePoolId(pairNonce, hasController, poolNonce);
+        poolId = PoolIdLib.encode(
+            strategy != DEFAULT_STRATEGY, // Flips the "altered" flag in the upper 4 bits: "0x10..."
+            controller != address(0), // Flips the "controlled" flag in the lower 4 bits:  "0x01..."
+            pairNonce,
+            poolNonce
+        );
 
         // Instantiate the pool.
         pools[poolId].createPool({
@@ -692,12 +747,13 @@ contract Portfolio is ERC1155, IPortfolio {
             feeBasisPoints: feeBasisPoints,
             priorityFeeBasisPoints: priorityFeeBasisPoints,
             controller: controller,
-            strategy: strategy == address(0) ? DEFAULT_STRATEGY : strategy
+            strategy: strategy
         });
 
         // Store the last created poolId for the multicall, to make sure the user is not frontrun.
         _getLastPoolId = poolId;
 
+        // This call also prevents accidently creating a pool with an invalid strategy target address.
         IStrategy(getStrategy(poolId)).afterCreate(poolId, strategyArgs);
 
         emit CreatePool(

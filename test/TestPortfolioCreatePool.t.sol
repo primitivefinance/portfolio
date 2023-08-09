@@ -198,8 +198,8 @@ contract TestPortfolioCreatePool is Setup {
         );
 
         subject().multicall(data);
-        uint64 poolId = AssemblyLib.encodePoolId(
-            pairNonce, false, uint32(subject().getPoolNonce(pairNonce))
+        uint64 poolId = PoolIdLib.encode(
+            false, false, pairNonce, uint32(subject().getPoolNonce(pairNonce))
         );
         assertEq(
             ghost().configOf(poolId).durationSeconds,
@@ -207,7 +207,7 @@ contract TestPortfolioCreatePool is Setup {
             "duration != SECONDS_PER_YEAR"
         );
         assertEq(
-            ghost().poolOf(poolId).computeTau(ghost().configOf(poolId), 0),
+            ghost().configOf(poolId).computeTau(0),
             SECONDS_PER_YEAR,
             "tau != year"
         );

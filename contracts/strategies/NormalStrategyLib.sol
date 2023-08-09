@@ -34,8 +34,18 @@ using {
     tradingFunction
 } for NormalCurve global;
 
-using { encode, modify, transform } for PortfolioConfig global;
+using {
+    computeTau,
+    encode,
+    getMaturity,
+    modify,
+    transform
+} for PortfolioConfig global;
 
+/// @dev Enforces minimum positive invariant growth for swaps in pools using this strategy.
+int256 constant INFINITY = type(int256).max;
+int256 constant NEGATIVE_INFINITY = type(int256).min;
+int256 constant MINIMUM_INVARIANT_DELTA = 1;
 uint256 constant MIN_STRIKE_PRICE = 1; // 1 wei
 uint256 constant MAX_STRIKE_PRICE = type(uint128).max;
 uint256 constant MIN_VOLATILITY = 1; // 0.01%
@@ -43,10 +53,10 @@ uint256 constant MAX_VOLATILITY = 25_000; // 250%
 uint256 constant MIN_DURATION = SECONDS_PER_DAY; // Miniumum duration is one day.
 uint256 constant MAX_DURATION = SECONDS_PER_YEAR * 3; // Maximum duration is three years.
 uint256 constant STRATEGY_ARGS_LENGTH = 32 * 5; // Not packed, 5 words total = 32 * 5 = 160 bytes.
+uint256 constant BISECTION_EPSILON = 1;
+uint256 constant BISECTION_MAX_ITER = 256;
 
 error NormalStrategyLib_ConfigExists();
-error NormalStrategyLib_UpperPriceLimitReached();
-error NormalStrategyLib_LowerPriceLimitReached();
 error NormalStrategyLib_NonExpiringPool();
 error NormalStrategyLib_InvalidDuration();
 error NormalStrategyLib_InvalidStrategyArgs();
@@ -104,7 +114,7 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
  * @notice
  * Computes the invariant of the RMM-01 trading function.
  *
- * @dev
+ * @dev For developers:
  * Re-arranges the trading function to remove the use of Φ (cdf).
  * By removing Φ and only using Φ⁻¹ (inverse cdf), the invariant is at least monotonic but non-strict.
  * While the Φ and Φ⁻¹ are theoretical inverses with strict monotonicity,
@@ -113,6 +123,15 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
  *
  * @custom:math
  * ```
+ * Where,
+ *        Φ   = Gaussian.cdf
+ *        Φ⁻¹ = Gaussian.ppf
+ *        K   = strikePriceWad
+ *        σ   = standardDeviationWad
+ *        τ   = timeRemainingSeconds
+ *        x   = reserveXPerWad
+ *        y   = reserveYPerWad
+ *
  * Original trading function
  * { 0    KΦ(Φ⁻¹(1-x) - σ√τ) >= y
  * { -∞   otherwise
@@ -132,10 +151,84 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
  *  -> Φ⁻¹(1-x) = Φ⁻¹(y/K) + σ√τ - k
  *      -> 1-x = Φ(Φ⁻¹(y/K) + σ√τ - k)
  *          -> x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
- *
  * ```
- * note
- * Slightly different from original trading function because invariant is different.
+ *
+ * # Special Boundary Properties
+ *
+ * The Φ⁻¹(y/K) term is denoted as `invariantTermY`
+ * The Φ⁻¹(1-x) term is denoted as `invariantTermX`.
+ *
+ * As y approaches its upper bound of K, Φ⁻¹(y/K) approaches +∞.
+ * As y approaches its lower bound of 0, Φ⁻¹(y/K) approaches -∞.
+ * As x approaches its upper bound of 1, Φ⁻¹(1-x) approaches -∞.
+ * As x approaches its lower bound of 0, Φ⁻¹(1-x) approaches +∞.
+ *
+ * Theoretically, if both x and y are at opposite bounds, they cancel eachother out.
+ * Pragmatically, it's a lot messier because infinity does not exist.
+ *
+ * To handle this special property, the x and y reserves are checked for exceeding their bounds.
+ * If they do exceed a bound, they are overwritten to be at the bound minus 1.
+ * This prevents reverts that would happen if inputting values outside the theoretically and
+ * practial domain of the `Gaussian.ppf` function, i.e. inputs of 0 or 1.
+ *
+ * By setting either or both the x and y to their bounds minus 1, each term will
+ * return the `ppf`'s effective minimum and maximum output.
+ *
+ * The maximum output of Φ⁻¹(1E18 - 1) = 8710427241990476442 [~8.71e18]. In wad units.
+ * The minimum output of Φ⁻¹(0 + 1)   = -8710427241990476442 [~-8.71e18]. In wad units.
+ *
+ * It's likely that the x and y reserves will reach opposite bounds,
+ * in which case the invariant terms completely cancel out, returning `k = σ√τ`.
+ *
+ * In the case only one bound is reached, the invariant term for the bound will
+ * be either the min or max output of the ppf. This will require the other term
+ * to be very close to the min or max output of the ppf in order to cancel out.
+ *
+ * note Assumes maximum values are from valid pools created via this strategy in Portfolio.
+ *
+ * ## Example
+ * The maximum value of σ√τ, where σ_max = 25_000 and τ_max = 94670859, is 4330127017500000000 [4.33e18].
+ * The minimum value of σ√τ is 0.
+ *
+ * If all y tokens are removed, Φ⁻¹(0/K) -> Φ⁻¹(1e-18) = `invariantTermY` = -8710427241990476442.
+ * For the swap to pass, the invariant needs to grow by at least 1.
+ * Assuming we started at k = 0, we need to find the `invariantTermX` that solves this:
+ *      -> 1 = -8710427241990476442 - invariantTermX + σ√τ.
+ * We need the σ√τ term to help us, so we can set it to its maximum value. Now we have:
+ *      -> 1 = -8710427241990476442 - invariantTermX + 4330127017500000000.
+ *      -> invariantTermX <= -8710427241990476442 + 4330127017500000000 - 1.
+ *      -> invariantTermX <= -4380300224490476443 [~-4.38e18].
+ *      -> Φ⁻¹(1-x) <= -4.380300224490476443. (not in wad anymore...)
+ *      -> 1 - x <= Φ(-4.380300224490476443).
+ *      -> x >= 1 - Φ(-4.380300224490476443).
+ *      -> x >= ~0.999999218479338350565045237958.
+ * In conclusion, to take all y reserves, the x reserves must be __very close__ to its upper bound.
+ *
+ *
+ * If all x tokens are removed, `invariantTermX` = 8710427241990476442.
+ * For the swap to pass, the invariant needs to grow by at least 1.
+ *     -> 1 = invariantTermY - 8710427241990476442 + σ√τ.
+ * We can use the σ√τ to help us, so we can set it to its maximum value. Now we have:
+ *    -> 1 = invariantTermY - 8710427241990476442 + 4330127017500000000.
+ *    -> invariantTermY >= 8710427241990476442 - 4330127017500000000 + 1.
+ *    -> invariantTermY >= 4380300224490476443 [~4.38e18].
+ *    -> Φ⁻¹(y/K) >= 4.380300224490476443. (not in wad anymore...)
+ *    -> y/K >= Φ(4.380300224490476443).
+ *    -> y >= KΦ(4.380300224490476443).
+ *    -> y >= K * ~0.999994074204725119575460221025.
+ * However, since the `invariantTermX` will be subtracted from `invariantTermY` first, it will
+ * revert the transaction with an arithemtic underflow unless the `invariantTermX` is equal
+ * to it's maximum value of 8710427241990476442, which is when the y reserves are at their
+ * upper bound of y = k.
+ * In conclusion, to take all x reserves, the y reserves __must__ be at its upper bound.
+ *
+ * This overwrite of "infinity" effectively makes the trading function return an actual value
+ * at the bounds, instead of reverting. This is important for pools which might have accrued
+ * enough fees to push one of it's reserves over the bounds. Additionally, a maximum and minimum
+ * price are effectively enforced at these boundaries.
+ *
+ *
+ * note Adjusted trading function's invariant != original trading function's invariant.
  *
  * @return invariant        k; Signed invariant of the pool.
  */
@@ -148,21 +241,33 @@ function tradingFunction(NormalCurve memory self)
 
     // Get the bounds and check if one of the reserves has reached the bounds.
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
-    (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
 
-    // Check if the reserves are within the boundary before computing its respective invariant term.
-    // This is required because the invariant term for x approaches 0 or 1 as x approaches its bounds.
-    // Taking the percent point function of 0 or 1 will result in an error, which we purposefully avoid.
-    int256 invariantTermX; // Φ⁻¹(1-x)
-    if (self.reserveXPerWad.isBetween(lowerBoundX + 1, upperBoundX - 1)) {
-        invariantTermX = Gaussian.ppf(int256(WAD - self.reserveXPerWad));
+    // Overwrite the reserves to be as close to its bounds as possible, to avoid reverting.
+    uint256 invariantTermXInput; // x - 1
+    if (self.reserveXPerWad >= upperBoundX) {
+        // As x -> 1E18, 1E18 - x -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermXInput to 1E18 - 1E18 + 1.
+        invariantTermXInput = 1;
+    } else if (self.reserveXPerWad <= lowerBoundX) {
+        // As x -> 0, 1E18 - 0 -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermXInput to 1E18 - 0 - 1.
+        invariantTermXInput = WAD - 1;
+    } else {
+        invariantTermXInput = WAD - self.reserveXPerWad;
     }
-    int256 invariantTermY; // Φ⁻¹(y/K)
-    if (self.reserveYPerWad.isBetween(lowerBoundY + 1, upperBoundY - 1)) {
-        invariantTermY = Gaussian.ppf(
-            int256(self.reserveYPerWad.divWadUp(self.strikePriceWad))
-        );
+
+    uint256 invariantTermYInput =
+        self.reserveYPerWad.divWadDown(self.strikePriceWad); // y/K -> [0,1]
+    if (invariantTermYInput >= WAD) {
+        // As y -> K, y/K -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermYInput to 1E18 - 1.
+        invariantTermYInput = WAD - 1;
+    } else if (invariantTermYInput <= 0) {
+        // As y -> 0, y/K -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermYInput to 0 + 1.
+        invariantTermYInput = 1;
     }
+
+    // Φ⁻¹(1-x)
+    int256 invariantTermX = Gaussian.ppf(int256(invariantTermXInput));
+    // Φ⁻¹(y/K)
+    int256 invariantTermY = Gaussian.ppf(int256(invariantTermYInput));
 
     // k = Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ
     invariant = invariantTermY - invariantTermX + int256(stdDevSqrtTau);
@@ -173,7 +278,7 @@ function tradingFunction(NormalCurve memory self)
  * Computes the x reserves given y reserves.
  *
  * @dev
- * Derived from the original trading function defined in `tradingFunction`.
+ * Derived from the __adjusted__ trading function defined in `tradingFunction`.
  *
  * @custom:math
  * x = 1 - Φ(Φ⁻¹(y/K) + σ√τ - k)
@@ -206,7 +311,7 @@ function approximateXGivenY(NormalCurve memory self)
  * Computes the y reserves given x reserves.
  *
  * @dev
- * Derived from the original trading function.
+ * Derived from the __adjusted__ trading function.
  *
  * @custom:math
  * y = KΦ(Φ⁻¹(1-x) - σ√τ + k)
@@ -305,7 +410,6 @@ function approximatePriceGivenX(
     uint256 reserveXPerWad
 ) pure returns (uint256 priceWad) {
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
-    (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
 
     if (reserveXPerWad >= upperBoundX) return self.strikePriceWad; // Terminal price limit.
     if (reserveXPerWad <= lowerBoundX) return type(uint128).max; // Upper price limit.
@@ -362,7 +466,22 @@ struct PortfolioConfig {
     bool isPerpetual;
 }
 
-/// @dev Transforms the normal strategy configuration into a class with methods for its math.
+/**
+ * @notice
+ * Tranforms a configuration into it's respective trading function parameters,
+ * converted to the required units.
+ *
+ * @dev Notes on the transformation:
+ * - Invariant is set to 0. For most functions that utilize the curve parameters,
+ * the invariant is not needed. However, for functions like the
+ * `approximateYGivenX` and `approximateXGivenY` the invariant is needed.
+ * Therefore, after the config has been transformed, it's invariant should be
+ * set to the result of `tradingFunction` if using these functions.
+ * - Time remaining is set to the config's duration. However,
+ * the duration parameter used in this transformed `NormalCurve` should be
+ * recomputed based on a fresher timestamp, like the current one. This is because
+ * the duration stored in the config is the static duration that the pool started with.
+ */
 function transform(PortfolioConfig memory config)
     pure
     returns (NormalCurve memory)
@@ -427,6 +546,38 @@ function modify(
 }
 
 /**
+ * @notice
+ * Get time remaining from timestamp.
+ *
+ * @dev
+ * Computes the time remaining in seconds for the pool to reach maturity.
+ *
+ * @param timestamp Timestamp (seconds) to start from when computing the time remaining.
+ */
+function computeTau(
+    PortfolioConfig memory config,
+    uint256 timestamp
+) pure returns (uint256) {
+    if (config.isPerpetual) return SECONDS_PER_YEAR;
+
+    uint256 endTimestamp = getMaturity(config);
+    unchecked {
+        // Cannot underflow as LHS is either equal to `timestamp` or greater.
+        return AssemblyLib.max(timestamp, endTimestamp) - timestamp;
+    }
+}
+
+/// @dev Get the timestamp of the pool's maturity.
+function getMaturity(PortfolioConfig memory config) pure returns (uint32) {
+    if (config.isPerpetual) revert NormalStrategyLib_NonExpiringPool();
+
+    // Portfolio duration is limited such that this addition will never overflow uint32.
+    unchecked {
+        return config.creationTimestamp + config.durationSeconds;
+    }
+}
+
+/**
  * @title
  * NormalStrategyLib.sol
  *
@@ -472,15 +623,24 @@ library NormalStrategyLib {
      * Get the invariant of the pool, computed on its last swap.
      *
      * @dev
-     * This invariant result is used in Portfolio's __critical__ invariant check.
-     * A swap will revert if this result has not increased since the last swap.
+     * Use this to get the "after" swap invariant.
      *
+     * Rounded down via rounded down virtual reserves per liquidity.
+     * Uses the last swap's timestamp to compute the time remaining in the pool.
+     * This invariant result is used in Portfolio's __critical__ invariant check,
+     * as it's "after" swap invariant value.
+     * A swap will revert if this result has not increased by at least min invariant delta,
+     * when compared to the "before" swap invariant value, which is rounded up.
+     *
+     * @param self Pool's liquidity and reserves to use to compute the invariant.
+     * @param config Parameters of the trading function to use in the trading function.
+     * @return invariant The invariant of the pool, computed at the time of the last swap.
      */
-    function getInvariant(
+    function getInvariantDown(
         PortfolioPool memory self,
         PortfolioConfig memory config
     ) internal view returns (int256) {
-        // Due to rounding errors, the invariant is not strictly monotonical all the time.
+        // Due to rounding errors, the invariant is not strictly monotonic all the time.
         // This is because the invariant is computed using approximations, and the rounding
         // error could cause enough loss of information to keep the invariant unchanged,
         // even if the reserves change a small amount.
@@ -488,6 +648,7 @@ library NormalStrategyLib {
         uint256 reserveXPerWad = self.virtualX.divWadDown(self.liquidity);
         uint256 reserveYPerWad = self.virtualY.divWadDown(self.liquidity);
 
+        // Uses `self.lastTimestamp` as the current timestamp to compute time remaining.
         NormalCurve memory curve = NormalCurve({
             reserveXPerWad: reserveXPerWad,
             reserveYPerWad: reserveYPerWad,
@@ -497,6 +658,64 @@ library NormalStrategyLib {
             invariant: 0
         });
 
+        return tradingFunction(curve);
+    }
+
+    /**
+     * @notice
+     * Computes the invariant of the pool using a rounded up output reserve.
+     *
+     * @dev
+     * Use this to get the "before" swap invariant.
+     *
+     * If either reserve increases, the invariant should also increase.
+     * However, due to approximation errors and truncation, it's possible
+     * the invariant does not change with a small increase in one of the reserves.
+     * By rounding one of the reserves up, it has the effect of rounding the invariant up.
+     * By rounding specifically the output reserve up, it rounds the output swap quantity down.
+     * Rounding the invariant up is advantageous for Portfolio,
+     * because the swapper must increase the invariant by the rounded up amount
+     * and the minimum invariant delta.
+     *
+     * @param self Pool's liquidity and reserves to use to compute the invariant.
+     * @param config Parameters of the trading function to use in the trading function.
+     * @param sellAsset Whether the asset is the input reserve or the output reserve.
+     * @param timestamp Expected timestamp of the swap. Used to compute time remaining in the pool.
+     * @return invariant Invariant of the pool before a swap in the `sellAsset` direction takes place at the current time.
+     */
+    function getInvariantUp(
+        PortfolioPool memory self,
+        PortfolioConfig memory config,
+        bool sellAsset,
+        uint256 timestamp
+    ) internal pure returns (int256) {
+        // Computes the existing invariant of the pool using a
+        // rounded up virtual output reserve per liquidity.
+        // This is to make it advantageous for Portfolio
+        // by overestimating the current invariant.
+        // Since an invariant must increase in a swap to be valid,
+        // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
+        uint256 reserveXPerWad = self.virtualX;
+        uint256 reserveYPerWad = self.virtualY;
+        if (sellAsset) {
+            reserveXPerWad = reserveXPerWad.divWadDown(self.liquidity);
+            reserveYPerWad = reserveYPerWad.divWadUp(self.liquidity);
+        } else {
+            reserveXPerWad = reserveXPerWad.divWadUp(self.liquidity);
+            reserveYPerWad = reserveYPerWad.divWadDown(self.liquidity);
+        }
+
+        // Uses `timestamp` as the current timestamp to compute time remaining.
+        NormalCurve memory curve = NormalCurve({
+            reserveXPerWad: reserveXPerWad,
+            reserveYPerWad: reserveYPerWad,
+            strikePriceWad: config.strikePriceWad,
+            standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
+            timeRemainingSeconds: config.computeTau(timestamp),
+            invariant: 0
+        });
+
+        // This invariant uses the rounded up output reserves and start `timestamp`.
         return tradingFunction(curve);
     }
 
@@ -529,37 +748,8 @@ library NormalStrategyLib {
             int256 postInvariant
         )
     {
-        NormalCurve memory curve;
-
-        {
-            // Computes the existing invariant of the pool with
-            // rounded up virtual reserves for the output reserve of a trade.
-            // This is to make it advantageous for Portfolio
-            // by overestimating the current invariant.
-            // Since an invariant must increase in a swap to be a valid trade,
-            // this ensures the cost of a swap is rounded to the benefit of liquidity providers.
-            uint256 reserveXPerWad = self.virtualX;
-            uint256 reserveYPerWad = self.virtualY;
-            if (order.sellAsset) {
-                reserveXPerWad = reserveXPerWad.divWadDown(self.liquidity);
-                reserveYPerWad = reserveYPerWad.divWadUp(self.liquidity);
-            } else {
-                reserveXPerWad = reserveXPerWad.divWadUp(self.liquidity);
-                reserveYPerWad = reserveYPerWad.divWadDown(self.liquidity);
-            }
-
-            curve = NormalCurve({
-                reserveXPerWad: reserveXPerWad,
-                reserveYPerWad: reserveYPerWad,
-                strikePriceWad: config.strikePriceWad,
-                standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
-                timeRemainingSeconds: computeTau(self, config, timestamp),
-                invariant: 0
-            });
-        }
-
-        // This invariant uses the rounded up input reserves and start `timestamp`.
-        prevInvariant = tradingFunction(curve);
+        // Computed using a rounded up output reserve per liquidity.
+        prevInvariant = getInvariantUp(self, config, order.sellAsset, timestamp);
 
         // Compute the next invariant if the swap amounts are non zero.
         (uint256 reserveX, uint256 reserveY) = (self.virtualX, self.virtualY);
@@ -572,10 +762,19 @@ library NormalStrategyLib {
         (,, reserveX, reserveY) =
             order.computeSwapResult(reserveX, reserveY, feeBps, protocolFee);
 
+        // Uses the `timestamp` as the current time for computing the time remaining in the pool.
+        NormalCurve memory curve = NormalCurve({
+            reserveXPerWad: 0,
+            reserveYPerWad: 0,
+            strikePriceWad: config.strikePriceWad,
+            standardDeviationWad: config.volatilityBasisPoints.bpsToPercentWad(),
+            timeRemainingSeconds: config.computeTau(timestamp),
+            invariant: 0
+        });
+
+        // Rounded down reserves to round the invariant down.
         curve.reserveXPerWad = reserveX.divWadDown(self.liquidity);
         curve.reserveYPerWad = reserveY.divWadDown(self.liquidity);
-
-        // This invariant uses the rounded down reserves after the swap is done.
         postInvariant = tradingFunction(curve);
         adjustedIndependentReserve =
             order.sellAsset ? curve.reserveXPerWad : curve.reserveYPerWad;
@@ -594,6 +793,7 @@ library NormalStrategyLib {
 
         NormalCurve memory curve = transform(config);
         curve.invariant = prevInv;
+        curve.timeRemainingSeconds = config.computeTau(timestamp);
 
         uint256 adjustedDependentReserve;
         bool sellAsset = order.sellAsset;
@@ -618,9 +818,8 @@ library NormalStrategyLib {
             return (sellAsset ? self.virtualY : self.virtualX);
         }
 
-        uint256 lower = adjustedDependentReserve.mulDivDown(98, 100);
-        uint256 upper = adjustedDependentReserve.mulDivUp(102, 100);
-
+        uint256 lower = adjustedDependentReserve.mulDivDown(50, 100);
+        uint256 upper = adjustedDependentReserve.mulDivUp(150, 100);
         // Output reserve is approximated with the derived math functions,
         // but to get it precise it needs a root finding algorithm.
         // Approximates the dependent reserve per liquidity by finding the root of the trading function.
@@ -628,8 +827,8 @@ library NormalStrategyLib {
             abi.encode(curve),
             lower,
             upper,
-            0, // Set to 0 to find the exact dependent reserve which sets the invariant to 0.
-            256, // Maximum amount of loops to run in bisection.
+            BISECTION_EPSILON, // Set to 1 to find the exact dependent reserve which increases invariant by 1.
+            BISECTION_MAX_ITER, // Maximum amount of loops to run in bisection.
             sellAsset ? findRootForSwappingInX : findRootForSwappingInY
         );
 
@@ -648,10 +847,11 @@ library NormalStrategyLib {
         uint256 value
     ) internal pure returns (int256) {
         // Optimize the trading function such that it is strictly monotonically increasing.
-        // Find the root: f(x) - invariant + 2 = 0
+        // Find the root: f(x) - (invariant + min invariant delta) = 0
         NormalCurve memory curve = abi.decode(args, (NormalCurve));
         curve.reserveYPerWad = value;
-        return tradingFunction(curve) - (curve.invariant + 1);
+        return
+            tradingFunction(curve) - (curve.invariant + MINIMUM_INVARIANT_DELTA);
     }
 
     function findRootForSwappingInY(
@@ -659,10 +859,11 @@ library NormalStrategyLib {
         uint256 value
     ) internal pure returns (int256) {
         // Optimize the trading function such that it is strictly monotonically increasing.
-        // Find the root: f(x) - invariant + 2 = 0
+        // Find the root: f(x) - (invariant + min invariant delta) = 0
         NormalCurve memory curve = abi.decode(args, (NormalCurve));
         curve.reserveXPerWad = value;
-        return tradingFunction(curve) - (curve.invariant + 1);
+        return
+            tradingFunction(curve) - (curve.invariant + MINIMUM_INVARIANT_DELTA);
     }
 
     // ----------------- //
@@ -674,7 +875,7 @@ library NormalStrategyLib {
     ) internal view returns (bool) {
         if (config.isPerpetual) return false;
 
-        return self.lastTimestamp >= getMaturity(self, config);
+        return self.lastTimestamp >= getMaturity(config);
     }
 
     /**
@@ -689,43 +890,7 @@ library NormalStrategyLib {
         PortfolioPool memory self,
         PortfolioConfig memory config
     ) internal view returns (uint256) {
-        return computeTau(self, config, self.lastTimestamp);
-    }
-
-    /**
-     * @notice
-     * Get time remaining from timestamp.
-     *
-     * @dev
-     * Computes the time remaining in seconds for the pool to reach maturity.
-     *
-     * @param timestamp Timestamp (seconds) to start from when computing the time remaining.
-     */
-    function computeTau(
-        PortfolioPool memory self,
-        PortfolioConfig memory config,
-        uint256 timestamp
-    ) internal pure returns (uint256) {
-        if (config.isPerpetual) return SECONDS_PER_YEAR;
-
-        uint256 endTimestamp = getMaturity(self, config);
-        unchecked {
-            // Cannot underflow as LHS is either equal to `timestamp` or greater.
-            return AssemblyLib.max(timestamp, endTimestamp) - timestamp;
-        }
-    }
-
-    /// @dev Get the timestamp of the pool's maturity.
-    function getMaturity(
-        PortfolioPool memory self,
-        PortfolioConfig memory config
-    ) internal pure returns (uint32) {
-        if (config.isPerpetual) revert NormalStrategyLib_NonExpiringPool();
-
-        // Portfolio duration is limited such that this addition will never overflow uint32.
-        unchecked {
-            return config.creationTimestamp + config.durationSeconds;
-        }
+        return computeTau(config, self.lastTimestamp);
     }
 
     // ----------------- //

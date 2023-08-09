@@ -42,7 +42,8 @@ contract TestPortfolioAllocate is Setup {
             )
         );
 
-        uint64 poolId = AssemblyLib.encodePoolId(1, false, 1);
+        // uses non-controlled pool and default strategy, leading byte 0x00 poolId
+        uint64 poolId = PoolIdLib.encode(false, false, 1, 1);
 
         data[2] = abi.encodeCall(
             IPortfolioActions.allocate,

@@ -138,34 +138,6 @@ library AssemblyLib {
         outputDec = (amountWad - 1) / factor + 1; // ((a-1) / b) + 1
     }
 
-    /**
-     * @dev
-     * Returns an encoded pool id given specific pool parameters.
-     * The encoding is simply packing the different parameters together.
-     *
-     * @custom:example
-     * ```
-     * uint64 poolId = encodePoolId(7, true, 42);
-     * assertEq(poolId, 0x000007010000002a);
-     * uint64 poolIdEncoded = abi.encodePacked(uint24(pairId), uint8(isMutable ? 1 : 0), uint32(poolNonce));
-     * assertEq(poolIdEncoded, poolId);
-     * ```
-     *
-     * @param pairId Id of the pair of asset / quote tokens
-     * @param isMutable True if the pool is mutable
-     * @param poolNonce Current pool nonce of the Portfolio contract
-     * @return poolId Corresponding encoded pool id
-     */
-    function encodePoolId(
-        uint24 pairId,
-        bool isMutable,
-        uint32 poolNonce
-    ) internal pure returns (uint64 poolId) {
-        assembly {
-            poolId := or(or(shl(40, pairId), shl(32, isMutable)), poolNonce)
-        }
-    }
-
     /// @dev Converts basis points (1 = 0.01%) to percentages in WAD units (1E18 = 100%).
     function bpsToPercentWad(uint256 bps)
         internal
@@ -182,5 +154,23 @@ library AssemblyLib {
         require(x < 1 << 16);
 
         y = uint16(x);
+    }
+
+    /// @dev Packs 4 bits into the upper and lower sections of a byte (8-bits).
+    function pack(
+        bytes1 upper,
+        bytes1 lower
+    ) internal pure returns (bytes1 data) {
+        data = upper << 4 | (lower & 0x0F);
+    }
+
+    /// @dev Separates the upper 4 and lower 4 bits of a byte (8-bits).
+    function separate(bytes1 data)
+        internal
+        pure
+        returns (bytes1 upper, bytes1 lower)
+    {
+        upper = data >> 4;
+        lower = data & 0x0f;
     }
 }
