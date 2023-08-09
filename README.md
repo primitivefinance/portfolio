@@ -76,7 +76,12 @@ forge install
 
 ##### Testing
 ```bash
-forge test
+FOUNDRY_PROFILE=test forge test
+```
+
+##### Building
+```bash
+FOUNDRY_PROFILE=optimized forge build --skip test
 ```
 
 ##### Coverage
