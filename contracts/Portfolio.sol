@@ -754,7 +754,9 @@ contract Portfolio is ERC1155, IPortfolio {
         _getLastPoolId = poolId;
 
         // This call also prevents accidently creating a pool with an invalid strategy target address.
-        IStrategy(getStrategy(poolId)).afterCreate(poolId, strategyArgs);
+        bool success =
+            IStrategy(getStrategy(poolId)).afterCreate(poolId, strategyArgs);
+        if (!success) revert Portfolio_AfterCreateFail();
 
         emit CreatePool(
             poolId,

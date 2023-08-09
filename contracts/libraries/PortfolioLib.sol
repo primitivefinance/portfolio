@@ -9,6 +9,7 @@ import "./ConstantsLib.sol" as ConstantsLib;
 import "./PoolLib.sol";
 import "./SwapLib.sol";
 
+error Portfolio_AfterCreateFail();
 error Portfolio_BeforeSwapFail();
 error Portfolio_DuplicateToken();
 error Portfolio_Insolvent(address token, int256 net);
