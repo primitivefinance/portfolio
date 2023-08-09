@@ -1,12 +1,62 @@
-> Beta: Not production ready. Pending on-going audits.
+> Beta: Portfolio is experimental software. Use at your own risk.
 
 # Portfolio by Primitive
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/primitivefinance/portfolio#contributing) [![](https://dcbadge.vercel.app/api/server/primitive?style=flat)](https://discord.gg/primitive) [![Twitter Badge](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/primitivefi)
 
 Portfolio is an automated market making protocol for implementing custom liquidity distribution strategies at the lowest cost possible.
 
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/primitivefinance/portfolio#contributing) [![](https://dcbadge.vercel.app/api/server/primitive?style=flat)](https://discord.gg/primitive) [![Twitter Badge](https://badgen.net/badge/icon/twitter?icon=twitter&label)](https://twitter.com/primitivefi)
+## Table of Contents
 
-## Installation
+- [Overview](#overview)
+- [Deployments](#deployments)
+- [Security](#security)
+- [Install](#install)
+- [Documentation](#documentation)
+- [Resources](#resources)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Overview
+
+Portfolio is an automated market making protocol for creating custom liquidity distribution strategies at the lowest cost possible. Each pool in Portfolio can be created with a default strategy or custom strategy that defines a trading function, determining the available prices offered by the provider's liquidity. These pools all exist within the single Portfolio smart contract resulting in significantly lower gas costs for liquidity providers and swappers.
+
+Read the local [docs](./docs/src/), hosted docs [docs.primitive.xyz](https://docs.primitive.xyz), or the [formal specification](https://primitive.xyz/whitepaper) for more information.
+
+
+## Deployments
+
+### Canonical Cross-chain Deployment Addresses
+
+| Contract             | Canonical cross-chain address                |
+| -------------------- | -------------------------------------------- |
+| Portfolio 1.3.0-beta | `0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1` |
+| Portfolio 1.4.0-beta | `todo`                                       |
+
+### Deployments by Chain
+
+| Network  | Portfolio 1.3.0-beta                                                                                                          | Portfolio v1.4.0-beta |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| Ethereum | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1 )        | todo                  |
+| Base     | n/a                                                                                                                           | todo                  |
+| Sepolia  | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://sepolia.etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1) | todo                  |
+
+# Security
+
+[Visit Primitive Security](https://www.primitive.xyz/security) to view a comprehensive overview of the security initiatives of Portfolio.
+
+## Audits
+
+| Security Firm         | Date       | Review Time | Status    | Final Commit w/ Fixes                                                                                                                         |
+| --------------------- | ---------- | ----------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| ChainSecurity         | 2022-05-31 | 8-weeks     | Completed | [c6f692f41c1d20ac09acb832923bd46500fd8e06](https://github.com/primitivefinance/portfolio/commit/c6f692f41c1d20ac09acb832923bd46500fd8e06)     |
+| Trail of Bits         | 2023-01-31 | 8-weeks     | Completed | n/a                                                                                                                                           |
+| Spearbit #1           | 2023-03-31 | 5-weeks     | Completed | [tag/v1.1.0-beta](https://github.com/primitivefinance/portfolio/releases/tag/v1.1.0-beta)                                                     |
+| Spearbit #1 Extension | 2023-05-12 | 2-weeks     | Competed  | [36e9efa28332fa03f6d5910edda2fec2f5937190](https://github.com/primitivefinance/portfolio/commit/36e9efa28332fa03f6d5910edda2fec2f5937190 )    |
+| Spearbit #2           | 2023-07-78 | 2-weeks     | Completed | [tag/v1.4.0-beta-spearbit-2023-08-complete](https://github.com/primitivefinance/portfolio/releases/tag/v1.4.0-beta-spearbit-2023-08-complete) |
+
+## Install
+
+To install locally and compile contracts: 
 
 #### [Required] Foundry. [Source](https://github.com/foundry-rs/foundry).
 If not installed, run the following:
@@ -17,26 +67,35 @@ curl -L https://foundry.paradigm.xyz | bash
 # Restart terminal or reload `PATH`, then run foundryup
 foundryup
 ```
-
-### Install & Run
-
+#### [Required] Install Deps
 ```bash
-forge install & forge test
+forge install
 ```
 
-# Security
+#### Usage
 
-[Visit Primitive Security](https://www.primitive.xyz/security) to view a comprehensive overview of the security initiatives of Portfolio.
+##### Testing
+```bash
+forge test
+```
 
-## Audits
+##### Coverage
 
-| Security Firm      | Review Time | Status    |
-| ------------------ | ----------- | --------- |
-| ChainSecurity      | 8-weeks     | Completed |
-| Trail of Bits      | 8-weeks     | Completed |
-| Spearbit           | 5-weeks     | Completed |
-| Spearbit Extension | 2-weeks     | Competed   |
-| Spearbit Extension #2 | 2-weeks     | Pending   |
+[Optional] Install coverage gutters [vs code extension](https://github.com/ryanluker/vscode-coverage-gutters).
+
+Then run this to generate a coverage report:
+
+```bash
+forge coverage --report lcov
+```
+
+### Install Artifacts via NPM
+To install the artifacts to use in your own project:
+
+
+```bash
+npm install @primitivexyz/portfolio
+```
 
 
 # Documentation
@@ -73,15 +132,7 @@ cd docs
 mdbook serve --open
 ```
 
-## coverage
 
-[Optional] Install coverage gutters [vs code extension](https://github.com/ryanluker/vscode-coverage-gutters).
-
-Then run this to generate a coverage report:
-
-```bash
-forge coverage --report lcov
-```
 
 ## Resources
 
@@ -113,3 +164,8 @@ When making a pull request:
     - New tests for all new features or code paths.
 - If making a modification to third-party dependencies, yarn audit passes.
 - A descriptive summary of the PR has been provided.
+
+
+## Copyright
+
+[AGPL-3.0](./LICENSE) © 2023 Primitive Bits, Inc.
