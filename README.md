@@ -46,13 +46,13 @@ Read the local [docs](./docs/src/), hosted docs [docs.primitive.xyz](https://doc
 
 ## Audits
 
-| Security Firm         | Date       | Review Time | Status    | Final Commit w/ Fixes                                                                                                                         |
-| --------------------- | ---------- | ----------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| ChainSecurity         | 2022-05-31 | 8-weeks     | Completed | [c6f692f41c1d20ac09acb832923bd46500fd8e06](https://github.com/primitivefinance/portfolio/commit/c6f692f41c1d20ac09acb832923bd46500fd8e06)     |
-| Trail of Bits         | 2023-01-31 | 8-weeks     | Completed | n/a                                                                                                                                           |
-| Spearbit #1           | 2023-03-31 | 5-weeks     | Completed | [tag/v1.1.0-beta](https://github.com/primitivefinance/portfolio/releases/tag/v1.1.0-beta)                                                     |
-| Spearbit #1 Extension | 2023-05-12 | 2-weeks     | Competed  | [36e9efa28332fa03f6d5910edda2fec2f5937190](https://github.com/primitivefinance/portfolio/commit/36e9efa28332fa03f6d5910edda2fec2f5937190 )    |
-| Spearbit #2           | 2023-07-78 | 2-weeks     | Completed | [tag/v1.4.0-beta-spearbit-2023-08-complete](https://github.com/primitivefinance/portfolio/releases/tag/v1.4.0-beta-spearbit-2023-08-complete) |
+| Security Firm                                                                                                 | Date       | Review Time | Status    | Final Commit w/ Fixes                                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------- | ---------- | ----------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| [ChainSecurity](https://github.com/primitivefinance/security/blob/main/audits/portfolio/chainsecurity.pdf)    | 2022-05-31 | 8-weeks     | Completed | [c6f692f41c1d20ac09acb832923bd46500fd8e06](https://github.com/primitivefinance/portfolio/commit/c6f692f41c1d20ac09acb832923bd46500fd8e06)     |
+| [Trail of Bits](https://github.com/primitivefinance/security/blob/main/audits/portfolio/trailofbits.pdf)      | 2023-01-31 | 8-weeks     | Completed | n/a                                                                                                                                           |
+| [Spearbit #1](https://github.com/primitivefinance/security/blob/main/audits/portfolio/spearbit.pdf)           | 2023-03-31 | 5-weeks     | Completed | [tag/v1.1.0-beta](https://github.com/primitivefinance/portfolio/releases/tag/v1.1.0-beta)                                                     |
+| [Spearbit #1 Extension](https://github.com/primitivefinance/security/blob/main/audits/portfolio/spearbit.pdf) | 2023-05-12 | 2-weeks     | Competed  | [36e9efa28332fa03f6d5910edda2fec2f5937190](https://github.com/primitivefinance/portfolio/commit/36e9efa28332fa03f6d5910edda2fec2f5937190 )    |
+| Spearbit #2                                                                                                   | 2023-07-78 | 2-weeks     | Completed | [tag/v1.4.0-beta-spearbit-2023-08-complete](https://github.com/primitivefinance/portfolio/releases/tag/v1.4.0-beta-spearbit-2023-08-complete) |
 
 ## Install
 
