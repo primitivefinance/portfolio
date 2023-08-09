@@ -74,6 +74,8 @@ contract NormalStrategy is INormalStrategy {
             durationSeconds: config.durationSeconds,
             isPerpetual: config.isPerpetual
         });
+
+        return true;
     }
 
     /// @inheritdoc IStrategy
