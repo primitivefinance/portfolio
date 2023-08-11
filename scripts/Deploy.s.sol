@@ -30,41 +30,42 @@ contract Deploy is Script {
     }
 
     function deployIfNecessary(
-        NuguFactory factory,
+        NuguFactory nugu,
         string memory name,
         bytes memory creationCode,
         bytes32 salt
     ) private returns (address at) {
-        at = factory.getDeployed(salt);
+        at = nugu.getDeployed(salt);
 
         if (at.code.length == 0) {
-            factory.deploy(salt, creationCode, 0);
+            nugu.deploy(salt, creationCode, 0);
             printJSON(name, at, "deployed", false);
         } else {
             printJSON(name, at, "skipped", false);
         }
     }
 
-    function run(address weth, address registry) external {
+    function run(address factory, address weth, address registry) external {
         console.log("~");
         console.log("{");
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
         // Here we specify the factory we want to use
-        NuguFactory factory =
-            NuguFactory(0x0000A79C3D8124ED3a7F8EC8427E4DC43a2B154d);
+        NuguFactory nugu = NuguFactory(create3Factory);
 
-        // Let's check if the contract is deployed on this network
+        // Let's check if the factory contract is deployed on this network, if
+        // it's not, it's better to avoid deploying it from here, as the address
+        // is canonical across all networks, we need a specific script for that.
         require(
-            address(factory).code.length > 0,
+            address(nugu).code.length > 0,
             "Nugu Factory not deployed on this network!"
         );
 
         // If no WETH address is provided, we deploy a new contract
         if (weth == address(0)) {
             deployIfNecessary(
-                factory, "WETH", type(WETH).creationCode, keccak256("WETH")
+                nugu, "WETH", type(WETH).creationCode, keccak256("WETH")
             );
         } else {
             printJSON("WETH", weth, "reused", false);
@@ -73,7 +74,7 @@ contract Deploy is Script {
         // Same thing for the Portfolio registry
         if (registry == address(0)) {
             deployIfNecessary(
-                factory,
+                nugu,
                 "Registry",
                 type(SimpleRegistry).creationCode,
                 keccak256(type(SimpleRegistry).creationCode)
@@ -84,7 +85,7 @@ contract Deploy is Script {
 
         // First we deploy the PositionRenderer contract
         address positionRenderer = deployIfNecessary(
-            factory,
+            nugu,
             "PositionRenderer",
             type(PositionRenderer).creationCode,
             keccak256(type(PositionRenderer).creationCode)
@@ -92,7 +93,7 @@ contract Deploy is Script {
 
         // Then we can deploy the Portfolio contract
         address portfolio = deployIfNecessary(
-            factory,
+            nugu,
             "Portfolio",
             abi.encodePacked(
                 type(Portfolio).creationCode,
