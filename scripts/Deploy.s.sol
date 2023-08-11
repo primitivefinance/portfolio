@@ -52,7 +52,7 @@ contract Deploy is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Here we specify the factory we want to use
-        NuguFactory nugu = NuguFactory(create3Factory);
+        NuguFactory nugu = NuguFactory(factory);
 
         // Let's check if the factory contract is deployed on this network, if
         // it's not, it's better to avoid deploying it from here, as the address
