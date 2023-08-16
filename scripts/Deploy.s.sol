@@ -31,11 +31,12 @@ contract Deploy is Script {
 
     function deployIfNecessary(
         NuguFactory nugu,
+        address deployer,
         string memory name,
         bytes memory creationCode,
         bytes32 salt
     ) private returns (address at) {
-        at = nugu.getDeployed(salt);
+        at = nugu.getDeployed(deployer, salt);
 
         if (at.code.length == 0) {
             nugu.deploy(salt, creationCode, 0);
@@ -46,7 +47,6 @@ contract Deploy is Script {
     }
 
     function run(address factory, address weth, address registry) external {
-        console.log("~");
         console.log("{");
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -65,7 +65,11 @@ contract Deploy is Script {
         // If no WETH address is provided, we deploy a new contract
         if (weth == address(0)) {
             deployIfNecessary(
-                nugu, "WETH", type(WETH).creationCode, keccak256("WETH")
+                nugu,
+                vm.addr(deployerPrivateKey),
+                "WETH",
+                type(WETH).creationCode,
+                keccak256("WETH")
             );
         } else {
             printJSON("WETH", weth, "reused", false);
@@ -75,6 +79,7 @@ contract Deploy is Script {
         if (registry == address(0)) {
             deployIfNecessary(
                 nugu,
+                vm.addr(deployerPrivateKey),
                 "Registry",
                 type(SimpleRegistry).creationCode,
                 keccak256(type(SimpleRegistry).creationCode)
@@ -86,6 +91,7 @@ contract Deploy is Script {
         // First we deploy the PositionRenderer contract
         address positionRenderer = deployIfNecessary(
             nugu,
+            vm.addr(deployerPrivateKey),
             "PositionRenderer",
             type(PositionRenderer).creationCode,
             keccak256(type(PositionRenderer).creationCode)
@@ -94,12 +100,13 @@ contract Deploy is Script {
         // Then we can deploy the Portfolio contract
         address portfolio = deployIfNecessary(
             nugu,
+            vm.addr(deployerPrivateKey),
             "Portfolio",
             abi.encodePacked(
                 type(Portfolio).creationCode,
                 abi.encode(weth, registry, positionRenderer)
             ),
-            keccak256(type(Portfolio).creationCode)
+            0x5EE6BA1393528E858144FF71FBB117AFA1AE672118B68E777631F459DE307EB8
         );
 
         printJSON(
@@ -111,6 +118,5 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
         console.log("}");
-        console.log("~");
     }
 }
