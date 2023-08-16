@@ -106,7 +106,7 @@ contract Deploy is Script {
                 type(Portfolio).creationCode,
                 abi.encode(weth, registry, positionRenderer)
             ),
-            0x5EE6BA1393528E858144FF71FBB117AFA1AE672118B68E777631F459DE307EB8
+            0x8B9A3E646B237114DA81624C540FBA61A7E7FFFEA48B90454E66F547AA5B706C
         );
 
         printJSON(
