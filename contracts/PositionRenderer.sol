@@ -26,6 +26,7 @@ contract PositionRenderer {
     }
 
     struct Pool {
+        uint256 poolId;
         uint128 virtualX;
         uint128 virtualY;
         uint16 feeBasisPoints;
@@ -33,6 +34,7 @@ contract PositionRenderer {
         address controller;
         address strategy;
         uint256 spotPriceWad;
+        bool hasDefaultStrategy;
     }
 
     struct Config {
@@ -50,7 +52,7 @@ contract PositionRenderer {
     }
 
     string private constant PRIMITIVE_LOGO =
-        '<path fill-rule="evenodd" clip-rule="evenodd" d="M339.976 134.664h41.048L256 340.586 130.976 134.664h41.047V98H64.143L256 414 447.857 98H339.976v36.664Zm-38.759 0V98h-90.436v36.664h90.436Z" fill="#fff" style="transform:scale(0.25)"/>';
+        '<svg class="logo">           <path             d="M138.739 45.405v-.756C138.235 19.928 118.055 0 93.334 0H0v170.271h33.297V33.55h59.28c7.063 0 12.613 5.549 12.613 12.612v26.739c0 7.063-5.55 12.613-12.613 12.613H56.505l-10.09 33.549h46.919c24.721 0 44.901-19.928 45.405-44.648v-29.01Z"             fill="#fff" transform="scale(0.5)" />         </svg>';
 
     function uri(uint256 id) external view returns (string memory) {
         Properties memory properties = _getProperties(id);
@@ -62,8 +64,8 @@ contract PositionRenderer {
                     abi.encodePacked(
                         '{"name":"',
                         _generateName(properties),
-                        '","image":"',
-                        _generateImage(properties),
+                        '","animation_url":"',
+                        _generateHTML(properties),
                         '","license":"MIT","creator":"primitive.eth",',
                         '"description":"This NFT represents a liquidity position in a Portfolio pool. The owner of this NFT can modify or redeem this position.\\n\\n',
                         unicode"⚠️ WARNING: Transferring this NFT makes the new recipient the owner of the position.",
@@ -81,6 +83,7 @@ contract PositionRenderer {
         );
     }
 
+    /*
     function _generateImage(Properties memory properties)
         private
         view
@@ -91,6 +94,7 @@ contract PositionRenderer {
             Base64.encode(bytes(_generateSVG(properties)))
         );
     }
+    */
 
     function _getPair(uint256 id) internal view returns (Pair memory) {
         (
@@ -127,13 +131,16 @@ contract PositionRenderer {
         uint256 spotPriceWad = IPortfolio(msg.sender).getSpotPrice(uint64(id));
 
         return Pool({
+            poolId: id,
             virtualX: virtualX,
             virtualY: virtualY,
             feeBasisPoints: feeBasisPoints,
             priorityFeeBasisPoints: priorityFeeBasisPoints,
             controller: controller,
             strategy: strategy,
-            spotPriceWad: spotPriceWad
+            spotPriceWad: spotPriceWad,
+            hasDefaultStrategy: strategy
+                == IPortfolio(msg.sender).DEFAULT_STRATEGY()
         });
     }
 
@@ -254,20 +261,42 @@ contract PositionRenderer {
         );
     }
 
-    function _generateSVG(Properties memory properties)
+    function _generateHTML(Properties memory properties)
         private
         view
         returns (string memory)
     {
-        return string.concat(
-            '<svg width="600" height="600" fill="none" xmlns="http://www.w3.org/2000/svg">',
-            _generateSVGNoise(),
-            _generateSVGGradient(),
-            '<rect fill="url(#MyGradient)" x="0" y="0" width="600" height="600" />'
-            '<rect width="100%" height="100%" filter="url(#noise-filter)"/>',
-            PRIMITIVE_LOGO,
+        string memory color0 = _generateColor(properties.pool.poolId / 10);
+        string memory color1 = _generateColor(properties.pool.poolId * 10);
+
+        string memory data = string.concat(
+            "<!DOCTYPE html> <html>  <head>   <style>     body {       height: 100vh;       width: 100vw;       margin: 0;       padding: 2rem;       font-family: monospace;       display: flex;       flex-direction: column;       gap: 2rem;       color: #fff;       background-image: linear-gradient(0.25turn,",
+            color0,
+            ",",
+            color1,
+            ');       background-repeat: no-repeat;       box-sizing: border-box;       text-rendering: geometricPrecision;     }      #noice {       height: 100vh;       width: 100vw;       position: absolute;       top: 0;       right: 0;       z-index: -1;     }      .stats {       border-spacing: 0 1rem;     }      .stats td {       font-size: 1.75rem;     }      .logo {       height: 85px;       width: 70px;     }      .label {       font-size: 1.2rem;       opacity: 0.5;     }      .footer {       background-color: #00000020;       padding: 1rem;       border-radius: 8px;     }      .footer p {       font-size: 18px;       margin: 0;     }   </style> </head>  <body><svg id="noice">     <filter id="noise-filter">       <feTurbulence type="fractalNoise" baseFrequency="1.34" numOctaves="4" stitchTiles="stitch"></feTurbulence>       <feColorMatrix type="saturate" values="0"></feColorMatrix>       <feComponentTransfer>         <feFuncR type="linear" slope="0.46"></feFuncR>         <feFuncG type="linear" slope="0.46"></feFuncG>         <feFuncB type="linear" slope="0.46"></feFuncB>         <feFuncA type="linear" slope="0.56"></feFuncA>       </feComponentTransfer>       <feComponentTransfer>         <feFuncR type="linear" slope="1.47" intercept="-0.23" />         <feFuncG type="linear" slope="1.47" intercept="-0.23" />         <feFuncB type="linear" slope="1.47" intercept="-0.23" />       </feComponentTransfer>     </filter>     <rect width="100%" height="100%" filter="url(#noise-filter)"></rect>   </svg>',
             _generateStats(properties),
-            "</svg>"
+            _generateHTMLFooter(properties),
+            "</body></html>"
+        );
+
+        return
+            string.concat("data:text/html;base64,", Base64.encode(bytes(data)));
+    }
+
+    function _generateStat(
+        string memory label,
+        string memory amount,
+        bool alignRight
+    ) private pure returns (string memory) {
+        return string.concat(
+            "<td",
+            alignRight ? ' style="text-align: right"' : "",
+            '><span class="label">',
+            label,
+            "</span><br />",
+            amount,
+            "</td>"
         );
     }
 
@@ -277,272 +306,191 @@ contract PositionRenderer {
         returns (string memory)
     {
         return string.concat(
-            _generateSVGTitle(properties),
-            _generateSVGSpotPrice(properties),
-            _generateSVGStrikePrice(properties),
-            _generateSVGReserves(properties),
-            _generateSVGPoolValuation(properties),
-            _generateSVGSwapFee(properties)
+            '<table class="stats">',
+            "<tr><td>",
+            PRIMITIVE_LOGO,
+            "</td>",
+            _generateHTMLTitle(properties),
+            "</tr><tr></tr><tr>",
+            _generateHTMLSpotPrice(properties),
+            _generateHTMLStrikePrice(properties),
+            "</tr><tr>",
+            _generateHTMLAssetReserves(properties),
+            _generateHTMLQuoteReserves(properties),
+            "</tr><tr>",
+            _generateHTMLPoolValuation(properties),
+            _generateHTMLSwapFee(properties),
+            "</tr></table>"
         );
     }
 
-    function _generateSVGNoise() internal pure returns (string memory) {
-        return
-        '<filter id="noise-filter"><feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope="0.28"/><feFuncG type="linear" slope="0.28"/><feFuncB type="linear" slope="0.28"/>       <feFuncA type="linear" slope="0.56"/>     </feComponentTransfer>     <feComponentTransfer>       <feFuncR type="linear" slope="1.47" intercept="-0.23"/>       <feFuncG type="linear" slope="1.47" intercept="-0.23"/>       <feFuncB type="linear" slope="1.47" intercept="-0.23"/>     </feComponentTransfer>   </filter>';
-    }
-
-    function _generateSVGGradient() internal pure returns (string memory) {
-        return string.concat(
-            '<defs><linearGradient id="MyGradient" gradientTransform="rotate(45)"><stop offset="0%" stop-color="',
-            "gold",
-            '" /><stop offset="100%" stop-color="',
-            "green",
-            '" /></linearGradient></defs>'
-        );
-    }
-
-    function _generateSVGTitle(Properties memory properties)
+    function _generateHTMLTitle(Properties memory properties)
         internal
         view
         returns (string memory)
     {
         return string.concat(
-            _drawText(
-                550,
-                75,
-                "#fff",
-                "3.25em",
-                "monospace",
-                "end",
+            _generateStat(
                 string.concat(
                     properties.pair.assetSymbol,
-                    " - ",
+                    "-",
                     properties.pair.quoteSymbol
-                )
-            ),
-            _drawText(
-                550,
-                100,
-                "#ffffff80",
-                "1.75em",
-                "monospace",
-                "end",
+                ),
                 properties.config.isPerpetual
-                    ? "Never expires"
+                    ? "Perpetual pool"
                     : _calculateCountdown(
                         properties.config.creationTimestamp
                             + properties.config.durationSeconds
-                    )
+                    ),
+                true
             )
         );
     }
 
-    function _generateSVGSpotPrice(Properties memory properties)
+    function _generateHTMLSpotPrice(Properties memory properties)
         internal
         pure
         returns (string memory)
     {
         return string.concat(
-            _drawText(
-                50,
-                200,
-                "#ffffff80",
-                "1.75em",
-                "monospace",
-                "start",
-                "Spot Price"
-            ),
-            _drawText(
-                50,
-                240,
-                "#fff",
-                "2.5em",
-                "monospace",
-                "start",
+            _generateStat(
+                "Spot Price",
                 string.concat(
-                    properties.pool.spotPriceWad.toString(),
+                    abbreviateAmount(
+                        properties.pool.spotPriceWad,
+                        properties.pair.quoteDecimals
+                    ),
                     " ",
                     properties.pair.quoteSymbol
-                )
+                ),
+                false
             )
         );
     }
 
-    function _generateSVGStrikePrice(Properties memory properties)
+    function _generateHTMLStrikePrice(Properties memory properties)
         internal
         pure
         returns (string memory)
     {
         return string.concat(
-            _drawText(
-                325,
-                200,
-                "#ffffff80",
-                "1.75em",
-                "monospace",
-                "start",
-                "Strike Price"
-            ),
-            _drawText(
-                325,
-                240,
-                "#fff",
-                "2.5em",
-                "monospace",
-                "start",
+            _generateStat(
+                "Strike Price",
                 string.concat(
-                    properties.config.strikePriceWad.toString(),
+                    abbreviateAmount(
+                        properties.config.strikePriceWad,
+                        properties.pair.quoteDecimals
+                    ),
                     " ",
                     properties.pair.quoteSymbol
-                )
+                ),
+                false
             )
         );
     }
 
-    function _generateSVGReserves(Properties memory properties)
+    function _generateHTMLAssetReserves(Properties memory properties)
         internal
         pure
         returns (string memory)
     {
-        return (
-            string.concat(
-                _drawText(
-                    50,
-                    320,
-                    "#ffffff80",
-                    "1.75em",
-                    "monospace",
-                    "start",
-                    "Asset Reserve"
-                ),
-                _drawText(
-                    50,
-                    360,
-                    "#fff",
-                    "2.5em",
-                    "monospace",
-                    "start",
-                    string.concat(
-                        properties.pool.virtualX.toString(),
-                        " ",
-                        properties.pair.assetSymbol
-                    )
-                ),
-                _drawText(
-                    325,
-                    320,
-                    "#ffffff80",
-                    "1.75em",
-                    "monospace",
-                    "start",
-                    "Quote Reserve"
-                ),
-                _drawText(
-                    325,
-                    360,
-                    "#fff",
-                    "2.5em",
-                    "monospace",
-                    "start",
-                    string.concat(
-                        properties.pool.virtualY.toString(),
-                        " ",
-                        properties.pair.quoteSymbol
-                    )
-                )
-            )
-        );
-    }
-
-    function _generateSVGPoolValuation(Properties memory properties)
-        internal
-        pure
-        returns (string memory)
-    {
-        return (
-            string.concat(
-                _drawText(
-                    50,
-                    440,
-                    "#ffffff80",
-                    "1.75em",
-                    "monospace",
-                    "start",
-                    "Pool Valuation"
-                ),
-                _drawText(
-                    50,
-                    480,
-                    "#fff",
-                    "2.5em",
-                    "monospace",
-                    "start",
-                    string.concat(
-                        properties.config.strikePriceWad.toString(),
-                        " ",
-                        properties.pair.quoteSymbol
-                    )
-                )
-            )
-        );
-    }
-
-    function _generateSVGSwapFee(Properties memory properties)
-        internal
-        pure
-        returns (string memory)
-    {
-        return (
-            string.concat(
-                _drawText(
-                    325,
-                    440,
-                    "#ffffff80",
-                    "1.75em",
-                    "monospace",
-                    "start",
-                    "Swap Fee"
-                ),
-                _drawText(
-                    325,
-                    480,
-                    "#fff",
-                    "2.5em",
-                    "monospace",
-                    "start",
-                    string.concat(
-                        properties.pool.feeBasisPoints.toString(), " %"
-                    )
-                )
-            )
-        );
-    }
-
-    function _drawText(
-        uint256 x,
-        uint256 y,
-        string memory fill,
-        string memory fontSize,
-        string memory fontFamily,
-        string memory textAnchor,
-        string memory text
-    ) internal pure returns (string memory) {
         return string.concat(
-            '<text x="',
-            x.toString(),
-            '" y="',
-            y.toString(),
-            '" fill="',
-            fill,
-            '" text-anchor="',
-            textAnchor,
-            '" font-size="',
-            fontSize,
-            '" font-family="',
-            fontFamily,
-            '">',
-            text,
-            "</text>"
+            _generateStat(
+                "Asset Reserves",
+                string.concat(
+                    abbreviateAmount(
+                        properties.pool.virtualX, properties.pair.assetDecimals
+                    ),
+                    " ",
+                    properties.pair.assetSymbol
+                ),
+                false
+            )
+        );
+    }
+
+    function _generateHTMLQuoteReserves(Properties memory properties)
+        internal
+        pure
+        returns (string memory)
+    {
+        return string.concat(
+            _generateStat(
+                "Asset Reserves",
+                string.concat(
+                    abbreviateAmount(
+                        properties.pool.virtualY, properties.pair.quoteDecimals
+                    ),
+                    " ",
+                    properties.pair.quoteSymbol
+                ),
+                false
+            )
+        );
+    }
+
+    function _generateHTMLPoolValuation(Properties memory properties)
+        internal
+        pure
+        returns (string memory)
+    {
+        uint256 poolValuation = (
+            properties.pool.virtualX * properties.pool.spotPriceWad
+        ) / properties.pair.quoteDecimals + properties.pool.virtualY;
+
+        return string.concat(
+            _generateStat(
+                "Pool Valuation",
+                string.concat(
+                    abbreviateAmount(
+                        poolValuation, properties.pair.quoteDecimals
+                    ),
+                    " ",
+                    properties.pair.quoteSymbol
+                ),
+                false
+            )
+        );
+    }
+
+    function _generateHTMLSwapFee(Properties memory properties)
+        internal
+        pure
+        returns (string memory)
+    {
+        return string.concat(
+            _generateStat(
+                "Swap Fee",
+                string.concat(
+                    abbreviateAmount(properties.pool.feeBasisPoints, 4), "  %"
+                ),
+                false
+            )
+        );
+    }
+
+    function _generateHTMLFooter(Properties memory properties)
+        internal
+        pure
+        returns (string memory)
+    {
+        string memory controlledLabel = properties.pool.controller == address(0)
+            ? "This pool is not controlled"
+            : string.concat(
+                "This pool is controlled by ",
+                properties.pool.controller.toHexString()
+            );
+
+        return (
+            string.concat(
+                '<div class="footer"><p>',
+                controlledLabel,
+                " and uses ",
+                properties.pool.hasDefaultStrategy
+                    ? "the default strategy."
+                    : "a custom strategy.",
+                "</p></div>"
+            )
         );
     }
 
@@ -576,6 +524,176 @@ contract PositionRenderer {
         return
             (string.concat("Expires in ", secondsLeft.toString(), " seconds"));
     }
+
+    /// @dev Escape character for "≥".
+    string internal constant SIGN_GE = "&#8805;";
+
+    /// @dev Escape character for ">".
+    string internal constant SIGN_GT = "&gt;";
+
+    /// @dev Escape character for "<".
+    string internal constant SIGN_LT = "&lt;";
+
+    /// @notice Creates an abbreviated representation of the provided amount, rounded down and prefixed with ">= ".
+    /// @dev The abbreviation uses these suffixes:
+    /// - "K" for thousands
+    /// - "M" for millions
+    /// - "B" for billions
+    /// - "T" for trillions
+    /// For example, if the input is 1,234,567, the output is ">= 1.23M".
+    /// @param amount The amount to abbreviate, denoted in units of `decimals`.
+    /// @param decimals The number of decimals to assume when abbreviating the amount.
+    /// @return abbreviation The abbreviated representation of the provided amount, as a string.
+    function abbreviateAmount(
+        uint256 amount,
+        uint256 decimals
+    ) internal pure returns (string memory) {
+        if (amount == 0) {
+            return "0";
+        }
+
+        uint256 truncatedAmount;
+        unchecked {
+            truncatedAmount = decimals == 0 ? amount : amount / 10 ** decimals;
+        }
+
+        // Return dummy values when the truncated amount is either very small or very big.
+        if (truncatedAmount < 1) {
+            return string.concat(SIGN_LT, " 1");
+        } else if (truncatedAmount >= 1e15) {
+            return string.concat(SIGN_GT, " 999.99T");
+        }
+
+        string[5] memory suffixes = ["", "K", "M", "B", "T"];
+        uint256 fractionalAmount;
+        uint256 suffixIndex = 0;
+
+        // Truncate repeatedly until the amount is less than 1000.
+        unchecked {
+            while (truncatedAmount >= 1000) {
+                fractionalAmount = (truncatedAmount / 10) % 100; // keep the first two digits after the decimal point
+                truncatedAmount /= 1000;
+                suffixIndex += 1;
+            }
+        }
+
+        // Concatenate the calculated parts to form the final string.
+        string memory prefix = string.concat(SIGN_GE, " ");
+        string memory wholePart = truncatedAmount.toString();
+        string memory fractionalPart =
+            stringifyFractionalAmount(fractionalAmount);
+        return string.concat(
+            prefix, wholePart, fractionalPart, suffixes[suffixIndex]
+        );
+    }
+
+    /// @notice Converts the provided fractional amount to a string prefixed by a dot.
+    /// @param fractionalAmount A numerical value with 2 implied decimals.
+    function stringifyFractionalAmount(uint256 fractionalAmount)
+        internal
+        pure
+        returns (string memory)
+    {
+        // Return the empty string if the fractional amount is zero.
+        if (fractionalAmount == 0) {
+            return "";
+        }
+        // Add a leading zero if the fractional part is less than 10, e.g. for "1", this function returns ".01%".
+        else if (fractionalAmount < 10) {
+            return string.concat(".0", fractionalAmount.toString());
+        }
+        // Otherwise, stringify the fractional amount simply.
+        else {
+            return string.concat(".", fractionalAmount.toString());
+        }
+    }
+
+    function _generateColor(uint256 seed)
+        internal
+        pure
+        returns (string memory)
+    {
+        return string.concat(
+            "rgb(",
+            _generateNumber(seed, 255).toString(),
+            ",",
+            _generateNumber(seed + 1, 255).toString(),
+            ",",
+            _generateNumber(seed + 2, 255).toString(),
+            ")"
+        );
+    }
+
+    function _generateNumber(
+        uint256 seed,
+        uint256 max
+    ) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(seed))) % max;
+    }
+
+    /*
+    function _drawText(
+        uint256 x,
+        uint256 y,
+        string memory fill,
+        string memory fontSize,
+        string memory fontFamily,
+        string memory textAnchor,
+        string memory text
+    ) internal pure returns (string memory) {
+        return string.concat(
+            '<text x="',
+            x.toString(),
+            '" y="',
+            y.toString(),
+            '" fill="',
+            fill,
+            '" text-anchor="',
+            textAnchor,
+            '" font-size="',
+            fontSize,
+            '" font-family="',
+            fontFamily,
+            '">',
+            text,
+            "</text>"
+        );
+    }
+
+    function _generateSVGNoise() internal pure returns (string memory) {
+        return
+        '<filter id="noise-filter"><feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope="0.28"/><feFuncG type="linear" slope="0.28"/><feFuncB type="linear" slope="0.28"/>       <feFuncA type="linear" slope="0.56"/>     </feComponentTransfer>     <feComponentTransfer>       <feFuncR type="linear" slope="1.47" intercept="-0.23"/>       <feFuncG type="linear" slope="1.47" intercept="-0.23"/>       <feFuncB type="linear" slope="1.47" intercept="-0.23"/>     </feComponentTransfer>   </filter>';
+    }
+
+    function _generateSVGGradient() internal pure returns (string memory) {
+        return string.concat(
+            '<defs><linearGradient id="MyGradient" gradientTransform="rotate(45)"><stop offset="0%" stop-color="',
+            "gold",
+            '" /><stop offset="100%" stop-color="',
+            "green",
+            '" /></linearGradient></defs>'
+        );
+    }
+
+    function _generateSVG(Properties memory properties)
+        private
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            '<svg width="600" height="600" fill="none" xmlns="http://www.w3.org/2000/svg">',
+            _generateSVGNoise(),
+            _generateSVGGradient(),
+            '<rect fill="url(#MyGradient)" x="0" y="0" width="600" height="600" />'
+            '<rect width="100%" height="100%" filter="url(#noise-filter)"/>',
+            PRIMITIVE_LOGO,
+            _generateStats(properties),
+            _generateSVGFooter(properties),
+            "</svg>"
+        );
+    }
+
+    */
 }
 
 /*
