@@ -411,7 +411,7 @@ function approximatePriceGivenX(
 ) pure returns (uint256 priceWad) {
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
 
-    if (reserveXPerWad >= upperBoundX) return self.strikePriceWad; // Terminal price limit.
+    if (reserveXPerWad >= upperBoundX) return 0; // Terminal price limit.
     if (reserveXPerWad <= lowerBoundX) return type(uint128).max; // Upper price limit.
 
     uint256 timeRemainingYearsWad =
