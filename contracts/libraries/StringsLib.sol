@@ -8,7 +8,7 @@ import { Math } from "openzeppelin/utils/math/Math.sol";
  * @dev Modified version of:
  * OpenZeppelin Contracts (last updated v4.9.0) (utils/Strings.sol)
  */
-library Strings {
+library StringsLib {
     bytes16 private constant _SYMBOLS = "0123456789abcdef";
     uint8 private constant _ADDRESS_LENGTH = 20;
 
@@ -88,5 +88,72 @@ library Strings {
         }
 
         return string.concat("#", string(result));
+    }
+
+    function toStringPercent(uint256 value)
+        internal
+        pure
+        returns (string memory)
+    {
+        uint256 integer = value / 100;
+        uint256 decimal = value % 100;
+        return string.concat(toString(integer), ".", toString(decimal), "%");
+    }
+
+    function toFormatAmount(
+        uint256 value,
+        uint256 decimals
+    ) internal pure returns (string memory) {
+        uint256 integer = value / (10 ** decimals);
+        uint256 decimal = value % (10 ** decimals);
+
+        if (decimal == 0) {
+            return toString(integer);
+        }
+
+        return string.concat(
+            toString(integer), ".", toString(removeTrailingZeroes(decimal))
+        );
+    }
+
+    function removeTrailingZeroes(uint256 value)
+        internal
+        pure
+        returns (uint256)
+    {
+        uint256 result = value;
+        while (result % 10 == 0) {
+            result /= 10;
+        }
+        return result;
+    }
+
+    function toCountdown(uint256 deadline)
+        internal
+        view
+        returns (string memory)
+    {
+        uint256 timeLeft = deadline - block.timestamp;
+        uint256 daysLeft = timeLeft / 86400;
+        uint256 hoursLeft = (timeLeft % 86400) / 3600;
+        uint256 minutesLeft = (timeLeft % 3600) / 60;
+        uint256 secondsLeft = timeLeft % 60;
+
+        // TODO: Fix the plurals
+        if (daysLeft >= 1) {
+            return (string.concat("Expires in ", toString(daysLeft), " days"));
+        }
+
+        if (hoursLeft >= 1) {
+            return (string.concat("Expires in ", toString(hoursLeft), " hours"));
+        }
+
+        if (minutesLeft >= 1) {
+            return (
+                string.concat("Expires in ", toString(minutesLeft), " minutes")
+            );
+        }
+
+        return (string.concat("Expires in ", toString(secondsLeft), " seconds"));
     }
 }
