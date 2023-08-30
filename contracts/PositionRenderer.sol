@@ -2,9 +2,10 @@
 pragma solidity ^0.8.4;
 
 import "openzeppelin/utils/Base64.sol";
-import "openzeppelin/utils/Strings.sol";
 import "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeCastLib.sol";
+
+import "./libraries/StringsLib.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IStrategy.sol";
 import "./strategies/NormalStrategy.sol";
@@ -52,7 +53,12 @@ contract PositionRenderer {
     }
 
     string private constant PRIMITIVE_LOGO =
-        '<svg class="logo">           <path             d="M138.739 45.405v-.756C138.235 19.928 118.055 0 93.334 0H0v170.271h33.297V33.55h59.28c7.063 0 12.613 5.549 12.613 12.612v26.739c0 7.063-5.55 12.613-12.613 12.613H56.505l-10.09 33.549h46.919c24.721 0 44.901-19.928 45.405-44.648v-29.01Z"             fill="#fff" transform="scale(0.5)" />         </svg>';
+        '<svg id="i" viewBox="0 0 139 170" fill="#fff"><path d="M138.739 45.405v-.756C138.235 19.928 118.055 0 93.334 0H0v170.271h33.297V33.55h59.28c7.063 0 12.613 5.549 12.613 12.612v26.739c0 7.063-5.55 12.613-12.613 12.613H56.505l-10.09 33.549h46.919c24.721 0 44.901-19.928 45.405-44.648v-29.01Z" /></svg>';
+
+    string private constant STYLE_0 =
+        "<style>body{height:100vh;width:100vw;margin:0;padding:2rem;font-family:monospace;display:flex;flex-direction:column;gap:2rem;color:#fff;background-repeat:no-repeat;box-sizing:border-box;text-rendering:geometricPrecision;justify-content:space-between}#g{background-image:linear-gradient(0,";
+    string private constant STYLE_1 =
+        ");animation:r 10s linear infinite;background-size:200% 200%;will-change:background-position;width:100vw;height:100vh;position:absolute;top:0;left:0;z-index:-2}#n{height:100vh;width:100vw;position:absolute;top:0;right:0;z-index:-1}@keyframes r{0%,100%{background-position:left top}50%{background-position:right bottom}}#t{font-size:6vh}.s{border-spacing:0 1rem}.s td{font-size:5vh}#i{height:15vh}.l{font-size:3.25vh;opacity:.5}.f{background-color:#00000020;padding:1rem;border-radius:8px}.f p{font-size:3vh;margin:0}</style>";
 
     function uri(uint256 id) external view returns (string memory) {
         Properties memory properties = _getProperties(id);
@@ -82,19 +88,6 @@ contract PositionRenderer {
             )
         );
     }
-
-    /*
-    function _generateImage(Properties memory properties)
-        private
-        view
-        returns (string memory)
-    {
-        return string.concat(
-            "data:image/svg+xml;base64,",
-            Base64.encode(bytes(_generateSVG(properties)))
-        );
-    }
-    */
 
     function _getPair(uint256 id) internal view returns (Pair memory) {
         (
@@ -223,6 +216,15 @@ contract PositionRenderer {
         returns (string memory)
     {
         return string.concat(
+            '"asset_reserves":"',
+            (properties.pool.virtualX / 1).toString(),
+            '",',
+            '"quote_reserves":"',
+            (properties.pool.virtualY / 1).toString(),
+            '",',
+            '"spot_price_wad":"',
+            (properties.pool.spotPriceWad / 10 ** 18).toString(),
+            '",',
             '"fee_basis_points":"',
             properties.pool.feeBasisPoints.toString(),
             '",',
@@ -245,7 +247,7 @@ contract PositionRenderer {
     {
         return string.concat(
             '"strike_price_wad":"',
-            properties.config.strikePriceWad.toString(),
+            (properties.config.strikePriceWad / 10 ** 18).toString(),
             '",',
             '"volatility_basis_points":"',
             properties.config.volatilityBasisPoints.toString(),
@@ -266,15 +268,34 @@ contract PositionRenderer {
         view
         returns (string memory)
     {
-        string memory color0 = _generateColor(properties.pool.poolId / 10);
-        string memory color1 = _generateColor(properties.pool.poolId * 10);
+        string memory color0 = Strings.toHexColor(
+            bytes3(
+                keccak256(abi.encode((properties.pool.poolId >> 232) << 232))
+            )
+        );
+        string memory color1 = Strings.toHexColor(
+            bytes3(keccak256(abi.encode(properties.pool.poolId << 232)))
+        );
+
+        string memory title = string.concat(
+            properties.pair.assetSymbol,
+            "-",
+            properties.pair.quoteSymbol,
+            " Portfolio LP"
+        );
 
         string memory data = string.concat(
-            "<!DOCTYPE html> <html>  <head>   <style>     body {       height: 100vh;       width: 100vw;       margin: 0;       padding: 2rem;       font-family: monospace;       display: flex;       flex-direction: column;       gap: 2rem;       color: #fff;       background-image: linear-gradient(0.25turn,",
+            '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>',
+            title,
+            "</title>",
+            STYLE_0,
             color0,
             ",",
             color1,
-            ');       background-repeat: no-repeat;       box-sizing: border-box;       text-rendering: geometricPrecision;     }      #noice {       height: 100vh;       width: 100vw;       position: absolute;       top: 0;       right: 0;       z-index: -1;     }      .stats {       border-spacing: 0 1rem;     }      .stats td {       font-size: 1.75rem;     }      .logo {       height: 85px;       width: 70px;     }      .label {       font-size: 1.2rem;       opacity: 0.5;     }      .footer {       background-color: #00000020;       padding: 1rem;       border-radius: 8px;     }      .footer p {       font-size: 18px;       margin: 0;     }   </style> </head>  <body><svg id="noice">     <filter id="noise-filter">       <feTurbulence type="fractalNoise" baseFrequency="1.34" numOctaves="4" stitchTiles="stitch"></feTurbulence>       <feColorMatrix type="saturate" values="0"></feColorMatrix>       <feComponentTransfer>         <feFuncR type="linear" slope="0.46"></feFuncR>         <feFuncG type="linear" slope="0.46"></feFuncG>         <feFuncB type="linear" slope="0.46"></feFuncB>         <feFuncA type="linear" slope="0.56"></feFuncA>       </feComponentTransfer>       <feComponentTransfer>         <feFuncR type="linear" slope="1.47" intercept="-0.23" />         <feFuncG type="linear" slope="1.47" intercept="-0.23" />         <feFuncB type="linear" slope="1.47" intercept="-0.23" />       </feComponentTransfer>     </filter>     <rect width="100%" height="100%" filter="url(#noise-filter)"></rect>   </svg>',
+            STYLE_1,
+            "</head><body>",
+            '<div id="g"></div>',
+            '<svg id="n"><filter id="a"><feTurbulence type="fractalNoise" baseFrequency="1.34" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope=".46"/><feFuncG type="linear" slope=".46"/><feFuncB type="linear" slope=".46"/><feFuncA type="linear" slope=".56"/></feComponentTransfer><feComponentTransfer><feFuncR type="linear" slope="1.47" intercept="-.23"/><feFuncG type="linear" slope="1.47" intercept="-.23"/><feFuncB type="linear" slope="1.47" intercept="-.23"/></feComponentTransfer></filter><rect width="100%" height="100%" filter="url(#a)"/></svg>',
             _generateStats(properties),
             _generateHTMLFooter(properties),
             "</body></html>"
@@ -286,17 +307,23 @@ contract PositionRenderer {
 
     function _generateStat(
         string memory label,
-        string memory amount,
-        bool alignRight
+        string memory amount
     ) private pure returns (string memory) {
         return string.concat(
-            "<td",
-            alignRight ? ' style="text-align: right"' : "",
-            '><span class="label">',
+            '<td><span class="l">', label, "</span><br />", amount, "</td>"
+        );
+    }
+
+    function _generateTitle(
+        string memory label,
+        string memory amount
+    ) private pure returns (string memory) {
+        return string.concat(
+            '<td class="t" style="text-align: right">',
             label,
-            "</span><br />",
+            '<br /><span class="l">',
             amount,
-            "</td>"
+            "</span></td>"
         );
     }
 
@@ -306,7 +333,7 @@ contract PositionRenderer {
         returns (string memory)
     {
         return string.concat(
-            '<table class="stats">',
+            '<table class="s">',
             "<tr><td>",
             PRIMITIVE_LOGO,
             "</td>",
@@ -330,7 +357,7 @@ contract PositionRenderer {
         returns (string memory)
     {
         return string.concat(
-            _generateStat(
+            _generateTitle(
                 string.concat(
                     properties.pair.assetSymbol,
                     "-",
@@ -341,8 +368,7 @@ contract PositionRenderer {
                     : _calculateCountdown(
                         properties.config.creationTimestamp
                             + properties.config.durationSeconds
-                    ),
-                true
+                    )
             )
         );
     }
@@ -357,13 +383,12 @@ contract PositionRenderer {
                 "Spot Price",
                 string.concat(
                     abbreviateAmount(
-                        properties.pool.spotPriceWad,
+                        properties.pool.spotPriceWad / 10 ** 18,
                         properties.pair.quoteDecimals
                     ),
                     " ",
                     properties.pair.quoteSymbol
-                ),
-                false
+                )
             )
         );
     }
@@ -378,13 +403,12 @@ contract PositionRenderer {
                 "Strike Price",
                 string.concat(
                     abbreviateAmount(
-                        properties.config.strikePriceWad,
+                        properties.config.strikePriceWad / 10 ** 18,
                         properties.pair.quoteDecimals
                     ),
                     " ",
                     properties.pair.quoteSymbol
-                ),
-                false
+                )
             )
         );
     }
@@ -399,12 +423,12 @@ contract PositionRenderer {
                 "Asset Reserves",
                 string.concat(
                     abbreviateAmount(
-                        properties.pool.virtualX, properties.pair.assetDecimals
+                        properties.pool.virtualX / 10 ** 18,
+                        properties.pair.assetDecimals
                     ),
                     " ",
                     properties.pair.assetSymbol
-                ),
-                false
+                )
             )
         );
     }
@@ -419,12 +443,12 @@ contract PositionRenderer {
                 "Asset Reserves",
                 string.concat(
                     abbreviateAmount(
-                        properties.pool.virtualY, properties.pair.quoteDecimals
+                        properties.pool.virtualY / 10 ** 18,
+                        properties.pair.quoteDecimals
                     ),
                     " ",
                     properties.pair.quoteSymbol
-                ),
-                false
+                )
             )
         );
     }
@@ -443,12 +467,11 @@ contract PositionRenderer {
                 "Pool Valuation",
                 string.concat(
                     abbreviateAmount(
-                        poolValuation, properties.pair.quoteDecimals
+                        poolValuation / 10 ** 18, properties.pair.quoteDecimals
                     ),
                     " ",
                     properties.pair.quoteSymbol
-                ),
-                false
+                )
             )
         );
     }
@@ -463,8 +486,7 @@ contract PositionRenderer {
                 "Swap Fee",
                 string.concat(
                     abbreviateAmount(properties.pool.feeBasisPoints, 4), "  %"
-                ),
-                false
+                )
             )
         );
     }
@@ -483,7 +505,7 @@ contract PositionRenderer {
 
         return (
             string.concat(
-                '<div class="footer"><p>',
+                '<div class="f"><p>',
                 controlledLabel,
                 " and uses ",
                 properties.pool.hasDefaultStrategy
@@ -608,138 +630,15 @@ contract PositionRenderer {
         }
     }
 
-    function _generateColor(uint256 seed)
-        internal
-        pure
-        returns (string memory)
-    {
-        return string.concat(
-            "rgb(",
-            _generateNumber(seed, 255).toString(),
-            ",",
-            _generateNumber(seed + 1, 255).toString(),
-            ",",
-            _generateNumber(seed + 2, 255).toString(),
-            ")"
-        );
-    }
+    function toColor(bytes3 data) internal pure returns (string memory) {
+        bytes memory hexChars = "0123456789ABCDEF";
+        bytes memory result = new bytes(6);
 
-    function _generateNumber(
-        uint256 seed,
-        uint256 max
-    ) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(seed))) % max;
-    }
+        for (uint256 i = 0; i < 3; i++) {
+            result[i * 2] = hexChars[uint8(data[i] >> 4)];
+            result[i * 2 + 1] = hexChars[uint8(data[i] & 0x0F)];
+        }
 
-    /*
-    function _drawText(
-        uint256 x,
-        uint256 y,
-        string memory fill,
-        string memory fontSize,
-        string memory fontFamily,
-        string memory textAnchor,
-        string memory text
-    ) internal pure returns (string memory) {
-        return string.concat(
-            '<text x="',
-            x.toString(),
-            '" y="',
-            y.toString(),
-            '" fill="',
-            fill,
-            '" text-anchor="',
-            textAnchor,
-            '" font-size="',
-            fontSize,
-            '" font-family="',
-            fontFamily,
-            '">',
-            text,
-            "</text>"
-        );
+        return string(result);
     }
-
-    function _generateSVGNoise() internal pure returns (string memory) {
-        return
-        '<filter id="noise-filter"><feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope="0.28"/><feFuncG type="linear" slope="0.28"/><feFuncB type="linear" slope="0.28"/>       <feFuncA type="linear" slope="0.56"/>     </feComponentTransfer>     <feComponentTransfer>       <feFuncR type="linear" slope="1.47" intercept="-0.23"/>       <feFuncG type="linear" slope="1.47" intercept="-0.23"/>       <feFuncB type="linear" slope="1.47" intercept="-0.23"/>     </feComponentTransfer>   </filter>';
-    }
-
-    function _generateSVGGradient() internal pure returns (string memory) {
-        return string.concat(
-            '<defs><linearGradient id="MyGradient" gradientTransform="rotate(45)"><stop offset="0%" stop-color="',
-            "gold",
-            '" /><stop offset="100%" stop-color="',
-            "green",
-            '" /></linearGradient></defs>'
-        );
-    }
-
-    function _generateSVG(Properties memory properties)
-        private
-        view
-        returns (string memory)
-    {
-        return string.concat(
-            '<svg width="600" height="600" fill="none" xmlns="http://www.w3.org/2000/svg">',
-            _generateSVGNoise(),
-            _generateSVGGradient(),
-            '<rect fill="url(#MyGradient)" x="0" y="0" width="600" height="600" />'
-            '<rect width="100%" height="100%" filter="url(#noise-filter)"/>',
-            PRIMITIVE_LOGO,
-            _generateStats(properties),
-            _generateSVGFooter(properties),
-            "</svg>"
-        );
-    }
-
-    */
 }
-
-/*
-<svg width="600" height="600" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <filter id="noise-filter">
-    <feTurbulence type="fractalNoise" baseFrequency="1.3" numOctaves="4" stitchTiles="stitch"/>
-    <feColorMatrix type="saturate" values="0"/>
-    <feComponentTransfer>
-      <feFuncR type="linear" slope="0.28"/>
-      <feFuncG type="linear" slope="0.28"/>
-      <feFuncB type="linear" slope="0.28"/>
-      <feFuncA type="linear" slope="0.56"/>
-    </feComponentTransfer>
-    <feComponentTransfer>
-      <feFuncR type="linear" slope="1.47" intercept="-0.23"/>
-      <feFuncG type="linear" slope="1.47" intercept="-0.23"/>
-      <feFuncB type="linear" slope="1.47" intercept="-0.23"/>
-    </feComponentTransfer>
-  </filter>
-    <defs>
-    <linearGradient id="MyGradient" gradientTransform="rotate(45)">
-      <stop offset="0%" stop-color="green" />
-      <stop offset="100%" stop-color="gold" />
-    </linearGradient>
-  </defs>
-  <rect fill="url(#MyGradient)" x="0" y="0" width="600" height="600" />
-  <rect width="100%" height="100%" filter="url(#noise-filter)"/>
-
-  <path fill-rule="evenodd" clip-rule="evenodd" d="M339.976 134.664h41.048L256 340.586 130.976 134.664h41.047V98H64.143L256 414 447.857 98H339.976v36.664Zm-38.759 0V98h-90.436v36.664h90.436Z" fill="#fff" style="transform:scale(0.25)"/>
-
-   <text x="550" y="75" text-anchor="end" fill="#fff" font-size="3.25em" font-family="monospace">USDT - USDC</text>
-     <text x="550" y="100" text-anchor="end" fill="#ffffff80" font-size="1.75em" font-family="monospace">Expires in 66 days</text>
-
-  <text x="50" y="200" fill="#ffffff80" font-size="1.75em" font-family="monospace">Spot Price</text>
-  <text x="50" y="240" fill="#fff" font-size="2.5em" font-family="monospace">0.99 USDC</text>
-
-    <text x="325" y="200" fill="#ffffff80" font-size="1.75em" font-family="monospace">Strike Price</text>
-  <text x="325" y="240" fill="#fff" font-size="2.5em" font-family="monospace">1.00 USDC</text>
-
-    <text x="50" y="320" fill="#ffffff80" font-size="1.75em" font-family="monospace">Asset Reserve</text>
-  <text x="50" y="360" fill="#fff" font-size="2.5em" font-family="monospace">435,235 USDT</text>
-
-    <text x="325" y="320" fill="#ffffff80" font-size="1.75em" font-family="monospace">Quote Reserve</text>
-  <text x="325" y="360" fill="#fff" font-size="2.5em" font-family="monospace">452,673 USDC</text>
-
-      <text x="50" y="440" fill="#ffffff80" font-size="1.75em" font-family="monospace">Pool Valuation</text>
-  <text x="50" y="480" fill="#fff" font-size="2.5em" font-family="monospace">883,555.65 USDC</text>
-</svg>
-*/
