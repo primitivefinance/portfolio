@@ -476,7 +476,7 @@ contract PositionRenderer {
         )
             * AssemblyLib.scaleFromWadDown(
                 properties.pool.spotPriceWad, properties.pair.quoteDecimals
-            ) / 10 ** properties.pair.quoteDecimals
+            ) / 10 ** properties.pair.assetDecimals
             + AssemblyLib.scaleFromWadDown(
                 properties.pool.virtualY, properties.pair.quoteDecimals
             );
