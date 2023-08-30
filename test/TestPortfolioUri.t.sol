@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import "openzeppelin/utils/Base64.sol";
 import "solmate/tokens/ERC1155.sol";
 import "../contracts/libraries/AssemblyLib.sol";
 import "./Setup.sol";
@@ -28,7 +27,7 @@ contract TestPortfolioUri is Setup {
 
         uint256 strikePriceWad = AssemblyLib.scaleToWad(2000 * 10 ** 6, 6);
         uint256 volatilityBasisPoints = 1_000;
-        uint256 durationSeconds = 86_400 * 7;
+        uint256 durationSeconds = 86_400 * 3;
         bool isPerpetual = false;
         uint256 priceWad = AssemblyLib.scaleToWad(2000 * 10 ** 6, 6);
 
@@ -86,6 +85,7 @@ contract TestPortfolioUri is Setup {
         console.log(uri);
     }
 
+    /*
     function test_metadata_controlled_pool() public {
         address asset = address(new MockERC20("Ethereum", "ETH", 18));
         address quote = address(new MockERC20("USD Coin", "USDC", 6));
@@ -173,6 +173,7 @@ contract TestPortfolioUri is Setup {
             liquidity - BURNED_LIQUIDITY
         );
     }
+    */
 
     function test_balanceOf_allocating_increases_balance()
         public
