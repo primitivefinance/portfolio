@@ -6,13 +6,14 @@ import "solmate/tokens/ERC20.sol";
 import "solmate/utils/SafeCastLib.sol";
 
 import "./libraries/StringsLib.sol";
+import "./libraries/AssemblyLib.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IStrategy.sol";
 import "./strategies/NormalStrategy.sol";
 
 /// @dev Contract to render a position.
 contract PositionRenderer {
-    using Strings for *;
+    using StringsLib for *;
     using SafeCastLib for *;
 
     struct Pair {
@@ -217,13 +218,13 @@ contract PositionRenderer {
     {
         return string.concat(
             '"asset_reserves":"',
-            (properties.pool.virtualX / 1).toString(),
+            (properties.pool.virtualX).toString(),
             '",',
             '"quote_reserves":"',
-            (properties.pool.virtualY / 1).toString(),
+            (properties.pool.virtualY).toString(),
             '",',
             '"spot_price_wad":"',
-            (properties.pool.spotPriceWad / 10 ** 18).toString(),
+            (properties.pool.spotPriceWad).toString(),
             '",',
             '"fee_basis_points":"',
             properties.pool.feeBasisPoints.toString(),
@@ -232,10 +233,10 @@ contract PositionRenderer {
             properties.pool.priorityFeeBasisPoints.toString(),
             '",',
             '"controller":"',
-            Strings.toHexString(properties.pool.controller),
+            StringsLib.toHexString(properties.pool.controller),
             '",',
             '"strategy":"',
-            Strings.toHexString(properties.pool.strategy),
+            StringsLib.toHexString(properties.pool.strategy),
             '"'
         );
     }
@@ -247,7 +248,7 @@ contract PositionRenderer {
     {
         return string.concat(
             '"strike_price_wad":"',
-            (properties.config.strikePriceWad / 10 ** 18).toString(),
+            (properties.config.strikePriceWad).toString(),
             '",',
             '"volatility_basis_points":"',
             properties.config.volatilityBasisPoints.toString(),
@@ -268,12 +269,12 @@ contract PositionRenderer {
         view
         returns (string memory)
     {
-        string memory color0 = Strings.toHexColor(
+        string memory color0 = StringsLib.toHexColor(
             bytes3(
                 keccak256(abi.encode((properties.pool.poolId >> 232) << 232))
             )
         );
-        string memory color1 = Strings.toHexColor(
+        string memory color1 = StringsLib.toHexColor(
             bytes3(keccak256(abi.encode(properties.pool.poolId << 232)))
         );
 
@@ -365,10 +366,10 @@ contract PositionRenderer {
                 ),
                 properties.config.isPerpetual
                     ? "Perpetual pool"
-                    : _calculateCountdown(
+                    : (
                         properties.config.creationTimestamp
                             + properties.config.durationSeconds
-                    )
+                    ).toCountdown()
             )
         );
     }
@@ -382,8 +383,11 @@ contract PositionRenderer {
             _generateStat(
                 "Spot Price",
                 string.concat(
-                    abbreviateAmount(
-                        properties.pool.spotPriceWad / 10 ** 18,
+                    StringsLib.toFormatAmount(
+                        AssemblyLib.scaleFromWadDown(
+                            properties.pool.spotPriceWad,
+                            properties.pair.quoteDecimals
+                        ),
                         properties.pair.quoteDecimals
                     ),
                     " ",
@@ -402,8 +406,11 @@ contract PositionRenderer {
             _generateStat(
                 "Strike Price",
                 string.concat(
-                    abbreviateAmount(
-                        properties.config.strikePriceWad / 10 ** 18,
+                    StringsLib.toFormatAmount(
+                        AssemblyLib.scaleFromWadDown(
+                            properties.config.strikePriceWad,
+                            properties.pair.quoteDecimals
+                        ),
                         properties.pair.quoteDecimals
                     ),
                     " ",
@@ -422,8 +429,11 @@ contract PositionRenderer {
             _generateStat(
                 "Asset Reserves",
                 string.concat(
-                    abbreviateAmount(
-                        properties.pool.virtualX / 10 ** 18,
+                    StringsLib.toFormatAmount(
+                        AssemblyLib.scaleFromWadDown(
+                            properties.pool.virtualX,
+                            properties.pair.assetDecimals
+                        ),
                         properties.pair.assetDecimals
                     ),
                     " ",
@@ -442,8 +452,11 @@ contract PositionRenderer {
             _generateStat(
                 "Asset Reserves",
                 string.concat(
-                    abbreviateAmount(
-                        properties.pool.virtualY / 10 ** 18,
+                    StringsLib.toFormatAmount(
+                        AssemblyLib.scaleFromWadDown(
+                            properties.pool.virtualY,
+                            properties.pair.quoteDecimals
+                        ),
                         properties.pair.quoteDecimals
                     ),
                     " ",
@@ -458,16 +471,22 @@ contract PositionRenderer {
         pure
         returns (string memory)
     {
-        uint256 poolValuation = (
-            properties.pool.virtualX * properties.pool.spotPriceWad
-        ) / properties.pair.quoteDecimals + properties.pool.virtualY;
+        uint256 poolValuation = AssemblyLib.scaleFromWadDown(
+            properties.pool.virtualX, properties.pair.assetDecimals
+        )
+            * AssemblyLib.scaleFromWadDown(
+                properties.pool.spotPriceWad, properties.pair.quoteDecimals
+            ) / 10 ** properties.pair.quoteDecimals
+            + AssemblyLib.scaleFromWadDown(
+                properties.pool.virtualY, properties.pair.quoteDecimals
+            );
 
         return string.concat(
             _generateStat(
                 "Pool Valuation",
                 string.concat(
-                    abbreviateAmount(
-                        poolValuation / 10 ** 18, properties.pair.quoteDecimals
+                    StringsLib.toFormatAmount(
+                        poolValuation, properties.pair.quoteDecimals
                     ),
                     " ",
                     properties.pair.quoteSymbol
@@ -483,10 +502,7 @@ contract PositionRenderer {
     {
         return string.concat(
             _generateStat(
-                "Swap Fee",
-                string.concat(
-                    abbreviateAmount(properties.pool.feeBasisPoints, 4), "  %"
-                )
+                "Swap Fee", properties.pool.feeBasisPoints.toStringPercent()
             )
         );
     }
@@ -514,131 +530,5 @@ contract PositionRenderer {
                 "</p></div>"
             )
         );
-    }
-
-    function _calculateCountdown(uint256 deadline)
-        internal
-        view
-        returns (string memory)
-    {
-        uint256 timeLeft = deadline - block.timestamp;
-        uint256 daysLeft = timeLeft / 86400;
-        uint256 hoursLeft = (timeLeft % 86400) / 3600;
-        uint256 minutesLeft = (timeLeft % 3600) / 60;
-        uint256 secondsLeft = timeLeft % 60;
-
-        // TODO: Fix the plurals
-        if (daysLeft >= 1) {
-            return (string.concat("Expires in ", daysLeft.toString(), " days"));
-        }
-
-        if (hoursLeft >= 1) {
-            return
-                (string.concat("Expires in ", hoursLeft.toString(), " hours"));
-        }
-
-        if (minutesLeft >= 1) {
-            return (
-                string.concat("Expires in ", minutesLeft.toString(), " minutes")
-            );
-        }
-
-        return
-            (string.concat("Expires in ", secondsLeft.toString(), " seconds"));
-    }
-
-    /// @dev Escape character for "≥".
-    string internal constant SIGN_GE = "&#8805;";
-
-    /// @dev Escape character for ">".
-    string internal constant SIGN_GT = "&gt;";
-
-    /// @dev Escape character for "<".
-    string internal constant SIGN_LT = "&lt;";
-
-    /// @notice Creates an abbreviated representation of the provided amount, rounded down and prefixed with ">= ".
-    /// @dev The abbreviation uses these suffixes:
-    /// - "K" for thousands
-    /// - "M" for millions
-    /// - "B" for billions
-    /// - "T" for trillions
-    /// For example, if the input is 1,234,567, the output is ">= 1.23M".
-    /// @param amount The amount to abbreviate, denoted in units of `decimals`.
-    /// @param decimals The number of decimals to assume when abbreviating the amount.
-    /// @return abbreviation The abbreviated representation of the provided amount, as a string.
-    function abbreviateAmount(
-        uint256 amount,
-        uint256 decimals
-    ) internal pure returns (string memory) {
-        if (amount == 0) {
-            return "0";
-        }
-
-        uint256 truncatedAmount;
-        unchecked {
-            truncatedAmount = decimals == 0 ? amount : amount / 10 ** decimals;
-        }
-
-        // Return dummy values when the truncated amount is either very small or very big.
-        if (truncatedAmount < 1) {
-            return string.concat(SIGN_LT, " 1");
-        } else if (truncatedAmount >= 1e15) {
-            return string.concat(SIGN_GT, " 999.99T");
-        }
-
-        string[5] memory suffixes = ["", "K", "M", "B", "T"];
-        uint256 fractionalAmount;
-        uint256 suffixIndex = 0;
-
-        // Truncate repeatedly until the amount is less than 1000.
-        unchecked {
-            while (truncatedAmount >= 1000) {
-                fractionalAmount = (truncatedAmount / 10) % 100; // keep the first two digits after the decimal point
-                truncatedAmount /= 1000;
-                suffixIndex += 1;
-            }
-        }
-
-        // Concatenate the calculated parts to form the final string.
-        string memory prefix = string.concat(SIGN_GE, " ");
-        string memory wholePart = truncatedAmount.toString();
-        string memory fractionalPart =
-            stringifyFractionalAmount(fractionalAmount);
-        return string.concat(
-            prefix, wholePart, fractionalPart, suffixes[suffixIndex]
-        );
-    }
-
-    /// @notice Converts the provided fractional amount to a string prefixed by a dot.
-    /// @param fractionalAmount A numerical value with 2 implied decimals.
-    function stringifyFractionalAmount(uint256 fractionalAmount)
-        internal
-        pure
-        returns (string memory)
-    {
-        // Return the empty string if the fractional amount is zero.
-        if (fractionalAmount == 0) {
-            return "";
-        }
-        // Add a leading zero if the fractional part is less than 10, e.g. for "1", this function returns ".01%".
-        else if (fractionalAmount < 10) {
-            return string.concat(".0", fractionalAmount.toString());
-        }
-        // Otherwise, stringify the fractional amount simply.
-        else {
-            return string.concat(".", fractionalAmount.toString());
-        }
-    }
-
-    function toColor(bytes3 data) internal pure returns (string memory) {
-        bytes memory hexChars = "0123456789ABCDEF";
-        bytes memory result = new bytes(6);
-
-        for (uint256 i = 0; i < 3; i++) {
-            result[i * 2] = hexChars[uint8(data[i] >> 4)];
-            result[i * 2 + 1] = hexChars[uint8(data[i] & 0x0F)];
-        }
-
-        return string(result);
     }
 }
