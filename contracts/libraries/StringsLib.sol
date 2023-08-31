@@ -7,6 +7,9 @@ import { Math } from "openzeppelin/utils/math/Math.sol";
 /**
  * @dev Modified version of:
  * OpenZeppelin Contracts (last updated v4.9.0) (utils/Strings.sol)
+ *
+ * Some of these functions are not really optimized, but since they are not
+ * supposed to be used onchain it doesn't really matter.
  */
 library StringsLib {
     bytes16 private constant _SYMBOLS = "0123456789abcdef";
@@ -88,44 +91,6 @@ library StringsLib {
         }
 
         return string.concat("#", string(result));
-    }
-
-    function toStringPercent(uint256 value)
-        internal
-        pure
-        returns (string memory)
-    {
-        uint256 integer = value / 100;
-        uint256 decimal = value % 100;
-        return string.concat(toString(integer), ".", toString(decimal), "%");
-    }
-
-    function toFormatAmount(
-        uint256 value,
-        uint256 decimals
-    ) internal pure returns (string memory) {
-        uint256 integer = value / (10 ** decimals);
-        uint256 decimal = value % (10 ** decimals);
-
-        if (decimal == 0) {
-            return toString(integer);
-        }
-
-        return string.concat(
-            toString(integer), ".", toString(removeTrailingZeroes(decimal))
-        );
-    }
-
-    function removeTrailingZeroes(uint256 value)
-        internal
-        pure
-        returns (uint256)
-    {
-        uint256 result = value;
-        while (result % 10 == 0) {
-            result /= 10;
-        }
-        return result;
     }
 
     function toCountdown(uint256 deadline)
