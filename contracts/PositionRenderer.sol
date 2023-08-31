@@ -308,10 +308,35 @@ contract PositionRenderer {
 
     function _generateStat(
         string memory label,
-        string memory amount
+        uint256 amount,
+        uint8 decimals,
+        string memory symbol
     ) private pure returns (string memory) {
         return string.concat(
-            '<td><span class="l">', label, "</span><br />", amount, "</td>"
+            '<td><span class="l">',
+            label,
+            "</span><br />",
+            "<script>document.write(new Intl.NumberFormat().format(",
+            amount.toString(),
+            "n / (10n ** ",
+            decimals.toString(),
+            "n)))</script> ",
+            symbol,
+            "</td>"
+        );
+    }
+
+    function _generatePercentStat(
+        string memory label,
+        uint256 amount
+    ) private pure returns (string memory) {
+        return string.concat(
+            '<td><span class="l">',
+            label,
+            "</span><br />",
+            "<script>document.write(new Intl.NumberFormat().format(",
+            amount.toString(),
+            " / 10000))</script> %</td>"
         );
     }
 
@@ -382,17 +407,11 @@ contract PositionRenderer {
         return string.concat(
             _generateStat(
                 "Spot Price",
-                string.concat(
-                    StringsLib.toFormatAmount(
-                        AssemblyLib.scaleFromWadDown(
-                            properties.pool.spotPriceWad,
-                            properties.pair.quoteDecimals
-                        ),
-                        properties.pair.quoteDecimals
-                    ),
-                    " ",
-                    properties.pair.quoteSymbol
-                )
+                AssemblyLib.scaleFromWadDown(
+                    properties.pool.spotPriceWad, properties.pair.quoteDecimals
+                ),
+                properties.pair.quoteDecimals,
+                properties.pair.quoteSymbol
             )
         );
     }
@@ -405,17 +424,12 @@ contract PositionRenderer {
         return string.concat(
             _generateStat(
                 "Strike Price",
-                string.concat(
-                    StringsLib.toFormatAmount(
-                        AssemblyLib.scaleFromWadDown(
-                            properties.config.strikePriceWad,
-                            properties.pair.quoteDecimals
-                        ),
-                        properties.pair.quoteDecimals
-                    ),
-                    " ",
-                    properties.pair.quoteSymbol
-                )
+                AssemblyLib.scaleFromWadDown(
+                    properties.config.strikePriceWad,
+                    properties.pair.quoteDecimals
+                ),
+                properties.pair.quoteDecimals,
+                properties.pair.quoteSymbol
             )
         );
     }
@@ -428,17 +442,11 @@ contract PositionRenderer {
         return string.concat(
             _generateStat(
                 "Asset Reserves",
-                string.concat(
-                    StringsLib.toFormatAmount(
-                        AssemblyLib.scaleFromWadDown(
-                            properties.pool.virtualX,
-                            properties.pair.assetDecimals
-                        ),
-                        properties.pair.assetDecimals
-                    ),
-                    " ",
-                    properties.pair.assetSymbol
-                )
+                AssemblyLib.scaleFromWadDown(
+                    properties.pool.virtualX, properties.pair.assetDecimals
+                ),
+                properties.pair.assetDecimals,
+                properties.pair.assetSymbol
             )
         );
     }
@@ -451,17 +459,11 @@ contract PositionRenderer {
         return string.concat(
             _generateStat(
                 "Asset Reserves",
-                string.concat(
-                    StringsLib.toFormatAmount(
-                        AssemblyLib.scaleFromWadDown(
-                            properties.pool.virtualY,
-                            properties.pair.quoteDecimals
-                        ),
-                        properties.pair.quoteDecimals
-                    ),
-                    " ",
-                    properties.pair.quoteSymbol
-                )
+                AssemblyLib.scaleFromWadDown(
+                    properties.pool.virtualY, properties.pair.quoteDecimals
+                ),
+                properties.pair.quoteDecimals,
+                properties.pair.quoteSymbol
             )
         );
     }
@@ -484,13 +486,9 @@ contract PositionRenderer {
         return string.concat(
             _generateStat(
                 "Pool Valuation",
-                string.concat(
-                    StringsLib.toFormatAmount(
-                        poolValuation, properties.pair.quoteDecimals
-                    ),
-                    " ",
-                    properties.pair.quoteSymbol
-                )
+                poolValuation,
+                properties.pair.quoteDecimals,
+                properties.pair.quoteSymbol
             )
         );
     }
@@ -501,9 +499,7 @@ contract PositionRenderer {
         returns (string memory)
     {
         return string.concat(
-            _generateStat(
-                "Swap Fee", properties.pool.feeBasisPoints.toStringPercent()
-            )
+            _generatePercentStat("Swap Fee", properties.pool.feeBasisPoints)
         );
     }
 
