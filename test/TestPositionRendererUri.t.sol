@@ -24,7 +24,11 @@ contract TestPositionRendererUri is Setup {
         public
         returns (uint64 poolId)
     {
-        uint24 pairId = subject().createPair(ctx.asset, ctx.quote);
+        uint24 pairId = subject().getPairId(ctx.asset, ctx.quote);
+
+        if (pairId == 0) {
+            pairId = subject().createPair(ctx.asset, ctx.quote);
+        }
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         INormalStrategy(subject().DEFAULT_STRATEGY()).getStrategyData(
