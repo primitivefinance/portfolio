@@ -71,8 +71,8 @@ contract PositionRenderer {
                     abi.encodePacked(
                         '{"name":"',
                         _generateName(properties),
-                        '","animation_url":"',
-                        _generateHTML(properties),
+                        '","animation_url":"data:text/html;base64,',
+                        Base64.encode(bytes(_generateHTML(properties))),
                         '","license":"MIT","creator":"primitive.eth",',
                         '"description":"This NFT represents a liquidity position in a Portfolio pool. The owner of this NFT can modify or redeem this position.\\n\\n',
                         unicode"⚠️ WARNING: Transferring this NFT makes the new recipient the owner of the position.",
@@ -285,7 +285,7 @@ contract PositionRenderer {
             " Portfolio LP"
         );
 
-        string memory data = string.concat(
+        return string.concat(
             '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>',
             title,
             "</title>",
@@ -301,9 +301,6 @@ contract PositionRenderer {
             _generateHTMLFooter(properties),
             "</body></html>"
         );
-
-        return
-            string.concat("data:text/html;base64,", Base64.encode(bytes(data)));
     }
 
     function _generateStat(
