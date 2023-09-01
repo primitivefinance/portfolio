@@ -5,7 +5,7 @@ import "forge-std/Script.sol";
 import "solmate/tokens/WETH.sol";
 import "nugu/NuguFactory.sol";
 
-import "../contracts/test/SimpleRegistry.sol";
+import "../contracts/PortfolioRegistry.sol";
 import "../contracts/Portfolio.sol";
 import "../contracts/PositionRenderer.sol";
 
@@ -42,7 +42,14 @@ contract Deploy is Script {
     function run() external {
         bytes memory registryDeployData = abi.encodeCall(
             NuguFactory.deploy,
-            (REGISTRY_SALT, type(SimpleRegistry).creationCode, 0)
+            (
+                REGISTRY_SALT,
+                abi.encodePacked(
+                    type(PortfolioRegistry).creationCode,
+                    abi.encode(SAFE_ADDRESS)
+                    ),
+                0
+            )
         );
 
         bytes memory positionRendererDeployData = abi.encodeCall(
