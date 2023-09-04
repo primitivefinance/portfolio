@@ -3,18 +3,26 @@ pragma solidity ^0.8.4;
 
 import "openzeppelin/utils/Base64.sol";
 import "solmate/tokens/ERC20.sol";
-import "solmate/utils/SafeCastLib.sol";
 
 import "./libraries/StringsLib.sol";
 import "./libraries/AssemblyLib.sol";
 import "./interfaces/IPortfolio.sol";
-import "./interfaces/IStrategy.sol";
 import "./strategies/NormalStrategy.sol";
 
-/// @dev Contract to render a position.
+/**
+ * @title
+ * PositionRenderer
+ *
+ * @author
+ * Primitive™
+ *
+ * @dev
+ * Prepares the metadata and generates the visual representation of the
+ * liquidity pool tokens.
+ * This contract is not meant to be called directly.
+ */
 contract PositionRenderer {
     using StringsLib for *;
-    using SafeCastLib for *;
 
     struct Pair {
         address asset;
@@ -61,6 +69,12 @@ contract PositionRenderer {
     string private constant STYLE_1 =
         ");animation:r 10s linear infinite;background-size:200% 200%;will-change:background-position;width:100vw;height:100vh;position:absolute;top:0;left:0;z-index:-2}#n{height:100vh;width:100vw;position:absolute;top:0;right:0;z-index:-1}@keyframes r{0%,100%{background-position:left top}50%{background-position:right bottom}}#t{font-size:6vh}.s{border-spacing:0 1rem}.s td{font-size:5vh}#i{height:15vh}.l{font-size:3.25vh;opacity:.5}.f{background-color:#00000020;padding:1rem;border-radius:8px}.f p{font-size:3vh;margin:0}</style>";
 
+    /**
+     * @dev Returns the metadata of the required liquidity pool token, following
+     * the ERC-1155 standard.
+     * @param id Id of the required pool.
+     * @return Minified Base64-encoded JSON containing the metadata.
+     */
     function uri(uint256 id) external view returns (string memory) {
         Properties memory properties = _getProperties(id);
 
@@ -90,6 +104,10 @@ contract PositionRenderer {
         );
     }
 
+    /**
+     * @dev Returns the data associated with the asset / quote pair.
+     * @param id Id of the required pool.
+     */
     function _getPair(uint256 id) internal view returns (Pair memory) {
         (
             address tokenAsset,
@@ -110,6 +128,10 @@ contract PositionRenderer {
         });
     }
 
+    /**
+     * @dev Returns the data associated with the current pool.
+     * @param id Id of the required pool.
+     */
     function _getPool(uint256 id) internal view returns (Pool memory) {
         (
             uint128 virtualX,
@@ -138,6 +160,10 @@ contract PositionRenderer {
         });
     }
 
+    /**
+     * @dev Returns the data associated with the current pool config.
+     * @param id Id of the required pool.
+     */
     function _getConfig(
         uint256 id,
         address strategy
@@ -159,6 +185,11 @@ contract PositionRenderer {
         });
     }
 
+    /**
+     * @dev Returns all data associated with the current pool packed within a
+     * struct.
+     * @param id Id of the required pool.
+     */
     function _getProperties(uint256 id)
         private
         view
@@ -171,6 +202,9 @@ contract PositionRenderer {
         return Properties({ pair: pair, pool: pool, config: config });
     }
 
+    /**
+     * @dev Generates the name of the NFT.
+     */
     function _generateName(Properties memory properties)
         private
         pure
@@ -184,6 +218,9 @@ contract PositionRenderer {
         );
     }
 
+    /**
+     * @dev Outputs all the data associated with the current pair in JSON format.
+     */
     function _generatePair(Properties memory properties)
         private
         pure
@@ -211,6 +248,9 @@ contract PositionRenderer {
         );
     }
 
+    /**
+     * @dev Outputs all the data associated with the current pool in JSON format.
+     */
     function _generatePool(Properties memory properties)
         private
         pure
@@ -241,6 +281,10 @@ contract PositionRenderer {
         );
     }
 
+    /**
+     * @dev Outputs all the data associated with the current pool config in JSON
+     * format.
+     */
     function _generateConfig(Properties memory properties)
         private
         pure
@@ -264,6 +308,9 @@ contract PositionRenderer {
         );
     }
 
+    /**
+     * @dev Generates the visual representation of the NFT in HTML.
+     */
     function _generateHTML(Properties memory properties)
         private
         view
@@ -298,11 +345,18 @@ contract PositionRenderer {
             '<div id="g"></div>',
             '<svg id="n"><filter id="a"><feTurbulence type="fractalNoise" baseFrequency="1.34" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/><feComponentTransfer><feFuncR type="linear" slope=".46"/><feFuncG type="linear" slope=".46"/><feFuncB type="linear" slope=".46"/><feFuncA type="linear" slope=".56"/></feComponentTransfer><feComponentTransfer><feFuncR type="linear" slope="1.47" intercept="-.23"/><feFuncG type="linear" slope="1.47" intercept="-.23"/><feFuncB type="linear" slope="1.47" intercept="-.23"/></feComponentTransfer></filter><rect width="100%" height="100%" filter="url(#a)"/></svg>',
             _generateStats(properties),
-            _generateHTMLFooter(properties),
+            _generateFooter(properties),
             "</body></html>"
         );
     }
 
+    /**
+     * @dev Generates a <td> element representing a stat.
+     * @param label Name of the stat.
+     * @param amount Full amount (including the decimals).
+     * @param decimals Decimals of the token.
+     * @param symbol Ticker of the token.
+     */
     function _generateStat(
         string memory label,
         uint256 amount,
@@ -323,6 +377,11 @@ contract PositionRenderer {
         );
     }
 
+    /**
+     * @dev Generates a <td> element representing a percentage stat.
+     * @param label Name of the stat.
+     * @param amount Full amount (using a 10,000 base).
+     */
     function _generatePercentStat(
         string memory label,
         uint256 amount
@@ -337,19 +396,33 @@ contract PositionRenderer {
         );
     }
 
-    function _generateTitle(
-        string memory label,
-        string memory amount
-    ) private pure returns (string memory) {
+    /**
+     * @dev Generates a <td> element containing the title.
+     */
+    function _generateTitle(Properties memory properties)
+        private
+        view
+        returns (string memory)
+    {
         return string.concat(
             '<td class="t" style="text-align: right">',
-            label,
+            string.concat(
+                properties.pair.assetSymbol, "-", properties.pair.quoteSymbol
+            ),
             '<br /><span class="l">',
-            amount,
+            properties.config.isPerpetual
+                ? "Perpetual pool"
+                : (
+                    properties.config.creationTimestamp
+                        + properties.config.durationSeconds
+                ).toCountdown(),
             "</span></td>"
         );
     }
 
+    /**
+     * @dev Generates the stats <table> element.
+     */
     function _generateStats(Properties memory properties)
         private
         view
@@ -360,43 +433,24 @@ contract PositionRenderer {
             "<tr><td>",
             PRIMITIVE_LOGO,
             "</td>",
-            _generateHTMLTitle(properties),
+            _generateTitle(properties),
             "</tr><tr></tr><tr>",
-            _generateHTMLSpotPrice(properties),
-            _generateHTMLStrikePrice(properties),
+            _generateSpotPrice(properties),
+            _generateStrikePrice(properties),
             "</tr><tr>",
-            _generateHTMLAssetReserves(properties),
-            _generateHTMLQuoteReserves(properties),
+            _generateAssetReserves(properties),
+            _generateQuoteReserves(properties),
             "</tr><tr>",
-            _generateHTMLPoolValuation(properties),
-            _generateHTMLSwapFee(properties),
+            _generatePoolValuation(properties),
+            _generateSwapFee(properties),
             "</tr></table>"
         );
     }
 
-    function _generateHTMLTitle(Properties memory properties)
-        internal
-        view
-        returns (string memory)
-    {
-        return string.concat(
-            _generateTitle(
-                string.concat(
-                    properties.pair.assetSymbol,
-                    "-",
-                    properties.pair.quoteSymbol
-                ),
-                properties.config.isPerpetual
-                    ? "Perpetual pool"
-                    : (
-                        properties.config.creationTimestamp
-                            + properties.config.durationSeconds
-                    ).toCountdown()
-            )
-        );
-    }
-
-    function _generateHTMLSpotPrice(Properties memory properties)
+    /**
+     * @dev Generates the spot price <td> element.
+     */
+    function _generateSpotPrice(Properties memory properties)
         internal
         pure
         returns (string memory)
@@ -413,7 +467,10 @@ contract PositionRenderer {
         );
     }
 
-    function _generateHTMLStrikePrice(Properties memory properties)
+    /**
+     * @dev Generates the strike price <td> element.
+     */
+    function _generateStrikePrice(Properties memory properties)
         internal
         pure
         returns (string memory)
@@ -431,7 +488,10 @@ contract PositionRenderer {
         );
     }
 
-    function _generateHTMLAssetReserves(Properties memory properties)
+    /**
+     * @dev Calculates the asset reserves and generates the <td> element.
+     */
+    function _generateAssetReserves(Properties memory properties)
         internal
         pure
         returns (string memory)
@@ -448,7 +508,10 @@ contract PositionRenderer {
         );
     }
 
-    function _generateHTMLQuoteReserves(Properties memory properties)
+    /**
+     * @dev Calculates the quote reserves and generates the <td> element.
+     */
+    function _generateQuoteReserves(Properties memory properties)
         internal
         pure
         returns (string memory)
@@ -465,7 +528,10 @@ contract PositionRenderer {
         );
     }
 
-    function _generateHTMLPoolValuation(Properties memory properties)
+    /**
+     * @dev Calculates the pool valuation and generates the <td> element.
+     */
+    function _generatePoolValuation(Properties memory properties)
         internal
         pure
         returns (string memory)
@@ -490,7 +556,10 @@ contract PositionRenderer {
         );
     }
 
-    function _generateHTMLSwapFee(Properties memory properties)
+    /**
+     * @dev Generates the swap fee <td> element.
+     */
+    function _generateSwapFee(Properties memory properties)
         internal
         pure
         returns (string memory)
@@ -500,7 +569,10 @@ contract PositionRenderer {
         );
     }
 
-    function _generateHTMLFooter(Properties memory properties)
+    /**
+     * @dev Generates the footer <div> element.
+     */
+    function _generateFooter(Properties memory properties)
         internal
         pure
         returns (string memory)
