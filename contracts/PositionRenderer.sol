@@ -6,6 +6,7 @@ import "solmate/tokens/ERC20.sol";
 
 import "./libraries/StringsLib.sol";
 import "./libraries/AssemblyLib.sol";
+import { PoolIdLib } from "./libraries/PoolLib.sol";
 import "./interfaces/IPortfolio.sol";
 import "./strategies/NormalStrategy.sol";
 
@@ -106,7 +107,7 @@ contract PositionRenderer {
 
     /**
      * @dev Returns the data associated with the asset / quote pair.
-     * @param id Id of the required pool.
+     * @param id Id of the pair associated with the required pool.
      */
     function _getPair(uint256 id) internal view returns (Pair memory) {
         (
@@ -114,7 +115,9 @@ contract PositionRenderer {
             uint8 decimalsAsset,
             address tokenQuote,
             uint8 decimalsQuote
-        ) = IPortfolio(msg.sender).pairs(uint24(id));
+        ) = IPortfolio(msg.sender).pairs(
+            uint24(PoolIdLib.pairId(PoolId.wrap(uint64(id))))
+        );
 
         return Pair({
             asset: tokenAsset,
@@ -318,11 +321,17 @@ contract PositionRenderer {
     {
         string memory color0 = StringsLib.toHexColor(
             bytes3(
-                keccak256(abi.encode((properties.pool.poolId >> 232) << 232))
+                keccak256(
+                    abi.encode(properties.pool.poolId, properties.pair.asset)
+                )
             )
         );
         string memory color1 = StringsLib.toHexColor(
-            bytes3(keccak256(abi.encode(properties.pool.poolId << 232)))
+            bytes3(
+                keccak256(
+                    abi.encode(properties.pool.poolId, properties.pair.quote)
+                )
+            )
         );
 
         string memory title = string.concat(
