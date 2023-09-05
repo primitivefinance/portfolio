@@ -62,6 +62,10 @@ error NormalStrategyLib_InvalidDuration();
 error NormalStrategyLib_InvalidStrategyArgs();
 error NormalStrategyLib_InvalidStrikePrice();
 error NormalStrategyLib_InvalidVolatility();
+error NormalStrategyLib_UpperReserveYBoundNotReached();
+error NormalStrategyLib_LowerReserveYBoundNotReached();
+error NormalStrategyLib_UpperReserveXBoundNotReached();
+error NormalStrategyLib_LowerReserveXBoundNotReached();
 
 /**
  * @notice
@@ -164,12 +168,12 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
  * As x approaches its lower bound of 0, Φ⁻¹(1-x) approaches +∞.
  *
  * Theoretically, if both x and y are at opposite bounds, they cancel eachother out.
- * Pragmatically, it's a lot messier because infinity does not exist.
+ * Pragmatically, it's complicated because infinity does not exist.
  *
  * To handle this special property, the x and y reserves are checked for exceeding their bounds.
  * If they do exceed a bound, they are overwritten to be at the bound minus 1.
- * This prevents reverts that would happen if inputting values outside the theoretically and
- * practial domain of the `Gaussian.ppf` function, i.e. inputs of 0 or 1.
+ * This prevents reverts that would happen if inputting values outside the theoretical
+ * domain of the `Gaussian.ppf` function, i.e. inputs of 0 or 1E18.
  *
  * By setting either or both the x and y to their bounds minus 1, each term will
  * return the `ppf`'s effective minimum and maximum output.
@@ -180,53 +184,16 @@ function computeStdDevSqrtTau(NormalCurve memory self) pure returns (uint256) {
  * It's likely that the x and y reserves will reach opposite bounds,
  * in which case the invariant terms completely cancel out, returning `k = σ√τ`.
  *
- * In the case only one bound is reached, the invariant term for the bound will
- * be either the min or max output of the ppf. This will require the other term
- * to be very close to the min or max output of the ppf in order to cancel out.
+ * In the case only one bound is reached, the other reserve must be at the opposite bound or else the transaction will revert
+ * with the "ReserveX/YMustBeAtBounds" error.
  *
- * note Assumes maximum values are from valid pools created via this strategy in Portfolio.
- *
- * ## Example
- * The maximum value of σ√τ, where σ_max = 25_000 and τ_max = 94670859, is 4330127017500000000 [4.33e18].
- * The minimum value of σ√τ is 0.
- *
- * If all y tokens are removed, Φ⁻¹(0/K) -> Φ⁻¹(1e-18) = `invariantTermY` = -8710427241990476442.
- * For the swap to pass, the invariant needs to grow by at least 1.
- * Assuming we started at k = 0, we need to find the `invariantTermX` that solves this:
- *      -> 1 = -8710427241990476442 - invariantTermX + σ√τ.
- * We need the σ√τ term to help us, so we can set it to its maximum value. Now we have:
- *      -> 1 = -8710427241990476442 - invariantTermX + 4330127017500000000.
- *      -> invariantTermX <= -8710427241990476442 + 4330127017500000000 - 1.
- *      -> invariantTermX <= -4380300224490476443 [~-4.38e18].
- *      -> Φ⁻¹(1-x) <= -4.380300224490476443. (not in wad anymore...)
- *      -> 1 - x <= Φ(-4.380300224490476443).
- *      -> x >= 1 - Φ(-4.380300224490476443).
- *      -> x >= ~0.999999218479338350565045237958.
- * In conclusion, to take all y reserves, the x reserves must be __very close__ to its upper bound.
- *
- *
- * If all x tokens are removed, `invariantTermX` = 8710427241990476442.
- * For the swap to pass, the invariant needs to grow by at least 1.
- *     -> 1 = invariantTermY - 8710427241990476442 + σ√τ.
- * We can use the σ√τ to help us, so we can set it to its maximum value. Now we have:
- *    -> 1 = invariantTermY - 8710427241990476442 + 4330127017500000000.
- *    -> invariantTermY >= 8710427241990476442 - 4330127017500000000 + 1.
- *    -> invariantTermY >= 4380300224490476443 [~4.38e18].
- *    -> Φ⁻¹(y/K) >= 4.380300224490476443. (not in wad anymore...)
- *    -> y/K >= Φ(4.380300224490476443).
- *    -> y >= KΦ(4.380300224490476443).
- *    -> y >= K * ~0.999994074204725119575460221025.
- * However, since the `invariantTermX` will be subtracted from `invariantTermY` first, it will
- * revert the transaction with an arithemtic underflow unless the `invariantTermX` is equal
- * to it's maximum value of 8710427241990476442, which is when the y reserves are at their
- * upper bound of y = k.
- * In conclusion, to take all x reserves, the y reserves __must__ be at its upper bound.
+ * To take all y reserves (lower bound), the x reserves __must__ be at its upper bound.
+ * To take all x reserves (lower bound), the y reserves __must__ be at its upper bound.
  *
  * This overwrite of "infinity" effectively makes the trading function return an actual value
  * at the bounds, instead of reverting. This is important for pools which might have accrued
  * enough fees to push one of it's reserves over the bounds. Additionally, a maximum and minimum
  * price are effectively enforced at these boundaries.
- *
  *
  * note Adjusted trading function's invariant != original trading function's invariant.
  *
@@ -243,25 +210,47 @@ function tradingFunction(NormalCurve memory self)
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
 
     // Overwrite the reserves to be as close to its bounds as possible, to avoid reverting.
-    uint256 invariantTermXInput; // x - 1
-    if (self.reserveXPerWad >= upperBoundX) {
-        // As x -> 1E18, 1E18 - x -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermXInput to 1E18 - 1E18 + 1.
-        invariantTermXInput = 1;
-    } else if (self.reserveXPerWad <= lowerBoundX) {
-        // As x -> 0, 1E18 - 0 -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermXInput to 1E18 - 0 - 1.
-        invariantTermXInput = WAD - 1;
-    } else {
-        invariantTermXInput = WAD - self.reserveXPerWad;
-    }
-
+    uint256 invariantTermXInput; // 1E18 - x
     uint256 invariantTermYInput =
-        self.reserveYPerWad.divWadDown(self.strikePriceWad); // y/K -> [0,1]
-    if (invariantTermYInput >= WAD) {
-        // As y -> K, y/K -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermYInput to 1E18 - 1.
-        invariantTermYInput = WAD - 1;
-    } else if (invariantTermYInput <= 0) {
-        // As y -> 0, y/K -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermYInput to 0 + 1.
-        invariantTermYInput = 1;
+        self.reserveYPerWad.divWadDown(self.strikePriceWad); // y/K
+
+    if (self.reserveXPerWad >= upperBoundX || invariantTermYInput <= 0) {
+        // If x is at upper bound or y is at lower bound.
+        // Trading function is only valid y is at its lower bound when x is at its upper bound.
+        // If y is not at its lower bound, the invariant will be negative infinity, which will revert.
+        if (invariantTermYInput > 0) {
+            revert NormalStrategyLib_LowerReserveYBoundNotReached();
+        }
+        // If x is not at its upper bound, the invariant will be negative infinity, which will revert.
+        if (self.reserveXPerWad < upperBoundX) {
+            revert NormalStrategyLib_UpperReserveXBoundNotReached();
+        }
+
+        // As x -> 1E18, 1E18 - x -> 0, Φ⁻¹(0) = -∞
+        // As y -> 0, y/K -> 0, Φ⁻¹(0) = -∞
+        // These terms cancel eachother out, therefore leaving the invariant to be equal to `stdDevSqrtTau`.
+        return int256(stdDevSqrtTau);
+    } else if (self.reserveXPerWad <= lowerBoundX || invariantTermYInput >= WAD)
+    {
+        // If x is at lower bound or y is at upper bound.
+        // Trading function is only valid if y is at its upper bound when x is at its lower bound.
+        // If y is not at its upper bound, the invariant will be positive infinity, which will revert.
+        if (invariantTermYInput < WAD) {
+            revert NormalStrategyLib_UpperReserveYBoundNotReached();
+        }
+
+        // If x is not at its lower bound, the invariant will be positive infinity, which will revert.
+        if (self.reserveXPerWad > lowerBoundX) {
+            revert NormalStrategyLib_LowerReserveXBoundNotReached();
+        }
+
+        // As x -> 0, 1E18 - 0 -> 1E18, Φ⁻¹(1E18) = +∞
+        // As y -> K, y/K -> 1E18, Φ⁻¹(1E18) = +∞
+        // These terms cancel eachother out, therefore leaving the invariant to be equal to `stdDevSqrtTau`.
+        return int256(stdDevSqrtTau);
+    } else {
+        // Else no bounds have been reached and the invariant can be computed with both terms.
+        invariantTermXInput = WAD - self.reserveXPerWad;
     }
 
     // Φ⁻¹(1-x)
@@ -290,9 +279,9 @@ function approximateXGivenY(NormalCurve memory self)
 {
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
     (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
-    // If y reserves has reached upper bound, x reserves is zero.
+    // If y reserves has reached upper bound, x reserves must be zero (lower bound).
     if (self.reserveYPerWad >= upperBoundY) return lowerBoundX;
-    // If y reserves has reached lower bound, x reserves is one.
+    // If y reserves has reached lower bound, x reserves must be one wad (upper bound).
     if (self.reserveYPerWad <= lowerBoundY) return upperBoundX;
     // σ√τ
     uint256 stdDevSqrtTau = self.computeStdDevSqrtTau();
@@ -323,9 +312,9 @@ function approximateYGivenX(NormalCurve memory self)
 {
     (uint256 upperBoundX, uint256 lowerBoundX) = self.getReserveXBounds();
     (uint256 upperBoundY, uint256 lowerBoundY) = self.getReserveYBounds();
-    // If x reserves has reached upper bound, y reserves is zero.
+    // If x reserves has reached upper bound, y reserves must be zero (lower bound).
     if (self.reserveXPerWad >= upperBoundX) return lowerBoundY;
-    // If x reserves has reached lower bound, y reserves is equal to the strike price.
+    // If x reserves has reached lower bound, y reserves must be equal to the strike price (upper bound).
     if (self.reserveXPerWad <= lowerBoundX) return upperBoundY;
     // σ√τ
     uint256 stdDevSqrtTau = self.computeStdDevSqrtTau();

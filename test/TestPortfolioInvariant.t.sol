@@ -51,6 +51,9 @@ contract TestPortfolioInvariant is Setup {
         uint256 volSqrtYearsWad = volatilityWad.mulWadDown(sqrtTauWad);
         // y / K
         uint256 quotientWad = reserveYPerWad.divWadUp(strikePriceWad); // todo: should this round up??
+        if (quotientWad >= 1e18) {
+            quotientWad = reserveYPerWad.divWadDown(strikePriceWad);
+        }
         console2.log(reserveYPerWad, strikePriceWad);
         console2.log("quotientWad", quotientWad);
         // Φ⁻¹(y/K)
@@ -257,6 +260,8 @@ contract TestPortfolioInvariant is Setup {
         // min delta <= delta <= x - min x
         deltaX =
             bound(deltaX, MINIMUM_DELTA, reserveXPerWad - MINIMUM_RESERVE_X);
+
+        console.log(reserveYPerWad);
 
         int256 previousResult = tradingFunction(
             NormalCurve(
@@ -502,6 +507,7 @@ contract TestPortfolioInvariant is Setup {
 
         // The Y reserve is bounded between the min delta and the strike price less min delta.
         // min y <= y <= strike - min delta
+        // Y reserve must be large enough to be divided by the strike price and not be zero.
         reserveYPerWad = bound(
             reserveYPerWad,
             MINIMUM_RESERVE_Y + MINIMUM_DELTA,
@@ -518,7 +524,7 @@ contract TestPortfolioInvariant is Setup {
         timeRemainingSec = bound(timeRemainingSec, MIN_DURATION, MAX_DURATION);
 
         // Need to make sure the computations in the function are valid.
-        uint256 quotient = reserveYPerWad.divWadUp(strikePriceWad);
+        uint256 quotient = reserveYPerWad.divWadDown(strikePriceWad);
         uint256 difference = 1 ether - reserveXPerWad;
         vm.assume(quotient > 0 && quotient < 1 ether);
         vm.assume(difference > 0 && difference < 1 ether);
@@ -569,7 +575,7 @@ contract TestPortfolioInvariant is Setup {
                 : postReserve.divWadUp(strikePriceWad)
         );
 
-        console.log("PPFs");
+        /* console.log("PPFs");
         console.logInt(
             Gaussian.ppf(
                 int256(
@@ -587,7 +593,7 @@ contract TestPortfolioInvariant is Setup {
                         : 1 ether - reserveXPerWad
                 )
             )
-        );
+        ); */
         console.log(
             "stdDevSqrtTau",
             volatilityWad.mulWadDown(
