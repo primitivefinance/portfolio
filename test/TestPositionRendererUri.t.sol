@@ -167,4 +167,25 @@ contract TestPositionRendererUri is Setup {
         _allocate(ctx, poolId, 1 ether, 2_000 * 10 ** 6);
         console.log(ERC1155(address(subject())).uri(poolId));
     }
+
+    function test_uri_many_pools() public {
+        MetaContext memory ctx = MetaContext({
+            asset: address(new MockERC20("Ethereum", "ETH", 18)),
+            quote: address(new MockERC20("USD Coin", "USDC", 6)),
+            strikePriceWad: AssemblyLib.scaleToWad(1666 * 10 ** 6, 6),
+            durationSeconds: 86_400 * 3,
+            swapFee: 400,
+            isPerpetual: false,
+            priceWad: AssemblyLib.scaleToWad(1666 * 10 ** 6, 6),
+            controller: address(0),
+            strategy: address(0),
+            prioritySwapFee: 0
+        });
+
+        _createPool(ctx);
+        _createPool(ctx);
+        uint64 poolId = _createPool(ctx);
+        _allocate(ctx, poolId, 1 ether, 2_000 * 10 ** 6);
+        console.log(ERC1155(address(subject())).uri(poolId));
+    }
 }
