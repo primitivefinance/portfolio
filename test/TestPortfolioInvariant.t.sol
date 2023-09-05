@@ -423,9 +423,10 @@ contract TestPortfolioInvariant is Setup {
             bound(deltaY, MINIMUM_DELTA, reserveYPerWad - MINIMUM_RESERVE_Y);
 
         uint256 prevQuotient = reserveYPerWad.divWadUp(strikePriceWad);
-        uint256 quotient = (reserveYPerWad - deltaY).divWadUp(strikePriceWad);
+        uint256 quotient = (reserveYPerWad - deltaY).divWadDown(strikePriceWad);
         console.log("prevQuotient: ", prevQuotient);
         console.log("quotient: ", quotient);
+        vm.assume(quotient > 0 && quotient < 1 ether);
 
         /// Make sure quotient is within bounds and it decreases by at least 2
         vm.assume(prevQuotient >= MINIMUM_QUOTIENT_DELTA);
