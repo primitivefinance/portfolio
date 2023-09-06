@@ -9,7 +9,15 @@ import "./IGeometricMeanStrategy.sol";
 /// @dev Emitted when a hook is called by a non-portfolio address.
 error GeometricMeanStrategy_NotPortfolio();
 
-using { encode, decode, modify, tradingFunction } for G3MConfig global;
+using FixedPointMathLib for uint256;
+using FixedPointMathLib for int256;
+
+using {
+    encode,
+    modify,
+    tradingFunction,
+    approximateYGivenXAndPrice
+} for G3MConfig global;
 
 /// @dev Geometric mean strategy has two tokens with a weighted composition that sums to 1.
 struct G3MConfig {
@@ -18,7 +26,7 @@ struct G3MConfig {
 }
 
 /// @dev Uses abi to decode the strategy args into the G3M config.
-function decode(bytes memory strategyArgs) pure returns (G3MConfig memory) {
+function decode(bytes calldata strategyArgs) pure returns (G3MConfig memory) {
     return abi.decode(strategyArgs, (G3MConfig));
 }
 
@@ -52,6 +60,7 @@ function tradingFunction(
     invariant = p_x * p_y / int256(WAD); // invariant = p_x * p_y
 }
 
+// A_o = B_o * (1 - (B_i / (A_i + B_i))^(W_i / W_o))
 function approximateAmountOut(
     PortfolioPool memory self,
     G3MConfig memory config,
@@ -59,17 +68,34 @@ function approximateAmountOut(
     uint256 timestamp,
     uint256 protocolFee,
     address swapper
-) internal view returns (uint256 amountOutWad) {
-    if (sellAsset) {
-        uint256 input =
-            uint256(self.virtualX).divWadDown(uint256(self.virtualX + amountIn));
-        int256 balanceIn = int256(weightIn.divWadDown(WAD - weightIn));
-        int256 pow = int256(input).powWad(balanceIn);
-        amountOut =
-            uint256(self.virtualY).mulWadDown(uint256(int256(WAD) - pow));
+) pure returns (uint256 amountOutWad) {
+    // independentReserve = A_i * (1 - fee in bps) + B_i
+    (uint256 independentReserve, int256 prevInv, int256 postInv) =
+        getSwapInvariants(self, config, order, timestamp, protocolFee, swapper);
+    uint256 B_i;
+    uint256 B_o;
+    uint256 W_i;
+    uint256 W_o;
+    if (order.sellAsset) {
+        W_i = config.assetWeightWad;
+        W_o = config.quoteWeightWad;
+        B_i = uint256(self.virtualX);
+        B_o = uint256(self.virtualY);
     } else {
-        // todo: implement opposite case.
+        W_i = config.quoteWeightWad;
+        W_o = config.assetWeightWad;
+        B_i = uint256(self.virtualY);
+        B_o = uint256(self.virtualX);
     }
+
+    // B_i / (A_i + B_i)
+    int256 balanceIn = int256(B_i.divWadUp(independentReserve)); // Rounded up to avoid truncating additional increase in independent reserve.
+    // W_i / W_o
+    uint256 exponent = W_i.divWadDown(W_o);
+    // (B_i / (A_i + B_i))^(W_i / W_o)
+    int256 pow = int256(balanceIn).powWad(int256(exponent));
+    // A_o = B_o * (1 - (B_i / (A_i + B_i))^(W_i / W_o))
+    amountOutWad = uint256(B_o).mulWadDown(uint256(int256(WAD) - pow));
 }
 
 /**
@@ -79,13 +105,30 @@ function approximateAmountOut(
 function approximatePriceGivenAssetWeight(
     PortfolioPool memory self,
     uint256 assetWeightWad
-) internal pure returns (uint256 price) {
+) pure returns (uint256 price) {
     price = uint256(self.virtualX).divWadDown(assetWeightWad).mulWadDown(
         (WAD - assetWeightWad).divWadDown(uint256(self.virtualY))
     );
 }
 
-function getInvariant(
+/**
+ * @custom:math balanceOut = reserveX * (1 - weightX) / (price * weightOut)
+ */
+function approximateYGivenXAndPrice(
+    G3MConfig memory self,
+    uint256 reserveX,
+    uint256 priceWad
+) pure returns (uint256, uint256) {
+    uint256 weightIn = self.assetWeightWad;
+    uint256 weightOut = WAD - weightIn;
+    uint256 reserveY = reserveX.divWadDown(
+        priceWad.mulWadDown(weightIn.divWadDown(WAD - weightOut))
+    );
+
+    return (reserveX, reserveY);
+}
+
+function getInvariantG3M(
     PortfolioPool memory self,
     G3MConfig memory config
 ) pure returns (int256) {
@@ -110,8 +153,7 @@ function getSwapInvariants(
     uint256 protocolFee,
     address swapper
 )
-    internal
-    view
+    pure
     returns (
         uint256 adjustedIndependentReserve,
         int256 prevInvariant,
@@ -119,7 +161,7 @@ function getSwapInvariants(
     )
 {
     // Computed using a rounded up output reserve per liquidity.
-    prevInvariant = self.getInvariant(config);
+    prevInvariant = getInvariantG3M(self, config);
 
     // Compute the next invariant if the swap amounts are non zero.
     (uint256 reserveX, uint256 reserveY) = (self.virtualX, self.virtualY);
@@ -137,21 +179,36 @@ function getSwapInvariants(
 }
 
 /// @title Geometric Mean Strategy
-contract GeometricMeanStrategy is IGeometricMeanStrategy {
+contract GeometricMeanStrategy is IStrategy {
     using AssemblyLib for *;
     using FixedPointMathLib for *;
     using SafeCastLib for uint256;
     using {
         approximatePriceGivenAssetWeight,
-        getInvariant,
-        approximateAmountOut
+        getInvariantG3M,
+        approximateAmountOut,
+        getSwapInvariants
     } for PortfolioPool;
+
+    using { decode } for bytes;
 
     /// @dev Canonical Portfolio smart contract.
     address public immutable portfolio;
 
     /// @dev Tracks each pool strategy configuration.
     mapping(uint64 poolId => G3MConfig config) public configs;
+
+    /// @dev Since G3M uses basic arithmetic, the invariant is always monotonic, enabling valid trades that keep the invariant the same.
+    int256 public constant MINIMUM_INVARIANT_DELTA = 0;
+
+    event Genesis(address portfolio);
+
+    event AfterCreate(
+        address indexed portfolio,
+        uint64 indexed poolId,
+        uint256 assetWeightWad,
+        uint256 quoteWeightWad
+    );
 
     constructor(address portfolio_) {
         portfolio = portfolio_;
@@ -207,10 +264,7 @@ contract GeometricMeanStrategy is IGeometricMeanStrategy {
         // This invariant uses the rounded up output reserves,
         // and computes the time remaining in the pool (a key parameter in the trading function)
         // using the `block.timestamp`.
-        int256 invariant = pool.getInvariant(config);
-
-        if (pool.expired(config)) return (false, invariant);
-
+        int256 invariant = pool.getInvariantG3M(config);
         return (true, invariant);
     }
 
@@ -234,7 +288,7 @@ contract GeometricMeanStrategy is IGeometricMeanStrategy {
         pool.virtualY = reserveY.safeCastTo128();
 
         // Compute the new invariant.
-        int256 invariantAfterSwap = pool.getInvariant(configs[poolId]);
+        int256 invariantAfterSwap = pool.getInvariantG3M(configs[poolId]);
         bool valid = _validateSwap(invariant, invariantAfterSwap);
 
         return (valid, invariantAfterSwap);
@@ -306,7 +360,7 @@ contract GeometricMeanStrategy is IGeometricMeanStrategy {
     function getSpotPrice(uint64 poolId) public view returns (uint256 price) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
         G3MConfig memory config = configs[poolId];
-        price = config.approximatePriceGivenAssetWeight({
+        price = pool.approximatePriceGivenAssetWeight({
             assetWeightWad: config.assetWeightWad
         });
     }
@@ -407,26 +461,10 @@ contract GeometricMeanStrategy is IGeometricMeanStrategy {
         returns (int256 invariant)
     {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-        invariant = pool.getInvariant(configs[poolId]);
+        invariant = pool.getInvariantG3M(configs[poolId]);
     }
 
     // ====== Optional ====== //
-
-    /**
-     * @custom:math balanceOut = reserveX * (1 - weightX) / (price * weightOut)
-     */
-    function approximateYGivenXAndPrice(
-        G3MConfig memory self,
-        uint256 reserveX,
-        uint256 priceWad
-    ) public view returns (uint256, uint256) {
-        uint256 weightOut = WAD - self.assetWeightWad;
-        uint256 reserveY = reserveX.divWadDown(
-            price.mulWadDown(self.assetWeightWad.divWadDown(WAD - weightOut))
-        );
-
-        return (reserveX, reserveY);
-    }
 
     /**
      * @notice Get the data required for creating a pool with this strategy.
@@ -434,6 +472,7 @@ contract GeometricMeanStrategy is IGeometricMeanStrategy {
      * @param assetWeightWad Weight of the asset token in the pool, in WAD units between 0 and 1E18.
      * @param quoteWeightWad Weight of the quote token in the pool, in WAD units between 0 and 1E18.
      * @param priceWad Initial price to approximately set the pool to, in WAD units.
+     * @param assetInWad Amount of assets to deposit.
      * @return strategyData Encoded configuration of the Normal Strategy parameters for `createPool`.
      * @return initialX Initial X reserves of a pool in WAD units, per WAD liquidity, at `priceWad`.
      * @return initialY Initial Y reserves of a pool in WAD units, per WAD liquidity, at `priceWad`.
@@ -441,7 +480,8 @@ contract GeometricMeanStrategy is IGeometricMeanStrategy {
     function getStrategyData(
         uint256 assetWeightWad,
         uint256 quoteWeightWad,
-        uint256 priceWad
+        uint256 priceWad,
+        uint256 assetInWad
     )
         public
         pure
@@ -451,6 +491,7 @@ contract GeometricMeanStrategy is IGeometricMeanStrategy {
         strategyData = config.encode();
 
         // Utilizes `durationSeconds` argument as the `timeRemainingSeconds` parameter.
-        (initialX, initialY) = config.approximateReservesGivenPrice(priceWad);
+        (initialX, initialY) =
+            config.approximateYGivenXAndPrice(assetInWad, priceWad);
     }
 }
