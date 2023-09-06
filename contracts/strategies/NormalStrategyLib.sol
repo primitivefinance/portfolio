@@ -248,25 +248,19 @@ function tradingFunction(NormalCurve memory self)
         self.reserveYPerWad.divWadDown(self.strikePriceWad); // y/K -> [0,1]
 
     if (invariantTermYInput >= WAD) {
-        // If the Y term is gte the upper bound, the X term must be lte the lower bound.
-        require(
-            self.reserveXPerWad <= lowerBoundX,
-            "NormalStrategyLib: X reserves must be at lower bound to fill Y reserves."
-        );
         // As y -> K, y/K -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermYInput to 1E18 - 1.
         invariantTermYInput = WAD - 1;
-        // As x -> 0, 1E18 - 0 -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermXInput to 1E18 - 0 - 1.
-        invariantTermXInput = WAD - 1;
     } else if (invariantTermYInput <= 0) {
-        // Else if Y term is lte the lower bound, the X term must be gte the upper bound.
-        require(
-            self.reserveXPerWad >= upperBoundX,
-            "NormalStrategyLib: X reserves must be at upper bound to empty Y reserves."
-        );
         // As y -> 0, y/K -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermYInput to 0 + 1.
         invariantTermYInput = 1;
+    }
+
+    if (self.reserveXPerWad >= upperBoundX) {
         // As x -> 1E18, 1E18 - x -> 0, Φ⁻¹(0) = -∞, therefore bound invariantTermXInput to 1E18 - 1E18 + 1.
         invariantTermXInput = 1;
+    } else if (self.reserveXPerWad <= lowerBoundX) {
+        // As x -> 0, 1E18 - 0 -> 1E18, Φ⁻¹(1E18) = +∞, therefore bound invariantTermXInput to 1E18 - 0 - 1.
+        invariantTermXInput = WAD - 1;
     } else {
         // If neither bound is reached, set the invariant terms to their actual values.
         invariantTermXInput = WAD - self.reserveXPerWad;
