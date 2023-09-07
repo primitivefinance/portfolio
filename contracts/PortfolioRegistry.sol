@@ -2,15 +2,12 @@
 pragma solidity ^0.8.4;
 
 import "./interfaces/IERC20.sol";
+import "./interfaces/IPortfolioRegistry.sol";
 import "solmate/auth/Owned.sol";
 
 interface PortfolioLike {
     function setProtocolFee(uint256) external;
     function claimFee(address, uint256) external;
-}
-
-interface IPortfolioRegistry {
-    function controller() external view returns (address);
 }
 
 /// @dev Basic registry with a single owner.
