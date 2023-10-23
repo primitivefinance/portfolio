@@ -53,7 +53,7 @@ Read the local [docs](./docs/src/), hosted docs [docs.primitive.xyz](https://doc
 | [Trail of Bits](https://github.com/primitivefinance/security/blob/main/audits/portfolio/trailofbits.pdf)      | 2023-01-31 | 8-weeks     | Completed | n/a                                                                                                                                           |
 | [Spearbit #1](https://github.com/primitivefinance/security/blob/main/audits/portfolio/spearbit.pdf)           | 2023-03-31 | 5-weeks     | Completed | [tag/v1.1.0-beta](https://github.com/primitivefinance/portfolio/releases/tag/v1.1.0-beta)                                                     |
 | [Spearbit #1 Extension](https://github.com/primitivefinance/security/blob/main/audits/portfolio/spearbit.pdf) | 2023-05-12 | 2-weeks     | Competed  | [36e9efa28332fa03f6d5910edda2fec2f5937190](https://github.com/primitivefinance/portfolio/commit/36e9efa28332fa03f6d5910edda2fec2f5937190 )    |
-| Spearbit #2                                                                                                   | 2023-07-78 | 2-weeks     | Completed | [tag/v1.5.0-beta-spearbit-2023-08-complete](https://github.com/primitivefinance/portfolio/releases/tag/v1.5.0-beta-spearbit-2023-08-complete) |
+| Spearbit #2                                                                                                   | 2023-07-78 | 2-weeks     | Completed | [tag/v1.4.0-beta-spearbit-2023-08-complete](https://github.com/primitivefinance/portfolio/releases/tag/v1.4.0-beta-spearbit-2023-08-complete) |
 
 ## Install
 
