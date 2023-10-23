@@ -16,6 +16,6 @@ jobs:
         with:
           version: nightly
 
-      - name: Run gas profiling for RMM01Portfolio
+      - name: Run gas profiling
         run: FOUNDRY_PROFILE=optimized forge test --gas-report --match-contract TestGas
 

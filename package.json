@@ -2,14 +2,17 @@
   "name": "@primitivexyz/portfolio",
   "license": "AGPL-3.0-only",
   "version": "v1.4.0-beta",
-  "description": "Onchain protocol for low cost portfolio management using automated market making strategies.",
+  "description": "Portfolio is an automated market making protocol for implementing custom liquidity distribution strategies at the lowest cost possible. ",
   "publishConfig": {
     "access": "public"
   },
   "files": [
     "contracts/**/*.sol",
+    "optimized-out/NormalStrategy.sol/NormalStrategy.json",
     "optimized-out/Portfolio.sol/Portfolio.json",
-    "optimized-out/RMM01Portfolio.sol/RMM01Portfolio.json",
+    "optimized-out/PositionRenderer.sol/PositionRenderer.json",
+    "optimized-out/IStrategy.sol/IStrategy.json",
+    "optimized-out/INormalStrategy.sol/INormalStrategy.json",
     "optimized-out/IPortfolio.sol/IPortfolio.json",
     "optimized-out/IPortfolioRegistry.sol/IPortfolioRegistry.json"
   ],
