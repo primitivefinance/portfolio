@@ -31,14 +31,15 @@ Read the local [docs](./docs/src/), hosted docs [docs.primitive.xyz](https://doc
 | -------------------- | -------------------------------------------- |
 | Portfolio 1.3.0-beta | `0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1` |
 | Portfolio 1.4.0-beta | `todo`                                       |
+| Portfolio 1.5.0-beta | `n/a`                                       |
 
 ### Deployments by Chain
 
-| Network  | Portfolio 1.3.0-beta                                                                                                          | Portfolio v1.4.0-beta |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| Ethereum | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1 )        | todo                  |
-| Base     | n/a                                                                                                                           | todo                  |
-| Sepolia  | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://sepolia.etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1) | todo                  |
+| Network  | Portfolio 1.3.0-beta                                                                                                          | Portfolio v1.4.0-beta | Portfolio v1.5.0-beta |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------- | --------------------- |
+| Ethereum | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1 )        | n/a                  |n/a                  |
+| Base     | n/a                                                                                                                           | n/a                  |n/a                  |
+| Sepolia  | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://sepolia.etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1) | n/a                  |n/a                  |
 
 # Security
 
@@ -52,7 +53,7 @@ Read the local [docs](./docs/src/), hosted docs [docs.primitive.xyz](https://doc
 | [Trail of Bits](https://github.com/primitivefinance/security/blob/main/audits/portfolio/trailofbits.pdf)      | 2023-01-31 | 8-weeks     | Completed | n/a                                                                                                                                           |
 | [Spearbit #1](https://github.com/primitivefinance/security/blob/main/audits/portfolio/spearbit.pdf)           | 2023-03-31 | 5-weeks     | Completed | [tag/v1.1.0-beta](https://github.com/primitivefinance/portfolio/releases/tag/v1.1.0-beta)                                                     |
 | [Spearbit #1 Extension](https://github.com/primitivefinance/security/blob/main/audits/portfolio/spearbit.pdf) | 2023-05-12 | 2-weeks     | Competed  | [36e9efa28332fa03f6d5910edda2fec2f5937190](https://github.com/primitivefinance/portfolio/commit/36e9efa28332fa03f6d5910edda2fec2f5937190 )    |
-| Spearbit #2                                                                                                   | 2023-07-78 | 2-weeks     | Completed | [tag/v1.4.0-beta-spearbit-2023-08-complete](https://github.com/primitivefinance/portfolio/releases/tag/v1.4.0-beta-spearbit-2023-08-complete) |
+| Spearbit #2                                                                                                   | 2023-07-78 | 2-weeks     | Completed | [tag/v1.5.0-beta-spearbit-2023-08-complete](https://github.com/primitivefinance/portfolio/releases/tag/v1.5.0-beta-spearbit-2023-08-complete) |
 
 ## Install
 

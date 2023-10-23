@@ -121,7 +121,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
             poolId: 0
         });
 
-        assertEq(subject().VERSION(), "v1.4.0-beta", "version-not-equal");
+        assertEq(subject().VERSION(), "v1.5.0-beta", "version-not-equal");
     }
 
     // ============= Edit Test Environment ============= //
