@@ -235,10 +235,12 @@ contract ETHSP is Setup {
         Configuration memory TRANCHE_A_CONFIG = CONFIG.edit(
             "asset", abi.encode(TOKEN_0)
         ).edit("quote", abi.encode(TOKEN_1));
+        TRANCHE_A_CONFIG.strategy = normalStrategy();
 
         Configuration memory TRANCHE_B_CONFIG = CONFIG.edit(
             "asset", abi.encode(TOKEN_2)
         ).edit("quote", abi.encode(TOKEN_3));
+        TRANCHE_B_CONFIG.strategy = normalStrategy();
         // Creates the pools with the configs.
         TRANCHE_A_POOL = TRANCHE_A_CONFIG.activate(
             address(subject()), NormalConfiguration.validateNormalStrategy

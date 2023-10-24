@@ -216,9 +216,6 @@ interface IPortfolioState {
     /// @notice Contract for rendering position tokens.
     function POSITION_RENDERER() external view returns (address);
 
-    /// @notice Default strategy contract used in pool creation.
-    function DEFAULT_STRATEGY() external view returns (address);
-
     /// @notice Proportion of swap fee allocated to the Registry controller.
     function protocolFee() external view returns (uint256);
 

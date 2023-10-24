@@ -31,7 +31,7 @@ contract TestPositionRendererUri is Setup {
         }
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
-        INormalStrategy(subject().DEFAULT_STRATEGY()).getStrategyData(
+        INormalStrategy(normalStrategy()).getStrategyData(
             ctx.strikePriceWad,
             1_00, // volatilityBasisPoints
             ctx.durationSeconds,
@@ -83,7 +83,7 @@ contract TestPositionRendererUri is Setup {
             isPerpetual: false,
             priceWad: AssemblyLib.scaleToWad(1666 * 10 ** 6, 6),
             controller: address(0),
-            strategy: address(0),
+            strategy: normalStrategy(),
             prioritySwapFee: 0
         });
 
@@ -102,7 +102,7 @@ contract TestPositionRendererUri is Setup {
             isPerpetual: false,
             priceWad: AssemblyLib.scaleToWad(1666 * 10 ** 6, 6),
             controller: address(this),
-            strategy: address(0),
+            strategy: normalStrategy(),
             prioritySwapFee: 200
         });
 
@@ -121,7 +121,7 @@ contract TestPositionRendererUri is Setup {
             isPerpetual: true,
             priceWad: AssemblyLib.scaleToWad(1666 * 10 ** 6, 6),
             controller: address(0),
-            strategy: address(0),
+            strategy: normalStrategy(),
             prioritySwapFee: 0
         });
 
@@ -178,7 +178,7 @@ contract TestPositionRendererUri is Setup {
             isPerpetual: false,
             priceWad: AssemblyLib.scaleToWad(1666 * 10 ** 6, 6),
             controller: address(0),
-            strategy: address(0),
+            strategy: normalStrategy(),
             prioritySwapFee: 0
         });
 

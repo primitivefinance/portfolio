@@ -45,7 +45,6 @@ contract PositionRenderer {
         address controller;
         address strategy;
         uint256 spotPriceWad;
-        bool hasDefaultStrategy;
     }
 
     struct Config {
@@ -157,9 +156,7 @@ contract PositionRenderer {
             priorityFeeBasisPoints: priorityFeeBasisPoints,
             controller: controller,
             strategy: strategy,
-            spotPriceWad: spotPriceWad,
-            hasDefaultStrategy: strategy
-                == IPortfolio(msg.sender).DEFAULT_STRATEGY()
+            spotPriceWad: spotPriceWad
         });
     }
 
@@ -598,9 +595,7 @@ contract PositionRenderer {
                 '<div class="f"><p>',
                 controlledLabel,
                 " and uses ",
-                properties.pool.hasDefaultStrategy
-                    ? "the default strategy."
-                    : "a custom strategy.",
+                "a custom strategy.",
                 "</p></div>"
             )
         );
