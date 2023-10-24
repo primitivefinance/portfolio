@@ -61,27 +61,6 @@ contract TestPortfolioCreatePool is Setup {
         );
     }
 
-    function test_createPool_no_strategy_defaults() public defaultConfig {
-        Configuration memory testConfig = configureNormalStrategy();
-
-        testConfig.reserveXPerWad++; // Avoid the reserve error
-        testConfig.reserveYPerWad++; // Avoid the reserve error
-
-        uint64 poolId = subject().createPool(
-            0,
-            testConfig.reserveXPerWad,
-            testConfig.reserveYPerWad,
-            100, // fee
-            0, // prior fee
-            address(0), // controller
-            address(0), // strategy
-            testConfig.strategyArgs
-        );
-
-        (,,,,,,, address strategy) = subject().pools(poolId);
-        assertEq(strategy, subject().DEFAULT_STRATEGY());
-    }
-
     function test_revert_createPool_invalid_priority_fee() public {
         bytes[] memory data = new bytes[](1);
 
@@ -101,7 +80,7 @@ contract TestPortfolioCreatePool is Setup {
                 1, // fee
                 testConfig.priorityFeeBasisPoints.safeCastTo16(), // prior fee
                 address(this), // controller
-                subject().DEFAULT_STRATEGY(),
+                normalStrategy(),
                 testConfig.strategyArgs
             )
         );
@@ -184,7 +163,7 @@ contract TestPortfolioCreatePool is Setup {
                 100,
                 1,
                 address(0),
-                subject().DEFAULT_STRATEGY(),
+                normalStrategy(),
                 abi.encode(
                     PortfolioConfig(
                         100,

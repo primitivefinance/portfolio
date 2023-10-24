@@ -37,7 +37,7 @@ contract TestPortfolioAllocate is Setup {
                 100, // fee
                 0, // prior fee
                 address(0), // controller
-                subject().DEFAULT_STRATEGY(),
+                normalStrategy(),
                 testConfig.strategyArgs
             )
         );
@@ -610,7 +610,7 @@ contract TestPortfolioAllocate is Setup {
             30, // fee
             0, // priority fee
             address(0),
-            subject().DEFAULT_STRATEGY(),
+            normalStrategy(),
             testConfig.strategyArgs
         );
 

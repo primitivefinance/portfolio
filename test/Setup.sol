@@ -34,6 +34,7 @@ struct SubjectsType {
     address weth;
     address portfolio;
     address positionRenderer;
+    address normalStrategy;
 }
 
 // Interfaces
@@ -70,6 +71,9 @@ interface ISetup {
 
     /// @dev Returns the position renderer contract used in the subject.
     function positionRenderer() external view returns (address);
+
+    /// @dev Returns the normal strategy address.
+    function normalStrategy() external view returns (address);
 }
 
 contract Setup is ISetup, Test, ERC1155TokenReceiver {
@@ -115,6 +119,10 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         );
         vm.label(_subjects.portfolio, "portfolio");
 
+        _subjects.normalStrategy =
+            address(new NormalStrategy(_subjects.portfolio));
+        vm.label(_subjects.normalStrategy, "normal-strategy");
+
         _ghost_state = GhostType({
             actor: address(this),
             subject: _subjects.portfolio,
@@ -136,6 +144,7 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         (address asset, address quote) = deployDefaultTokenPair();
         if (config.asset == address(0)) config.asset = asset;
         if (config.quote == address(0)) config.quote = quote;
+        config.strategy = normalStrategy();
 
         // Makes it accessible for debugging via `Setup.global_config()`.
         _global_config = config;
@@ -499,6 +508,11 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     /// @inheritdoc ISetup
     function positionRenderer() public view override returns (address) {
         return _subjects.positionRenderer;
+    }
+
+    /// @inheritdoc ISetup
+    function normalStrategy() public view override returns (address) {
+        return _subjects.normalStrategy;
     }
 
     receive() external payable { }
