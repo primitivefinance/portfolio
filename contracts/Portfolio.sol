@@ -726,7 +726,7 @@ contract Portfolio is ERC1155, IPortfolio {
 
         // Compute the poolId, which is a packed 64-bit integer.
         poolId = PoolIdLib.encode(
-            true, // Flips the "altered" flag in the upper 4 bits: "0x10..."
+            false, // Flips the "altered" flag in the upper 4 bits: "0x10..."
             controller != address(0), // Flips the "controlled" flag in the lower 4 bits:  "0x01..."
             pairNonce,
             poolNonce
