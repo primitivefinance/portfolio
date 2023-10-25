@@ -30,15 +30,27 @@ Read the local [docs](./docs/src/), hosted docs [docs.primitive.xyz](https://doc
 | Contract             | Canonical cross-chain address                |
 | -------------------- | -------------------------------------------- |
 | Portfolio 1.3.0-beta | `0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1` |
-| Portfolio 1.4.0-beta | `todo`                                       |
+| Portfolio 1.4.0-beta | `n/a`                                        |
+| Portfolio 1.5.0-beta | `0x0000a37Fd680Ab248119b448545eF72C51Bf7530` |
 
 ### Deployments by Chain
 
-| Network  | Portfolio 1.3.0-beta                                                                                                          | Portfolio v1.4.0-beta |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| Ethereum | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1 )        | todo                  |
-| Base     | n/a                                                                                                                           | todo                  |
-| Sepolia  | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://sepolia.etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1) | todo                  |
+| Network  | Portfolio 1.3.0-beta                                                                                                          | Portfolio v1.4.0-beta | Portfolio v1.5.0-beta                                                                                                 |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Ethereum | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1 )        | n/a                   | [0x0000a37Fd680Ab248119b448545eF72C51Bf7530](https://etherscan.io/address/0x0000a37fd680ab248119b448545ef72c51bf7530) |
+| Base     | n/a                                                                                                                           | n/a                   | n/a                                                                                                                   |
+| Sepolia  | [0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1](https://sepolia.etherscan.io/address/0x82360b9a2076a09ea8abe2b3e11aed89de3a02d1) | n/a                   | n/a                                                                                                                   |
+
+| Network  | PortfolioRegistry v1.5.0-beta                                                                                         |
+| -------- | --------------------------------------------------------------------------------------------------------------------- |
+| Ethereum | [0x42776F58b6BC63492E0b7A7a937D1138DF716670](https://etherscan.io/address/0x42776f58b6bc63492e0b7a7a937d1138df716670) |
+
+| Network  | PositionRenderer v1.5.0-beta                                                                                          |
+| -------- | --------------------------------------------------------------------------------------------------------------------- |
+| Ethereum | [0xdDA01E1d7684Cc35e6a3A5803736D32d012B8C99](https://etherscan.io/address/0xdDA01E1d7684Cc35e6a3A5803736D32d012B8C99) |
+
+
+
 
 # Security
 

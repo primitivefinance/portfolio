@@ -148,7 +148,7 @@ contract TestGas is Setup {
                 hundred, // fee
                 0, // prior fee
                 address(0), // controller
-                subject().DEFAULT_STRATEGY(),
+                normalStrategy(),
                 testConfig.strategyArgs
             )
         );
@@ -271,7 +271,7 @@ contract TestGas is Setup {
                 hundred, // fee
                 0, // prior fee
                 address(0), // controller
-                address(0), // default strategy
+                normalStrategy(),
                 testConfig.strategyArgs
             )
         );
@@ -559,7 +559,7 @@ contract TestGas is Setup {
                         uint16(100 + 100 / i), // fee
                         0, // prior fee
                         controller,
-                        subject().DEFAULT_STRATEGY(),
+                        normalStrategy(),
                         testConfig.strategyArgs
                     )
                 );
@@ -692,7 +692,7 @@ contract TestGas is Setup {
                 uint16(100), // fee
                 uint16(10), // prior fee
                 address(0), // controller
-                subject().DEFAULT_STRATEGY(),
+                normalStrategy(),
                 testConfig.strategyArgs
             )
         );

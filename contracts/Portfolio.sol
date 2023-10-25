@@ -7,7 +7,6 @@ import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IPortfolioRegistry.sol";
 import "./interfaces/IStrategy.sol";
-import "./strategies/NormalStrategy.sol";
 import "./PositionRenderer.sol";
 
 /**
@@ -35,11 +34,11 @@ contract Portfolio is ERC1155, IPortfolio {
             mstore(0x00, 0x20)
 
             // We load the length of our string (11 bytes, 0x0b in hex) and its
-            // actual hex value (0x76312e342e302d62657461) using the offset 0x2b.
+            // actual hex value (0x76312e352e302d62657461) using the offset 0x2b.
             // Using this particular offset value will right pad the length at
             // the end of the slot and left pad the string at the beginning of
             // the next slot, assuring the right ABI format to return a string.
-            mstore(0x2b, 0x0b76312e342e302d62657461) // "v1.4.0-beta"
+            mstore(0x2b, 0x0b76312e352e302d62657461) // "v1.5.0-beta"
 
             // Return all the 96 bytes (0x60) of data that was loaded into
             // the memory.
@@ -55,9 +54,6 @@ contract Portfolio is ERC1155, IPortfolio {
 
     /// @inheritdoc IPortfolioState
     address public immutable REGISTRY;
-
-    /// @inheritdoc IPortfolioState
-    address public immutable DEFAULT_STRATEGY;
 
     /// @inheritdoc IPortfolioState
     address public immutable POSITION_RENDERER;
@@ -206,7 +202,6 @@ contract Portfolio is ERC1155, IPortfolio {
     ) ERC1155() {
         WETH = weth;
         REGISTRY = registry;
-        DEFAULT_STRATEGY = address(new NormalStrategy(address(this)));
         POSITION_RENDERER = positionRenderer;
         __account__.settled = true;
     }
@@ -729,12 +724,9 @@ contract Portfolio is ERC1155, IPortfolio {
         // Increment the pool nonce.
         uint32 poolNonce = ++getPoolNonce[pairNonce];
 
-        // Zero address strtaegy is a magic value to use the default strategy.
-        strategy = strategy == address(0) ? DEFAULT_STRATEGY : strategy;
-
         // Compute the poolId, which is a packed 64-bit integer.
         poolId = PoolIdLib.encode(
-            strategy != DEFAULT_STRATEGY, // Flips the "altered" flag in the upper 4 bits: "0x10..."
+            false, // Flips the "altered" flag in the upper 4 bits: "0x10..."
             controller != address(0), // Flips the "controlled" flag in the lower 4 bits:  "0x01..."
             pairNonce,
             poolNonce
