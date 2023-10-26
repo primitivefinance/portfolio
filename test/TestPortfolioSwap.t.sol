@@ -555,19 +555,10 @@ contract TestPortfolioSwap is Setup {
         // This swap takes all of the quote token "y" out of the pool.
         // Therefore, we will hit the "lower bound" case for the "y" reserves.
         // This will make the invariant y term `Gaussian.ppf(1)`, which is -8710427241990476442.
-        // Then it will subtract the invariantTermX and add the stdDevSqrtTau term.
-        // The minimum value for the invariantTermX is the same, `Gaussian.ppf(1)`, which is -8710427241990476442.
-        // Therefore, the x reserve needs to be close to its upper bound, since the input to the ppf is 1 - x.
-        // If it is close or at the boundary, it will cancel out the invariant y term.
-        // If its not close, the stdDevSqrtTau term will need to be large enough to close the difference,
-        // which might be too large than that term could be.
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Portfolio_InvalidInvariant.selector,
-                int256(938),
-                int256(-8707810991428151127)
-            )
-        );
+        // This requires the asset token "x" reserves to be at the upper bound of 1 WAD.
+        // If both reserves are not at opposite bounds, it will revert.
+        // In this case, it will revert with the `NormalStrategyLib_UpperReserveXBoundNotReached` error.
+        vm.expectRevert(NormalStrategyLib_UpperReserveXBoundNotReached.selector);
         subject_.swap(order);
     }
 
