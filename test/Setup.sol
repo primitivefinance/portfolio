@@ -26,6 +26,7 @@ import "contracts/Portfolio.sol";
 
 // Strategy to test
 import "contracts/strategies/NormalStrategy.sol";
+import "contracts/strategies/G3MStrategy.sol";
 
 // Contracts in the test environment
 struct SubjectsType {
@@ -75,6 +76,9 @@ interface ISetup {
 
     /// @dev Returns the normal strategy address.
     function normalStrategy() external view returns (address);
+
+    /// @dev Returns the G3M strategy address.
+    function g3mStrategy() external view returns (address);
 }
 
 contract Setup is ISetup, Test, ERC1155TokenReceiver {
@@ -123,6 +127,9 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         _subjects.normalStrategy =
             address(new NormalStrategy(_subjects.portfolio));
         vm.label(_subjects.normalStrategy, "normal-strategy");
+
+        _subjects.g3mStrategy = address(new G3MStrategy(_subjects.portfolio));
+        vm.label(_subjects.g3mStrategy, "g3m-strategy");
 
         _ghost_state = GhostType({
             actor: address(this),
@@ -514,6 +521,11 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
     /// @inheritdoc ISetup
     function normalStrategy() public view override returns (address) {
         return _subjects.normalStrategy;
+    }
+
+    /// @inheritdoc ISetup
+    function g3mStrategy() public view override returns (address) {
+        return _subjects.g3mStrategy;
     }
 
     receive() external payable { }
