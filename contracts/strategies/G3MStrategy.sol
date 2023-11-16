@@ -48,6 +48,13 @@ contract G3MStrategy is IG3MStrategy {
         uint256 reserveY
     ) external view returns (bool, int256) { }
 
+    function _validateSwap(
+        uint256 preInvariant,
+        uint256 postInvariant
+    ) internal pure returns (bool) {
+        return postInvariant > preInvariant;
+    }
+
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
