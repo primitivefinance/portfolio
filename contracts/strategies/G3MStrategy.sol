@@ -20,7 +20,11 @@ contract G3MStrategy is IG3MStrategy {
     function afterCreate(
         uint64 poolId,
         bytes calldata strategyArgs
-    ) external returns (bool success) { }
+    ) external returns (bool success) {
+        (uint256 weightX) = abi.decode(strategyArgs, (uint256));
+        configs[poolId] = Config(weightX);
+        return true;
+    }
 
     function beforeSwap(
         uint64 poolId,
