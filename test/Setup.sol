@@ -35,6 +35,7 @@ struct SubjectsType {
     address portfolio;
     address positionRenderer;
     address normalStrategy;
+    address g3mStrategy;
 }
 
 // Interfaces
