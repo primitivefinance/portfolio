@@ -6,6 +6,13 @@ import "./IG3MStrategy.sol";
 contract G3MStrategy is IG3MStrategy {
     address public immutable portfolio;
 
+    mapping(uint64 => IG3MStrategy.Config) public configs;
+
+    modifier onlyPortfolio() {
+        if (msg.sender != portfolio) revert NotPortfolio();
+        _;
+    }
+
     constructor(address portfolio_) {
         portfolio = portfolio_;
     }
