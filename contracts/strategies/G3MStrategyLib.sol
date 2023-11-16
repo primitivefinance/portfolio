@@ -100,4 +100,21 @@ library G3MStrategyLib {
         deltaX = reserveX.divWadDown(reserveY).mulWadDown(reserveY + deltaY)
             - reserveX;
     }
+
+    function computeAmountOutGivenAmountIn(
+        uint256 amountIn,
+        uint256 reserveIn,
+        uint256 weightIn,
+        uint256 reserveOut,
+        uint256 weightOut
+    ) internal pure returns (uint256 amountOut) {
+        amountOut = reserveOut.mulWadDown(
+            FixedPointMathLib.WAD
+                - uint256(
+                    int256(reserveIn.divWadDown(reserveIn + amountIn)).powWad(
+                        int256(weightIn.divWadDown(weightOut))
+                    )
+                )
+        );
+    }
 }
