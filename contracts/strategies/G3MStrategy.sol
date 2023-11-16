@@ -26,6 +26,15 @@ contract G3MStrategy is IG3MStrategy {
         return true;
     }
 
+    function validatePool(uint64 poolId)
+        external
+        view
+        override
+        returns (bool)
+    {
+        return configs[poolId].weightX != 0;
+    }
+
     function beforeSwap(
         uint64 poolId,
         bool sellAsset,
@@ -69,11 +78,4 @@ contract G3MStrategy is IG3MStrategy {
     { }
 
     function getInvariant(uint64 poolId) external view returns (int256) { }
-
-    function validatePool(uint64 poolId)
-        external
-        view
-        override
-        returns (bool)
-    { }
 }
