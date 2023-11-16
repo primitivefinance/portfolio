@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 
 import "./IG3MStrategy.sol";
+import "./G3MStrategyLib.sol";
 
 contract G3MStrategy is IG3MStrategy {
     address public immutable portfolio;
@@ -46,7 +47,19 @@ contract G3MStrategy is IG3MStrategy {
         int256 invariant,
         uint256 reserveX,
         uint256 reserveY
-    ) external view returns (bool, int256) { }
+    ) external view returns (bool, int256) {
+        uint256 postInvariant = G3MStrategyLib.computeInvariant(
+            reserveX,
+            configs[poolId].weightX,
+            reserveY,
+            FixedPointMathLib.WAD - configs[poolId].weightX
+        );
+
+        return (
+            _validateSwap(uint256(invariant), postInvariant),
+            int256(postInvariant)
+        );
+    }
 
     function _validateSwap(
         uint256 preInvariant,
