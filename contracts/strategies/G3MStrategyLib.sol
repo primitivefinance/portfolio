@@ -32,4 +32,32 @@ library G3MStrategyLib {
             )
         );
     }
+
+    /**
+     * @dev Computes the spot price of a pool using the following formula:
+     *
+     *       rO
+     *       ──
+     *       wO
+     * p =  ────
+     *       rI
+     *       ──
+     *       wI
+     *
+     * @param reserveOut Reserve of the output token
+     * @param weightOut Weight of the output token
+     * @param reserveIn Reserve of the input token
+     * @param weightIn Weight of the input token
+     * @return p Spot price of the pool
+     */
+    function computeSpotPrice(
+        uint256 reserveIn,
+        uint256 weightIn,
+        uint256 reserveOut,
+        uint256 weightOut
+    ) internal pure returns (uint256 p) {
+        p = reserveOut.divWadDown(weightOut).divWadDown(
+            reserveIn.divWadDown(weightIn)
+        );
+    }
 }
