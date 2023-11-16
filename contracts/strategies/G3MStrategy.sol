@@ -4,6 +4,12 @@ pragma solidity 0.8.19;
 import "./IG3MStrategy.sol";
 
 contract G3MStrategy is IG3MStrategy {
+    address public immutable portfolio;
+
+    constructor(address portfolio_) {
+        portfolio = portfolio_;
+    }
+
     function afterCreate(
         uint64 poolId,
         bytes calldata strategyArgs
