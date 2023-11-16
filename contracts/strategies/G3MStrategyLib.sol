@@ -60,4 +60,15 @@ library G3MStrategyLib {
             reserveIn.divWadDown(weightIn)
         );
     }
+
+    function computeAmountInGivenExactLiquidity(
+        uint256 liquidity,
+        uint256 deltaLiquidity,
+        uint256 reserveIn
+    ) internal pure returns (uint256 amountIn) {
+        amountIn = (
+            (liquidity + deltaLiquidity).divWadDown(liquidity)
+                - FixedPointMathLib.WAD
+        ).mulWadUp(reserveIn);
+    }
 }
