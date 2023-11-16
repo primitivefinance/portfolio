@@ -91,4 +91,13 @@ library G3MStrategyLib {
         deltaY = reserveY.divWadDown(reserveX).mulWadDown(reserveX + deltaX)
             - reserveY;
     }
+
+    function computeDeltaXGivenDeltaY(
+        uint256 reserveX,
+        uint256 reserveY,
+        uint256 deltaY
+    ) internal pure returns (uint256 deltaX) {
+        deltaX = reserveX.divWadDown(reserveY).mulWadDown(reserveY + deltaY)
+            - reserveX;
+    }
 }
