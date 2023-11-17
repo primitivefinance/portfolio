@@ -98,4 +98,20 @@ contract G3MStrategy is IG3MStrategy {
     { }
 
     function getInvariant(uint64 poolId) external view returns (int256) { }
+
+    function getStrategyData(
+        uint256 reserveX,
+        uint256 weightX,
+        uint256 price
+    )
+        external
+        pure
+        returns (bytes memory strategyData, uint256 initialX, uint256 initialY)
+    {
+        strategyData = abi.encode(weightX);
+        initialX = reserveX;
+        initialY = G3MStrategyLib.computeReserveInGivenPrice(
+            price, reserveX, weightX, FixedPointMathLib.WAD - weightX
+        );
+    }
 }
