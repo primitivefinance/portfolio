@@ -133,4 +133,14 @@ library G3MStrategyLib {
             ) - FixedPointMathLib.WAD
         );
     }
+
+    function computeReserveInGivenPrice(
+        uint256 price,
+        uint256 reserveOut,
+        uint256 weightIn,
+        uint256 weightOut
+    ) internal pure returns (uint256 reserveIn) {
+        reserveIn =
+            reserveOut.mulWadUp(weightIn).divWadUp(weightOut.mulWadUp(price));
+    }
 }
