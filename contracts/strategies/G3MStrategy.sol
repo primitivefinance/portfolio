@@ -41,7 +41,19 @@ contract G3MStrategy is IG3MStrategy {
         uint64 poolId,
         bool sellAsset,
         address swapper
-    ) external returns (bool, int256) { }
+    ) external returns (bool, int256) {
+        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+
+        int256 invariant = int256(
+            G3MStrategyLib.computeInvariant(
+                pool.virtualX,
+                configs[poolId].weightX,
+                pool.virtualY,
+                FixedPointMathLib.WAD - configs[poolId].weightX
+            )
+        );
+        return (true, invariant);
+    }
 
     function validateSwap(
         uint64 poolId,
