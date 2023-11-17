@@ -141,7 +141,18 @@ contract G3MStrategy is IG3MStrategy {
         success = postInvariant > prevInvariant;
     }
 
-    function getInvariant(uint64 poolId) external view returns (int256) { }
+    function getInvariant(uint64 poolId) external view returns (int256) {
+        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+
+        return int256(
+            G3MStrategyLib.computeInvariant(
+                pool.virtualX,
+                configs[poolId].weightX,
+                pool.virtualY,
+                FixedPointMathLib.WAD - configs[poolId].weightX
+            )
+        );
+    }
 
     function getStrategyData(
         uint256 reserveX,
