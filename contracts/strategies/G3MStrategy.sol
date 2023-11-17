@@ -3,6 +3,7 @@ pragma solidity 0.8.19;
 
 import "./IG3MStrategy.sol";
 import "./G3MStrategyLib.sol";
+import "../interfaces/IPortfolio.sol";
 
 contract G3MStrategy is IG3MStrategy {
     address public immutable portfolio;
@@ -73,7 +74,23 @@ contract G3MStrategy is IG3MStrategy {
         bool sellAsset,
         uint256 amountIn,
         address swapper
-    ) external view returns (uint256) { }
+    ) external view returns (uint256) {
+        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+
+        uint256 amountOut = G3MStrategyLib.computeAmountOutGivenAmountIn(
+            amountIn,
+            sellAsset ? pool.virtualX : pool.virtualY,
+            sellAsset
+                ? configs[poolId].weightX
+                : FixedPointMathLib.WAD - configs[poolId].weightX,
+            sellAsset ? pool.virtualY : pool.virtualX,
+            sellAsset
+                ? FixedPointMathLib.WAD - configs[poolId].weightX
+                : configs[poolId].weightX
+        );
+
+        return amountOut;
+    }
 
     function getSpotPrice(uint64 poolId)
         external
@@ -95,7 +112,34 @@ contract G3MStrategy is IG3MStrategy {
         external
         view
         returns (bool success, int256 prevInvariant, int256 postInvariant)
-    { }
+    {
+        PortfolioPool memory pool =
+            IPortfolioStruct(portfolio).pools(order.poolId);
+
+        prevInvariant = int256(
+            G3MStrategyLib.computeInvariant(
+                pool.virtualX,
+                configs[order.poolId].weightX,
+                pool.virtualY,
+                FixedPointMathLib.WAD - configs[order.poolId].weightX
+            )
+        );
+
+        postInvariant = int256(
+            G3MStrategyLib.computeInvariant(
+                order.sellAsset
+                    ? pool.virtualX + order.input
+                    : pool.virtualX - order.input,
+                configs[order.poolId].weightX,
+                order.sellAsset
+                    ? pool.virtualY - order.output
+                    : pool.virtualY + order.output,
+                FixedPointMathLib.WAD - configs[order.poolId].weightX
+            )
+        );
+
+        success = postInvariant > prevInvariant;
+    }
 
     function getInvariant(uint64 poolId) external view returns (int256) { }
 
