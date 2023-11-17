@@ -111,7 +111,7 @@ contract G3MStrategy is IG3MStrategy {
         strategyData = abi.encode(weightX);
         initialX = reserveX;
         initialY = G3MStrategyLib.computeReserveInGivenPrice(
-            price, reserveX, weightX, FixedPointMathLib.WAD - weightX
+            price, reserveX, FixedPointMathLib.WAD - weightX, weightX
         );
     }
 }
