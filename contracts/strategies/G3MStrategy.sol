@@ -96,7 +96,15 @@ contract G3MStrategy is IG3MStrategy {
         external
         view
         returns (uint256 price)
-    { }
+    {
+        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        price = G3MStrategyLib.computeSpotPrice(
+            pool.virtualY,
+            FixedPointMathLib.WAD - configs[poolId].weightX,
+            pool.virtualX,
+            configs[poolId].weightX
+        );
+    }
 
     function getMaxOrder(
         uint64 poolId,
