@@ -4,6 +4,7 @@ pragma solidity 0.8.19;
 import "./IG3MStrategy.sol";
 import "./G3MStrategyLib.sol";
 import "../interfaces/IPortfolio.sol";
+import "../libraries/SwapLib.sol";
 
 contract G3MStrategy is IG3MStrategy {
     address public immutable portfolio;
@@ -89,8 +90,13 @@ contract G3MStrategy is IG3MStrategy {
     ) external view returns (uint256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
+        // uint256 protocolFee = IPortfolio(portfolio).protocolFee();
+
+        uint256 fees = amountIn * pool.feeBasisPoints / BASIS_POINT_DIVISOR;
+        uint256 amountInMinusFees = amountIn - fees;
+
         uint256 amountOut = G3MStrategyLib.computeAmountOutGivenAmountIn(
-            amountIn,
+            amountInMinusFees,
             sellAsset ? pool.virtualX : pool.virtualY,
             sellAsset
                 ? configs[poolId].weightX
