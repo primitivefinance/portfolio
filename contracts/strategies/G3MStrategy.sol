@@ -20,6 +20,7 @@ contract G3MStrategy is IG3MStrategy {
         portfolio = portfolio_;
     }
 
+    /// @inheritdoc IStrategy
     function afterCreate(
         uint64 poolId,
         bytes calldata strategyArgs
@@ -29,6 +30,7 @@ contract G3MStrategy is IG3MStrategy {
         return true;
     }
 
+    /// @inheritdoc IStrategy
     function validatePool(uint64 poolId)
         external
         view
@@ -38,6 +40,7 @@ contract G3MStrategy is IG3MStrategy {
         return configs[poolId].weightX != 0;
     }
 
+    /// @inheritdoc IStrategy
     function beforeSwap(
         uint64 poolId,
         bool sellAsset,
@@ -56,6 +59,7 @@ contract G3MStrategy is IG3MStrategy {
         return (true, invariant);
     }
 
+    /// @inheritdoc IStrategy
     function validateSwap(
         uint64 poolId,
         int256 invariant,
@@ -82,6 +86,7 @@ contract G3MStrategy is IG3MStrategy {
         return postInvariant > preInvariant;
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function getAmountOut(
         uint64 poolId,
         bool sellAsset,
@@ -110,6 +115,7 @@ contract G3MStrategy is IG3MStrategy {
         return amountOut;
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function getSpotPrice(uint64 poolId)
         external
         view
@@ -124,12 +130,14 @@ contract G3MStrategy is IG3MStrategy {
         );
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function getMaxOrder(
         uint64 poolId,
         bool sellAsset,
         address swapper
     ) external view returns (Order memory) { }
 
+    /// @inheritdoc IPortfolioStrategy
     function simulateSwap(
         Order memory order,
         uint256 timestamp,
@@ -167,6 +175,7 @@ contract G3MStrategy is IG3MStrategy {
         success = postInvariant > prevInvariant;
     }
 
+    /// @inheritdoc IPortfolioStrategy
     function getInvariant(uint64 poolId) external view returns (int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
