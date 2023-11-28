@@ -4,19 +4,28 @@ pragma solidity ^0.8.4;
 import "./Setup.sol";
 
 contract TestG3MCreatePool is Setup {
+    function deployTokens(
+        IPortfolio subject,
+        bool createPair
+    ) internal returns (MockERC20 token0, MockERC20 token1) {
+        token0 = new MockERC20("tkn", "tkn", 18);
+        token1 = new MockERC20("tkn", "tkn", 18);
+        token0.mint(address(this), type(uint256).max);
+        token0.approve(address(subject), type(uint256).max);
+        token1.mint(address(this), type(uint256).max);
+        token1.approve(address(subject), type(uint256).max);
+
+        if (createPair) {
+            subject.createPair(address(token0), address(token1));
+        }
+    }
+
     function test_G3M_createPool_SetsSpotPrice() public {
+        deployTokens(subject(), true);
+
         uint256 reserveX = 18_600 ether;
         uint256 weightX = 0.75 ether;
         uint256 initialPrice = 1937.5 ether;
-
-        address token0 = address(new MockERC20("tkn", "tkn", 18));
-        address token1 = address(new MockERC20("tkn", "tkn", 18));
-        MockERC20(token0).mint(address(this), type(uint256).max);
-        MockERC20(token0).approve(address(subject()), type(uint256).max);
-        MockERC20(token1).mint(address(this), type(uint256).max);
-        MockERC20(token1).approve(address(subject()), type(uint256).max);
-
-        subject().createPair(token0, token1);
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
@@ -38,18 +47,15 @@ contract TestG3MCreatePool is Setup {
     }
 
     function test_g3m_createPool() public {
-        address token0 = address(new MockERC20("tkn", "tkn", 18));
-        address token1 = address(new MockERC20("tkn", "tkn", 18));
-        MockERC20(token0).mint(address(this), type(uint256).max);
-        MockERC20(token0).approve(address(subject()), type(uint256).max);
-        MockERC20(token1).mint(address(this), type(uint256).max);
-        MockERC20(token1).approve(address(subject()), type(uint256).max);
+        (MockERC20 token0, MockERC20 token1) = deployTokens(subject(), true);
 
-        subject().createPair(token0, token1);
+        uint256 reserveX = 18_600 ether;
+        uint256 weightX = 0.75 ether;
+        uint256 initialPrice = 1937.5 ether;
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
-            18_600 ether, 0.75 ether, 1937.5 ether
+            reserveX, weightX, initialPrice
         );
 
         console.log("initialX:", initialX);
@@ -66,17 +72,11 @@ contract TestG3MCreatePool is Setup {
             strategyData
         );
 
-        console.log("balance x", MockERC20(token0).balanceOf(address(this)));
-        console.log("balance y", MockERC20(token1).balanceOf(address(this)));
+        console.log("balance x", token0.balanceOf(address(this)));
+        console.log("balance y", token1.balanceOf(address(this)));
 
-        console.log(
-            "Portfolio balance x",
-            MockERC20(token0).balanceOf(address(subject()))
-        );
-        console.log(
-            "Portfolio balance y",
-            MockERC20(token1).balanceOf(address(subject()))
-        );
+        console.log("Portfolio balance x", token0.balanceOf(address(subject())));
+        console.log("Portfolio balance y", token1.balanceOf(address(subject())));
 
         {
             (
@@ -108,8 +108,8 @@ contract TestG3MCreatePool is Setup {
 
         console.log("Spot price:", subject().getSpotPrice(poolId));
 
-        console.log("balance x", MockERC20(token0).balanceOf(address(this)));
-        console.log("balance y", MockERC20(token1).balanceOf(address(this)));
+        console.log("balance x", token0.balanceOf(address(this)));
+        console.log("balance y", token1.balanceOf(address(this)));
 
         {
             (
@@ -128,14 +128,8 @@ contract TestG3MCreatePool is Setup {
             console.log("liquidity", liquidity);
         }
 
-        console.log(
-            "Portfolio balance x",
-            MockERC20(token0).balanceOf(address(subject()))
-        );
-        console.log(
-            "Portfolio balance y",
-            MockERC20(token1).balanceOf(address(subject()))
-        );
+        console.log("Portfolio balance x", token0.balanceOf(address(subject())));
+        console.log("Portfolio balance y", token1.balanceOf(address(subject())));
 
         console.log(
             "Out:",
