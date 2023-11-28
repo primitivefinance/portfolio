@@ -20,7 +20,7 @@ contract TestG3MCreatePool is Setup {
         }
     }
 
-    function test_G3M_createPool_SetsSpotPrice() public {
+    function test_G3M_createPool() public {
         deployTokens(subject(), true);
 
         uint256 reserveX = 18_600 ether;
@@ -44,10 +44,11 @@ contract TestG3MCreatePool is Setup {
         );
 
         assertEq(subject().getSpotPrice(poolId), initialPrice);
+        assertEq(subject().getStrategy(poolId), g3mStrategy());
     }
 
-    function test_g3m_createPool() public {
-        (MockERC20 token0, MockERC20 token1) = deployTokens(subject(), true);
+    function test_G3M_allocate() public {
+        deployTokens(subject(), true);
 
         uint256 reserveX = 18_600 ether;
         uint256 weightX = 0.75 ether;
@@ -57,9 +58,6 @@ contract TestG3MCreatePool is Setup {
         G3MStrategy(g3mStrategy()).getStrategyData(
             reserveX, weightX, initialPrice
         );
-
-        console.log("initialX:", initialX);
-        console.log("initialY:", initialY);
 
         uint64 poolId = subject().createPool(
             0,
@@ -72,29 +70,6 @@ contract TestG3MCreatePool is Setup {
             strategyData
         );
 
-        console.log("balance x", token0.balanceOf(address(this)));
-        console.log("balance y", token1.balanceOf(address(this)));
-
-        console.log("Portfolio balance x", token0.balanceOf(address(subject())));
-        console.log("Portfolio balance y", token1.balanceOf(address(subject())));
-
-        {
-            (
-                uint128 virtualX, // Total X reserves in WAD units for all liquidity.
-                uint128 virtualY, // Total Y reserves in WAD units for all liquidity.
-                uint128 liquidity, // Total supply of liquidity.
-                uint32 lastTimestamp, // Updated __only__ on `swap()`.
-                uint16 feeBasisPoints,
-                uint16 priorityFeeBasisPoints,
-                address controller, // Address that can call `changeParameters()`.
-                address strategy
-            ) = subject().pools(poolId);
-
-            console.log("virtualX", virtualX);
-            console.log("virtualY", virtualY);
-            console.log("liquidity", liquidity);
-        }
-
         subject().allocate(
             false,
             address(this),
@@ -103,39 +78,38 @@ contract TestG3MCreatePool is Setup {
             type(uint128).max,
             type(uint128).max
         );
+    }
 
-        console.log("Invariant:", uint256(subject().getInvariant(poolId)));
+    function test_G3M_swap() public {
+        deployTokens(subject(), true);
 
-        console.log("Spot price:", subject().getSpotPrice(poolId));
+        uint256 reserveX = 18_600 ether;
+        uint256 weightX = 0.75 ether;
+        uint256 initialPrice = 1937.5 ether;
 
-        console.log("balance x", token0.balanceOf(address(this)));
-        console.log("balance y", token1.balanceOf(address(this)));
+        (bytes memory strategyData, uint256 initialX, uint256 initialY) =
+        G3MStrategy(g3mStrategy()).getStrategyData(
+            reserveX, weightX, initialPrice
+        );
 
-        {
-            (
-                uint128 virtualX, // Total X reserves in WAD units for all liquidity.
-                uint128 virtualY, // Total Y reserves in WAD units for all liquidity.
-                uint128 liquidity, // Total supply of liquidity.
-                uint32 lastTimestamp, // Updated __only__ on `swap()`.
-                uint16 feeBasisPoints,
-                uint16 priorityFeeBasisPoints,
-                address controller, // Address that can call `changeParameters()`.
-                address strategy
-            ) = subject().pools(poolId);
+        uint64 poolId = subject().createPool(
+            0,
+            initialX,
+            initialY,
+            100,
+            0,
+            address(0),
+            g3mStrategy(),
+            strategyData
+        );
 
-            console.log("virtualX", virtualX);
-            console.log("virtualY", virtualY);
-            console.log("liquidity", liquidity);
-        }
-
-        console.log("Portfolio balance x", token0.balanceOf(address(subject())));
-        console.log("Portfolio balance y", token1.balanceOf(address(subject())));
-
-        console.log(
-            "Out:",
-            G3MStrategy(g3mStrategy()).getAmountOut(
-                poolId, true, 500 ether, address(this)
-            )
+        subject().allocate(
+            false,
+            address(this),
+            poolId,
+            100 ether,
+            type(uint128).max,
+            type(uint128).max
         );
 
         Order memory order = Order({
@@ -149,17 +123,6 @@ contract TestG3MCreatePool is Setup {
             poolId: poolId,
             sellAsset: true
         });
-
-        (bool success, int256 prevInvariant, int256 postInvariant) =
-            subject().simulateSwap(order, block.timestamp, address(this));
-
-        console.log("success:", success);
-        console.log("prevInvariant:");
-        console.logInt(prevInvariant);
-        console.log("postInvariant:");
-        console.logInt(postInvariant);
-
-        console.log("Invariant is gud:", postInvariant > prevInvariant);
 
         subject().swap(order);
     }
