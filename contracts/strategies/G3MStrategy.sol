@@ -5,8 +5,12 @@ import "./IG3MStrategy.sol";
 import "./G3MStrategyLib.sol";
 import "../interfaces/IPortfolio.sol";
 import "../libraries/SwapLib.sol";
+import "../libraries/AssemblyLib.sol";
+import "../libraries/PoolLib.sol";
 
 contract G3MStrategy is IG3MStrategy {
+    using AssemblyLib for *;
+
     address public immutable portfolio;
 
     mapping(uint64 => IG3MStrategy.Config) public configs;
@@ -92,15 +96,20 @@ contract G3MStrategy is IG3MStrategy {
         bool sellAsset,
         uint256 amountIn,
         address swapper
-    ) external view returns (uint256) {
+    ) external view returns (uint256 output) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
-        // uint256 protocolFee = IPortfolio(portfolio).protocolFee();
+        PortfolioPair memory pair =
+            IPortfolioStruct(portfolio).pairs(PoolId.wrap(poolId).pairId());
+
+        amountIn = amountIn.scaleToWad(
+            sellAsset ? pair.decimalsAsset : pair.decimalsQuote
+        );
 
         uint256 fees = amountIn * pool.feeBasisPoints / BASIS_POINT_DIVISOR;
         uint256 amountInMinusFees = amountIn - fees;
 
-        uint256 amountOut = G3MStrategyLib.computeAmountOutGivenAmountIn(
+        output = G3MStrategyLib.computeAmountOutGivenAmountIn(
             amountInMinusFees,
             sellAsset ? pool.virtualX : pool.virtualY,
             sellAsset
@@ -112,7 +121,8 @@ contract G3MStrategy is IG3MStrategy {
                 : configs[poolId].weightX
         );
 
-        return amountOut;
+        uint256 outputDec = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
+        output = output.scaleFromWadDown(outputDec);
     }
 
     /// @inheritdoc IPortfolioStrategy
