@@ -107,7 +107,7 @@ contract NormalStrategy is INormalStrategy {
     error CannotUpdatePool();
 
     /// @inheritdoc IStrategy
-    function updatePool(uint64, bytes memory) external {
+    function updatePool(uint64, address, bytes memory) external {
         revert CannotUpdatePool();
     }
 
