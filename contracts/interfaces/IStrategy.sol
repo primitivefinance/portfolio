@@ -85,4 +85,6 @@ interface IStrategy is IPortfolioStrategy {
         uint256 reserveX,
         uint256 reserveY
     ) external view returns (bool, int256);
+
+    function updatePool(uint64 poolId, bytes memory data) external;
 }

@@ -298,6 +298,10 @@ contract Portfolio is ERC1155, IPortfolio {
         _postLock();
     }
 
+    function updatePool(uint64 poolId, bytes memory data) external {
+        IStrategy(getStrategy(poolId)).updatePool(poolId, data);
+    }
+
     /// @inheritdoc IPortfolioActions
     function allocate(
         bool useMax,
