@@ -29,8 +29,9 @@ contract G3MStrategy is IG3MStrategy {
         uint64 poolId,
         bytes calldata strategyArgs
     ) external returns (bool success) {
-        (uint256 weightX) = abi.decode(strategyArgs, (uint256));
-        configs[poolId] = Config(weightX);
+        (address controller, uint256 weightX) =
+            abi.decode(strategyArgs, (address, uint256));
+        configs[poolId] = Config({ weightX: weightX, controller: controller });
         return true;
     }
 
@@ -202,6 +203,7 @@ contract G3MStrategy is IG3MStrategy {
     }
 
     function getStrategyData(
+        address controller,
         uint256 reserveX,
         uint256 weightX,
         uint256 price
@@ -210,7 +212,7 @@ contract G3MStrategy is IG3MStrategy {
         pure
         returns (bytes memory strategyData, uint256 initialX, uint256 initialY)
     {
-        strategyData = abi.encode(weightX);
+        strategyData = abi.encode(controller, weightX);
         initialX = reserveX;
         initialY = G3MStrategyLib.computeReserveInGivenPrice(
             price, reserveX, FixedPointMathLib.WAD - weightX, weightX

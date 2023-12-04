@@ -8,5 +8,6 @@ interface IG3MStrategy is IStrategy {
 
     struct Config {
         uint256 weightX;
+        address controller;
     }
 }
