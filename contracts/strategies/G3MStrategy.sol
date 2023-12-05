@@ -45,7 +45,17 @@ contract G3MStrategy is IG3MStrategy {
         return configs[poolId].weightX != 0;
     }
 
-    function updatePool(uint64, address, bytes memory) external { }
+    error NotController();
+
+    function updatePool(
+        uint64 poolId,
+        address caller,
+        bytes memory data
+    ) external onlyPortfolio {
+        if (caller != configs[poolId].controller) revert NotController();
+
+        // TODO: Add some actual features here
+    }
 
     /// @inheritdoc IStrategy
     function beforeSwap(
