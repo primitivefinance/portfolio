@@ -29,7 +29,7 @@ contract TestG3MCreatePool is Setup {
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
-            address(this), reserveX, weightX, initialPrice
+            abi.encode(address(this), reserveX, weightX, initialPrice)
         );
 
         uint64 poolId = subject().createPool(
@@ -56,7 +56,7 @@ contract TestG3MCreatePool is Setup {
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
-            address(this), reserveX, weightX, initialPrice
+            abi.encode(address(this), reserveX, weightX, initialPrice)
         );
 
         uint64 poolId = subject().createPool(
@@ -89,7 +89,7 @@ contract TestG3MCreatePool is Setup {
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
-            address(this), reserveX, weightX, initialPrice
+            abi.encode(address(this), reserveX, weightX, initialPrice)
         );
 
         uint64 poolId = subject().createPool(

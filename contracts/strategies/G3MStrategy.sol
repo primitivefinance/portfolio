@@ -212,16 +212,14 @@ contract G3MStrategy is IG3MStrategy {
         );
     }
 
-    function getStrategyData(
-        address controller,
-        uint256 reserveX,
-        uint256 weightX,
-        uint256 price
-    )
+    function getStrategyData(bytes memory data)
         external
         pure
         returns (bytes memory strategyData, uint256 initialX, uint256 initialY)
     {
+        (address controller, uint256 reserveX, uint256 weightX, uint256 price) =
+            abi.decode(data, (address, uint256, uint256, uint256));
+
         strategyData = abi.encode(controller, weightX);
         initialX = reserveX;
         initialY = G3MStrategyLib.computeReserveInGivenPrice(
