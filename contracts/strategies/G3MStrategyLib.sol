@@ -159,4 +159,15 @@ library G3MStrategyLib {
         return FixedPointMathLib.WAD
             - (FixedPointMathLib.WAD.divWadUp(FixedPointMathLib.WAD + boop));
     }
+
+    function computeISFunction(uint256 t) internal pure returns (uint256 x) {
+        uint256 boop = uint256(
+            int256(
+                FixedPointMathLib.WAD.divWadUp(
+                    FixedPointMathLib.WAD - t - FixedPointMathLib.WAD
+                )
+            ).powWad(-(int256(FixedPointMathLib.WAD.divWadUp(2))))
+        );
+        return FixedPointMathLib.WAD.divWadUp(FixedPointMathLib.WAD + boop);
+    }
 }
