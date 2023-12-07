@@ -251,7 +251,7 @@ contract G3MStrategy is IG3MStrategy {
 
     function computeWeights(uint64 poolId)
         internal
-        returns (uint256, uint256)
+        returns (uint256 weightX, uint256 weightY)
     {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
 
@@ -262,9 +262,7 @@ contract G3MStrategy is IG3MStrategy {
         uint256 fw0 = G3MStrategyLib.computeISFunction(pool.startWeightX);
         uint256 fw1 = G3MStrategyLib.computeISFunction(pool.endWeightX);
 
-        uint256 weightX = G3MStrategyLib.computeSFunction(t, fw1 - fw0, fw0);
-        uint256 weightY = WAD - weightX;
-
-        return (weightX, weightY);
+        weightX = G3MStrategyLib.computeSFunction(t, fw1 - fw0, fw0);
+        weightY = WAD - weightX;
     }
 }
