@@ -29,9 +29,22 @@ contract G3MStrategy is IG3MStrategy {
         uint64 poolId,
         bytes calldata strategyArgs
     ) external returns (bool success) {
-        (address controller, uint256 weightX) =
-            abi.decode(strategyArgs, (address, uint256));
-        configs[poolId] = Config({ weightX: weightX, controller: controller });
+        (
+            address controller,
+            uint256 startWeightX,
+            uint256 endWeightX,
+            uint256 startUpdate,
+            uint256 endUpdate
+        ) = abi.decode(
+            strategyArgs, (address, uint256, uint256, uint256, uint256)
+        );
+        configs[poolId] = Config({
+            controller: controller,
+            startWeightX: startWeightX,
+            endWeightX: endWeightX,
+            startUpdate: startUpdate,
+            endUpdate: endUpdate
+        });
         return true;
     }
 
@@ -42,7 +55,7 @@ contract G3MStrategy is IG3MStrategy {
         override
         returns (bool)
     {
-        return configs[poolId].weightX != 0;
+        return configs[poolId].startWeightX != 0;
     }
 
     error NotController();
@@ -217,13 +230,41 @@ contract G3MStrategy is IG3MStrategy {
         pure
         returns (bytes memory strategyData, uint256 initialX, uint256 initialY)
     {
-        (address controller, uint256 reserveX, uint256 weightX, uint256 price) =
-            abi.decode(data, (address, uint256, uint256, uint256));
+        (
+            address controller,
+            uint256 reserveX,
+            uint256 startWeightX,
+            uint256 endWeightX,
+            uint256 startUpdate,
+            uint256 endUpdate,
+            uint256 price
+        ) = abi.decode(data, (address, uint256, uint256, uint256));
 
-        strategyData = abi.encode(controller, weightX);
+        strategyData = abi.encode(
+            controller, startWeightX, endWeightX, startUpdate, endUpdate
+        );
         initialX = reserveX;
         initialY = G3MStrategyLib.computeReserveInGivenPrice(
-            price, reserveX, FixedPointMathLib.WAD - weightX, weightX
+            price, reserveX, FixedPointMathLib.WAD - startWeightX, startWeightX
         );
+    }
+
+    function computeWeights(uint64 poolId)
+        internal
+        returns (uint256, uint256)
+    {
+        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+
+        uint256 duration =
+            configs[poolId].endUpdate - configs[poolId].startUpdate;
+        uint256 timeElapsed = block.timestamp - configs[poolId].startUpdate;
+        uint256 t = timeElapsed * WAD / duration;
+        uint256 fw0 = G3MStrategyLib.computeISFunction(pool.startWeightX);
+        uint256 fw1 = G3MStrategyLib.computeISFunction(pool.endWeightX);
+
+        uint256 weightX = G3MStrategyLib.computeSFunction(t, fw1 - fw0, fw0);
+        uint256 weightY = WAD - weightX;
+
+        return (weightX, weightY);
     }
 }
