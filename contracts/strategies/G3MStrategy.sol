@@ -77,13 +77,11 @@ contract G3MStrategy is IG3MStrategy {
         address swapper
     ) external returns (bool, int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        (uint256 weightX, uint256 weightY) = computeWeights(poolId);
 
         int256 invariant = int256(
             G3MStrategyLib.computeInvariant(
-                pool.virtualX,
-                configs[poolId].weightX,
-                pool.virtualY,
-                FixedPointMathLib.WAD - configs[poolId].weightX
+                pool.virtualX, weightX, pool.virtualY, weightY
             )
         );
         return (true, invariant);
@@ -96,11 +94,10 @@ contract G3MStrategy is IG3MStrategy {
         uint256 reserveX,
         uint256 reserveY
     ) external view returns (bool, int256) {
+        (uint256 weightX, uint256 weightY) = computeWeights(poolId);
+
         uint256 postInvariant = G3MStrategyLib.computeInvariant(
-            reserveX,
-            configs[poolId].weightX,
-            reserveY,
-            FixedPointMathLib.WAD - configs[poolId].weightX
+            reserveX, weightX, reserveY, weightY
         );
 
         return (
@@ -124,6 +121,7 @@ contract G3MStrategy is IG3MStrategy {
         address swapper
     ) external view returns (uint256 output) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        (uint256 weightX, uint256 weightY) = computeWeights(poolId);
 
         PortfolioPair memory pair =
             IPortfolioStruct(portfolio).pairs(PoolId.wrap(poolId).pairId());
@@ -138,13 +136,9 @@ contract G3MStrategy is IG3MStrategy {
         output = G3MStrategyLib.computeAmountOutGivenAmountIn(
             amountInMinusFees,
             sellAsset ? pool.virtualX : pool.virtualY,
-            sellAsset
-                ? configs[poolId].weightX
-                : FixedPointMathLib.WAD - configs[poolId].weightX,
+            sellAsset ? weightX : weightY,
             sellAsset ? pool.virtualY : pool.virtualX,
-            sellAsset
-                ? FixedPointMathLib.WAD - configs[poolId].weightX
-                : configs[poolId].weightX
+            sellAsset ? weightY : weightX
         );
 
         uint256 outputDec = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
@@ -158,11 +152,10 @@ contract G3MStrategy is IG3MStrategy {
         returns (uint256 price)
     {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        (uint256 weightX, uint256 weightY) = computeWeights(poolId);
+
         price = G3MStrategyLib.computeSpotPrice(
-            pool.virtualY,
-            FixedPointMathLib.WAD - configs[poolId].weightX,
-            pool.virtualX,
-            configs[poolId].weightX
+            pool.virtualY, weightY, pool.virtualX, weightX
         );
     }
 
@@ -185,13 +178,11 @@ contract G3MStrategy is IG3MStrategy {
     {
         PortfolioPool memory pool =
             IPortfolioStruct(portfolio).pools(order.poolId);
+        (uint256 weightX, uint256 weightY) = computeWeights(order.poolId);
 
         prevInvariant = int256(
             G3MStrategyLib.computeInvariant(
-                pool.virtualX,
-                configs[order.poolId].weightX,
-                pool.virtualY,
-                FixedPointMathLib.WAD - configs[order.poolId].weightX
+                pool.virtualX, weightX, pool.virtualY, weightY
             )
         );
 
@@ -200,11 +191,11 @@ contract G3MStrategy is IG3MStrategy {
                 order.sellAsset
                     ? pool.virtualX + order.input
                     : pool.virtualX - order.input,
-                configs[order.poolId].weightX,
+                weightX,
                 order.sellAsset
                     ? pool.virtualY - order.output
                     : pool.virtualY + order.output,
-                FixedPointMathLib.WAD - configs[order.poolId].weightX
+                weightY
             )
         );
 
@@ -214,13 +205,11 @@ contract G3MStrategy is IG3MStrategy {
     /// @inheritdoc IPortfolioStrategy
     function getInvariant(uint64 poolId) external view returns (int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        (uint256 weightX, uint256 weightY) = computeWeights(poolId);
 
         return int256(
             G3MStrategyLib.computeInvariant(
-                pool.virtualX,
-                configs[poolId].weightX,
-                pool.virtualY,
-                FixedPointMathLib.WAD - configs[poolId].weightX
+                pool.virtualX, weightX, pool.virtualY, weightY
             )
         );
     }
@@ -238,7 +227,10 @@ contract G3MStrategy is IG3MStrategy {
             uint256 startUpdate,
             uint256 endUpdate,
             uint256 price
-        ) = abi.decode(data, (address, uint256, uint256, uint256));
+        ) = abi.decode(
+            data,
+            (address, uint256, uint256, uint256, uint256, uint256, uint256)
+        );
 
         strategyData = abi.encode(
             controller, startWeightX, endWeightX, startUpdate, endUpdate
@@ -251,16 +243,17 @@ contract G3MStrategy is IG3MStrategy {
 
     function computeWeights(uint64 poolId)
         internal
+        view
         returns (uint256 weightX, uint256 weightY)
     {
-        PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        Config memory config = configs[poolId];
 
         uint256 duration =
             configs[poolId].endUpdate - configs[poolId].startUpdate;
         uint256 timeElapsed = block.timestamp - configs[poolId].startUpdate;
         uint256 t = timeElapsed * WAD / duration;
-        uint256 fw0 = G3MStrategyLib.computeISFunction(pool.startWeightX);
-        uint256 fw1 = G3MStrategyLib.computeISFunction(pool.endWeightX);
+        uint256 fw0 = G3MStrategyLib.computeISFunction(config.startWeightX);
+        uint256 fw1 = G3MStrategyLib.computeISFunction(config.endWeightX);
 
         weightX = G3MStrategyLib.computeSFunction(t, fw1 - fw0, fw0);
         weightY = WAD - weightX;
