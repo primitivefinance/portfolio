@@ -148,7 +148,7 @@ library G3MStrategyLib {
         uint256 t,
         uint256 w0,
         uint256 w1
-    ) internal pure returns (uint256 x) {
+    ) internal pure returns (uint256) {
         uint256 boop = uint256(
             int256(
                 FixedPointMathLib.WAD.divWadUp(w0.mulWadUp(t) + w1)
@@ -160,13 +160,12 @@ library G3MStrategyLib {
             - (FixedPointMathLib.WAD.divWadUp(FixedPointMathLib.WAD + boop));
     }
 
-    function computeISFunction(uint256 t) internal pure returns (uint256 x) {
+    function computeISFunction(uint256 x) internal pure returns (uint256) {
         uint256 boop = uint256(
             int256(
-                FixedPointMathLib.WAD.divWadUp(
-                    FixedPointMathLib.WAD - t - FixedPointMathLib.WAD
-                )
-            ).powWad(-(int256(FixedPointMathLib.WAD.divWadUp(2))))
+                FixedPointMathLib.WAD.divWadUp(FixedPointMathLib.WAD - x)
+                    - FixedPointMathLib.WAD
+            ).powWad(-0.5 ether)
         );
         return FixedPointMathLib.WAD.divWadUp(FixedPointMathLib.WAD + boop);
     }
