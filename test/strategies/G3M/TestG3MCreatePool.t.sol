@@ -74,4 +74,41 @@ contract TestG3MCreatePool is Setup {
         assertEq(configStartUpdate, startUpdate);
         assertEq(configEndUpdate, endUpdate);
     }
+
+    function test_G3M_createPool_UpdatesWeights() public {
+        deployTokens(subject(), true);
+
+        (bytes memory strategyData, uint256 initialX, uint256 initialY) =
+        G3MStrategy(g3mStrategy()).getStrategyData(
+            abi.encode(
+                controller,
+                reserveX,
+                0.1 ether,
+                0.9 ether,
+                startUpdate,
+                endUpdate + 10 days,
+                initialPrice
+            )
+        );
+
+        uint64 poolId = subject().createPool(
+            0,
+            initialX,
+            initialY,
+            100,
+            0,
+            address(0),
+            g3mStrategy(),
+            strategyData
+        );
+
+        (uint256 weightX, uint256 weightY) =
+            G3MStrategy(g3mStrategy()).computeWeights(poolId);
+        assertEq(weightX, 0.1 ether);
+        assertEq(weightY, 0.9 ether);
+        vm.warp(block.timestamp + 10 days);
+        (weightX, weightY) = G3MStrategy(g3mStrategy()).computeWeights(poolId);
+        assertEq(weightX, 0.9 ether);
+        assertEq(weightY, 0.1 ether);
+    }
 }
