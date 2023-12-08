@@ -43,13 +43,25 @@ contract TestG3MCreatePool is Setup {
     function test_G3M_createPool() public {
         deployTokens(subject(), true);
 
+        address controller = address(0);
         uint256 reserveX = 18_600 ether;
-        uint256 weightX = 0.75 ether;
+        uint256 startWeightX = 0.75 ether;
+        uint256 endWeightX = 0.75 ether;
+        uint256 startUpdate = block.timestamp;
+        uint256 endUpdate = block.timestamp;
         uint256 initialPrice = 1937.5 ether;
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
-            abi.encode(address(this), reserveX, weightX, initialPrice)
+            abi.encode(
+                controller,
+                reserveX,
+                startWeightX,
+                endWeightX,
+                startUpdate,
+                endUpdate,
+                initialPrice
+            )
         );
 
         uint64 poolId = subject().createPool(
@@ -70,13 +82,25 @@ contract TestG3MCreatePool is Setup {
     function test_G3M_allocate() public {
         deployTokens(subject(), true);
 
+        address controller = address(0);
         uint256 reserveX = 18_600 ether;
-        uint256 weightX = 0.75 ether;
+        uint256 startWeightX = 0.75 ether;
+        uint256 endWeightX = 0.75 ether;
+        uint256 startUpdate = block.timestamp;
+        uint256 endUpdate = block.timestamp;
         uint256 initialPrice = 1937.5 ether;
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
-            abi.encode(address(this), reserveX, weightX, initialPrice)
+            abi.encode(
+                controller,
+                reserveX,
+                startWeightX,
+                endWeightX,
+                startUpdate,
+                endUpdate,
+                initialPrice
+            )
         );
 
         uint64 poolId = subject().createPool(
@@ -103,13 +127,25 @@ contract TestG3MCreatePool is Setup {
     function test_G3M_swap() public {
         deployTokens(subject(), true);
 
+        address controller = address(0);
         uint256 reserveX = 18_600 ether;
-        uint256 weightX = 0.75 ether;
+        uint256 startWeightX = 0.75 ether;
+        uint256 endWeightX = 0.75 ether;
+        uint256 startUpdate = block.timestamp;
+        uint256 endUpdate = block.timestamp;
         uint256 initialPrice = 1937.5 ether;
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
-            abi.encode(address(this), reserveX, weightX, initialPrice)
+            abi.encode(
+                controller,
+                reserveX,
+                startWeightX,
+                endWeightX,
+                startUpdate,
+                endUpdate,
+                initialPrice
+            )
         );
 
         uint64 poolId = subject().createPool(
