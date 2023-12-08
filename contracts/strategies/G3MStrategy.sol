@@ -248,14 +248,19 @@ contract G3MStrategy is IG3MStrategy {
     {
         Config memory config = configs[poolId];
 
-        uint256 duration =
-            configs[poolId].endUpdate - configs[poolId].startUpdate;
-        uint256 timeElapsed = block.timestamp - configs[poolId].startUpdate;
-        uint256 t = timeElapsed * WAD / duration;
-        uint256 fw0 = G3MStrategyLib.computeISFunction(config.startWeightX);
-        uint256 fw1 = G3MStrategyLib.computeISFunction(config.endWeightX);
+        if (block.timestamp >= config.endUpdate) {
+            weightX = config.endWeightX;
+            weightY = WAD - config.endWeightX;
+        } else {
+            uint256 duration =
+                configs[poolId].endUpdate - configs[poolId].startUpdate;
+            uint256 timeElapsed = block.timestamp - configs[poolId].startUpdate;
+            uint256 t = timeElapsed * WAD / duration;
+            uint256 fw0 = G3MStrategyLib.computeISFunction(config.startWeightX);
+            uint256 fw1 = G3MStrategyLib.computeISFunction(config.endWeightX);
 
-        weightX = G3MStrategyLib.computeSFunction(t, fw1 - fw0, fw0);
-        weightY = WAD - weightX;
+            weightX = G3MStrategyLib.computeSFunction(t, fw1 - fw0, fw0);
+            weightY = WAD - weightX;
+        }
     }
 }
