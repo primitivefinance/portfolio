@@ -6,6 +6,14 @@ import "../../Setup.sol";
 contract TestG3MCreatePool is Setup {
     using FixedPointMathLib for *;
 
+    address controller = address(0);
+    uint256 reserveX = 18_600 ether;
+    uint256 startWeightX = 0.75 ether;
+    uint256 endWeightX = 0.75 ether;
+    uint256 startUpdate = block.timestamp;
+    uint256 endUpdate = block.timestamp;
+    uint256 initialPrice = 1937.5 ether;
+
     function deployTokens(
         IPortfolio subject,
         bool createPair
@@ -24,14 +32,6 @@ contract TestG3MCreatePool is Setup {
 
     function test_G3M_createPool() public {
         deployTokens(subject(), true);
-
-        address controller = address(0);
-        uint256 reserveX = 18_600 ether;
-        uint256 startWeightX = 0.75 ether;
-        uint256 endWeightX = 0.75 ether;
-        uint256 startUpdate = block.timestamp;
-        uint256 endUpdate = block.timestamp;
-        uint256 initialPrice = 1937.5 ether;
 
         (bytes memory strategyData, uint256 initialX, uint256 initialY) =
         G3MStrategy(g3mStrategy()).getStrategyData(
@@ -59,5 +59,19 @@ contract TestG3MCreatePool is Setup {
 
         assertEq(subject().getSpotPrice(poolId), initialPrice);
         assertEq(subject().getStrategy(poolId), g3mStrategy());
+
+        (
+            address configController,
+            uint256 configStartWeightX,
+            uint256 configEndWeightX,
+            uint256 configStartUpdate,
+            uint256 configEndUpdate
+        ) = G3MStrategy(g3mStrategy()).configs(poolId);
+
+        assertEq(configController, controller);
+        assertEq(configStartWeightX, startWeightX);
+        assertEq(configEndWeightX, endWeightX);
+        assertEq(configStartUpdate, startUpdate);
+        assertEq(configEndUpdate, endUpdate);
     }
 }
