@@ -242,7 +242,7 @@ contract G3MStrategy is IG3MStrategy {
     }
 
     function computeWeights(uint64 poolId)
-        internal
+        public
         view
         returns (uint256 weightX, uint256 weightY)
     {
