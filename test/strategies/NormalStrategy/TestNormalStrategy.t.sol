@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 pragma solidity ^0.8.4;
 
-import "../Setup.sol";
+import "../../Setup.sol";
 
 contract TestNormalStrategy is Setup {
     // Needs default config so a pool is deployed so the default strategy is returned by strategy()

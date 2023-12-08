@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 
 // Global test configuration for Portfolio
 import "./Configuration.sol";
-import "./strategies/NormalConfiguration.sol";
+import "./strategies/NormalStrategy/NormalConfiguration.sol";
 
 // Test helper types
 import { deploy as deployCoin, Coin } from "./utils/CoinType.sol";
@@ -120,7 +120,9 @@ contract Setup is ISetup, Test, ERC1155TokenReceiver {
         vm.label(_subjects.positionRenderer, "position-renderer");
 
         _subjects.portfolio = address(
-            new Portfolio(_subjects.weth, _subjects.registry, _subjects.positionRenderer)
+            new Portfolio(
+                _subjects.weth, _subjects.registry, _subjects.positionRenderer
+            )
         );
         vm.label(_subjects.portfolio, "portfolio");
 
