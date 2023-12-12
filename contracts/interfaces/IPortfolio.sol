@@ -479,6 +479,8 @@ interface IPortfolioActions is IPortfolioRegistryActions {
         uint16 fee
     ) external;
 
+    function updatePool(uint64 poolId, bytes calldata data) external;
+
     /**
      * @notice
      * Add liquidity to a pool.
