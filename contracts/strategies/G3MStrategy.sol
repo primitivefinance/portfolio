@@ -67,7 +67,14 @@ contract G3MStrategy is IG3MStrategy {
     ) external onlyPortfolio {
         if (caller != configs[poolId].controller) revert NotController();
 
-        // TODO: Add some actual features here
+        (uint256 endWeightX, uint256 endUpdate) =
+            abi.decode(data, (uint256, uint256));
+        (uint256 weightX,) = computeWeights(poolId);
+
+        configs[poolId].startWeightX = weightX;
+        configs[poolId].endWeightX = block.timestamp;
+        configs[poolId].endWeightX = endWeightX;
+        configs[poolId].endUpdate = endUpdate;
     }
 
     /// @inheritdoc IStrategy
