@@ -9,6 +9,8 @@ import "./interfaces/IPortfolioRegistry.sol";
 import "./interfaces/IStrategy.sol";
 import "./PositionRenderer.sol";
 
+import "./LiquidityToken.sol";
+
 /**
  * @title
  * Portfolio
@@ -81,6 +83,8 @@ contract Portfolio is ERC1155, IPortfolio {
 
     /// @inheritdoc IPortfolioState
     uint256 public protocolFee;
+
+    address public immutable ERC20_PROXY_IMPLEMENTATION;
 
     /**
      * @notice
@@ -204,6 +208,8 @@ contract Portfolio is ERC1155, IPortfolio {
         REGISTRY = registry;
         POSITION_RENDERER = positionRenderer;
         __account__.settled = true;
+        ERC20_PROXY_IMPLEMENTATION =
+            address(new LiquidityToken("PROXY_IMPLEMENTATION", "PROXY"));
     }
 
     receive() external payable {
