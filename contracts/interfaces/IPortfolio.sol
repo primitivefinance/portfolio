@@ -479,6 +479,11 @@ interface IPortfolioActions is IPortfolioRegistryActions {
         uint16 fee
     ) external;
 
+    /**
+     * @notice Updates a pool by calling the pool's strategy contract.
+     * @param poolId Id of the pool to update.
+     * @param data Array of data to provide to the strategy contract.
+     */
     function updatePool(uint64 poolId, bytes calldata data) external;
 
     /**
