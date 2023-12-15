@@ -31,6 +31,9 @@ contract NormalStrategy is INormalStrategy {
     /// @dev Canonical Portfolio smart contract.
     address public immutable portfolio;
 
+    /// @inheritdoc IStrategy
+    string public constant name = "NormalStrategy";
+
     /// @dev Tracks each pool strategy configuration.
     mapping(uint64 poolId => PortfolioConfig config) public configs;
 

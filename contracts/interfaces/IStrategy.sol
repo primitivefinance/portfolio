@@ -19,6 +19,8 @@ interface IStrategy is IPortfolioStrategy {
     // ====== Required ====== //
     // Includes: IPortfolioStrategy
 
+    function name() external view returns (string memory);
+
     /**
      * @notice
      * Called by the Portfolio contract after a pool is created.

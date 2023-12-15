@@ -13,6 +13,9 @@ contract G3MStrategy is IG3MStrategy {
 
     address public immutable portfolio;
 
+    /// @inheritdoc IStrategy
+    string public constant name = "G3MStrategy";
+
     mapping(uint64 => IG3MStrategy.Config) public configs;
 
     modifier onlyPortfolio() {
