@@ -2,7 +2,7 @@
 pragma solidity ^0.8.4;
 
 import "forge-std/Test.sol";
-import "contracts/libraries/BisectionLib.sol" as BisectionLib;
+import "contracts/strategies/NormalStrategy/BisectionLib.sol" as BisectionLib;
 
 contract TestBisectionLib is Test {
     function simplePolynomial(

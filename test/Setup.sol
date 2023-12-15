@@ -25,8 +25,8 @@ import "contracts/test/SimpleRegistry.sol";
 import "contracts/Portfolio.sol";
 
 // Strategy to test
-import "contracts/strategies/NormalStrategy.sol";
-import "contracts/strategies/G3MStrategy.sol";
+import "contracts/strategies/NormalStrategy/NormalStrategy.sol";
+import "contracts/strategies/G3MStrategy/G3MStrategy.sol";
 
 // Contracts in the test environment
 struct SubjectsType {

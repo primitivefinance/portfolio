@@ -8,7 +8,7 @@ import "./libraries/StringsLib.sol";
 import "./libraries/AssemblyLib.sol";
 import { PoolIdLib } from "./libraries/PoolLib.sol";
 import "./interfaces/IPortfolio.sol";
-import "./strategies/NormalStrategy.sol";
+import "./strategies/NormalStrategy/NormalStrategy.sol";
 
 /**
  * @title

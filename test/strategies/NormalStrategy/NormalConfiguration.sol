@@ -16,7 +16,7 @@ using AssemblyLib for uint128;
 using AssemblyLib for uint32;
 
 // Strategy contract
-import "contracts/strategies/NormalStrategyLib.sol";
+import "contracts/strategies/NormalStrategy/NormalStrategyLib.sol";
 
 uint256 constant NormalConfiguration_DEFAULT_PRICE = 1 ether;
 uint256 constant NormalConfiguration_DEFAULT_STRIKE_WAD = 1 ether;

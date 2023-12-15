@@ -3,10 +3,10 @@ pragma solidity 0.8.19;
 
 import "./IG3MStrategy.sol";
 import "./G3MStrategyLib.sol";
-import "../interfaces/IPortfolio.sol";
-import "../libraries/SwapLib.sol";
-import "../libraries/AssemblyLib.sol";
-import "../libraries/PoolLib.sol";
+import "../../interfaces/IPortfolio.sol";
+import "../../libraries/SwapLib.sol";
+import "../../libraries/AssemblyLib.sol";
+import "../../libraries/PoolLib.sol";
 
 contract G3MStrategy is IG3MStrategy {
     using AssemblyLib for *;

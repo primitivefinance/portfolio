@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "solmate/tokens/ERC1155.sol";
 import "../contracts/libraries/AssemblyLib.sol";
 import "./Setup.sol";
-import "../contracts/strategies/NormalStrategy.sol";
+import "../contracts/strategies/NormalStrategy/NormalStrategy.sol";
 
 contract TestPortfolioBalanceOf is Setup {
     function test_balanceOf_allocating_increases_balance()

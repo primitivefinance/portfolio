@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
-import "../interfaces/IPortfolio.sol";
-import "../libraries/BisectionLib.sol";
-import "../libraries/PortfolioLib.sol";
+import "../../interfaces/IPortfolio.sol";
+import "../../libraries/PortfolioLib.sol";
+import "./BisectionLib.sol";
 import "./INormalStrategy.sol";
 import "./NormalStrategyLib.sol";
 

@@ -6,7 +6,7 @@ import "contracts/interfaces/IStrategy.sol";
 import "contracts/interfaces/IPortfolio.sol";
 import "contracts/libraries/PortfolioLib.sol";
 import "solmate/test/utils/mocks/MockERC20.sol";
-import "contracts/strategies/NormalStrategyLib.sol";
+import "contracts/strategies/NormalStrategy/NormalStrategyLib.sol";
 import "contracts/Portfolio.sol";
 
 import { Coin } from "./CoinType.sol";
