@@ -737,8 +737,7 @@ library NormalStrategyLib {
         PortfolioConfig memory config,
         Order memory order,
         uint256 timestamp,
-        uint256 protocolFee,
-        address swapper
+        uint256 protocolFee
     )
         internal
         view
@@ -754,9 +753,7 @@ library NormalStrategyLib {
         // Compute the next invariant if the swap amounts are non zero.
         (uint256 reserveX, uint256 reserveY) = (self.virtualX, self.virtualY);
 
-        uint256 feeBps = swapper == self.controller
-            ? self.priorityFeeBasisPoints
-            : self.feeBasisPoints;
+        uint256 feeBps = self.feeBasisPoints; 
 
         // Compute the adjusted reserves.
         (,, reserveX, reserveY) =
@@ -785,11 +782,10 @@ library NormalStrategyLib {
         PortfolioConfig memory config,
         Order memory order,
         uint256 timestamp,
-        uint256 protocolFee,
-        address swapper
+        uint256 protocolFee
     ) internal view returns (uint256 amountOutWad) {
         (uint256 independentReserve, int256 prevInv, int256 postInv) =
-        getSwapInvariants(self, config, order, timestamp, protocolFee, swapper);
+        getSwapInvariants(self, config, order, timestamp, protocolFee);
 
         NormalCurve memory curve = transform(config);
         curve.invariant = prevInv;

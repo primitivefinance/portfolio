@@ -59,7 +59,7 @@ contract TestPortfolioAllocate is Setup {
 
         subject().multicall(data);
 
-        (,, uint128 liquidity,,,,,) = subject().pools(poolId);
+        (,, uint128 liquidity,,,,,,,,) = subject().pools(poolId);
 
         assertEq(liquidity, 1 ether, "liquidity");
     }

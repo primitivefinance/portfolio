@@ -46,7 +46,7 @@ contract NormalStrategy is INormalStrategy {
         _;
     }
 
-    // ====== Required ====== //
+    // ====== Required ====== /
 
     /// @inheritdoc IStrategy
     function afterCreate(
@@ -109,9 +109,12 @@ contract NormalStrategy is INormalStrategy {
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
-        uint256 reserveY
-    ) public view returns (bool, int256) {
+        uint256 reserveY,
+        bool sellAsset,
+        uint256 feeAmountUnit
+    ) public view returns (bool, bool, int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
+        bool segmentFees = false;
 
         // Update the reserves in memory.
         pool.virtualX = reserveX.safeCastTo128();
@@ -119,9 +122,14 @@ contract NormalStrategy is INormalStrategy {
 
         // Compute the new invariant.
         int256 invariantAfterSwap = pool.getInvariantDown(configs[poolId]);
-        bool valid = _validateSwap(invariant, invariantAfterSwap);
+        if (invariantAfterSwap > 0) {
+            segmentFees = true;
+            sellAsset ? pool.virtualX -= feeAmountUnit.safeCastTo128() : pool.virtualY -= feeAmountUnit.safeCastTo128();
+            invariantAfterSwap = pool.getInvariantDown(configs[poolId]);
+        }
+        bool valid = _validateSwap(invariant, invariantAfterSwap, segmentFees);
 
-        return (valid, invariantAfterSwap);
+        return (valid, segmentFees, invariantAfterSwap);
     }
 
     /**
@@ -144,10 +152,15 @@ contract NormalStrategy is INormalStrategy {
      */
     function _validateSwap(
         int256 invariantBefore,
-        int256 invariantAfter
+        int256 invariantAfter,
+        bool segmentFees
     ) internal pure returns (bool) {
         int256 delta = invariantAfter - invariantBefore;
-        if (delta < MINIMUM_INVARIANT_DELTA) return false;
+        if (segmentFees) {
+            if (invariantBefore < invariantAfter) return false;
+        } else {
+            if (delta < MINIMUM_INVARIANT_DELTA) return false;
+        }
 
         return true;
     }
@@ -178,8 +191,7 @@ contract NormalStrategy is INormalStrategy {
                 sellAsset: sellAsset
             }),
             timestamp: block.timestamp,
-            protocolFee: IPortfolio(portfolio).protocolFee(),
-            swapper: swapper
+            protocolFee: IPortfolio(portfolio).protocolFee()
         });
 
         uint256 outputDec = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
@@ -292,11 +304,10 @@ contract NormalStrategy is INormalStrategy {
             config: configs[order.poolId],
             order: order,
             timestamp: timestamp,
-            protocolFee: IPortfolio(portfolio).protocolFee(),
-            swapper: swapper
+            protocolFee: IPortfolio(portfolio).protocolFee()
         });
 
-        success = _validateSwap(prevInvariant, postInvariant);
+        success = _validateSwap(prevInvariant, postInvariant, false);
     }
 
     /// @inheritdoc IPortfolioStrategy

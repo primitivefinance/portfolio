@@ -2,6 +2,7 @@
 pragma solidity >=0.8.0;
 
 import { Order } from "../libraries/SwapLib.sol";
+import { SwapState } from "../libraries/SwapLib.sol";
 import { IPortfolioStrategy } from "./IPortfolio.sol";
 
 /**
@@ -83,6 +84,8 @@ interface IStrategy is IPortfolioStrategy {
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
-        uint256 reserveY
-    ) external view returns (bool, int256);
+        uint256 reserveY,
+        bool sellAsset,
+        uint256 feeAmountUnit
+    ) external view returns (bool, bool, int256);
 }
