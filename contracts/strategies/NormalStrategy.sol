@@ -6,6 +6,7 @@ import "../libraries/BisectionLib.sol";
 import "../libraries/PortfolioLib.sol";
 import "./INormalStrategy.sol";
 import "./NormalStrategyLib.sol";
+import "forge-std/console2.sol";
 
 /// @dev Emitted when a hook is called by a non-portfolio address.
 error NormalStrategy_NotPortfolio();
@@ -109,12 +110,9 @@ contract NormalStrategy is INormalStrategy {
         uint64 poolId,
         int256 invariant,
         uint256 reserveX,
-        uint256 reserveY,
-        bool sellAsset,
-        uint256 feeAmountUnit
-    ) public view returns (bool, bool, int256) {
+        uint256 reserveY
+    ) public view returns (bool, int256) {
         PortfolioPool memory pool = IPortfolioStruct(portfolio).pools(poolId);
-        bool segmentFees = false;
 
         // Update the reserves in memory.
         pool.virtualX = reserveX.safeCastTo128();
@@ -122,14 +120,9 @@ contract NormalStrategy is INormalStrategy {
 
         // Compute the new invariant.
         int256 invariantAfterSwap = pool.getInvariantDown(configs[poolId]);
-        if (invariantAfterSwap > 0) {
-            segmentFees = true;
-            sellAsset ? pool.virtualX -= feeAmountUnit.safeCastTo128() : pool.virtualY -= feeAmountUnit.safeCastTo128();
-            invariantAfterSwap = pool.getInvariantDown(configs[poolId]);
-        }
-        bool valid = _validateSwap(invariant, invariantAfterSwap, segmentFees);
+        bool valid = _validateSwap(invariant, invariantAfterSwap);
 
-        return (valid, segmentFees, invariantAfterSwap);
+        return (valid, invariantAfterSwap);
     }
 
     /**
@@ -152,15 +145,10 @@ contract NormalStrategy is INormalStrategy {
      */
     function _validateSwap(
         int256 invariantBefore,
-        int256 invariantAfter,
-        bool segmentFees
+        int256 invariantAfter
     ) internal pure returns (bool) {
         int256 delta = invariantAfter - invariantBefore;
-        if (segmentFees) {
-            if (invariantBefore < invariantAfter) return false;
-        } else {
-            if (delta < MINIMUM_INVARIANT_DELTA) return false;
-        }
+        if (delta < MINIMUM_INVARIANT_DELTA) return false;
 
         return true;
     }
@@ -307,7 +295,18 @@ contract NormalStrategy is INormalStrategy {
             protocolFee: IPortfolio(portfolio).protocolFee()
         });
 
-        success = _validateSwap(prevInvariant, postInvariant, false);
+        success = _validateSwap(prevInvariant, postInvariant);
+    }
+
+    function checkInvariant(uint64 poolId, PortfolioPool memory pool)
+        public
+        view
+        returns (bool)
+    {
+        int256 invariant = pool.getInvariantDown(configs[poolId]);
+        console2.log("invariant in checkInvariant", invariant);
+        return invariant < 0;
+
     }
 
     /// @inheritdoc IPortfolioStrategy

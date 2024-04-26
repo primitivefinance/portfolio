@@ -121,17 +121,17 @@ contract TestPortfolioSwap is Setup {
     {
         bool sellAsset = true;
         uint128 amtIn = 0.5 ether;
-        int256 initialInvariant = subject().getInvariant(ghost().poolId);
-        console.logInt(initialInvariant);
 
         uint256 i = 0;
-        while (i < 5) {
+        while (i < 365) {
             vm.warp(block.timestamp + 1 days);
             (uint256 reserveAsset, uint256 reserveQuote) =
                 subject().getPoolReserves(ghost().poolId);
+            int256 invariant = subject().getInvariant(ghost().poolId);
+            console2.log("invariant before swap execution", invariant);
             sellAsset = reserveQuote > 1 ether ? true : sellAsset;
             sellAsset = reserveAsset > 1 ether ? false : sellAsset;
-            amtIn = uint128(sellAsset ? reserveQuote - 0.12 ether : reserveAsset - 0.12 ether);
+            amtIn = uint128(sellAsset ? reserveQuote - 0.4 ether : reserveAsset - 0.4 ether);
             // amtIn = 1000;
             console.log("amtIn", amtIn);
             uint128 amtOut = uint128(
@@ -153,8 +153,8 @@ contract TestPortfolioSwap is Setup {
 
             subject().swap(order);
 
-            int256 invariant = subject().getInvariant(ghost().poolId);
-            console.logInt(invariant);
+            invariant = subject().getInvariant(ghost().poolId);
+            console2.log("invariant after swap execution", invariant);
 
             sellAsset = !sellAsset;
             i++;

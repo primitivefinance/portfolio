@@ -616,8 +616,8 @@ contract Portfolio is ERC1155, IPortfolio {
             // ====== Invariant Check ====== //
 
             bool validInvariant;
-            (validInvariant, inter.segmentFees, inter.nextInvariant) = strategy.validateSwap(
-                poolId, inter.prevInvariant, adjustedVirtualX, adjustedVirtualY, sellAsset, inter.feeAmountUnit
+            (validInvariant, inter.nextInvariant) = strategy.validateSwap(
+                poolId, inter.prevInvariant, adjustedVirtualX, adjustedVirtualY 
             );
 
             if (!validInvariant) {
@@ -632,19 +632,21 @@ contract Portfolio is ERC1155, IPortfolio {
         // Take the protocol fee from the input amount, so that protocol fee is not re-invested into pool.
         // Increases the independent pool reserve by the input amount, including fee and excluding protocol fee.
         // Decrease the dependent pool reserve by the output amount.
-        if (inter.segmentFees) {
+        pool.adjustReserves(
+            args.sellAsset,
+            inter.amountInputUnit - inter.protocolFeeAmountUnit,
+            inter.amountOutputUnit
+        );
+        // returns false if the invariant is > 0
+        bool valid = strategy.checkInvariant(poolId, pool);
+        if (!valid) {
+            // If the invariant is > 0, the pool is segmented and the fees are not reinvested.
             pool.adjustReserves(
-                args.sellAsset,
-                inter.amountInputUnit - inter.protocolFeeAmountUnit - inter.feeAmountUnit,
-                inter.amountOutputUnit
+                !args.sellAsset,
+                0,
+                inter.feeAmountUnit
             );
             inter.feeGrowthGlobal += inter.feeAmountUnit;
-        } else {
-            pool.adjustReserves(
-                args.sellAsset,
-                inter.amountInputUnit - inter.protocolFeeAmountUnit,
-                inter.amountOutputUnit
-            );
         }
 
         // Increasing reserves requires Portfolio's balance of tokens to also increases by the end of `settlement`.
