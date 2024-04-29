@@ -1,0 +1,33 @@
+TestTradingFunction
+├── When reserveXPerWad is at the upper bound
+│   └── When reserveYPerWad is not at the lower bound
+    │   └── It should revert with `NormalStrategyLib_LowerReserveYBoundNotReached`
+│   └── When reserveYPerWad is at the lower bound
+    │   └── It should return σ√τ
+├── When reserveYPerWad is at the lower bound
+│   └── When reserveXPerWad is not at the upper bound
+    │   └── It should revert with `NormalStrategyLib_UpperReserveXBoundNotReached`
+│   └── When reserveXPerWad is at the upper bound
+    │   └── It should return σ√τ
+├── When reserveXPerWad is at the lower bound
+│   └── When reserveYPerWad is not at the upper bound
+    │   └── It should revert with `NormalStrategyLib_UpperReserveYBoundNotReached`
+│   └── When reserveYPerWad is at the upper bound
+    │   └── It should return σ√τ if reserveYPerWad
+├── When reserveYPerWad is at the upper bound
+│   └── When reserveXPerWad is not at the lower bound
+    │   └── It should revert with `NormalStrategyLib_LowerReserveXBoundNotReached`
+│   └── When reserveXPerWad is at the lower bound
+    │   └── It should return σ√τ
+├── When reserveXPerWad and reserveYPerWad are both not at any bound
+│   └── It should not revert
+│   └── It should return `Φ⁻¹(y/K) - Φ⁻¹(1-x) + σ√τ`
+├── When using all parameter profiles
+│   └── When increasing reserveXPerWad
+    │   └── It should increase the invariant
+│   └── When increasing reserveYPerWad
+    │   └── It should increase the invariant
+│   └── When decreasing reserveXPerWad
+    │   └── It should decrease the invariant
+│   └── When decreasing reserveYPerWad
+    │   └── It should decrease the invariant
