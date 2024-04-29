@@ -143,7 +143,7 @@ contract PositionRenderer {
             uint16 feeBasisPoints,
             uint16 priorityFeeBasisPoints,
             address controller,
-            address strategy
+            address strategy,,,
         ) = IPortfolio(msg.sender).pools(uint64(id));
 
         uint256 spotPriceWad = IPortfolio(msg.sender).getSpotPrice(uint64(id));

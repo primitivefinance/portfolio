@@ -52,7 +52,7 @@ error Configuration_FuzzInvalidKey(bytes32 what);
 
 address constant Configuration_DEFAULT_CONTROLLER = address(0);
 address constant Configuration_DEFAULT_STRATEGY = address(0);
-uint16 constant Configuration_DEFAULT_FEE = 30;
+uint16 constant Configuration_DEFAULT_FEE = 1;
 uint16 constant Configuration_DEFAULT_PRIORITY_FEE = 0;
 
 /// @dev Instantiates a configuration with default values.

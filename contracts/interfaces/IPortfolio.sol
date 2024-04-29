@@ -266,7 +266,10 @@ interface IPortfolioState {
             uint16 feeBasisPoints,
             uint16 priorityFeeBasisPoints,
             address controller,
-            address strategy
+            address strategy,
+            uint256 invariantGrowthGlobal,
+            uint256 feeGrowthGlobalAsset,
+            uint256 feeGrowthGlobalQuote
         );
 }
 

@@ -20,8 +20,8 @@ import "contracts/strategies/NormalStrategyLib.sol";
 
 uint256 constant NormalConfiguration_DEFAULT_PRICE = 1 ether;
 uint256 constant NormalConfiguration_DEFAULT_STRIKE_WAD = 1 ether;
-uint256 constant NormalConfiguration_DEFAULT_VOLATILITY_BPS = 1000 wei; // in bps
-uint256 constant NormalConfiguration_DEFAULT_DURATION_SEC = 1 days; // in seconds
+uint256 constant NormalConfiguration_DEFAULT_VOLATILITY_BPS = 500 wei; // in bps
+uint256 constant NormalConfiguration_DEFAULT_DURATION_SEC = 365 days + 100; // in seconds
 uint256 constant NormalConfiguration_DEFAULT_CREATION_TIMESTAMP = 0;
 bool constant NormalConfiguration_DEFAULT_IS_PERPETUAL = false;
 

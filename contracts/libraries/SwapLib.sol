@@ -201,6 +201,10 @@ struct SwapState {
     address tokenOutput;
     uint8 decimalsInput;
     uint8 decimalsOutput;
+    uint256 feeGrowthGlobal;
+    int256 invariantGrowthGlobal;
+    uint256 liquidity;
+    bool segmentFees;
 }
 
 using { toWad, fromWad } for SwapState global;

@@ -6,6 +6,7 @@ import "../libraries/BisectionLib.sol";
 import "../libraries/PortfolioLib.sol";
 import "./INormalStrategy.sol";
 import "./NormalStrategyLib.sol";
+import "forge-std/console2.sol";
 
 /// @dev Emitted when a hook is called by a non-portfolio address.
 error NormalStrategy_NotPortfolio();
@@ -46,7 +47,7 @@ contract NormalStrategy is INormalStrategy {
         _;
     }
 
-    // ====== Required ====== //
+    // ====== Required ====== /
 
     /// @inheritdoc IStrategy
     function afterCreate(
@@ -178,8 +179,7 @@ contract NormalStrategy is INormalStrategy {
                 sellAsset: sellAsset
             }),
             timestamp: block.timestamp,
-            protocolFee: IPortfolio(portfolio).protocolFee(),
-            swapper: swapper
+            protocolFee: IPortfolio(portfolio).protocolFee()
         });
 
         uint256 outputDec = sellAsset ? pair.decimalsQuote : pair.decimalsAsset;
@@ -292,11 +292,21 @@ contract NormalStrategy is INormalStrategy {
             config: configs[order.poolId],
             order: order,
             timestamp: timestamp,
-            protocolFee: IPortfolio(portfolio).protocolFee(),
-            swapper: swapper
+            protocolFee: IPortfolio(portfolio).protocolFee()
         });
 
         success = _validateSwap(prevInvariant, postInvariant);
+    }
+
+    function checkInvariant(uint64 poolId, PortfolioPool memory pool)
+        public
+        view
+        returns (bool)
+    {
+        int256 invariant = pool.getInvariantDown(configs[poolId]);
+        console2.log("invariant in checkInvariant", invariant);
+        return invariant < 0;
+
     }
 
     /// @inheritdoc IPortfolioStrategy

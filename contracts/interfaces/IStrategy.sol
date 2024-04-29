@@ -2,7 +2,9 @@
 pragma solidity >=0.8.0;
 
 import { Order } from "../libraries/SwapLib.sol";
+import { SwapState } from "../libraries/SwapLib.sol";
 import { IPortfolioStrategy } from "./IPortfolio.sol";
+import { PortfolioPool } from "../libraries/PoolLib.sol";
 
 /**
  * @title
@@ -85,4 +87,22 @@ interface IStrategy is IPortfolioStrategy {
         uint256 reserveX,
         uint256 reserveY
     ) external view returns (bool, int256);
+
+    /**
+     * @notice
+     * Checks the validity of the invariant of the in-memory pool during swap execution.
+     *
+     * @dev
+     * Critical function that is responsible for the economic validity of the protocol.
+     * Swaps should not push the invariant over 0 in many pools
+     * This tells portfolio if it should segment fees or not
+     *
+     * @param poolId Id of the pool.
+     * @param pool intermediate pool struct in swap execution
+     * @return success Whether the invariant is positive.
+     */
+    function checkInvariant(
+        uint64 poolId,
+        PortfolioPool memory pool
+    ) external view returns (bool);
 }

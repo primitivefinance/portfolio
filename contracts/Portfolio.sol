@@ -3,6 +3,8 @@ pragma solidity 0.8.19;
 
 import "solmate/tokens/ERC1155.sol";
 import "./libraries/PortfolioLib.sol";
+import "./libraries/PositionLib.sol";
+import "./libraries/PoolLib.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IPortfolio.sol";
 import "./interfaces/IPortfolioRegistry.sol";
@@ -72,6 +74,8 @@ contract Portfolio is ERC1155, IPortfolio {
 
     /// @inheritdoc IPortfolioState
     mapping(uint64 => PortfolioPool) public pools;
+
+    mapping(address => mapping(uint64 => PortfolioPosition)) public positions;
 
     /// @inheritdoc IPortfolioState
     mapping(address => mapping(address => uint24)) public getPairId;
@@ -298,6 +302,7 @@ contract Portfolio is ERC1155, IPortfolio {
         _postLock();
     }
 
+
     /// @inheritdoc IPortfolioActions
     function allocate(
         bool useMax,
@@ -461,8 +466,12 @@ contract Portfolio is ERC1155, IPortfolio {
      * If allocating to an instantiated pool, a minimum amount of liquidity is permanently
      * burned to prevent the pool from reaching 0 liquidity.
      */
-    function _changeLiquidity(ChangeLiquidityParams memory args) internal {
-        PortfolioPool storage pool = pools[args.poolId];
+    function _changeLiquidity(ChangeLiquidityParams memory args) internal returns (uint256 feeAsset, uint256 feeQuote, uint256 invariantGrowth) {
+        (PortfolioPool storage pool, PortfolioPosition storage position) = (pools[args.poolId], positions[args.owner][args.poolId]);
+
+        (feeAsset, feeQuote, invariantGrowth) = position.syncPositionFees(
+            pool.feeGrowthGlobalAsset, pool.feeGrowthGlobalQuote, pool.invariantGrowthGlobal
+        );
 
         (uint128 deltaAssetWad, uint128 deltaQuoteWad) =
             (args.deltaAsset.safeCastTo128(), args.deltaQuote.safeCastTo128());
@@ -496,6 +505,7 @@ contract Portfolio is ERC1155, IPortfolio {
             _burn(args.owner, args.poolId, uint256(-int256(positionLiquidity)));
         }
 
+        position.changePositionLiquidity(args.timestamp, args.deltaLiquidity);
         pools[args.poolId].changePoolLiquidity(args.deltaLiquidity);
 
         (address asset, address quote) = (args.tokenAsset, args.tokenQuote);
@@ -549,11 +559,13 @@ contract Portfolio is ERC1155, IPortfolio {
             inter.decimalsOutput = pair.decimalsQuote;
             inter.tokenInput = pair.tokenAsset;
             inter.tokenOutput = pair.tokenQuote;
+            inter.feeGrowthGlobal = pool.feeGrowthGlobalAsset;
         } else {
             inter.decimalsInput = pair.decimalsQuote;
             inter.decimalsOutput = pair.decimalsAsset;
             inter.tokenInput = pair.tokenQuote;
             inter.tokenOutput = pair.tokenAsset;
+            inter.feeGrowthGlobal = pool.feeGrowthGlobalQuote;
         }
 
         // Overwrites the input argument with the token surplus, if available.
@@ -568,6 +580,7 @@ contract Portfolio is ERC1155, IPortfolio {
         inter.prevInvariant = invariant;
         inter.amountInputUnit = input;
         inter.amountOutputUnit = output;
+        inter.liquidity = pool.liquidity;
 
         // Converts input and output amounts to WAD units for the swap math.
         inter = inter.toWad();
@@ -586,13 +599,9 @@ contract Portfolio is ERC1155, IPortfolio {
         );
 
         {
-            // Use the priority fee if the pool controller is the caller.
-            uint256 feeBps = pool.controller == msg.sender
-                ? pool.priorityFeeBasisPoints
-                : pool.feeBasisPoints;
-
             // Compute the respective fee and protocol fee amounts.
             // Compute the reserves after applying the desired swap amounts and fees.
+            bool sellAsset = args.sellAsset;
             uint256 adjustedVirtualX;
             uint256 adjustedVirtualY;
             (
@@ -601,14 +610,14 @@ contract Portfolio is ERC1155, IPortfolio {
                 adjustedVirtualX,
                 adjustedVirtualY
             ) = orderInWad.computeSwapResult(
-                pool.virtualX, pool.virtualY, feeBps, protocolFee
+                pool.virtualX, pool.virtualY, pool.feeBasisPoints, protocolFee
             );
 
             // ====== Invariant Check ====== //
 
             bool validInvariant;
             (validInvariant, inter.nextInvariant) = strategy.validateSwap(
-                poolId, inter.prevInvariant, adjustedVirtualX, adjustedVirtualY
+                poolId, inter.prevInvariant, adjustedVirtualX, adjustedVirtualY 
             );
 
             if (!validInvariant) {
@@ -628,6 +637,17 @@ contract Portfolio is ERC1155, IPortfolio {
             inter.amountInputUnit - inter.protocolFeeAmountUnit,
             inter.amountOutputUnit
         );
+        // returns false if the invariant is > 0
+        bool valid = strategy.checkInvariant(poolId, pool);
+        if (!valid) {
+            // If the invariant is > 0, the pool is segmented and the fees are not reinvested.
+            pool.adjustReserves(
+                !args.sellAsset,
+                0,
+                inter.feeAmountUnit
+            );
+            inter.feeGrowthGlobal += inter.feeAmountUnit;
+        }
 
         // Increasing reserves requires Portfolio's balance of tokens to also increases by the end of `settlement`.
         _increaseReserves(inter.tokenInput, inter.amountInputUnit);
@@ -737,8 +757,6 @@ contract Portfolio is ERC1155, IPortfolio {
             reserveX: reserveXPerWad,
             reserveY: reserveYPerWad,
             feeBasisPoints: feeBasisPoints,
-            priorityFeeBasisPoints: priorityFeeBasisPoints,
-            controller: controller,
             strategy: strategy
         });
 

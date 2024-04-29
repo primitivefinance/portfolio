@@ -206,6 +206,9 @@ struct PortfolioPool {
     uint16 priorityFeeBasisPoints;
     address controller; // Address that can call `changeParameters()`.
     address strategy;
+    uint256 invariantGrowthGlobal; // Cumulative sum of positive invariant growth.
+    uint256 feeGrowthGlobalAsset; // Cumulative sum of fee's denominated in the `asset` with positive invariant.
+    uint256 feeGrowthGlobalQuote; // Cumulative sum of fee's denominated in the `quote` with positive invariant.
 }
 
 // ----------------- //
@@ -216,8 +219,6 @@ function createPool(
     uint256 reserveX,
     uint256 reserveY,
     uint256 feeBasisPoints,
-    uint256 priorityFeeBasisPoints,
-    address controller,
     address strategy
 ) {
     // Check if the pool has already been created.
@@ -234,17 +235,6 @@ function createPool(
         revert PoolLib_InvalidFee(feeBasisPoints);
     }
     self.feeBasisPoints = feeBasisPoints.safeCastTo16();
-
-    // Controller is not required, so it can remain uninitialized at the zero address.
-    bool controlled = controller != address(0);
-    if (controlled) {
-        if (!priorityFeeBasisPoints.isBetween(MIN_FEE, feeBasisPoints)) {
-            revert PoolLib_InvalidPriorityFee(priorityFeeBasisPoints);
-        }
-
-        self.controller = controller;
-        self.priorityFeeBasisPoints = priorityFeeBasisPoints.safeCastTo16();
-    }
 
     self.strategy = strategy;
 }

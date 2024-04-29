@@ -112,6 +112,56 @@ contract TestPortfolioSwap is Setup {
         assertTrue(post > prev, "physical-balance-did-not-increase");
     }
 
+    function test_swap_invariant_overtime()
+        public
+        defaultConfig
+        useActor
+        usePairTokens(10 ether)
+        allocateSome(1 ether)
+    {
+        bool sellAsset = true;
+        uint128 amtIn = 0.5 ether;
+
+        uint256 i = 0;
+        while (i < 365) {
+            vm.warp(block.timestamp + 1 days);
+            (uint256 reserveAsset, uint256 reserveQuote) =
+                subject().getPoolReserves(ghost().poolId);
+            int256 invariant = subject().getInvariant(ghost().poolId);
+            console2.log("invariant before swap execution", invariant);
+            sellAsset = reserveQuote > 1 ether ? true : sellAsset;
+            sellAsset = reserveAsset > 1 ether ? false : sellAsset;
+            amtIn = uint128(sellAsset ? reserveQuote - 0.4 ether : reserveAsset - 0.4 ether);
+            // amtIn = 1000;
+            console.log("amtIn", amtIn);
+            uint128 amtOut = uint128(
+                subject().getAmountOut(ghost().poolId, sellAsset, amtIn, actor())
+            );
+            console.log("sellAsset", sellAsset);
+            console.log("reserveAsset", reserveAsset);
+            console.log("reserveQuote", reserveQuote);
+            console2.log("iter", i);
+
+
+            Order memory order = Order({
+                useMax: false,
+                poolId: ghost().poolId,
+                input: amtIn,
+                output: amtOut,
+                sellAsset: sellAsset
+            });
+
+            subject().swap(order);
+
+            invariant = subject().getInvariant(ghost().poolId);
+            console2.log("invariant after swap execution", invariant);
+
+            sellAsset = !sellAsset;
+            i++;
+        }
+    }
+
+
     function test_swap_protocol_fee()
         public
         defaultConfig
